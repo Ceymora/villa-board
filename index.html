@@ -1630,7 +1630,7 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('update', 'villa_bookings', `Edited booking: ${guest||type} (${ci} → ${co})`);
     } else {
-      ({ error } = await sb.from('villa_bookings').insert(payload));
+      ({ error } = await sb.from('villa_bookings').insert(payload)); 
       if(error) throw error;
       logActivity('create', 'villa_bookings', `Added booking: ${guest||type} (${ci} → ${co}) at ${currentVillaCal}`);
     }
