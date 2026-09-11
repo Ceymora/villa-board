@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Villa Management Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board:#faf9f5;
+    --board-line:#e4e0d6;
+    --frame:#7a5236;
+    --frame-dark:#5e3f29;
+    --ink:#2b2b2b;
+    --muted:#8a8578;
+    --green:#2f9e44; --green-bg:#e9f8ee;
+    --red:#e03131; --red-bg:#fdecec;
+    --amber:#f08c00; --amber-bg:#fff4e0;
+    --blue:#1971c2; --blue-bg:#e8f2fc;
+    --gray:#adb5bd; --gray-bg:#f1f1ee;
+
+    --kalava:#0c8599; --noelia:#7048e8; --brisa:#e64980; --nv1:#f76707; --nv2:#66a80f;
+
+    --airbnb:#ff5a5f; --airbnb-bg:#ffe9ea;
+    --direct:#0ca678; --direct-bg:#e3f9f2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Inter',system-ui,sans-serif;
+    background: radial-gradient(circle at 30% 20%, #fffef9 0%, var(--board) 60%);
+    color:var(--ink); padding:18px;
+  }
+  .frame{
+    background:linear-gradient(160deg, var(--frame), var(--frame-dark));
+    border-radius:18px; padding:14px;
+    box-shadow:0 12px 30px rgba(0,0,0,0.25), inset 0 0 0 2px rgba(255,255,255,0.05);
+    max-width:1100px; margin:0 auto;
+  }
+  .board{
+    background: linear-gradient(var(--board-line) 1px, transparent 1px) 0 0/100% 34px, var(--board);
+    border-radius:10px; padding:22px 22px 16px;
+    box-shadow: inset 0 2px 12px rgba(0,0,0,0.08);
+    position:relative; overflow:hidden;
+  }
+  .board::before{
+    content:""; position:absolute; inset:0;
+    background: linear-gradient(120deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 40%);
+    pointer-events:none;
+  }
+  h1{ font-family:'Kalam',cursive; font-size:26px; margin:0 0 2px; transform:rotate(-0.6deg); }
+  .sub{ font-size:12.5px; color:var(--muted); margin-bottom:14px; }
+
+  .setup-banner{
+    background:#fff4e0; border:1.5px solid var(--amber); border-radius:10px;
+    padding:14px 16px; margin-bottom:16px; font-size:13px; line-height:1.5;
+  }
+  .setup-banner code{ background:#fff; padding:1px 5px; border-radius:4px; border:1px solid #eee; }
+  .setup-banner b{color:#b25b00;}
+
+  /* Top-level tabs */
+  .maintabs{ display:flex; gap:8px; margin-bottom:16px; border-bottom:2px solid var(--board-line); padding-bottom:0; }
+  .maintab-btn{
+    font-family:'Kalam',cursive; font-size:16px; font-weight:700;
+    background:none; border:none; padding:8px 16px; cursor:pointer;
+    color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-2px;
+  }
+  .maintab-btn.active{ color:var(--ink); border-bottom-color:var(--frame); }
+
+  .toolbar{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  .weeknav{ display:flex; align-items:center; gap:10px; font-family:'Kalam',cursive; font-size:17px; }
+  .weeknav button{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+    background:#fff; border:1px solid var(--board-line); padding:6px 12px;
+    border-radius:7px; cursor:pointer; color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.06);
+  }
+  .weeknav button:hover{background:#f3f1ea;}
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .swatch{width:13px;height:13px;border-radius:4px;display:inline-block;}
+
+  /* Housekeeping table */
+  table{ border-collapse:separate; border-spacing:0; width:100%; }
+  thead th{ font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; padding:6px 6px 10px; text-align:center; }
+  thead th.staffcol{ text-align:left; }
+  thead .daynum{ display:block; font-family:'Kalam',cursive; font-size:16px; color:var(--ink); text-transform:none; letter-spacing:0; }
+  th.today-col, td.today-col{ background:rgba(240,140,0,0.06); }
+  .villa-row td{ padding-top:16px; padding-bottom:4px; }
+  .villa-tag{ font-family:'Kalam',cursive; font-size:15px; font-weight:700; display:inline-flex; align-items:center; gap:8px; padding:3px 10px 3px 3px; border-radius:20px; }
+  .villa-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-left:6px;}
+  .staffcell{ padding:8px 10px; white-space:nowrap; border-bottom:1px solid var(--board-line); }
+  .staffname{font-weight:600; font-size:13.5px;}
+  .staffrole{font-size:11px; color:var(--muted); display:block;}
+  .pool-badge{ font-size:10px; color:var(--blue); background:var(--blue-bg); border-radius:5px; padding:1px 5px; margin-left:6px; vertical-align:1px; }
+  td.cell{ border-bottom:1px solid var(--board-line); text-align:center; padding:6px; }
+  .mark{
+    width:56px; height:38px; margin:0 auto; border-radius:9px; border:1.5px dashed #d8d4c8;
+    background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none; transition:transform .08s ease, box-shadow .12s ease; font-size:16px; line-height:1;
+  }
+  .mark:hover{ transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,0.08); }
+  .mark .lbl{ font-size:9px; margin-top:2px; font-weight:600; letter-spacing:.02em; }
+  .s-empty{ color:#c8c4b8; }
+  .s-clean{ background:var(--green-bg); border:1.5px solid var(--green); color:var(--green); }
+  .s-pool{ background:var(--blue-bg); border:1.5px solid var(--blue); color:var(--blue); }
+  .s-leave{ background:var(--amber-bg); border:1.5px solid var(--amber); color:var(--amber); }
+  .s-missed{ background:var(--red-bg); border:1.5px solid var(--red); color:var(--red); }
+
+  .footer-note{ margin-top:14px; font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .status-msg{ font-size:11px; color:var(--muted); }
+  .reset-link{ background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer; font-size:11px; padding:0; }
+
+  /* Bookings calendar */
+  .villatabs{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .villatab-btn{
+    font-family:'Kalam',cursive; font-size:14px; font-weight:700;
+    padding:6px 14px; border-radius:20px; cursor:pointer; border:1.5px solid var(--board-line);
+    background:#fff; color:var(--muted);
+  }
+  .villatab-btn.active{ color:#fff; border-color:transparent; }
+
+  .cal-weekdays{ display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:2px; }
+  .cal-weekdays div{ font-size:11px; text-transform:uppercase; color:var(--muted); font-weight:600; text-align:center; padding-bottom:4px; }
+  .cal-weeks{ border-top:1px solid var(--board-line); }
+  .cal-week{ position:relative; height:81px; border-bottom:1px solid var(--board-line); }
+  .cal-daygrid{ display:grid; grid-template-columns:repeat(7,1fr); height:100%; }
+  .cal-daybg{
+    padding:4px 5px 0; position:relative; cursor:pointer;
+    border-right:1px solid var(--board-line);
+  }
+  .cal-daybg:nth-child(7n){ border-right:none; }
+  .cal-daybg.outside{ background:#f8f7f2; cursor:default; }
+  .cal-daybg.booked{ background:#f6f4ee; }
+  .cal-daynum{ font-size:11.5px; font-weight:600; color:var(--ink); display:inline-block; }
+  .outside .cal-daynum{ color:#c8c4b8; }
+  .today .cal-daynum{
+    background:var(--frame); color:#fff; border-radius:50%;
+    width:19px; height:19px; display:inline-flex; align-items:center; justify-content:center; font-size:11px;
+  }
+  .cal-pills-overlay{ position:absolute; top:24px; left:0; right:0; bottom:0; pointer-events:none; }
+  .booking-pill{
+    position:absolute; box-sizing:border-box;
+    font-size:10.5px; font-weight:600; color:#fff; padding:0 8px; margin:0 2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; pointer-events:auto;
+    border-radius:11px; display:flex; align-items:center; height:17px; line-height:17px;
+  }
+  .booking-pill.airbnb{ background:var(--airbnb); }
+  .booking-pill.direct{ background:var(--direct); }
+  .cal-daybg.selecting{ background:var(--amber-bg); box-shadow: inset 0 0 0 2px var(--amber); }
+  .cal-hint{
+    font-size:12px; color:var(--muted); background:#fff; border:1px dashed var(--board-line);
+    border-radius:8px; padding:8px 12px; margin-bottom:10px;
+  }
+  .cal-hint b{ color:var(--ink); }
+  .manage-section{ margin-top:18px; border-top:1px solid var(--board-line); padding-top:12px; }
+  .manage-title{ font-family:'Kalam',cursive; font-size:15px; font-weight:700; }
+  .manage-list{ margin-top:8px; display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
+  .manage-row{
+    display:flex; align-items:center; gap:10px; font-size:12.5px;
+    background:#fff; border:1px solid var(--board-line); border-radius:8px; padding:7px 10px;
+  }
+  .manage-type-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .manage-type-dot.airbnb{ background:var(--airbnb); }
+  .manage-type-dot.direct{ background:var(--direct); }
+  .manage-dates{ color:var(--muted); font-size:11.5px; }
+  .manage-guest{ font-weight:600; flex:1; }
+  .manage-del{
+    background:var(--red-bg); color:var(--red); border:none; border-radius:6px;
+    padding:4px 9px; font-size:11.5px; font-weight:600; cursor:pointer; flex-shrink:0;
+  }
+  .manage-edit{
+    background:var(--blue-bg); color:var(--blue); border:none; border-radius:6px;
+    padding:4px 9px; font-size:11.5px; font-weight:600; cursor:pointer; flex-shrink:0;
+  }
+  .manage-empty{ font-size:12px; color:var(--muted); font-style:italic; padding:6px 0; }
+  .add-booking-btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+    background:#fff; border:1px solid var(--board-line); padding:6px 12px;
+    border-radius:7px; cursor:pointer; color:var(--ink);
+  }
+
+  /* Modal */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35);
+    align-items:center; justify-content:center; z-index:50;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:#fff; border-radius:12px; padding:22px; width:340px; max-width:90vw;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);
+  }
+  .modal h3{ font-family:'Kalam',cursive; margin:0 0 14px; font-size:19px; }
+  .modal label{ display:block; font-size:12px; font-weight:600; color:var(--muted); margin:10px 0 4px; }
+  .modal input[type=date], .modal input[type=text]{
+    width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit;
+  }
+  .type-choice{ display:flex; gap:8px; margin-top:4px; }
+  .type-choice label{
+    flex:1; margin:0; display:flex; align-items:center; justify-content:center; gap:6px;
+    border:1.5px solid var(--board-line); border-radius:8px; padding:8px; cursor:pointer; font-weight:600; font-size:12.5px; color:var(--ink);
+  }
+  .type-choice input{ display:none; }
+  .type-choice label.sel-airbnb{ border-color:var(--airbnb); background:var(--airbnb-bg); color:var(--airbnb); }
+  .type-choice label.sel-direct{ border-color:var(--direct); background:var(--direct-bg); color:var(--direct); }
+  .modal-actions{ display:flex; justify-content:space-between; align-items:center; margin-top:18px; gap:8px; }
+  .btn{ font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:8px 14px; border-radius:7px; cursor:pointer; border:none; }
+  .btn-save{ background:var(--ink); color:#fff; }
+  .btn-cancel{ background:#f1f1ee; color:var(--ink); }
+  .btn-delete{ background:var(--red-bg); color:var(--red); }
+  .modal-error{ color:var(--red); font-size:12px; margin-top:8px; display:none; }
+
+  @media (max-width:720px){
+    .mark{width:40px;height:32px;font-size:13px;} .mark .lbl{display:none;}
+    h1{font-size:20px;}
+    .cal-grid td{ height:56px; }
+    .booking-bar{ font-size:9px; }
+  }
+
+  /* Petty cash */
+  .cash-summary{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .cash-card{
+    flex:1; min-width:180px; border-radius:12px; padding:14px 16px;
+    background:linear-gradient(135deg, #2b2b2b, #454545); color:#fff;
+    box-shadow:0 6px 16px rgba(0,0,0,0.15);
+  }
+  .cash-card.kalava{ background:linear-gradient(135deg, var(--kalava), #075c69); }
+  .cash-card-label{ font-size:12px; opacity:0.8; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+  .cash-card-balance{ font-family:'Kalam',cursive; font-size:26px; margin-top:4px; }
+  .toolbar-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .txn-row{
+    display:flex; align-items:center; gap:10px; font-size:12.5px;
+    background:#fff; border:1px solid var(--board-line); border-radius:8px; padding:8px 10px;
+  }
+  .txn-badge{
+    font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; flex-shrink:0; text-transform:uppercase;
+  }
+  .txn-badge.income{ background:var(--green-bg); color:var(--green); }
+  .txn-badge.expense{ background:var(--red-bg); color:var(--red); }
+  .txn-main{ flex:1; min-width:0; }
+  .txn-title{ font-weight:600; overflow-wrap:break-word; }
+  .txn-sub{ color:var(--muted); font-size:11.5px; overflow-wrap:break-word; }
+  .txn-amount{ font-weight:700; font-family:'Kalam',cursive; font-size:15px; flex-shrink:0; }
+  .txn-amount.income{ color:var(--green); }
+  .txn-amount.expense{ color:var(--red); }
+
+  /* Inventory */
+  .inv-table{ width:100%; border-collapse:separate; border-spacing:0; margin-bottom:18px; }
+  .inv-table th{
+    font-size:11px; text-transform:uppercase; color:var(--muted); font-weight:600;
+    padding:6px 10px; text-align:left; border-bottom:2px solid var(--board-line);
+  }
+  .inv-table td{ padding:8px 10px; border-bottom:1px solid var(--board-line); font-size:13px; }
+  .inv-table td.num{ text-align:center; font-weight:600; }
+  .inv-table td.num.zero{ color:#c8c4b8; font-weight:400; }
+  .inv-empty{ font-size:12px; color:var(--muted); font-style:italic; padding:10px 0; }
+  .inv-del-btn{
+    background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px;
+    padding:2px 6px; border-radius:5px;
+  }
+  .inv-del-btn:hover{ background:var(--red-bg); color:var(--red); }
+
+  .modal-wide{ width:380px; }
+  .modal-checkbox-row{ display:flex; align-items:center; gap:8px; margin-top:12px; }
+  .modal-checkbox-row input{ width:16px; height:16px; }
+  .modal-checkbox-row label{ margin:0; font-size:12.5px; font-weight:600; color:var(--ink); }
+  .modal input[type=number]{
+    width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit;
+  }
+  .modal select{
+    width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; background:#fff;
+  }
+  .field-hint{ font-size:11px; color:var(--muted); margin-top:3px; }
+  .modal input[type=file]{
+    width:100%; padding:7px 0; font-size:12.5px; font-family:inherit;
+  }
+  .invoice-link{
+    font-size:11px; color:var(--blue); text-decoration:none; font-weight:600; margin-left:6px;
+  }
+  .invoice-link:hover{ text-decoration:underline; }
+
+  /* Login screen */
+  #loginScreen{
+    position:fixed; inset:0; z-index:200;
+    background: radial-gradient(circle at 30% 20%, #fffef9 0%, var(--board) 60%);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .login-card{
+    background:#fff; border-radius:14px; padding:32px 30px; width:320px; max-width:90vw;
+    box-shadow:0 20px 50px rgba(0,0,0,0.18); text-align:center;
+  }
+  .login-card h1{ font-size:22px; margin:0 0 4px; }
+  .login-card .sub{ margin-bottom:20px; }
+  .login-card label{ display:block; text-align:left; font-size:12px; font-weight:600; color:var(--muted); margin:12px 0 4px; }
+  .login-card input, .login-card select{
+    width:100%; padding:9px 10px; border:1px solid var(--board-line); border-radius:8px; font-size:14px; font-family:inherit;
+  }
+  .login-card button{
+    width:100%; margin-top:20px; background:var(--ink); color:#fff; border:none;
+    padding:10px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .login-error{ color:var(--red); font-size:12.5px; margin-top:10px; display:none; }
+  #appRoot{ display:none; }
+
+  /* Viewer role: hide every action that mutates data */
+  .viewer-mode .add-booking-btn,
+  .viewer-mode .manage-del,
+  .viewer-mode .manage-edit,
+  .viewer-mode .inv-del-btn,
+  .viewer-mode #resetWeek,
+  .viewer-mode .toolbar-actions{ display:none !important; }
+  .viewer-mode .mark,
+  .viewer-mode .cal-daybg,
+  .viewer-mode .booking-pill{ cursor:default !important; pointer-events:none !important; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>🏡 Villa Management Board</h1>
+    <div class="sub" style="font-size:12.5px;color:var(--muted);">Sign in to continue</div>
+    <label>Name</label>
+    <select id="loginUsername">
+      <option value="">Select your name…</option>
+    </select>
+    <label>Password</label>
+    <input type="password" id="loginPassword" placeholder="Enter your password">
+    <div class="login-error" id="loginError">Incorrect password.</div>
+    <button id="loginBtn">Sign in</button>
+  </div>
+</div>
+
+<div id="appRoot">
+<div class="frame">
+  <div class="board" id="board">
+
+    <div class="setup-banner" id="setupBanner">
+      <b>⚠ One-time setup needed:</b> This file needs to be connected to your free Supabase database before it will save anything.
+      Find the <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> section near the bottom and paste in your own project's values.
+    </div>
+
+    <h1>🏡 Villa Management Board</h1>
+    <div class="sub">Housekeeping tracking and booking calendar — shared live with your whole team.</div>
+
+    <div class="maintabs">
+      <button class="maintab-btn active" data-tab="housekeeping">🧹 Housekeeping</button>
+      <button class="maintab-btn" data-tab="bookings">📅 Bookings Calendar</button>
+      <button class="maintab-btn" data-tab="pettycash">💰 Petty Cash</button>
+      <button class="maintab-btn" data-tab="inventory">📦 Inventory</button>
+      <button class="maintab-btn" data-tab="activitylog" id="activityLogTabBtn" style="display:none">📋 Activity Log</button>
+    </div>
+
+    <!-- ===================== HOUSEKEEPING PANEL ===================== -->
+    <div id="housekeepingPanel">
+      <div class="toolbar">
+        <div class="weeknav">
+          <button id="prevWeek">◀ Prev</button>
+          <span id="weekLabel">Week of ...</span>
+          <button id="nextWeek">Next ▶</button>
+          <button id="thisWeek">This week</button>
+        </div>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--green-bg);border:1.5px solid var(--green)"></span>Cleaned</span>
+          <span><span class="swatch" style="background:var(--blue-bg);border:1.5px solid var(--blue)"></span>Cleaned + Pool</span>
+          <span><span class="swatch" style="background:var(--amber-bg);border:1.5px solid var(--amber)"></span>Leave</span>
+          <span><span class="swatch" style="background:var(--red-bg);border:1.5px solid var(--red)"></span>Missed</span>
+          <span><span class="swatch" style="background:#fff;border:1.5px dashed #d8d4c8"></span>Not marked</span>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th class="staffcol">Staff</th>
+            <th id="th0"></th><th id="th1"></th><th id="th2"></th>
+            <th id="th3"></th><th id="th4"></th><th id="th5"></th><th id="th6"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+
+      <div class="footer-note">
+        <span id="statusMsg" class="status-msg">Loading board…</span>
+        <button class="reset-link" id="resetWeek">Clear this week</button>
+      </div>
+    </div>
+
+    <!-- ===================== BOOKINGS PANEL ===================== -->
+    <div id="bookingsPanel" style="display:none">
+      <div class="villatabs" id="villaTabs"></div>
+
+      <div class="toolbar">
+        <div class="weeknav">
+          <button id="prevMonth">◀ Prev</button>
+          <span id="monthLabel">Month of ...</span>
+          <button id="nextMonth">Next ▶</button>
+          <button id="thisMonth">This month</button>
+        </div>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--airbnb)"></span>Airbnb</span>
+          <span><span class="swatch" style="background:var(--direct)"></span>Direct booking</span>
+        </div>
+        <button class="add-booking-btn" id="addBookingBtn">+ Add booking</button>
+      </div>
+
+      <div class="cal-hint" id="calHint">Click your <b>check-in</b> day, then click the <b>last night</b> the guest stays (not the departure day). Click "+ Add booking" instead if you'd rather type dates directly.</div>
+
+      <div class="cal-weekdays">
+        <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+      </div>
+      <div class="cal-weeks" id="calBody"></div>
+
+      <div class="footer-note">
+        <span id="bookingStatusMsg" class="status-msg">Loading calendar…</span>
+        <span id="monthSummary" class="status-msg" style="font-weight:600;"></span>
+      </div>
+
+      <div class="manage-section">
+        <div class="manage-header">
+          <span class="manage-title">Bookings this villa</span>
+        </div>
+        <div id="manageList" class="manage-list"></div>
+      </div>
+    </div>
+
+    <!-- ===================== PETTY CASH PANEL ===================== -->
+    <div id="pettyCashPanel" style="display:none">
+      <div class="cash-summary">
+        <div class="cash-card ceymora">
+          <div class="cash-card-label">Ceymora Card</div>
+          <div class="cash-card-balance" id="ceymoraBalance">LKR 0</div>
+        </div>
+        <div class="cash-card kalava">
+          <div class="cash-card-label">Kalava Villa Card</div>
+          <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="status-msg" id="cashStatusMsg">Loading…</div>
+        <div class="toolbar-actions">
+          <button class="add-booking-btn" id="addIncomeBtn">+ Money received</button>
+          <button class="add-booking-btn" id="addExpenseBtn">+ Record expense</button>
+        </div>
+      </div>
+
+      <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="manage-title">Transactions</div>
+        <div id="cashList" class="manage-list" style="max-height:420px;"></div>
+      </div>
+    </div>
+
+    <!-- ===================== INVENTORY PANEL ===================== -->
+    <div id="inventoryPanel" style="display:none">
+      <div class="toolbar">
+        <div class="status-msg" id="invStatusMsg">Loading…</div>
+        <div class="toolbar-actions">
+          <button class="add-booking-btn" id="addPurchaseBtn">+ Purchase item</button>
+          <button class="add-booking-btn" id="addDistributeBtn">+ Distribute</button>
+        </div>
+      </div>
+
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:center">Kalava</th>
+            <th style="text-align:center">Noelia</th>
+            <th style="text-align:center">Brisa</th>
+            <th style="text-align:center">Office</th>
+            <th style="text-align:center">Store</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="invBody"></tbody>
+      </table>
+
+      <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="manage-title">Purchase &amp; distribution history</div>
+        <div id="invHistoryList" class="manage-list" style="max-height:320px;"></div>
+      </div>
+
+      <div class="manage-section">
+        <div class="toolbar" style="margin-bottom:8px;">
+          <div class="manage-title">Monthly summary — by villa</div>
+          <div class="weeknav">
+            <button id="invPrevMonth">◀ Prev</button>
+            <span id="invMonthLabel">Month of ...</span>
+            <button id="invNextMonth">Next ▶</button>
+            <button id="invThisMonth">This month</button>
+          </div>
+        </div>
+        <table class="inv-table">
+          <thead>
+            <tr><th>Villa / Office</th><th style="text-align:center">Items distributed (qty)</th><th style="text-align:center">Petty cash spent (LKR)</th></tr>
+          </thead>
+          <tbody id="invMonthlyBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================== ACTIVITY LOG PANEL ===================== -->
+    <div id="activityLogPanel" style="display:none">
+      <div class="toolbar">
+        <div class="status-msg" id="logStatusMsg">Loading…</div>
+      </div>
+      <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div id="activityLogList" class="manage-list" style="max-height:520px;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Booking modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Add booking</h3>
+    <label>Check-in</label>
+    <input type="date" id="fCheckIn">
+    <label>Check-out</label>
+    <input type="date" id="fCheckOut">
+    <div style="font-size:11px;color:var(--muted);margin-top:3px;">The day the guest leaves (e.g. if the last night is the 5th, check-out is the 6th).</div>
+    <label>Booking type</label>
+    <div class="type-choice">
+      <label id="lblAirbnb"><input type="radio" name="btype" value="airbnb"> Airbnb</label>
+      <label id="lblDirect"><input type="radio" name="btype" value="direct"> Direct</label>
+    </div>
+    <label>Guest / note (optional)</label>
+    <input type="text" id="fGuest" placeholder="e.g. Smith family">
+    <div class="modal-error" id="modalError">Check-out must be after check-in.</div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="btnDelete" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="btnCancel">Cancel</button>
+      <button class="btn btn-save" id="btnSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Income modal (money received) -->
+<div class="modal-overlay" id="incomeModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Money received</h3>
+    <label>Date</label>
+    <input type="date" id="incDate">
+    <label>Received into</label>
+    <select id="incCard">
+      <option value="ceymora">Ceymora Card</option>
+      <option value="kalava_card">Kalava Villa Card</option>
+    </select>
+    <label>Amount (LKR)</label>
+    <input type="number" id="incAmount" min="0" step="1" placeholder="e.g. 50000">
+    <label>Note (optional)</label>
+    <input type="text" id="incNote" placeholder="e.g. Monthly float">
+    <label>Attach receipt / deposit slip (optional)</label>
+    <input type="file" id="incFile" accept="image/*,.pdf">
+    <div class="field-hint" id="incFileHint"></div>
+    <div class="modal-error" id="incError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="incCancel">Cancel</button>
+      <button class="btn btn-save" id="incSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Expense modal (record purchase / expense) -->
+<div class="modal-overlay" id="expenseModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Record expense</h3>
+    <label>Date</label>
+    <input type="date" id="expDate">
+    <label>Paid from</label>
+    <select id="expCard">
+      <option value="ceymora">Ceymora Card</option>
+      <option value="kalava_card">Kalava Villa Card</option>
+    </select>
+    <div class="field-hint" id="expCardHint">Ceymora Card can be used for any villa or the office.</div>
+    <label>For</label>
+    <select id="expFor">
+      <option value="kalava">Kalava Villa</option>
+      <option value="noelia">Noelia Villa</option>
+      <option value="brisa">Brisa Villa</option>
+      <option value="office">Office</option>
+      <option value="store">Store</option>
+    </select>
+    <label>What was it for</label>
+    <input type="text" id="expPurpose" placeholder="e.g. Cleaning supplies">
+    <label>Amount (LKR)</label>
+    <input type="number" id="expAmount" min="0" step="1" placeholder="e.g. 3500">
+    <div class="modal-checkbox-row">
+      <input type="checkbox" id="expIsStock">
+      <label for="expIsStock">This is a stock item — also add to Inventory</label>
+    </div>
+    <div id="expStockFields" style="display:none">
+      <label>Item name</label>
+      <input type="text" id="expItemName" placeholder="e.g. Toilet paper (24 pack)">
+      <label>Quantity purchased (optional)</label>
+      <input type="number" id="expItemQty" min="0" step="1" placeholder="e.g. 5">
+    </div>
+    <label>Note (optional)</label>
+    <input type="text" id="expNote">
+    <label>Attach invoice / receipt (optional)</label>
+    <input type="file" id="expFile" accept="image/*,.pdf">
+    <div class="field-hint" id="expFileHint"></div>
+    <div class="modal-error" id="expError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="expCancel">Cancel</button>
+      <button class="btn btn-save" id="expSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Purchase modal (inventory only) -->
+<div class="modal-overlay" id="purchaseModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Purchase item (add to Store)</h3>
+    <label>Date</label>
+    <input type="date" id="purDate">
+    <label>Item name</label>
+    <input type="text" id="purItemName" placeholder="e.g. Bed sheets (queen)">
+    <label>Quantity (optional — leave blank for items like "Fruits" that aren't counted)</label>
+    <input type="number" id="purQty" min="0" step="1" placeholder="e.g. 10">
+    <label>Note (optional)</label>
+    <input type="text" id="purNote">
+    <div class="modal-error" id="purError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="purCancel">Cancel</button>
+      <button class="btn btn-save" id="purSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Distribute modal (store -> office/villa) -->
+<div class="modal-overlay" id="distributeModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Distribute from Store</h3>
+    <label>Date</label>
+    <input type="date" id="distDate">
+    <label>Item name</label>
+    <input type="text" id="distItemName" list="invItemList" placeholder="Start typing…">
+    <datalist id="invItemList"></datalist>
+    <div class="field-hint" id="distStockHint"></div>
+    <label>Quantity to send</label>
+    <input type="number" id="distQty" min="0" step="1">
+    <label>Send to</label>
+    <select id="distVilla">
+      <option value="kalava">Kalava Villa</option>
+      <option value="noelia">Noelia Villa</option>
+      <option value="brisa">Brisa Villa</option>
+      <option value="office">Office</option>
+    </select>
+    <label>Note (optional)</label>
+    <input type="text" id="distNote">
+    <div class="modal-error" id="distError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="distCancel">Cancel</button>
+      <button class="btn btn-save" id="distSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Villa detail modal (invoices + amounts, month-wise) -->
+<div class="modal-overlay" id="villaDetailModalOverlay">
+  <div class="modal modal-wide" style="width:420px; max-height:82vh; overflow-y:auto;">
+    <h3 id="villaDetailTitle">Villa detail</h3>
+    <div id="villaDetailBody"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="villaDetailClose">Close</button>
+    </div>
+  </div>
+</div>
+
+</div> <!-- /#appRoot -->
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+// =====================================================================
+// STEP 1: Replace these with YOUR Supabase project's values.
+// Project Settings > Data API > Project URL, and the "anon public" key.
+// =====================================================================
+const SUPABASE_URL = "https://wjbgbuvatrsnamsbvqrs.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_6ubvcWXRhH2JKmuPooh_6w_2WzeO5MD";
+// =====================================================================
+
+const CONFIGURED = SUPABASE_URL !== "PASTE_YOUR_SUPABASE_URL_HERE";
+document.getElementById('setupBanner').style.display = CONFIGURED ? 'none' : 'block';
+
+let sb = null;
+if (CONFIGURED) {
+  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// =====================================================================
+// Password required to delete anything in Petty Cash or Inventory.
+// Change this to whatever you like.
+// =====================================================================
+const DELETE_PASSWORD = "villa123";
+function checkDeletePassword(){
+  const pw = prompt('Enter the password to confirm this delete:');
+  if(pw === null) return false; // cancelled
+  if(pw !== DELETE_PASSWORD){ alert('Incorrect password. Nothing was deleted.'); return false; }
+  return true;
+}
+
+// Row <-> JS object mapping helpers (Postgres uses snake_case columns)
+function rowToBooking(r){ return { id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url }; }
+
+async function uploadReceiptFile(file){
+  if(!file) return null;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${Date.now()}_${safeName}`;
+  const { error } = await sb.storage.from('receipts').upload(path, file);
+  if(error) throw error;
+  const { data } = sb.storage.from('receipts').getPublicUrl(path);
+  return data.publicUrl;
+}
+function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note }; }
+
+// =====================================================================
+// USERS — change passwords here any time. Roles:
+//   'admin'                    — sees everything, can edit/delete anywhere
+//   'cash_inventory'           — only sees Petty Cash + Inventory, can edit/delete there
+//   'cash_inventory_bookings'  — same as above, plus Bookings Calendar access
+//   'viewer'                   — sees everything, cannot edit/delete/add anything
+// =====================================================================
+const USERS = {
+  'Makky':   { password: 'makky123',   role: 'admin' },
+  'Zahny':   { password: 'zahny123',   role: 'cash_inventory' },
+  'Anuja':   { password: 'anuja123',   role: 'cash_inventory_bookings' },
+  'Raashid': { password: 'raashid123', role: 'viewer' },
+  'Nafhan':  { password: 'nafhan123',  role: 'viewer' },
+  'Sharon':  { password: 'sharon123',  role: 'viewer' },
+};
+
+let currentUser = null; // { username, role }
+
+function canEdit(){
+  return currentUser && (currentUser.role === 'admin' || currentUser.role === 'cash_inventory' || currentUser.role === 'cash_inventory_bookings');
+}
+function isAdmin(){
+  return currentUser && currentUser.role === 'admin';
+}
+
+async function logActivity(action, tableName, description){
+  if(!sb || !currentUser) return;
+  try{
+    await sb.from('activity_log').insert({
+      username: currentUser.username, role: currentUser.role, action, table_name: tableName, description
+    });
+  }catch(e){ console.error('activity log failed', e); }
+}
+
+// Populate the name dropdown
+(function populateLoginDropdown(){
+  const sel = document.getElementById('loginUsername');
+  Object.keys(USERS).forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+})();
+
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
+
+function doLogin(){
+  const username = document.getElementById('loginUsername').value;
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const user = USERS[username];
+  if(!username || !user || user.password !== password){
+    errEl.textContent = 'Incorrect name or password.';
+    errEl.style.display = 'block';
+    return;
+  }
+  currentUser = { username, role: user.role };
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  startApp();
+}
+
+function startApp(){
+  applyRolePermissions();
+  renderHK();
+  subscribeWeek(currentMonday);
+}
+
+function applyRolePermissions(){
+  const role = currentUser.role;
+  const tabs = {
+    housekeeping: document.querySelector('.maintab-btn[data-tab="housekeeping"]'),
+    bookings: document.querySelector('.maintab-btn[data-tab="bookings"]'),
+    pettycash: document.querySelector('.maintab-btn[data-tab="pettycash"]'),
+    inventory: document.querySelector('.maintab-btn[data-tab="inventory"]'),
+  };
+
+  if(role === 'cash_inventory'){
+    // Only Petty Cash + Inventory visible
+    tabs.housekeeping.style.display = 'none';
+    tabs.bookings.style.display = 'none';
+    // switch to Petty Cash by default
+    document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
+    tabs.pettycash.classList.add('active');
+    document.getElementById('housekeepingPanel').style.display = 'none';
+    document.getElementById('bookingsPanel').style.display = 'none';
+    document.getElementById('pettyCashPanel').style.display = '';
+    document.getElementById('inventoryPanel').style.display = 'none';
+    if(!cashInited){ initPettyCash(); }
+  }
+
+  if(role === 'cash_inventory_bookings'){
+    // Petty Cash + Inventory + Bookings visible; Housekeeping hidden
+    tabs.housekeeping.style.display = 'none';
+    document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
+    tabs.pettycash.classList.add('active');
+    document.getElementById('housekeepingPanel').style.display = 'none';
+    document.getElementById('bookingsPanel').style.display = 'none';
+    document.getElementById('pettyCashPanel').style.display = '';
+    document.getElementById('inventoryPanel').style.display = 'none';
+    if(!cashInited){ initPettyCash(); }
+  }
+
+  if(role === 'admin'){
+    document.getElementById('activityLogTabBtn').style.display = '';
+  }
+
+  if(role === 'viewer'){
+    // Hide every add/action button; disable clickable edit surfaces.
+    // (Individual sections also check canEdit() before acting, this just
+    // removes the visual affordance so it's clear editing isn't available.)
+    document.body.classList.add('viewer-mode');
+  }
+
+  // Add a small badge showing who's signed in, top-right of the board, with a logout button
+  const badgeWrap = document.createElement('div');
+  badgeWrap.style.cssText = 'position:absolute; top:14px; right:18px; display:flex; align-items:center; gap:8px; z-index:5;';
+
+  const badge = document.createElement('div');
+  badge.style.cssText = 'font-size:11.5px; color:var(--muted); background:#fff; border:1px solid var(--board-line); padding:4px 10px; border-radius:20px;';
+  const roleLabels = {
+    admin: 'Admin',
+    cash_inventory: 'Cash & Inventory',
+    cash_inventory_bookings: 'Cash, Inventory & Bookings',
+    viewer: 'View only',
+  };
+  badge.textContent = `${currentUser.username} (${roleLabels[role] || role})`;
+
+  const logoutBtn = document.createElement('button');
+  logoutBtn.textContent = 'Log out';
+  logoutBtn.style.cssText = 'font-family:Inter,sans-serif; font-size:11.5px; font-weight:600; color:var(--muted); background:#fff; border:1px solid var(--board-line); padding:4px 10px; border-radius:20px; cursor:pointer;';
+  logoutBtn.addEventListener('click', ()=>{
+    if(confirm('Log out?')) location.reload();
+  });
+
+  badgeWrap.appendChild(badge);
+  badgeWrap.appendChild(logoutBtn);
+  document.getElementById('board').style.position = 'relative';
+  document.getElementById('board').appendChild(badgeWrap);
+}
+
+/* ============================= TAB SWITCHING ============================= */
+document.querySelectorAll('.maintab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('housekeepingPanel').style.display = tab==='housekeeping' ? '' : 'none';
+    document.getElementById('bookingsPanel').style.display = tab==='bookings' ? '' : 'none';
+    document.getElementById('pettyCashPanel').style.display = tab==='pettycash' ? '' : 'none';
+    document.getElementById('inventoryPanel').style.display = tab==='inventory' ? '' : 'none';
+    document.getElementById('activityLogPanel').style.display = tab==='activitylog' ? '' : 'none';
+    if(tab === 'bookings' && !bookingsInited){ initBookings(); }
+    if(tab === 'pettycash' && !cashInited){ initPettyCash(); }
+    if(tab === 'inventory' && !invInited){ initInventory(); if(!cashInited){ initPettyCash(); } }
+    if(tab === 'activitylog' && !logInited){ initActivityLog(); }
+  });
+});
+
+/* ============================= HOUSEKEEPING ============================= */
+const VILLAS = [
+  { id:'kalava', name:'Kalava Villa', color:'var(--kalava)' },
+  { id:'noelia', name:'Noelia Villa', color:'var(--noelia)' },
+  { id:'brisa', name:'Brisa Villa', color:'var(--brisa)' },
+  { id:'nv1', name:'New Villa 1', color:'var(--nv1)' },
+  { id:'nv2', name:'New Villa 2', color:'var(--nv2)' },
+];
+const STAFF = [
+  { id:'anoma', name:'Anoma', villa:'kalava', role:'Housekeeping', pool:false },
+  { id:'chathuranga', name:'Chathuranga', villa:'kalava', role:'Housekeeping + Pool', pool:true },
+  { id:'shanika', name:'Shanika', villa:'brisa', role:'Housekeeping', pool:false },
+  { id:'shanika_d', name:'Shanika (Daughter)', villa:'brisa', role:'Housekeeping', pool:false },
+  { id:'shanika_h', name:'Shanika (Helper)', villa:'brisa', role:'Housekeeping', pool:false },
+  { id:'gamunu', name:'Gamunu', villa:'brisa', role:'Housekeeping + Pool', pool:true },
+  { id:'rohan', name:'Rohan', villa:'noelia', role:'Housekeeping + Pool', pool:true },
+  { id:'nv1_staff', name:'Unassigned', villa:'nv1', role:'Assign staff', pool:false },
+  { id:'nv2_staff', name:'Unassigned', villa:'nv2', role:'Assign staff', pool:false },
+];
+const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function cycleStates(pool){ return pool ? ['empty','clean','pool','leave','missed'] : ['empty','clean','leave','missed']; }
+const STATE_META = {
+  empty:{cls:'s-empty',icon:'—',lbl:''}, clean:{cls:'s-clean',icon:'✓',lbl:'Cleaned'},
+  pool:{cls:'s-pool',icon:'✓🏊',lbl:'+Pool'}, leave:{cls:'s-leave',icon:'🏖',lbl:'Leave'}, missed:{cls:'s-missed',icon:'✗',lbl:'Missed'},
+};
+function getMonday(d){ const date=new Date(d); const day=date.getDay(); const diff=(day===0?-6:1)-day; date.setDate(date.getDate()+diff); date.setHours(0,0,0,0); return date; }
+function fmtDate(d){ return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
+function isoKeyWeek(d){ return d.toISOString().slice(0,10); }
+function sameDay(a,b){ return a.toDateString()===b.toDateString(); }
+
+let currentMonday = getMonday(new Date());
+let boardData = {};
+let hkChannel = null;
+const statusMsg = document.getElementById('statusMsg');
+
+function weekId(monday){ return isoKeyWeek(monday); }
+function hkDocId(monday, staffId, dayIdx){ return `${weekId(monday)}_${staffId}_${dayIdx}`; }
+
+async function fetchWeek(monday){
+  statusMsg.textContent = 'Loading…';
+  const { data, error } = await sb.from('villa_board').select('*').eq('week', weekId(monday));
+  if(error){ statusMsg.textContent='Connection error'; console.error(error); return; }
+  boardData = {};
+  for(const row of data){ boardData[`${row.staff_id}:${row.day}`] = row.state; }
+  statusMsg.textContent = 'Board synced (live)';
+  renderHK();
+}
+function subscribeWeek(monday){
+  if (!sb) { statusMsg.textContent = 'Not connected to Supabase yet'; return; }
+  if (hkChannel) sb.removeChannel(hkChannel);
+  fetchWeek(monday);
+  hkChannel = sb.channel('villa_board_' + weekId(monday))
+    .on('postgres_changes', { event:'*', schema:'public', table:'villa_board', filter:`week=eq.${weekId(monday)}` }, ()=> fetchWeek(monday))
+    .subscribe();
+}
+async function setCell(monday, staffId, dayIdx, state){
+  if(!sb) return;
+  const id = hkDocId(monday, staffId, dayIdx);
+  try{
+    const { error } = await sb.from('villa_board').upsert({ id, week: weekId(monday), staff_id: staffId, day: dayIdx, state, updated_at: new Date().toISOString() });
+    if(error) throw error;
+    logActivity('update', 'villa_board', `Marked ${staffId} as "${state}" for ${DAY_NAMES[dayIdx]} (week of ${weekId(monday)})`);
+  }catch(e){ statusMsg.textContent='Save failed'; console.error(e); }
+}
+async function clearWeek(monday){
+  if(!sb) return;
+  const { error } = await sb.from('villa_board').delete().eq('week', weekId(monday));
+  if(error) console.error(error);
+  else logActivity('delete', 'villa_board', `Cleared all housekeeping marks for week of ${weekId(monday)}`);
+}
+function renderHK(){
+  const sunday=new Date(currentMonday); sunday.setDate(sunday.getDate()+6);
+  document.getElementById('weekLabel').textContent = `${fmtDate(currentMonday)} – ${fmtDate(sunday)}`;
+  const today=new Date();
+  for(let i=0;i<7;i++){
+    const d=new Date(currentMonday); d.setDate(d.getDate()+i);
+    const th=document.getElementById('th'+i);
+    th.innerHTML = `${DAY_NAMES[i]}<span class="daynum">${fmtDate(d)}</span>`;
+    th.classList.toggle('today-col', sameDay(d,today));
+  }
+  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
+  let lastVilla=null;
+  for(const person of STAFF){
+    if(person.villa!==lastVilla){
+      const villa=VILLAS.find(v=>v.id===person.villa);
+      const tr=document.createElement('tr'); tr.className='villa-row';
+      const td=document.createElement('td'); td.colSpan=8;
+      td.innerHTML = `<span class="villa-tag" style="background:color-mix(in srgb, ${villa.color} 12%, white); color:${villa.color}">${villa.name}<span class="villa-dot" style="background:${villa.color}"></span></span>`;
+      tr.appendChild(td); tbody.appendChild(tr); lastVilla=person.villa;
+    }
+    const tr=document.createElement('tr');
+    const nameTd=document.createElement('td'); nameTd.className='staffcell';
+    nameTd.innerHTML = `<span class="staffname">${person.name}</span>${person.pool?'<span class="pool-badge">POOL</span>':''}<span class="staffrole">${person.role}</span>`;
+    tr.appendChild(nameTd);
+    for(let i=0;i<7;i++){
+      const td=document.createElement('td'); td.className='cell';
+      const d=new Date(currentMonday); d.setDate(d.getDate()+i);
+      if(sameDay(d,today)) td.classList.add('today-col');
+      const state = boardData[`${person.id}:${i}`] || 'empty';
+      const meta = STATE_META[state];
+      const mark=document.createElement('div'); mark.className=`mark ${meta.cls}`;
+      mark.innerHTML = `<span>${meta.icon}</span>${meta.lbl?`<span class="lbl">${meta.lbl}</span>`:''}`;
+      mark.title='Click to change status';
+      mark.addEventListener('click', async ()=>{
+        const states=cycleStates(person.pool); const idx=states.indexOf(state);
+        const next=states[(idx+1)%states.length];
+        await setCell(currentMonday, person.id, i, next);
+      });
+      td.appendChild(mark); tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+}
+document.getElementById('prevWeek').addEventListener('click', ()=>{ currentMonday.setDate(currentMonday.getDate()-7); subscribeWeek(currentMonday); renderHK(); });
+document.getElementById('nextWeek').addEventListener('click', ()=>{ currentMonday.setDate(currentMonday.getDate()+7); subscribeWeek(currentMonday); renderHK(); });
+document.getElementById('thisWeek').addEventListener('click', ()=>{ currentMonday=getMonday(new Date()); subscribeWeek(currentMonday); renderHK(); });
+document.getElementById('resetWeek').addEventListener('click', async ()=>{
+  if(confirm('Clear all marks for this week? This cannot be undone.')){
+    statusMsg.textContent='Clearing…'; await clearWeek(currentMonday); statusMsg.textContent='Week cleared';
+  }
+});
+
+/* ============================= BOOKINGS CALENDAR ============================= */
+const CAL_VILLAS = [
+  { id:'kalava', name:'Kalava Villa', color:'#0c8599' },
+  { id:'noelia', name:'Noelia Villa', color:'#7048e8' },
+  { id:'brisa', name:'Brisa Villa', color:'#e64980' },
+];
+let bookingsInited = false;
+let allBookings = [];
+let currentVillaCal = 'kalava';
+let currentMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let editingBookingId = null;
+const bookingStatusMsg = document.getElementById('bookingStatusMsg');
+
+function initBookings(){
+  bookingsInited = true;
+  const tabWrap = document.getElementById('villaTabs');
+  CAL_VILLAS.forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'villatab-btn' + (v.id===currentVillaCal ? ' active':'');
+    b.textContent = v.name;
+    b.style.setProperty('--vc', v.color);
+    if(v.id===currentVillaCal){ b.style.background=v.color; }
+    b.addEventListener('click', ()=>{
+      currentVillaCal = v.id;
+      document.querySelectorAll('.villatab-btn').forEach(x=>{ x.classList.remove('active'); x.style.background='#fff'; x.style.color='var(--muted)'; });
+      b.classList.add('active'); b.style.background=v.color; b.style.color='#fff';
+      renderCalendar();
+    });
+    tabWrap.appendChild(b);
+  });
+  // style first active tab
+  const firstBtn = tabWrap.querySelector('.villatab-btn');
+  if(firstBtn){ firstBtn.style.background = CAL_VILLAS[0].color; firstBtn.style.color='#fff'; }
+
+  if(!sb){ bookingStatusMsg.textContent = 'Not connected to Supabase yet'; renderCalendar(); return; }
+  bookingStatusMsg.textContent = 'Loading…';
+  fetchBookings();
+  sb.channel('villa_bookings_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'villa_bookings' }, fetchBookings)
+    .subscribe();
+
+  document.getElementById('prevMonth').addEventListener('click', ()=>{ currentMonthDate.setMonth(currentMonthDate.getMonth()-1); renderCalendar(); });
+  document.getElementById('nextMonth').addEventListener('click', ()=>{ currentMonthDate.setMonth(currentMonthDate.getMonth()+1); renderCalendar(); });
+  document.getElementById('thisMonth').addEventListener('click', ()=>{ currentMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderCalendar(); });
+  document.getElementById('addBookingBtn').addEventListener('click', ()=>{ resetSelection(); renderCalendar(); openModal(null, todayISO()); });
+
+  renderCalendar();
+}
+
+async function fetchBookings(){
+  const { data, error } = await sb.from('villa_bookings').select('*');
+  if(error){ bookingStatusMsg.textContent='Connection error'; console.error(error); return; }
+  allBookings = data.map(rowToBooking);
+  bookingStatusMsg.textContent = 'Calendar synced (live)';
+  renderCalendar();
+}
+
+let pendingStart = null; // ISO date string of first click, awaiting second click
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+function resetSelection(){
+  pendingStart = null;
+  document.getElementById('calHint').innerHTML = 'Click your <b>check-in</b> day, then click the <b>last night</b> the guest stays (not the departure day). Click "+ Add booking" instead if you\'d rather type dates directly.';
+}
+
+function handleDayClick(iso){
+  if(pendingStart === null){
+    pendingStart = iso;
+    document.getElementById('calHint').innerHTML = `Check-in set to <b>${iso}</b>. Now click the <b>last night</b> of the stay (the last day the guest is actually there — if they leave on the 6th, click the 5th). Click the same day again to cancel.`;
+    renderCalendar();
+    return;
+  }
+  if(iso === pendingStart){
+    resetSelection(); renderCalendar(); return;
+  }
+  const ci = iso < pendingStart ? iso : pendingStart;
+  const lastNight = iso < pendingStart ? pendingStart : iso;
+  const co = toISO((()=>{ const d=parseISO(lastNight); d.setDate(d.getDate()+1); return d; })());
+  resetSelection();
+  openModal(null, ci, co);
+}
+function toISO(d){ return d.toISOString().slice(0,10); }
+function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); return new Date(y, m-1, dd); }
+
+function assignLanes(bookings){
+  const sorted = [...bookings].sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
+  const laneEnds = [];
+  for(const b of sorted){
+    let placed=false;
+    for(let i=0;i<laneEnds.length;i++){
+      if(laneEnds[i] <= b.checkIn){ laneEnds[i]=b.checkOut; b._lane=i; placed=true; break; }
+    }
+    if(!placed){ laneEnds.push(b.checkOut); b._lane = laneEnds.length-1; }
+  }
+  return laneEnds.length;
+}
+
+function renderCalendar(){
+  const monthLabel = document.getElementById('monthLabel');
+  monthLabel.textContent = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+
+  const villaBookings = allBookings.filter(b=>b.villa===currentVillaCal);
+  assignLanes(villaBookings); // sets b._lane on each booking
+
+  const firstOfMonth = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth(), 1);
+  const startOffset = (firstOfMonth.getDay()+6)%7; // Monday=0
+  const gridStart = new Date(firstOfMonth); gridStart.setDate(gridStart.getDate()-startOffset);
+
+  const today = new Date();
+  const calBody = document.getElementById('calBody');
+  calBody.innerHTML = '';
+
+  for(let week=0; week<6; week++){
+    const weekStart = new Date(gridStart); weekStart.setDate(weekStart.getDate() + week*7);
+    const weekEndExclusive = new Date(weekStart); weekEndExclusive.setDate(weekEndExclusive.getDate()+7);
+    const weekStartISO = toISO(weekStart);
+    const weekEndISO = toISO(weekEndExclusive);
+
+    let anyInMonth = false;
+    const weekRow = document.createElement('div');
+    weekRow.className = 'cal-week';
+    const dayGrid = document.createElement('div');
+    dayGrid.className = 'cal-daygrid';
+
+    // day background cells (numbers, shading)
+    for(let dow=0; dow<7; dow++){
+      const cellDate = new Date(weekStart); cellDate.setDate(cellDate.getDate() + dow);
+      const iso = toISO(cellDate);
+      const inMonth = cellDate.getMonth()===currentMonthDate.getMonth();
+      if(inMonth) anyInMonth = true;
+      const isBooked = villaBookings.some(b => iso >= b.checkIn && iso < b.checkOut);
+
+      const daybg = document.createElement('div');
+      daybg.className = 'cal-daybg';
+      if(!inMonth) daybg.classList.add('outside');
+      if(sameDay(cellDate, today)) daybg.classList.add('today');
+      if(isBooked && inMonth) daybg.classList.add('booked');
+      if(iso === pendingStart) daybg.classList.add('selecting');
+
+      const num = document.createElement('span');
+      num.className = 'cal-daynum';
+      num.textContent = cellDate.getDate();
+      daybg.appendChild(num);
+
+      if(inMonth){
+        daybg.addEventListener('click', ()=> handleDayClick(iso));
+      }
+      dayGrid.appendChild(daybg);
+    }
+    weekRow.appendChild(dayGrid);
+
+    // continuous pills for bookings overlapping this week, positioned by percentage
+    const overlay = document.createElement('div');
+    overlay.className = 'cal-pills-overlay';
+    for(const b of villaBookings){
+      if(b._lane > 2) continue; // only 3 pill rows available
+      const segStart = b.checkIn > weekStartISO ? b.checkIn : weekStartISO;
+      const segEndExclusive = b.checkOut < weekEndISO ? b.checkOut : weekEndISO;
+      if(segStart >= segEndExclusive) continue; // no overlap with this week
+
+      const startColIdx = Math.round((parseISO(segStart) - weekStart) / 86400000); // 0-6
+      const spanDays = Math.round((parseISO(segEndExclusive) - parseISO(segStart)) / 86400000); // 1-7
+
+      const pill = document.createElement('div');
+      pill.className = 'booking-pill ' + b.type;
+      pill.style.left = (startColIdx / 7 * 100) + '%';
+      pill.style.width = (spanDays / 7 * 100) + '%';
+      pill.style.top = (b._lane * 19) + 'px';
+      pill.textContent = b.guest ? b.guest : (b.type==='airbnb' ? 'Airbnb' : 'Direct');
+      pill.title = `${b.type==='airbnb'?'Airbnb':'Direct'} · ${b.checkIn} → ${b.checkOut}${b.guest ? ' · '+b.guest : ''}`;
+      pill.addEventListener('click', (e)=>{ e.stopPropagation(); openModal(b, null); });
+      overlay.appendChild(pill);
+    }
+    weekRow.appendChild(overlay);
+
+    calBody.appendChild(weekRow);
+    if(!anyInMonth && week>=4) break;
+  }
+
+  renderMonthSummary(villaBookings);
+  renderManageList(villaBookings);
+}
+
+function renderMonthSummary(villaBookings){
+  const monthStart = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth(), 1);
+  const monthEndExclusive = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth()+1, 1);
+  const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
+
+  let totalNights=0, airbnbNights=0, directNights=0;
+  for(const b of villaBookings){
+    const segStart = b.checkIn > monthStartISO ? b.checkIn : monthStartISO;
+    const segEnd = b.checkOut < monthEndISO ? b.checkOut : monthEndISO;
+    if(segStart >= segEnd) continue;
+    const nights = Math.round((parseISO(segEnd) - parseISO(segStart)) / 86400000);
+    totalNights += nights;
+    if(b.type==='airbnb') airbnbNights += nights; else directNights += nights;
+  }
+  const daysInMonth = Math.round((monthEndExclusive - monthStart)/86400000);
+  document.getElementById('monthSummary').textContent =
+    `${totalNights} of ${daysInMonth} nights booked this month (${airbnbNights} Airbnb · ${directNights} Direct)`;
+}
+
+function renderManageList(villaBookings){
+  const list = document.getElementById('manageList');
+  list.innerHTML = '';
+  if(villaBookings.length === 0){
+    list.innerHTML = '<div class="manage-empty">No bookings yet for this villa.</div>';
+    return;
+  }
+  const sorted = [...villaBookings].sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
+  for(const b of sorted){
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+    row.innerHTML = `
+      <span class="manage-type-dot ${b.type}"></span>
+      <span class="manage-guest">${b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest')}</span>
+      <span class="manage-dates">${b.checkIn} → ${b.checkOut} (${nights} night${nights===1?'':'s'})</span>
+    `;
+    const delBtn = document.createElement('button');
+    delBtn.className = 'manage-del';
+    delBtn.textContent = 'Cancel';
+    delBtn.addEventListener('click', async ()=>{
+      if(confirm('Cancel / delete this booking?')){
+        try{
+          await sb.from('villa_bookings').delete().eq('id', b.id);
+          logActivity('delete', 'villa_bookings', `Cancelled booking: ${b.guest||b.type} (${b.checkIn} → ${b.checkOut}) at ${(CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa}`);
+        }catch(e){ console.error(e); }
+      }
+    });
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  }
+}
+
+/* ---- Modal ---- */
+const overlay = document.getElementById('modalOverlay');
+const fCheckIn = document.getElementById('fCheckIn');
+const fCheckOut = document.getElementById('fCheckOut');
+const fGuest = document.getElementById('fGuest');
+const lblAirbnb = document.getElementById('lblAirbnb');
+const lblDirect = document.getElementById('lblDirect');
+const modalError = document.getElementById('modalError');
+const btnDelete = document.getElementById('btnDelete');
+
+function openModal(booking, presetCheckInISO, presetCheckOutISO){
+  editingBookingId = booking ? booking.id : null;
+  modalError.style.display = 'none';
+  document.getElementById('modalTitle').textContent = booking ? 'Edit booking' : 'Add booking';
+  if(booking){
+    fCheckIn.value = booking.checkIn;
+    fCheckOut.value = booking.checkOut;
+    fGuest.value = booking.guest || '';
+    setTypeUI(booking.type);
+    btnDelete.style.display = '';
+  } else {
+    const ci = presetCheckInISO || todayISO();
+    const co = presetCheckOutISO || toISO((()=>{ const d=parseISO(ci); d.setDate(d.getDate()+1); return d; })());
+    fCheckIn.value = ci;
+    fCheckOut.value = co;
+    fGuest.value = '';
+    setTypeUI('airbnb');
+    btnDelete.style.display = 'none';
+  }
+  overlay.classList.add('open');
+}
+function closeModal(){ overlay.classList.remove('open'); resetSelection(); renderCalendar(); }
+function setTypeUI(type){
+  document.querySelectorAll('input[name=btype]').forEach(r=> r.checked = (r.value===type));
+  lblAirbnb.classList.toggle('sel-airbnb', type==='airbnb');
+  lblDirect.classList.toggle('sel-direct', type==='direct');
+}
+document.querySelectorAll('input[name=btype]').forEach(r=>{
+  r.addEventListener('change', ()=> setTypeUI(r.value));
+});
+document.getElementById('btnCancel').addEventListener('click', closeModal);
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeModal(); });
+
+document.getElementById('btnSave').addEventListener('click', async ()=>{
+  if(!sb){ modalError.textContent='Not connected to Supabase yet.'; modalError.style.display='block'; return; }
+  const ci = fCheckIn.value, co = fCheckOut.value;
+  if(!ci || !co || co <= ci){ modalError.textContent='Check-out must be after check-in.'; modalError.style.display='block'; return; }
+
+  const conflict = allBookings.find(b =>
+    b.villa === currentVillaCal &&
+    b.id !== editingBookingId &&
+    b.checkIn < co && ci < b.checkOut
+  );
+  if(conflict){
+    const who = conflict.guest ? conflict.guest : (conflict.type==='airbnb'?'an Airbnb booking':'a direct booking');
+    modalError.textContent = `These dates clash with ${who} (${conflict.checkIn} → ${conflict.checkOut}). Cancel that booking first, or pick different dates.`;
+    modalError.style.display='block';
+    return;
+  }
+
+  const type = document.querySelector('input[name=btype]:checked').value;
+  const guest = fGuest.value.trim();
+  const payload = { villa: currentVillaCal, check_in: ci, check_out: co, type, guest };
+  try{
+    let error;
+    if(editingBookingId){
+      ({ error } = await sb.from('villa_bookings').update(payload).eq('id', editingBookingId));
+      if(error) throw error;
+      logActivity('update', 'villa_bookings', `Edited booking: ${guest||type} (${ci} → ${co})`);
+    } else {
+      ({ error } = await sb.from('villa_bookings').insert(payload));
+      if(error) throw error;
+      logActivity('create', 'villa_bookings', `Added booking: ${guest||type} (${ci} → ${co}) at ${currentVillaCal}`);
+    }
+    closeModal();
+  }catch(e){
+    modalError.textContent='Save failed — check connection.'; modalError.style.display='block'; console.error(e);
+  }
+});
+btnDelete.addEventListener('click', async ()=>{
+  if(!editingBookingId) return;
+  if(confirm('Delete this booking?')){
+    try{
+      await sb.from('villa_bookings').delete().eq('id', editingBookingId);
+      logActivity('delete', 'villa_bookings', `Deleted booking (${fCheckIn.value} → ${fCheckOut.value})`);
+      closeModal();
+    }
+    catch(e){ console.error(e); }
+  }
+});
+
+/* ============================= PETTY CASH ============================= */
+const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
+const FOR_LABELS = { kalava: 'Kalava Villa', noelia: 'Noelia Villa', brisa: 'Brisa Villa', office: 'Office', store: 'Store' };
+
+let cashInited = false;
+let allCashTxns = [];
+const cashStatusMsg = document.getElementById('cashStatusMsg');
+
+function initPettyCash(){
+  cashInited = true;
+  if(!sb){ cashStatusMsg.textContent = 'Not connected to Supabase yet'; renderCash(); return; }
+  cashStatusMsg.textContent = 'Loading…';
+  fetchCash();
+  sb.channel('petty_cash_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'petty_cash_transactions' }, fetchCash)
+    .subscribe();
+
+  document.getElementById('addIncomeBtn').addEventListener('click', ()=> openIncomeModal());
+  document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
+
+  document.getElementById('expCard').addEventListener('change', updateExpenseCardLock);
+  document.getElementById('expIsStock').addEventListener('change', (e)=>{
+    document.getElementById('expStockFields').style.display = e.target.checked ? '' : 'none';
+  });
+
+  renderCash();
+}
+
+async function fetchCash(){
+  const { data, error } = await sb.from('petty_cash_transactions').select('*');
+  if(error){ cashStatusMsg.textContent='Connection error'; console.error(error); return; }
+  allCashTxns = data.map(rowToCash);
+  cashStatusMsg.textContent = 'Synced (live)';
+  renderCash();
+}
+
+function updateExpenseCardLock(){
+  const card = document.getElementById('expCard').value;
+  const forSelect = document.getElementById('expFor');
+  const hint = document.getElementById('expCardHint');
+  if(card === 'kalava_card'){
+    forSelect.value = 'kalava';
+    forSelect.disabled = true;
+    hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa expenses.';
+  } else {
+    forSelect.disabled = false;
+    hint.textContent = 'Ceymora Card can be used for any villa or the office.';
+  }
+}
+
+function renderCash(){
+  let ceymoraBal = 0, kalavaBal = 0;
+  for(const t of allCashTxns){
+    const sign = t.type === 'income' ? 1 : -1;
+    if(t.card === 'ceymora') ceymoraBal += sign * t.amount;
+    else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
+  }
+  document.getElementById('ceymoraBalance').textContent = 'LKR ' + ceymoraBal.toLocaleString();
+  document.getElementById('kalavaCardBalance').textContent = 'LKR ' + kalavaBal.toLocaleString();
+
+  const list = document.getElementById('cashList');
+  list.innerHTML = '';
+  if(allCashTxns.length === 0){
+    list.innerHTML = '<div class="manage-empty">No transactions yet.</div>';
+    return;
+  }
+  const sorted = [...allCashTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  for(const t of sorted){
+    const row = document.createElement('div');
+    row.className = 'txn-row';
+    const cardLabel = CARD_LABELS[t.card] || t.card;
+    let title, sub;
+    if(t.type === 'income'){
+      title = 'Money received — ' + cardLabel;
+      sub = t.date + (t.note ? ' · ' + t.note : '');
+    } else {
+      title = (t.purpose || 'Expense') + ' — ' + (FOR_LABELS[t.for] || t.for);
+      sub = `${t.date} · Paid from ${cardLabel}${t.note ? ' · '+t.note : ''}${t.linkedInventory ? ' · 📦 added to inventory' : ''}`;
+    }
+    const invoiceLink = t.invoiceUrl ? `<a class="invoice-link" href="${t.invoiceUrl}" target="_blank" rel="noopener">📎 View</a>` : '';
+    row.innerHTML = `
+      <span class="txn-badge ${t.type}">${t.type}</span>
+      <span class="txn-main">
+        <div class="txn-title">${title}${invoiceLink}</div>
+        <div class="txn-sub">${sub}</div>
+      </span>
+      <span class="txn-amount ${t.type}">${t.type==='income'?'+':'−'} ${t.amount.toLocaleString()}</span>
+    `;
+    const delBtn = document.createElement('button');
+    delBtn.className = 'manage-del';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', async ()=>{
+      if(!checkDeletePassword()) return;
+      if(confirm('Delete this transaction?')){
+        try{
+          await sb.from('petty_cash_transactions').delete().eq('id', t.id);
+          logActivity('delete', 'petty_cash_transactions', `Deleted ${t.type}: ${t.type==='income' ? CARD_LABELS[t.card] : t.purpose} — LKR ${t.amount.toLocaleString()}`);
+        }catch(e){ console.error(e); }
+      }
+    });
+    if(canEdit()){
+      const editBtn = document.createElement('button');
+      editBtn.className = 'manage-edit';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', ()=>{
+        if(t.type === 'income') openIncomeModal(t); else openExpenseModal(t);
+      });
+      row.appendChild(editBtn);
+    }
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  }
+}
+
+let editingCashId = null;
+
+function openIncomeModal(record){
+  editingCashId = record ? record.id : null;
+  try{
+    document.getElementById('incDate').value = record ? record.date : todayISO();
+    document.getElementById('incCard').value = record ? record.card : 'ceymora';
+    document.getElementById('incAmount').value = record ? record.amount : '';
+    document.getElementById('incNote').value = record ? (record.note || '') : '';
+    document.getElementById('incFile').value = '';
+    document.getElementById('incFileHint').textContent = record && record.invoiceUrl ? 'Has a file attached — choose a new one to replace it, or leave blank to keep it.' : '';
+    document.getElementById('incError').style.display = 'none';
+    document.querySelector('#incomeModalOverlay h3').textContent = record ? 'Edit money received' : 'Money received';
+    document.getElementById('incomeModalOverlay').classList.add('open');
+  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
+}
+document.getElementById('incCancel').addEventListener('click', ()=> document.getElementById('incomeModalOverlay').classList.remove('open'));
+document.getElementById('incomeModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='incomeModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('incSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('incError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const date = document.getElementById('incDate').value;
+  const card = document.getElementById('incCard').value;
+  const amount = parseFloat(document.getElementById('incAmount').value);
+  const note = document.getElementById('incNote').value.trim();
+  const file = document.getElementById('incFile').files[0];
+  if(!date || !amount || amount <= 0){ errEl.textContent='Enter a date and a valid amount.'; errEl.style.display='block'; return; }
+  try{
+    let invoiceUrl = undefined; // undefined = don't touch existing value on update
+    if(file){
+      document.getElementById('incFileHint').textContent = 'Uploading file…';
+      invoiceUrl = await uploadReceiptFile(file);
+      document.getElementById('incFileHint').textContent = '';
+    }
+    if(editingCashId){
+      const payload = { type:'income', date, card, amount, note };
+      if(invoiceUrl !== undefined) payload.invoice_url = invoiceUrl;
+      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
+      if(error) throw error;
+      logActivity('update', 'petty_cash_transactions', `Edited money received: LKR ${amount.toLocaleString()} into ${CARD_LABELS[card]}`);
+    } else {
+      const { error } = await sb.from('petty_cash_transactions').insert({ type:'income', date, card, amount, note, invoice_url: invoiceUrl || null });
+      if(error) throw error;
+      logActivity('create', 'petty_cash_transactions', `Recorded money received: LKR ${amount.toLocaleString()} into ${CARD_LABELS[card]}`);
+    }
+    document.getElementById('incomeModalOverlay').classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+
+function openExpenseModal(record){
+  editingCashId = record ? record.id : null;
+  try{
+    document.getElementById('expDate').value = record ? record.date : todayISO();
+    document.getElementById('expCard').value = record ? record.card : 'ceymora';
+    document.getElementById('expFor').value = record ? record.for : 'kalava';
+    document.getElementById('expFor').disabled = false;
+    document.getElementById('expPurpose').value = record ? record.purpose : '';
+    document.getElementById('expAmount').value = record ? record.amount : '';
+    document.getElementById('expIsStock').checked = false;
+    document.getElementById('expStockFields').style.display = 'none';
+    document.getElementById('expItemName').value = '';
+    document.getElementById('expItemQty').value = '';
+    document.getElementById('expNote').value = record ? (record.note || '') : '';
+    document.getElementById('expFile').value = '';
+    document.getElementById('expFileHint').textContent = record && record.invoiceUrl ? 'Has a file attached — choose a new one to replace it, or leave blank to keep it.' : '';
+    document.getElementById('expError').style.display = 'none';
+    // Hide the "add to inventory" checkbox when editing, to avoid creating duplicate inventory entries
+    document.getElementById('expIsStock').closest('.modal-checkbox-row').style.display = record ? 'none' : '';
+    updateExpenseCardLock();
+    document.querySelector('#expenseModalOverlay h3').textContent = record ? 'Edit expense' : 'Record expense';
+    document.getElementById('expenseModalOverlay').classList.add('open');
+  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
+}
+document.getElementById('expCancel').addEventListener('click', ()=> document.getElementById('expenseModalOverlay').classList.remove('open'));
+document.getElementById('expenseModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='expenseModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('expSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('expError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const date = document.getElementById('expDate').value;
+  const card = document.getElementById('expCard').value;
+  const forWhom = document.getElementById('expFor').value;
+  const purpose = document.getElementById('expPurpose').value.trim();
+  const amount = parseFloat(document.getElementById('expAmount').value);
+  const note = document.getElementById('expNote').value.trim();
+  const isStock = document.getElementById('expIsStock').checked;
+  const itemName = document.getElementById('expItemName').value.trim();
+  const itemQtyRaw = document.getElementById('expItemQty').value;
+  const itemQty = itemQtyRaw ? parseFloat(itemQtyRaw) : 1;
+  const file = document.getElementById('expFile').files[0];
+
+  if(!date || !amount || amount <= 0 || !purpose){ errEl.textContent='Fill in date, purpose, and a valid amount.'; errEl.style.display='block'; return; }
+  if(card === 'kalava_card' && forWhom !== 'kalava'){ errEl.textContent='Kalava Villa Card can only be used for Kalava Villa.'; errEl.style.display='block'; return; }
+  if(isStock && !itemName){ errEl.textContent='Enter an item name for the stock item.'; errEl.style.display='block'; return; }
+
+  try{
+    let invoiceUrl = undefined; // undefined = don't touch existing value on update
+    if(file){
+      document.getElementById('expFileHint').textContent = 'Uploading file…';
+      invoiceUrl = await uploadReceiptFile(file);
+      document.getElementById('expFileHint').textContent = '';
+    }
+
+    if(editingCashId){
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note };
+      if(invoiceUrl !== undefined) payload.invoice_url = invoiceUrl;
+      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
+      if(error) throw error;
+      logActivity('update', 'petty_cash_transactions', `Edited expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]})`);
+      document.getElementById('expenseModalOverlay').classList.remove('open');
+      return;
+    }
+
+    const { error } = await sb.from('petty_cash_transactions').insert({
+      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_url: invoiceUrl || null
+    });
+    if(error) throw error;
+    logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
+    if(isStock){
+      const qtyLabel = itemQtyRaw ? ` (qty ${itemQty})` : '';
+      if(forWhom === 'store'){
+        // Bought generally, not earmarked for a specific villa yet — goes into Store, needs a Distribute step later.
+        const { error: invErr } = await sb.from('inventory_transactions').insert({
+          type:'purchase', date, item:itemName, qty:itemQty, note: 'Via petty cash: ' + purpose
+        });
+        if(invErr) throw invErr;
+        logActivity('create', 'inventory_transactions', `Purchased ${itemName}${qtyLabel} → Store (via petty cash expense)`);
+      } else {
+        // Bought directly for a specific villa/office — update that location's stock immediately,
+        // no separate Distribute step needed. (Nets to zero in Store: purchase in, distribute straight out.)
+        const { error: invErr1 } = await sb.from('inventory_transactions').insert({
+          type:'purchase', date, item:itemName, qty:itemQty, note: 'Via petty cash: ' + purpose
+        });
+        if(invErr1) throw invErr1;
+        const { error: invErr2 } = await sb.from('inventory_transactions').insert({
+          type:'distribute', date, item:itemName, qty:itemQty, to_villa: forWhom, note: 'Direct purchase via petty cash: ' + purpose
+        });
+        if(invErr2) throw invErr2;
+        logActivity('create', 'inventory_transactions', `Purchased ${itemName}${qtyLabel} directly for ${FOR_LABELS[forWhom]} (via petty cash expense)`);
+      }
+    }
+    document.getElementById('expenseModalOverlay').classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+
+/* ============================= INVENTORY ============================= */
+const INV_VILLAS = ['kalava','noelia','brisa'];
+const INV_LOCATIONS = ['office','kalava','noelia','brisa'];
+const INV_LOCATION_LABELS = { office:'Office', kalava:'Kalava Villa', noelia:'Noelia Villa', brisa:'Brisa Villa', store:'Store' };
+
+let invInited = false;
+let allInvTxns = [];
+let invMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+const invStatusMsg = document.getElementById('invStatusMsg');
+
+function initInventory(){
+  invInited = true;
+  if(!sb){ invStatusMsg.textContent = 'Not connected to Supabase yet'; renderInventory(); return; }
+  invStatusMsg.textContent = 'Loading…';
+  fetchInv();
+  sb.channel('inventory_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'inventory_transactions' }, fetchInv)
+    .subscribe();
+
+  document.getElementById('addPurchaseBtn').addEventListener('click', ()=> openPurchaseModal());
+  document.getElementById('addDistributeBtn').addEventListener('click', ()=> openDistributeModal());
+  document.getElementById('distItemName').addEventListener('input', updateDistStockHint);
+  document.getElementById('invPrevMonth').addEventListener('click', ()=>{ invMonthDate.setMonth(invMonthDate.getMonth()-1); renderInventory(); });
+  document.getElementById('invNextMonth').addEventListener('click', ()=>{ invMonthDate.setMonth(invMonthDate.getMonth()+1); renderInventory(); });
+  document.getElementById('invThisMonth').addEventListener('click', ()=>{ invMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderInventory(); });
+
+  renderInventory();
+}
+
+async function fetchInv(){
+  const { data, error } = await sb.from('inventory_transactions').select('*');
+  if(error){ invStatusMsg.textContent='Connection error'; console.error(error); return; }
+  allInvTxns = data.map(rowToInv);
+  invStatusMsg.textContent = 'Synced (live)';
+  renderInventory();
+}
+
+function computeStock(){
+  const items = {}; // itemName -> { store, office, kalava, noelia, brisa }
+  for(const t of allInvTxns){
+    const name = t.item;
+    if(!items[name]) items[name] = { store:0, office:0, kalava:0, noelia:0, brisa:0 };
+    if(t.type === 'purchase'){
+      items[name].store += t.qty;
+    } else if(t.type === 'distribute'){
+      items[name].store -= t.qty;
+      items[name][t.toVilla] += t.qty;
+    }
+  }
+  return items;
+}
+
+function renderInventory(){
+  const stock = computeStock();
+  const invBody = document.getElementById('invBody');
+  invBody.innerHTML = '';
+  const itemNames = Object.keys(stock).sort((a,b)=> a.localeCompare(b));
+  if(itemNames.length === 0){
+    invBody.innerHTML = '<tr><td colspan="7" class="inv-empty">No items purchased yet.</td></tr>';
+  } else {
+    for(const name of itemNames){
+      const s = stock[name];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${name}</td>
+        <td class="num ${s.kalava===0?'zero':''}">${s.kalava}</td>
+        <td class="num ${s.noelia===0?'zero':''}">${s.noelia}</td>
+        <td class="num ${s.brisa===0?'zero':''}">${s.brisa}</td>
+        <td class="num ${s.office===0?'zero':''}">${s.office}</td>
+        <td class="num ${s.store===0?'zero':''}">${s.store}</td>
+      `;
+      const delTd = document.createElement('td');
+      const delBtn = document.createElement('button');
+      delBtn.className = 'manage-del';
+      delBtn.textContent = 'Delete';
+      delBtn.title = 'Delete this item entirely (all history)';
+      delBtn.addEventListener('click', async ()=>{
+        if(!checkDeletePassword()) return;
+        if(!confirm(`Delete "${name}" completely? This removes all its purchase and distribution history.`)) return;
+        try{
+          const { error } = await sb.from('inventory_transactions').delete().eq('item', name);
+          if(error) throw error;
+          logActivity('delete', 'inventory_transactions', `Deleted item entirely: "${name}" (all purchase/distribution history removed)`);
+        }catch(e){ console.error(e); }
+      });
+      delTd.appendChild(delBtn);
+      tr.appendChild(delTd);
+      invBody.appendChild(tr);
+    }
+  }
+
+  // datalist for distribute modal autocomplete
+  const dl = document.getElementById('invItemList');
+  dl.innerHTML = itemNames.map(n=>`<option value="${n}">`).join('');
+
+  // history list
+  const hist = document.getElementById('invHistoryList');
+  hist.innerHTML = '';
+  if(allInvTxns.length === 0){
+    hist.innerHTML = '<div class="manage-empty">No purchase or distribution history yet.</div>';
+  } else {
+    const sorted = [...allInvTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    for(const t of sorted){
+      const row = document.createElement('div');
+      row.className = 'txn-row';
+      const title = t.type === 'purchase'
+        ? `Purchased ${t.qty} × ${t.item} → Store`
+        : `Sent ${t.qty} × ${t.item} → ${INV_LOCATION_LABELS[t.toVilla]||t.toVilla}`;
+      const sub = t.date + (t.note ? ' · ' + t.note : '');
+      row.innerHTML = `
+        <span class="txn-badge ${t.type==='purchase'?'income':'expense'}">${t.type}</span>
+        <span class="txn-main">
+          <div class="txn-title">${title}</div>
+          <div class="txn-sub">${sub}</div>
+        </span>
+      `;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'manage-del';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', async ()=>{
+        if(!checkDeletePassword()) return;
+        if(confirm('Delete this record?')){
+          try{
+            await sb.from('inventory_transactions').delete().eq('id', t.id);
+            logActivity('delete', 'inventory_transactions', `Deleted ${t.type} record: ${t.qty} × ${t.item}`);
+          }catch(e){ console.error(e); }
+        }
+      });
+      if(canEdit()){
+        const editBtn = document.createElement('button');
+        editBtn.className = 'manage-edit';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', ()=>{
+          if(t.type === 'purchase') openPurchaseModal(t); else openDistributeModal(t);
+        });
+        row.appendChild(editBtn);
+      }
+      row.appendChild(delBtn);
+      hist.appendChild(row);
+    }
+  }
+
+  renderInvMonthlySummary();
+}
+
+function renderInvMonthlySummary(){
+  document.getElementById('invMonthLabel').textContent = invMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  const monthStart = new Date(invMonthDate.getFullYear(), invMonthDate.getMonth(), 1);
+  const monthEndExclusive = new Date(invMonthDate.getFullYear(), invMonthDate.getMonth()+1, 1);
+  const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
+
+  const qtyByLoc = { office:0, kalava:0, noelia:0, brisa:0, store:0 };
+  for(const t of allInvTxns){
+    if(t.type !== 'distribute') continue;
+    if(t.date >= monthStartISO && t.date < monthEndISO){
+      qtyByLoc[t.toVilla] = (qtyByLoc[t.toVilla] || 0) + t.qty;
+    }
+  }
+  const amountByLoc = { office:0, kalava:0, noelia:0, brisa:0, store:0 };
+  for(const t of allCashTxns){
+    if(t.type !== 'expense') continue;
+    if(t.date >= monthStartISO && t.date < monthEndISO){
+      amountByLoc[t.for] = (amountByLoc[t.for] || 0) + t.amount;
+    }
+  }
+
+  const body = document.getElementById('invMonthlyBody');
+  body.innerHTML = '';
+  for(const loc of ['kalava','noelia','brisa','office','store']){
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.textContent = INV_LOCATION_LABELS[loc];
+    nameTd.style.cssText = 'cursor:pointer; color:var(--blue); font-weight:600;';
+    nameTd.title = 'Click to see invoices and amounts for this month';
+    nameTd.addEventListener('click', ()=> openVillaDetail(loc));
+    tr.appendChild(nameTd);
+
+    const qtyTd = document.createElement('td');
+    qtyTd.className = 'num' + (qtyByLoc[loc]===0 ? ' zero' : '');
+    qtyTd.textContent = qtyByLoc[loc];
+    tr.appendChild(qtyTd);
+
+    const amtTd = document.createElement('td');
+    amtTd.className = 'num' + (amountByLoc[loc]===0 ? ' zero' : '');
+    amtTd.textContent = amountByLoc[loc].toLocaleString();
+    tr.appendChild(amtTd);
+
+    body.appendChild(tr);
+  }
+}
+
+function openVillaDetail(loc){
+  const monthStart = new Date(invMonthDate.getFullYear(), invMonthDate.getMonth(), 1);
+  const monthEndExclusive = new Date(invMonthDate.getFullYear(), invMonthDate.getMonth()+1, 1);
+  const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
+
+  const expenses = allCashTxns
+    .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  const received = allInvTxns
+    .filter(t => t.type==='distribute' && t.toVilla===loc && t.date>=monthStartISO && t.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+
+  document.getElementById('villaDetailTitle').textContent =
+    `${INV_LOCATION_LABELS[loc]} — ${invMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`;
+
+  let html = '<div class="manage-title" style="margin-top:2px;">Petty cash expenses</div>';
+  if(expenses.length === 0){
+    html += '<div class="manage-empty">None this month.</div>';
+  } else {
+    let total = 0;
+    html += '<div class="manage-list" style="margin-top:6px;">';
+    for(const e of expenses){
+      total += e.amount;
+      const inv = e.invoiceUrl ? `<a class="invoice-link" href="${e.invoiceUrl}" target="_blank" rel="noopener">📎 View</a>` : '';
+      html += `<div class="txn-row">
+        <span class="txn-badge expense">expense</span>
+        <span class="txn-main">
+          <div class="txn-title">${e.purpose || 'Expense'}${inv}</div>
+          <div class="txn-sub">${e.date}${e.note ? ' · '+e.note : ''} · ${CARD_LABELS[e.card]||e.card}</div>
+        </span>
+        <span class="txn-amount expense">LKR ${e.amount.toLocaleString()}</span>
+      </div>`;
+    }
+    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${total.toLocaleString()}</div>`;
+  }
+
+  html += '<div class="manage-title" style="margin-top:18px;">Inventory received</div>';
+  if(received.length === 0){
+    html += '<div class="manage-empty">None this month.</div>';
+  } else {
+    html += '<div class="manage-list" style="margin-top:6px;">';
+    for(const r of received){
+      html += `<div class="txn-row">
+        <span class="txn-badge income">stock</span>
+        <span class="txn-main">
+          <div class="txn-title">${r.qty} × ${r.item}</div>
+          <div class="txn-sub">${r.date}${r.note ? ' · '+r.note : ''}</div>
+        </span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('villaDetailBody').innerHTML = html;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+}
+document.getElementById('villaDetailClose').addEventListener('click', ()=> document.getElementById('villaDetailModalOverlay').classList.remove('open'));
+document.getElementById('villaDetailModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='villaDetailModalOverlay') e.currentTarget.classList.remove('open'); });
+
+let editingInvId = null;
+
+function openPurchaseModal(record){
+  editingInvId = record ? record.id : null;
+  try{
+    document.getElementById('purDate').value = record ? record.date : todayISO();
+    document.getElementById('purItemName').value = record ? record.item : '';
+    document.getElementById('purQty').value = record ? record.qty : '';
+    document.getElementById('purNote').value = record ? (record.note || '') : '';
+    document.getElementById('purError').style.display = 'none';
+    document.querySelector('#purchaseModalOverlay h3').textContent = record ? 'Edit purchase' : 'Purchase item (add to Store)';
+    document.getElementById('purchaseModalOverlay').classList.add('open');
+  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
+}
+document.getElementById('purCancel').addEventListener('click', ()=> document.getElementById('purchaseModalOverlay').classList.remove('open'));
+document.getElementById('purchaseModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='purchaseModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('purSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('purError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const date = document.getElementById('purDate').value;
+  const item = document.getElementById('purItemName').value.trim();
+  const qtyRaw = document.getElementById('purQty').value;
+  const qty = qtyRaw ? parseFloat(qtyRaw) : 1;
+  const note = document.getElementById('purNote').value.trim();
+  if(!date || !item){ errEl.textContent='Enter a date and item name.'; errEl.style.display='block'; return; }
+  try{
+    if(editingInvId){
+      const { error } = await sb.from('inventory_transactions').update({ date, item, qty, note }).eq('id', editingInvId);
+      if(error) throw error;
+      logActivity('update', 'inventory_transactions', `Edited purchase: ${item} (qty ${qty}) → Store`);
+    } else {
+      const { error } = await sb.from('inventory_transactions').insert({ type:'purchase', date, item, qty, note });
+      if(error) throw error;
+      logActivity('create', 'inventory_transactions', `Purchased ${item} → Store${qtyRaw ? ' (qty '+qty+')' : ''}`);
+    }
+    document.getElementById('purchaseModalOverlay').classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+
+function updateDistStockHint(){
+  const item = document.getElementById('distItemName').value.trim();
+  const hint = document.getElementById('distStockHint');
+  if(!item){ hint.textContent=''; return; }
+  const stock = computeStock();
+  const s = stock[item];
+  hint.textContent = s ? `Currently in Store: ${s.store}` : 'No stock recorded yet for this item.';
+}
+
+function openDistributeModal(record){
+  editingInvId = record ? record.id : null;
+  try{
+    document.getElementById('distDate').value = record ? record.date : todayISO();
+    document.getElementById('distItemName').value = record ? record.item : '';
+    document.getElementById('distQty').value = record ? record.qty : '';
+    document.getElementById('distVilla').value = record ? record.toVilla : 'kalava';
+    document.getElementById('distNote').value = record ? (record.note || '') : '';
+    document.getElementById('distError').style.display = 'none';
+    updateDistStockHint();
+    document.querySelector('#distributeModalOverlay h3').textContent = record ? 'Edit distribution' : 'Distribute from Store';
+    document.getElementById('distributeModalOverlay').classList.add('open');
+  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
+}
+document.getElementById('distCancel').addEventListener('click', ()=> document.getElementById('distributeModalOverlay').classList.remove('open'));
+document.getElementById('distributeModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='distributeModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('distSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('distError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const date = document.getElementById('distDate').value;
+  const item = document.getElementById('distItemName').value.trim();
+  const qty = parseFloat(document.getElementById('distQty').value);
+  const toVilla = document.getElementById('distVilla').value;
+  const note = document.getElementById('distNote').value.trim();
+  if(!date || !item || !qty || qty <= 0){ errEl.textContent='Enter a date, item name, and valid quantity.'; errEl.style.display='block'; return; }
+  const stock = computeStock();
+  let storeStock = stock[item] ? stock[item].store : 0;
+  if(editingInvId){
+    // Add back this record's original qty before checking the limit, since editing
+    // effectively replaces the old distribution rather than adding a new one.
+    const original = allInvTxns.find(t=>t.id===editingInvId);
+    if(original && original.item === item) storeStock += original.qty;
+  }
+  if(qty > storeStock){ errEl.textContent = `Only ${storeStock} of "${item}" available in Store.`; errEl.style.display='block'; return; }
+  try{
+    if(editingInvId){
+      const { error } = await sb.from('inventory_transactions').update({ date, item, qty, to_villa: toVilla, note }).eq('id', editingInvId);
+      if(error) throw error;
+      logActivity('update', 'inventory_transactions', `Edited distribution: ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}`);
+    } else {
+      const { error } = await sb.from('inventory_transactions').insert({ type:'distribute', date, item, qty, to_villa: toVilla, note });
+      if(error) throw error;
+      logActivity('create', 'inventory_transactions', `Distributed ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}`);
+    }
+    document.getElementById('distributeModalOverlay').classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+
+/* ============================= ACTIVITY LOG ============================= */
+let logInited = false;
+const logStatusMsg = document.getElementById('logStatusMsg');
+
+function initActivityLog(){
+  logInited = true;
+  if(!sb){ logStatusMsg.textContent = 'Not connected to Supabase yet'; return; }
+  logStatusMsg.textContent = 'Loading…';
+  fetchActivityLog();
+  sb.channel('activity_log_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'activity_log' }, fetchActivityLog)
+    .subscribe();
+}
+
+async function fetchActivityLog(){
+  const { data, error } = await sb.from('activity_log').select('*').order('created_at', { ascending:false }).limit(300);
+  if(error){ logStatusMsg.textContent = 'Connection error'; console.error(error); return; }
+  logStatusMsg.textContent = 'Synced (live)';
+  renderActivityLog(data);
+}
+
+function renderActivityLog(rows){
+  const list = document.getElementById('activityLogList');
+  list.innerHTML = '';
+  if(!rows || rows.length === 0){
+    list.innerHTML = '<div class="manage-empty">No activity recorded yet.</div>';
+    return;
+  }
+  const actionColor = { create:'income', update:'expense', delete:'expense' };
+  for(const r of rows){
+    const row = document.createElement('div');
+    row.className = 'txn-row';
+    const when = new Date(r.created_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    row.innerHTML = `
+      <span class="txn-badge ${actionColor[r.action] || 'expense'}">${r.action}</span>
+      <span class="txn-main">
+        <div class="txn-title">${r.username} — ${r.description}</div>
+        <div class="txn-sub">${when} · ${r.table_name}</div>
+      </span>
+    `;
+    list.appendChild(row);
+  }
+}
+</script>
+</body>
+</html>
