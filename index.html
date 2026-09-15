@@ -569,6 +569,7 @@
         </div>
       </div>
       <div class="field-hint" style="margin-bottom:8px;">"Direct" purchases below are items bought straight for a villa/office (bypassing Store) — see the Petty Cash tab for the direct-purchases total.</div>
+      <div id="storeProfitCard" class="cash-card" style="max-width:340px; margin-bottom:16px; background:linear-gradient(135deg, #2f9e44, #1e6b2c);"></div>
       <table class="inv-table">
         <thead>
           <tr><th>Villa / Office</th><th style="text-align:center">Items distributed (qty)</th><th style="text-align:center">Petty cash spent (LKR)</th></tr>
@@ -730,6 +731,9 @@
       <option value="brisa">Brisa Villa</option>
       <option value="office">Office</option>
     </select>
+    <label>Price to charge <span id="distSuggestedCost" style="font-weight:400;color:var(--muted);"></span> (LKR, optional)</label>
+    <input type="number" id="distPrice" min="0" step="1" placeholder="e.g. 4500">
+    <div class="field-hint">Leave blank if you're not marking this transfer up — Store's average purchase cost will be used as an estimate instead wherever a price is needed.</div>
     <label>Note (optional)</label>
     <input type="text" id="distNote">
     <div class="modal-error" id="distError"></div>
@@ -2330,6 +2334,42 @@ function renderReports(){
     }
   }
 
+  // Store profit: for every distribution this month where a price was actually entered,
+  // compare that price against the item's average purchase cost. Lines with no price
+  // entered, or no purchase cost on record for that item, are left out of the total
+  // (rather than guessed at) and counted separately so the number stays honest.
+  const avgUnitCostForProfit = computeAvgUnitCost();
+  let profitRevenue = 0, profitCost = 0, profitLines = 0, skippedLines = 0;
+  for(const t of allInvTxns){
+    if(t.type !== 'distribute') continue;
+    if(t.date < monthStartISO || t.date >= monthEndISO) continue;
+    if(t.amount === null || t.amount === undefined) continue;
+    const unitCost = avgUnitCostForProfit[t.item];
+    if(unitCost === undefined){ skippedLines++; continue; }
+    profitRevenue += t.amount;
+    profitCost += unitCost * t.qty;
+    profitLines++;
+  }
+  const storeProfit = profitRevenue - profitCost;
+  const profitCard = document.getElementById('storeProfitCard');
+  if(profitLines === 0){
+    profitCard.style.background = 'linear-gradient(135deg, #2b2b2b, #454545)';
+    profitCard.innerHTML = `
+      <div class="cash-card-label">Store Profit This Month</div>
+      <div class="cash-card-balance" style="font-size:16px;">No priced transfers yet</div>
+      <div style="font-size:11px; opacity:0.85; margin-top:4px;">Enter a price when you distribute an item from Store to start tracking profit.</div>
+    `;
+  } else {
+    profitCard.style.background = storeProfit >= 0
+      ? 'linear-gradient(135deg, #2f9e44, #1e6b2c)'
+      : 'linear-gradient(135deg, #e03131, #8a1f1f)';
+    profitCard.innerHTML = `
+      <div class="cash-card-label">Store Profit This Month</div>
+      <div class="cash-card-balance">LKR ${Math.round(storeProfit).toLocaleString()}</div>
+      <div style="font-size:11px; opacity:0.85; margin-top:4px;">Revenue LKR ${Math.round(profitRevenue).toLocaleString()} − est. cost LKR ${Math.round(profitCost).toLocaleString()}, across ${profitLines} priced transfer${profitLines===1?'':'s'}${skippedLines ? ` (${skippedLines} unpriced transfer${skippedLines===1?'':'s'} not counted)` : ''}.</div>
+    `;
+  }
+
   const body = document.getElementById('repMonthlyBody');
   body.innerHTML = '';
   for(const loc of ['kalava','noelia','brisa','office','store']){
@@ -2361,6 +2401,25 @@ function renderReports(){
 
     body.appendChild(tr);
   }
+}
+
+// Distributions don't carry their own cost (that's recorded once, at purchase time, into
+// Store) so to show a "Price" per distributed line we fall back to each item's average
+// purchase cost per unit (total spent on that item ÷ total quantity ever bought). It's an
+// estimate, not the exact cost of that specific batch — flagged in the UI accordingly.
+function computeAvgUnitCost(){
+  const sums = {}; // item -> { totalAmount, totalQty }
+  for(const t of allInvTxns){
+    if(t.type !== 'purchase' || t.amount===null || t.amount===undefined || !t.qty) continue;
+    if(!sums[t.item]) sums[t.item] = { totalAmount:0, totalQty:0 };
+    sums[t.item].totalAmount += t.amount;
+    sums[t.item].totalQty += t.qty;
+  }
+  const avg = {};
+  for(const item in sums){
+    if(sums[item].totalQty > 0) avg[item] = sums[item].totalAmount / sums[item].totalQty;
+  }
+  return avg;
 }
 
 function buildVillaReportHTML(loc, monthDate){
@@ -2400,17 +2459,50 @@ function buildVillaReportHTML(loc, monthDate){
   if(received.length === 0){
     html += '<div class="manage-empty">None this month.</div>';
   } else {
-    html += '<div class="manage-list" style="margin-top:6px;">';
-    for(const r of received){
-      html += `<div class="txn-row">
-        <span class="txn-badge income">stock</span>
-        <span class="txn-main">
-          <div class="txn-title">${r.item}${r.qty ? ' × '+r.qty : ''}</div>
-          <div class="txn-sub">${r.date}${r.note ? ' · '+r.note : ''}</div>
-        </span>
-      </div>`;
+    const avgUnitCost = computeAvgUnitCost();
+    const sortedReceived = [...received].sort((a,b)=> a.date.localeCompare(b.date));
+    let receivedTotal = 0, anyUnknownPrice = false, anyEstimated = false;
+    html += `<table class="inv-table" style="margin-top:6px;">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Item</th>
+          <th style="text-align:center">Quantity</th>
+          <th style="text-align:center">Price (LKR)</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    for(const r of sortedReceived){
+      let linePrice, isEstimated = false;
+      if(r.amount !== null && r.amount !== undefined){
+        linePrice = r.amount; // price actually entered when this was distributed
+      } else {
+        const unitCost = avgUnitCost[r.item];
+        linePrice = unitCost !== undefined ? Math.round(r.qty * unitCost) : null;
+        isEstimated = linePrice !== null;
+      }
+      if(linePrice !== null) receivedTotal += linePrice; else anyUnknownPrice = true;
+      if(isEstimated) anyEstimated = true;
+      html += `<tr>
+        <td>${r.date}</td>
+        <td>${r.item}${r.note ? `<div class="txn-sub">${r.note}</div>` : ''}</td>
+        <td class="num">${r.qty}</td>
+        <td class="num ${linePrice===null?'zero':''}">${linePrice!==null ? linePrice.toLocaleString()+(isEstimated?' *':'') : '—'}</td>
+      </tr>`;
     }
-    html += '</div>';
+    html += `
+        <tr style="font-weight:700; border-top:2px solid var(--board-line);">
+          <td colspan="3">Total</td>
+          <td class="num">${receivedTotal.toLocaleString()}</td>
+        </tr>
+      </tbody>
+    </table>`;
+    if(anyEstimated){
+      html += '<div class="field-hint" style="margin-top:4px;">* No price was entered for this transfer — estimated from the item\'s average purchase cost instead.</div>';
+    }
+    if(anyUnknownPrice){
+      html += '<div class="field-hint" style="margin-top:4px;">Items showing "—" have no price entered and no purchase cost on record.</div>';
+    }
   }
   return html;
 }
@@ -2769,10 +2861,15 @@ document.getElementById('purSave').addEventListener('click', async ()=>{
 function updateDistStockHint(){
   const item = document.getElementById('distItemName').value.trim();
   const hint = document.getElementById('distStockHint');
-  if(!item){ hint.textContent=''; return; }
+  const suggested = document.getElementById('distSuggestedCost');
+  if(!item){ hint.textContent=''; if(suggested) suggested.textContent=''; return; }
   const stock = computeStock();
   const s = stock[item];
   hint.textContent = s ? `Currently in Store: ${s.store}` : 'No stock recorded yet for this item.';
+  if(suggested){
+    const avgCost = computeAvgUnitCost()[item];
+    suggested.textContent = avgCost !== undefined ? `(avg. purchase cost ≈ LKR ${Math.round(avgCost).toLocaleString()}/unit)` : '';
+  }
 }
 
 function openDistributeModal(record){
@@ -2782,6 +2879,7 @@ function openDistributeModal(record){
     document.getElementById('distItemName').value = record ? record.item : '';
     document.getElementById('distQty').value = record ? record.qty : '';
     document.getElementById('distVilla').value = record ? record.toVilla : 'kalava';
+    document.getElementById('distPrice').value = record && record.amount!==null && record.amount!==undefined ? record.amount : '';
     document.getElementById('distNote').value = record ? (record.note || '') : '';
     document.getElementById('distError').style.display = 'none';
     updateDistStockHint();
@@ -2798,6 +2896,8 @@ document.getElementById('distSave').addEventListener('click', async ()=>{
   const item = document.getElementById('distItemName').value.trim();
   const qty = parseFloat(document.getElementById('distQty').value);
   const toVilla = document.getElementById('distVilla').value;
+  const priceRaw = document.getElementById('distPrice').value;
+  const amount = priceRaw ? parseFloat(priceRaw) : null;
   const note = document.getElementById('distNote').value.trim();
   if(!date || !item || !qty || qty <= 0){ errEl.textContent='Enter a date, item name, and valid quantity.'; errEl.style.display='block'; return; }
   const stock = computeStock();
@@ -2811,13 +2911,13 @@ document.getElementById('distSave').addEventListener('click', async ()=>{
   if(qty > storeStock){ errEl.textContent = `Only ${storeStock} of "${item}" available in Store.`; errEl.style.display='block'; return; }
   try{
     if(editingInvId){
-      const { error } = await sb.from('inventory_transactions').update({ date, item, qty, to_villa: toVilla, note }).eq('id', editingInvId);
+      const { error } = await sb.from('inventory_transactions').update({ date, item, qty, to_villa: toVilla, note, amount }).eq('id', editingInvId);
       if(error) throw error;
-      logActivity('update', 'inventory_transactions', `Edited distribution: ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}`);
+      logActivity('update', 'inventory_transactions', `Edited distribution: ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}${amount!==null ? ` @ LKR ${amount.toLocaleString()}` : ''}`);
     } else {
-      const { error } = await sb.from('inventory_transactions').insert({ type:'distribute', date, item, qty, to_villa: toVilla, note });
+      const { error } = await sb.from('inventory_transactions').insert({ type:'distribute', date, item, qty, to_villa: toVilla, note, amount });
       if(error) throw error;
-      logActivity('create', 'inventory_transactions', `Distributed ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}`);
+      logActivity('create', 'inventory_transactions', `Distributed ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}${amount!==null ? ` @ LKR ${amount.toLocaleString()}` : ''}`);
     }
     document.getElementById('distributeModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
