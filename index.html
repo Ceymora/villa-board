@@ -472,11 +472,15 @@
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
         <div class="cash-card" style="background:linear-gradient(135deg, #f08c00, #b56500);">
-          <div class="cash-card-label">Direct Villa Purchases (all time)</div>
-          <div class="cash-card-balance" id="directPurchasesTotal">LKR 0</div>
+          <div class="cash-card-label">Direct Villa Purchases — via Kalava Card</div>
+          <div class="cash-card-balance" id="directPurchasesKalava">LKR 0</div>
+        </div>
+        <div class="cash-card" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91);">
+          <div class="cash-card-label">Direct Villa Purchases — via Ceymora Card</div>
+          <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
         </div>
       </div>
-      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">"Direct" = stock bought straight for a villa/office (bypassing Store) — already counted in the card balances above, shown here separately just so it's easy to measure.</div>
+      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">"Direct" = stock bought straight for a villa/office (bypassing Store) — already counted in the card balances above, shown here separately just so it's easy to measure per card.</div>
 
       <div class="toolbar">
         <div class="status-msg" id="cashStatusMsg">Loading…</div>
@@ -694,6 +698,8 @@
     <input type="text" id="purItemName" placeholder="e.g. Bed sheets (queen)">
     <label>Quantity (optional — leave blank for items like "Fruits" that aren't counted)</label>
     <input type="number" id="purQty" min="0" step="1" placeholder="e.g. 10">
+    <label>Cost (LKR, optional — for the purchase report)</label>
+    <input type="number" id="purAmount" min="0" step="1" placeholder="e.g. 3500">
     <label>Note (optional)</label>
     <input type="text" id="purNote">
     <div class="modal-error" id="purError"></div>
@@ -745,6 +751,7 @@
     <input type="text" id="villaColor" value="#0c8599">
     <div class="modal-error" id="villaError"></div>
     <div class="modal-actions">
+      <button class="btn btn-delete" id="villaDeleteBtn" style="display:none">Delete</button>
       <div style="flex:1"></div>
       <button class="btn btn-cancel" id="villaCancel">Cancel</button>
       <button class="btn btn-save" id="villaSave">Save</button>
@@ -767,6 +774,7 @@
     </select>
     <div class="modal-error" id="empError"></div>
     <div class="modal-actions">
+      <button class="btn btn-delete" id="empDeleteBtn" style="display:none">Delete</button>
       <div style="flex:1"></div>
       <button class="btn btn-cancel" id="empCancel">Cancel</button>
       <button class="btn btn-save" id="empSave">Save</button>
@@ -780,12 +788,18 @@
     <h3 id="opExModalTitle">Add expense</h3>
     <label>Date</label>
     <input type="date" id="opExDate">
+    <label id="opExEmployeeLabel" style="display:none;">Employee name</label>
+    <input type="text" id="opExEmployeeName" style="display:none;" placeholder="e.g. Kumar">
     <label>Amount (LKR)</label>
     <input type="number" id="opExAmount" min="0" step="1">
     <label id="opExOtherLabel" style="display:none;">Description</label>
     <input type="text" id="opExOtherName" style="display:none;" placeholder="e.g. Gardener wages">
     <label>Note (optional)</label>
     <input type="text" id="opExNote">
+    <label>Attach invoice / bill (optional)</label>
+    <input type="file" id="opExFile" accept="image/*,.pdf">
+    <div id="opExFileList"></div>
+    <div class="field-hint" id="opExFileHint"></div>
     <div class="modal-error" id="opExError"></div>
     <div class="modal-actions">
       <div style="flex:1"></div>
@@ -905,7 +919,8 @@ function createMultiFileHandler(inputId, listId){
 }
 const incFileHandler = createMultiFileHandler('incFile', 'incFileList');
 const expFileHandler = createMultiFileHandler('expFile', 'expFileList');
-function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note }; }
+const opExFileHandler = createMultiFileHandler('opExFile', 'opExFileList');
+function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note, amount:r.amount!==null&&r.amount!==undefined?Number(r.amount):null }; }
 
 // =====================================================================
 // USERS — change passwords here any time. Roles:
@@ -1019,6 +1034,8 @@ function applyRolePermissions(){
 
   if(role === 'admin'){
     document.getElementById('activityLogTabBtn').style.display = '';
+    document.getElementById('villaReportTabBtn').style.display = '';
+    if(!villaReportInited){ initVillaReport(); }
   }
 
   if(role === 'viewer'){
@@ -1040,10 +1057,10 @@ function applyRolePermissions(){
   }
 
   if(role === 'viewer_villa_fixed'){
-    // Only the Villa Report for their one assigned villa — nothing else.
+    // Villa Report for their one assigned villa, plus Bookings Calendar — nothing else.
     document.body.classList.add('viewer-mode');
     tabs.housekeeping.style.display = 'none';
-    tabs.bookings.style.display = 'none';
+    tabs.bookings.style.display = '';
     tabs.pettycash.style.display = 'none';
     tabs.inventory.style.display = 'none';
     document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
@@ -1123,12 +1140,17 @@ async function fetchVillasAndStaff(){
   renderHK();
 }
 
-document.getElementById('addVillaBtn').addEventListener('click', ()=>{
-  document.getElementById('villaName').value = '';
-  document.getElementById('villaColor').value = '#0c8599';
+let editingVillaId = null;
+function openVillaModal(villa){
+  editingVillaId = villa ? villa.id : null;
+  document.getElementById('villaModalOverlay').querySelector('h3').textContent = villa ? 'Edit villa' : 'Add villa';
+  document.getElementById('villaName').value = villa ? villa.name : '';
+  document.getElementById('villaColor').value = villa ? villa.color : '#0c8599';
   document.getElementById('villaError').style.display = 'none';
+  document.getElementById('villaDeleteBtn').style.display = villa ? '' : 'none';
   document.getElementById('villaModalOverlay').classList.add('open');
-});
+}
+document.getElementById('addVillaBtn').addEventListener('click', ()=> openVillaModal(null));
 document.getElementById('villaCancel').addEventListener('click', ()=> document.getElementById('villaModalOverlay').classList.remove('open'));
 document.getElementById('villaModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='villaModalOverlay') e.currentTarget.classList.remove('open'); });
 document.getElementById('villaSave').addEventListener('click', async ()=>{
@@ -1137,23 +1159,45 @@ document.getElementById('villaSave').addEventListener('click', async ()=>{
   const name = document.getElementById('villaName').value.trim();
   const color = document.getElementById('villaColor').value.trim() || '#0c8599';
   if(!name){ errEl.textContent='Enter a villa name.'; errEl.style.display='block'; return; }
-  const id = name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('villa_'+Date.now());
   try{
-    const { error } = await sb.from('villas').insert({ id, name, color });
-    if(error) throw error;
-    logActivity('create', 'villas', `Added villa: ${name}`);
+    if(editingVillaId){
+      const { error } = await sb.from('villas').update({ name, color }).eq('id', editingVillaId);
+      if(error) throw error;
+      logActivity('update', 'villas', `Renamed/updated villa: ${name}`);
+    } else {
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('villa_'+Date.now());
+      const { error } = await sb.from('villas').insert({ id, name, color });
+      if(error) throw error;
+      logActivity('create', 'villas', `Added villa: ${name}`);
+    }
     document.getElementById('villaModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent = e.message && e.message.includes('duplicate') ? 'A villa with a similar name already exists.' : 'Save failed.'; errEl.style.display='block'; console.error(e); }
 });
+document.getElementById('villaDeleteBtn').addEventListener('click', async ()=>{
+  if(!editingVillaId) return;
+  if(!checkDeletePassword()) return;
+  if(!confirm('Delete this villa? Staff assigned to it will need to be reassigned.')) return;
+  try{
+    await sb.from('villas').delete().eq('id', editingVillaId);
+    logActivity('delete', 'villas', `Deleted villa: ${editingVillaId}`);
+    document.getElementById('villaModalOverlay').classList.remove('open');
+  }catch(e){ console.error(e); alert('Delete failed — this villa may still have staff assigned to it.'); }
+});
 
-document.getElementById('addEmployeeBtn').addEventListener('click', ()=>{
+let editingStaffId = null;
+function openEmployeeModal(staff){
+  editingStaffId = staff ? staff.id : null;
   const sel = document.getElementById('empVilla');
   sel.innerHTML = VILLAS.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
-  document.getElementById('empName').value = '';
-  document.getElementById('empRoleSelect').value = 'Housekeeping';
+  document.getElementById('employeeModalOverlay').querySelector('h3').textContent = staff ? 'Edit employee' : 'Add employee';
+  document.getElementById('empName').value = staff ? staff.name : '';
+  if(staff) sel.value = staff.villa;
+  document.getElementById('empRoleSelect').value = staff ? staff.role : 'Housekeeping';
   document.getElementById('empError').style.display = 'none';
+  document.getElementById('empDeleteBtn').style.display = staff ? '' : 'none';
   document.getElementById('employeeModalOverlay').classList.add('open');
-});
+}
+document.getElementById('addEmployeeBtn').addEventListener('click', ()=> openEmployeeModal(null));
 document.getElementById('empCancel').addEventListener('click', ()=> document.getElementById('employeeModalOverlay').classList.remove('open'));
 document.getElementById('employeeModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='employeeModalOverlay') e.currentTarget.classList.remove('open'); });
 document.getElementById('empSave').addEventListener('click', async ()=>{
@@ -1164,13 +1208,29 @@ document.getElementById('empSave').addEventListener('click', async ()=>{
   const role = document.getElementById('empRoleSelect').value;
   const pool = role === 'Housekeeping + Pool';
   if(!name || !villaId){ errEl.textContent='Enter a name and pick a villa.'; errEl.style.display='block'; return; }
-  const id = name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') + '_' + Date.now().toString().slice(-4);
   try{
-    const { error } = await sb.from('staff').insert({ id, name, villa_id: villaId, role, pool });
-    if(error) throw error;
-    logActivity('create', 'staff', `Added employee: ${name} (${VILLAS.find(v=>v.id===villaId)?.name || villaId})`);
+    if(editingStaffId){
+      const { error } = await sb.from('staff').update({ name, villa_id: villaId, role, pool }).eq('id', editingStaffId);
+      if(error) throw error;
+      logActivity('update', 'staff', `Edited employee: ${name} (${VILLAS.find(v=>v.id===villaId)?.name || villaId})`);
+    } else {
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') + '_' + Date.now().toString().slice(-4);
+      const { error } = await sb.from('staff').insert({ id, name, villa_id: villaId, role, pool });
+      if(error) throw error;
+      logActivity('create', 'staff', `Added employee: ${name} (${VILLAS.find(v=>v.id===villaId)?.name || villaId})`);
+    }
     document.getElementById('employeeModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+document.getElementById('empDeleteBtn').addEventListener('click', async ()=>{
+  if(!editingStaffId) return;
+  if(!checkDeletePassword()) return;
+  if(!confirm('Remove this employee from the board?')) return;
+  try{
+    await sb.from('staff').delete().eq('id', editingStaffId);
+    logActivity('delete', 'staff', `Removed employee: ${editingStaffId}`);
+    document.getElementById('employeeModalOverlay').classList.remove('open');
+  }catch(e){ console.error(e); }
 });
 
 const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -1246,12 +1306,34 @@ function renderHK(){
       const villa=VILLAS.find(v=>v.id===person.villa);
       const tr=document.createElement('tr'); tr.className='villa-row';
       const td=document.createElement('td'); td.colSpan=8;
-      td.innerHTML = `<span class="villa-tag" style="background:color-mix(in srgb, ${villa.color} 12%, white); color:${villa.color}">${villa.name}<span class="villa-dot" style="background:${villa.color}"></span></span>`;
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'villa-tag';
+      tagSpan.style.background = `color-mix(in srgb, ${villa.color} 12%, white)`;
+      tagSpan.style.color = villa.color;
+      tagSpan.innerHTML = `${villa.name}<span class="villa-dot" style="background:${villa.color}"></span>`;
+      if(canEdit()){
+        tagSpan.style.cursor = 'pointer';
+        tagSpan.title = 'Click to edit this villa';
+        tagSpan.addEventListener('click', ()=> openVillaModal(villa));
+      }
+      td.appendChild(tagSpan);
       tr.appendChild(td); tbody.appendChild(tr); lastVilla=person.villa;
     }
     const tr=document.createElement('tr');
     const nameTd=document.createElement('td'); nameTd.className='staffcell';
-    nameTd.innerHTML = `<span class="staffname">${person.name}</span>${person.pool?'<span class="pool-badge">POOL</span>':''}<span class="staffrole">${person.role}</span>`;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'staffname';
+    nameSpan.textContent = person.name;
+    if(canEdit()){
+      nameSpan.style.cursor = 'pointer';
+      nameSpan.style.textDecoration = 'underline dotted';
+      nameSpan.title = 'Click to edit this employee';
+      nameSpan.addEventListener('click', ()=> openEmployeeModal(person));
+    }
+    nameTd.appendChild(nameSpan);
+    if(person.pool){ const poolBadge=document.createElement('span'); poolBadge.className='pool-badge'; poolBadge.textContent='POOL'; nameTd.appendChild(poolBadge); }
+    const roleSpan=document.createElement('span'); roleSpan.className='staffrole'; roleSpan.textContent=person.role;
+    nameTd.appendChild(roleSpan);
     tr.appendChild(nameTd);
     for(let i=0;i<7;i++){
       const td=document.createElement('td'); td.className='cell';
@@ -1530,9 +1612,23 @@ async function getFxRate(dateISO, fromCurrency){
   const cacheKey = fromCurrency + ':' + dateISO;
   if(fxRateCache[cacheKey] !== undefined) return fxRateCache[cacheKey];
   try{
-    const res = await fetch(`https://api.frankfurter.app/${dateISO}?from=${fromCurrency}&to=LKR`);
-    const data = await res.json();
-    const rate = data && data.rates && data.rates.LKR ? data.rates.LKR : null;
+    // Exchange rates don't exist for future dates (or sometimes today, before publication) —
+    // frankfurter.app only has historical rates up to "today". If the requested date is in
+    // the future, or the historical lookup comes back empty, fall back to the latest known rate
+    // so the report never silently shows LKR 0 for a valid booking.
+    const todayISOStr = new Date().toISOString().slice(0,10);
+    const useDate = dateISO > todayISOStr ? 'latest' : dateISO;
+    let res = await fetch(`https://api.frankfurter.app/${useDate}?from=${fromCurrency}&to=LKR`);
+    let data = res.ok ? await res.json() : null;
+    let rate = data && data.rates && data.rates.LKR ? data.rates.LKR : null;
+
+    if(!rate){
+      // Historical date came back empty (e.g. bank holiday with no rate published) — retry with latest.
+      res = await fetch(`https://api.frankfurter.app/latest?from=${fromCurrency}&to=LKR`);
+      data = res.ok ? await res.json() : null;
+      rate = data && data.rates && data.rates.LKR ? data.rates.LKR : null;
+    }
+
     fxRateCache[cacheKey] = rate;
     return rate;
   }catch(e){
@@ -1767,18 +1863,20 @@ function updateExpenseCardLock(){
 }
 
 function renderCash(){
-  let ceymoraBal = 0, kalavaBal = 0, directTotal = 0;
+  let ceymoraBal = 0, kalavaBal = 0, directKalava = 0, directCeymora = 0;
   for(const t of allCashTxns){
     const sign = t.type === 'income' ? 1 : -1;
     if(t.card === 'ceymora') ceymoraBal += sign * t.amount;
     else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
     if(t.type === 'expense' && t.linkedInventory && t.for !== 'store'){
-      directTotal += t.amount;
+      if(t.card === 'kalava_card') directKalava += t.amount;
+      else if(t.card === 'ceymora') directCeymora += t.amount;
     }
   }
   document.getElementById('ceymoraBalance').textContent = 'LKR ' + ceymoraBal.toLocaleString();
   document.getElementById('kalavaCardBalance').textContent = 'LKR ' + kalavaBal.toLocaleString();
-  document.getElementById('directPurchasesTotal').textContent = 'LKR ' + directTotal.toLocaleString();
+  document.getElementById('directPurchasesKalava').textContent = 'LKR ' + directKalava.toLocaleString();
+  document.getElementById('directPurchasesCeymora').textContent = 'LKR ' + directCeymora.toLocaleString();
 
   const list = document.getElementById('cashList');
   list.innerHTML = '';
@@ -1787,27 +1885,53 @@ function renderCash(){
     return;
   }
   const sorted = [...allCashTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const table = document.createElement('table');
+  table.className = 'inv-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Details</th>
+        <th>Card</th>
+        <th style="text-align:center">Amount (LKR)</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector('tbody');
   for(const t of sorted){
-    const row = document.createElement('div');
-    row.className = 'txn-row';
     const cardLabel = CARD_LABELS[t.card] || t.card;
-    let title, sub;
+    let details;
     if(t.type === 'income'){
-      title = 'Money received — ' + cardLabel;
-      sub = t.date + (t.note ? ' · ' + t.note : '');
+      details = 'Money received' + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
     } else {
-      title = (t.purpose || 'Expense') + ' — ' + (FOR_LABELS[t.for] || t.for);
-      sub = `${t.date} · Paid from ${cardLabel}${t.note ? ' · '+t.note : ''}${t.linkedInventory ? ' · 📦 added to inventory' : ''}`;
+      details = (t.purpose || 'Expense') + ` <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>`
+        + (t.linkedInventory ? ' 📦' : '')
+        + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
     }
-    const invoiceLink = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎 View${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join('');
-    row.innerHTML = `
-      <span class="txn-badge ${t.type}">${t.type}</span>
-      <span class="txn-main">
-        <div class="txn-title">${title}${invoiceLink}</div>
-        <div class="txn-sub">${sub}</div>
-      </span>
-      <span class="txn-amount ${t.type}">${t.type==='income'?'+':'−'} ${t.amount.toLocaleString()}</span>
+    const invoiceLink = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${t.date}</td>
+      <td><span class="txn-badge ${t.type}">${t.type}</span></td>
+      <td>${details}${invoiceLink ? ' '+invoiceLink : ''}</td>
+      <td>${cardLabel}</td>
+      <td class="num" style="color:${t.type==='income' ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${t.type==='income'?'+':'−'} ${t.amount.toLocaleString()}</td>
     `;
+    const actionTd = document.createElement('td');
+    actionTd.style.whiteSpace = 'nowrap';
+    if(canEdit()){
+      const editBtn = document.createElement('button');
+      editBtn.className = 'manage-edit';
+      editBtn.textContent = 'Edit';
+      editBtn.style.marginRight = '4px';
+      editBtn.addEventListener('click', ()=>{
+        if(t.type === 'income') openIncomeModal(t); else openExpenseModal(t);
+      });
+      actionTd.appendChild(editBtn);
+    }
     const delBtn = document.createElement('button');
     delBtn.className = 'manage-del';
     delBtn.textContent = 'Delete';
@@ -1820,18 +1944,11 @@ function renderCash(){
         }catch(e){ console.error(e); }
       }
     });
-    if(canEdit()){
-      const editBtn = document.createElement('button');
-      editBtn.className = 'manage-edit';
-      editBtn.textContent = 'Edit';
-      editBtn.addEventListener('click', ()=>{
-        if(t.type === 'income') openIncomeModal(t); else openExpenseModal(t);
-      });
-      row.appendChild(editBtn);
-    }
-    row.appendChild(delBtn);
-    list.appendChild(row);
+    actionTd.appendChild(delBtn);
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
   }
+  list.appendChild(table);
 }
 
 let editingCashId = null;
@@ -1967,7 +2084,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       if(forWhom === 'store'){
         // Bought generally, not earmarked for a specific villa yet — goes into Store, needs a Distribute step later.
         const { error: invErr } = await sb.from('inventory_transactions').insert({
-          type:'purchase', date, item:itemName, qty:itemQty, note: 'Via petty cash: ' + purpose
+          type:'purchase', date, item:itemName, qty:itemQty, amount, note: 'Via petty cash: ' + purpose
         });
         if(invErr) throw invErr;
         logActivity('create', 'inventory_transactions', `Purchased ${itemName}${qtyLabel} → Store (via petty cash expense)`);
@@ -1975,7 +2092,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
         // Bought directly for a specific villa/office — update that location's stock immediately,
         // no separate Distribute step needed. (Nets to zero in Store: purchase in, distribute straight out.)
         const { error: invErr1 } = await sb.from('inventory_transactions').insert({
-          type:'purchase', date, item:itemName, qty:itemQty, note: 'Via petty cash: ' + purpose
+          type:'purchase', date, item:itemName, qty:itemQty, amount, note: 'Via petty cash: ' + purpose
         });
         if(invErr1) throw invErr1;
         const { error: invErr2 } = await sb.from('inventory_transactions').insert({
@@ -2095,7 +2212,7 @@ function renderInventory(){
   const dl = document.getElementById('invItemList');
   dl.innerHTML = itemNames.map(n=>`<option value="${n}">`).join('');
 
-  // history list — filtered by Purchase/Distribution sub-tab
+  // history list — filtered by Purchase/Distribution sub-tab, shown as a proper table
   const hist = document.getElementById('invHistoryList');
   hist.innerHTML = '';
   const filteredTxns = allInvTxns.filter(t => t.type === invHistoryTab);
@@ -2103,20 +2220,45 @@ function renderInventory(){
     hist.innerHTML = `<div class="manage-empty">No ${invHistoryTab === 'purchase' ? 'purchase' : 'distribution'} history yet.</div>`;
   } else {
     const sorted = [...filteredTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const table = document.createElement('table');
+    table.className = 'inv-table';
+    const isPurchase = invHistoryTab === 'purchase';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Item Purchased</th>
+          <th style="text-align:center">Quantity</th>
+          <th style="text-align:center">${isPurchase ? 'Amount (LKR)' : 'Sent To'}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector('tbody');
     for(const t of sorted){
-      const row = document.createElement('div');
-      row.className = 'txn-row';
-      const title = t.type === 'purchase'
-        ? `Purchased ${t.qty} × ${t.item} → Store`
-        : `Sent ${t.qty} × ${t.item} → ${INV_LOCATION_LABELS[t.toVilla]||t.toVilla}`;
-      const sub = t.date + (t.note ? ' · ' + t.note : '');
-      row.innerHTML = `
-        <span class="txn-badge ${t.type==='purchase'?'income':'expense'}">${t.type}</span>
-        <span class="txn-main">
-          <div class="txn-title">${title}</div>
-          <div class="txn-sub">${sub}</div>
-        </span>
+      const tr = document.createElement('tr');
+      const lastCol = isPurchase
+        ? (t.amount ? t.amount.toLocaleString() : '—')
+        : (INV_LOCATION_LABELS[t.toVilla] || t.toVilla);
+      tr.innerHTML = `
+        <td>${t.date}</td>
+        <td>${t.item}${t.note ? `<div class="txn-sub">${t.note}</div>` : ''}</td>
+        <td class="num">${t.qty}</td>
+        <td class="num ${isPurchase && !t.amount ? 'zero' : ''}">${lastCol}</td>
       `;
+      const actionTd = document.createElement('td');
+      actionTd.style.whiteSpace = 'nowrap';
+      if(canEdit()){
+        const editBtn = document.createElement('button');
+        editBtn.className = 'manage-edit';
+        editBtn.textContent = 'Edit';
+        editBtn.style.marginRight = '4px';
+        editBtn.addEventListener('click', ()=>{
+          if(t.type === 'purchase') openPurchaseModal(t); else openDistributeModal(t);
+        });
+        actionTd.appendChild(editBtn);
+      }
       const delBtn = document.createElement('button');
       delBtn.className = 'manage-del';
       delBtn.textContent = 'Delete';
@@ -2129,18 +2271,11 @@ function renderInventory(){
           }catch(e){ console.error(e); }
         }
       });
-      if(canEdit()){
-        const editBtn = document.createElement('button');
-        editBtn.className = 'manage-edit';
-        editBtn.textContent = 'Edit';
-        editBtn.addEventListener('click', ()=>{
-          if(t.type === 'purchase') openPurchaseModal(t); else openDistributeModal(t);
-        });
-        row.appendChild(editBtn);
-      }
-      row.appendChild(delBtn);
-      hist.appendChild(row);
+      actionTd.appendChild(delBtn);
+      tr.appendChild(actionTd);
+      tbody.appendChild(tr);
     }
+    hist.appendChild(table);
   }
 }
 
@@ -2290,7 +2425,7 @@ let opExInited = false;
 async function fetchOpEx(){
   const { data, error } = await sb.from('villa_operating_expenses').select('*');
   if(error){ console.error(error); return; }
-  allOpEx = data.map(r => ({ id:r.id, villaId:r.villa_id, category:r.category, amount:Number(r.amount), date:r.date, note:r.note }));
+  allOpEx = data.map(r => ({ id:r.id, villaId:r.villa_id, category:r.category, amount:Number(r.amount), date:r.date, note:r.note, employeeName:r.employee_name, invoiceUrls:r.invoice_urls || [] }));
   renderVillaReport();
 }
 
@@ -2347,9 +2482,9 @@ async function renderVillaReport(){
 
   document.getElementById('villaReportBody').innerHTML = html;
 
-  // Wire up the "+ category" buttons
+  // Wire up the "+ category" buttons — admin only
   const btnWrap = document.getElementById('opExButtons');
-  if(btnWrap){
+  if(btnWrap && isAdmin()){
     const categories = [
       { key:'salary', label:'+ Salary' },
       { key:'water', label:'+ Water Bill' },
@@ -2365,8 +2500,9 @@ async function renderVillaReport(){
       btnWrap.appendChild(btn);
     });
   }
-  // Wire up delete buttons for operating expense rows
+  // Wire up delete buttons for operating expense rows — admin only
   document.querySelectorAll('#villaReportBody [data-opex-id]').forEach(btn=>{
+    if(!isAdmin()){ btn.style.display = 'none'; return; }
     btn.addEventListener('click', async ()=>{
       if(!checkDeletePassword()) return;
       if(confirm('Delete this expense?')){
@@ -2461,9 +2597,13 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     opExHtml = '<div class="manage-list" style="margin-top:6px;">';
     for(const o of opEx){
       opExTotal += o.amount;
+      const opInvoiceLinks = (o.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${o.invoiceUrls.length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+      const titleText = o.category === 'salary' && o.employeeName
+        ? `${OPEX_LABELS[o.category]} — ${o.employeeName}`
+        : (o.note || OPEX_LABELS[o.category] || o.category);
       opExHtml += `<div class="txn-row">
         <span class="txn-badge expense">${OPEX_LABELS[o.category] || o.category}</span>
-        <span class="txn-main"><div class="txn-title">${o.note || OPEX_LABELS[o.category] || o.category}</div><div class="txn-sub">${o.date}</div></span>
+        <span class="txn-main"><div class="txn-title">${titleText}${opInvoiceLinks ? ' '+opInvoiceLinks : ''}</div><div class="txn-sub">${o.date}${o.category!=='salary' && o.note ? ' · '+o.note : ''}</div></span>
         <span class="txn-amount expense">LKR ${o.amount.toLocaleString()}</span>
         <button class="manage-del no-print" data-opex-id="${o.id}">Delete</button>
       </div>`;
@@ -2519,10 +2659,16 @@ function openOpExModal(villaId, category){
   document.getElementById('opExAmount').value = '';
   document.getElementById('opExNote').value = '';
   document.getElementById('opExError').style.display = 'none';
+  opExFileHandler.reset();
+  document.getElementById('opExFileHint').textContent = '';
   const isOther = category === 'other';
+  const isSalary = category === 'salary';
   document.getElementById('opExOtherLabel').style.display = isOther ? '' : 'none';
   document.getElementById('opExOtherName').style.display = isOther ? '' : 'none';
   document.getElementById('opExOtherName').value = '';
+  document.getElementById('opExEmployeeLabel').style.display = isSalary ? '' : 'none';
+  document.getElementById('opExEmployeeName').style.display = isSalary ? '' : 'none';
+  document.getElementById('opExEmployeeName').value = '';
   document.getElementById('opExModalOverlay').dataset.villaId = villaId;
   document.getElementById('opExModalOverlay').dataset.category = category;
   document.getElementById('opExModalOverlay').classList.add('open');
@@ -2538,12 +2684,25 @@ document.getElementById('opExSave').addEventListener('click', async ()=>{
   const date = document.getElementById('opExDate').value;
   const amount = parseFloat(document.getElementById('opExAmount').value);
   const otherName = document.getElementById('opExOtherName').value.trim();
+  const employeeName = document.getElementById('opExEmployeeName').value.trim();
   const note = document.getElementById('opExNote').value.trim();
+  const files = opExFileHandler.getFiles();
   if(!date || !amount || amount <= 0){ errEl.textContent='Enter a date and a valid amount.'; errEl.style.display='block'; return; }
   if(category === 'other' && !otherName){ errEl.textContent='Enter a description for this expense.'; errEl.style.display='block'; return; }
+  if(category === 'salary' && !employeeName){ errEl.textContent='Enter the employee\'s name.'; errEl.style.display='block'; return; }
   const finalNote = category === 'other' ? (otherName + (note ? ' · '+note : '')) : note;
   try{
-    const { error } = await sb.from('villa_operating_expenses').insert({ villa_id: villaId, category, amount, date, note: finalNote });
+    const invoiceUrls = [];
+    for(const f of files){
+      document.getElementById('opExFileHint').textContent = `Uploading ${f.name}…`;
+      invoiceUrls.push(await uploadReceiptFile(f));
+    }
+    document.getElementById('opExFileHint').textContent = '';
+    const { error } = await sb.from('villa_operating_expenses').insert({
+      villa_id: villaId, category, amount, date, note: finalNote,
+      employee_name: category === 'salary' ? employeeName : null,
+      invoice_urls: invoiceUrls,
+    });
     if(error) throw error;
     logActivity('create', 'villa_operating_expenses', `Added ${OPEX_LABELS[category]||category}: LKR ${amount.toLocaleString()} for ${villaId}`);
     overlay2.classList.remove('open');
@@ -2558,6 +2717,7 @@ function openPurchaseModal(record){
     document.getElementById('purDate').value = record ? record.date : todayISO();
     document.getElementById('purItemName').value = record ? record.item : '';
     document.getElementById('purQty').value = record ? record.qty : '';
+    document.getElementById('purAmount').value = record && record.amount ? record.amount : '';
     document.getElementById('purNote').value = record ? (record.note || '') : '';
     document.getElementById('purError').style.display = 'none';
     document.querySelector('#purchaseModalOverlay h3').textContent = record ? 'Edit purchase' : 'Purchase item (add to Store)';
@@ -2573,15 +2733,17 @@ document.getElementById('purSave').addEventListener('click', async ()=>{
   const item = document.getElementById('purItemName').value.trim();
   const qtyRaw = document.getElementById('purQty').value;
   const qty = qtyRaw ? parseFloat(qtyRaw) : 1;
+  const amountRaw = document.getElementById('purAmount').value;
+  const amount = amountRaw ? parseFloat(amountRaw) : null;
   const note = document.getElementById('purNote').value.trim();
   if(!date || !item){ errEl.textContent='Enter a date and item name.'; errEl.style.display='block'; return; }
   try{
     if(editingInvId){
-      const { error } = await sb.from('inventory_transactions').update({ date, item, qty, note }).eq('id', editingInvId);
+      const { error } = await sb.from('inventory_transactions').update({ date, item, qty, amount, note }).eq('id', editingInvId);
       if(error) throw error;
       logActivity('update', 'inventory_transactions', `Edited purchase: ${item} (qty ${qty}) → Store`);
     } else {
-      const { error } = await sb.from('inventory_transactions').insert({ type:'purchase', date, item, qty, note });
+      const { error } = await sb.from('inventory_transactions').insert({ type:'purchase', date, item, qty, amount, note });
       if(error) throw error;
       logActivity('create', 'inventory_transactions', `Purchased ${item} → Store${qtyRaw ? ' (qty '+qty+')' : ''}`);
     }
