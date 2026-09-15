@@ -1602,40 +1602,55 @@ function renderManageList(villaBookings){
 
 /* ============================= EARNINGS (15% Ceymora commission) ============================= */
 // NOTE: uses the historical rate for each booking's check-in date via a free,
-// no-key exchange rate API (frankfurter.app), converting from that booking's own
-// currency (USD for Kalava/Noelia, EUR for Brisa) into LKR. If a rate can't be found for a
-// specific date (e.g. a public holiday with no published rate), it falls back to the closest
-// available one. If you later get a paid FX data source (e.g. Sampath's TEMCO API once you
-// have credentials and a server-side bridge for it), swap the body of getFxRate() below.
+// no-key exchange rate API (fawazahmed0/currency-api, served off jsdelivr's CDN),
+// converting from that booking's own currency (USD for Kalava/Noelia, EUR for Brisa)
+// into LKR. We previously used frankfurter.app, but that API is ECB-only and does not
+// publish a rate for LKR at all, so every lookup silently failed and the LKR/commission
+// columns always showed 0. fawazahmed0/currency-api covers 200+ currencies (LKR included)
+// and mirrors the same "date-in-the-path" historical lookup style. If a rate can't be found
+// for a specific date (e.g. no data published yet for a very recent date), it falls back to
+// the latest known rate. If you later get a paid FX data source (e.g. Sampath's TEMCO API
+// once you have credentials and a server-side bridge for it), swap the body of getFxRate() below.
 const fxRateCache = {};
+async function fetchFxJson(dateOrLatest, fromCurrency){
+  const from = fromCurrency.toLowerCase();
+  // Primary: jsdelivr-hosted CDN. Fallback: Cloudflare Pages mirror (same data, different host,
+  // in case jsdelivr is blocked or having issues on the network).
+  const urls = [
+    `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateOrLatest}/v1/currencies/${from}.json`,
+    `https://${dateOrLatest}.currency-api.pages.dev/v1/currencies/${from}.json`
+  ];
+  for(const url of urls){
+    try{
+      const res = await fetch(url);
+      if(!res.ok) continue;
+      const data = await res.json();
+      const rate = data && data[from] && data[from].lkr ? data[from].lkr : null;
+      if(rate) return rate;
+    }catch(e){
+      console.error('FX rate fetch failed for', url, e);
+    }
+  }
+  return null;
+}
 async function getFxRate(dateISO, fromCurrency){
   const cacheKey = fromCurrency + ':' + dateISO;
   if(fxRateCache[cacheKey] !== undefined) return fxRateCache[cacheKey];
-  try{
-    // Exchange rates don't exist for future dates (or sometimes today, before publication) —
-    // frankfurter.app only has historical rates up to "today". If the requested date is in
-    // the future, or the historical lookup comes back empty, fall back to the latest known rate
-    // so the report never silently shows LKR 0 for a valid booking.
-    const todayISOStr = new Date().toISOString().slice(0,10);
-    const useDate = dateISO > todayISOStr ? 'latest' : dateISO;
-    let res = await fetch(`https://api.frankfurter.app/${useDate}?from=${fromCurrency}&to=LKR`);
-    let data = res.ok ? await res.json() : null;
-    let rate = data && data.rates && data.rates.LKR ? data.rates.LKR : null;
 
-    if(!rate){
-      // Historical date came back empty (e.g. bank holiday with no rate published) — retry with latest.
-      res = await fetch(`https://api.frankfurter.app/latest?from=${fromCurrency}&to=LKR`);
-      data = res.ok ? await res.json() : null;
-      rate = data && data.rates && data.rates.LKR ? data.rates.LKR : null;
-    }
+  // Exchange rates don't exist for future dates (or sometimes today, before publication).
+  // If the requested date is in the future, or the historical lookup comes back empty,
+  // fall back to the latest known rate so the report never silently shows LKR 0 for a
+  // valid booking.
+  const todayISOStr = new Date().toISOString().slice(0,10);
+  const useDate = dateISO > todayISOStr ? 'latest' : dateISO;
 
-    fxRateCache[cacheKey] = rate;
-    return rate;
-  }catch(e){
-    console.error('FX rate fetch failed for', cacheKey, e);
-    fxRateCache[cacheKey] = null;
-    return null;
+  let rate = await fetchFxJson(useDate, fromCurrency);
+  if(!rate && useDate !== 'latest'){
+    rate = await fetchFxJson('latest', fromCurrency);
   }
+
+  fxRateCache[cacheKey] = rate;
+  return rate;
 }
 
 let earningsRenderToken = 0;
@@ -1671,7 +1686,7 @@ async function renderEarnings(){
 
   statusEl.textContent = relevant.length === 0
     ? 'No bookings with a nightly rate set for this month yet — add one via the Rate per night field.'
-    : 'Rates fetched for each booking\'s check-in date (frankfurter.app).';
+    : 'Rates fetched for each booking\'s check-in date (currency-api).';
 
   body.innerHTML = '';
   let grandGrossLkr = 0, grandFeeLkr = 0, grandNetLkr = 0;
