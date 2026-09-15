@@ -310,6 +310,20 @@
   .viewer-mode .mark,
   .viewer-mode .cal-daybg,
   .viewer-mode .booking-pill{ cursor:default !important; pointer-events:none !important; }
+
+  /* Print support for report sections */
+  .print-header{ display:none; }
+  @media print{
+    body{ background:#fff; padding:0; }
+    .frame{ background:none; box-shadow:none; padding:0; border-radius:0; }
+    .board{ box-shadow:none; background:#fff; }
+    .board::before{ display:none; }
+    #loginScreen, .maintabs, .no-print, .add-booking-btn, .manage-del, .manage-edit,
+    #resetWeek, .weeknav button, .toolbar-actions, .setup-banner{ display:none !important; }
+    .print-header{ display:block; margin-bottom:14px; }
+    .manage-list{ max-height:none !important; overflow:visible !important; }
+    .modal-overlay{ display:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -348,6 +362,7 @@
       <button class="maintab-btn" data-tab="inventory">📦 Inventory</button>
       <button class="maintab-btn" data-tab="activitylog" id="activityLogTabBtn" style="display:none">📋 Activity Log</button>
       <button class="maintab-btn" data-tab="villareport" id="villaReportTabBtn" style="display:none">🏘️ Villa Report</button>
+      <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
     </div>
 
     <!-- ===================== HOUSEKEEPING PANEL ===================== -->
@@ -434,7 +449,7 @@
             <tr>
               <th>Villa</th>
               <th style="text-align:center">Nights</th>
-              <th style="text-align:center">Gross (USD)</th>
+              <th style="text-align:center">Gross (native currency)</th>
               <th style="text-align:center">Gross (LKR)</th>
               <th style="text-align:center">Ceymora fee (LKR)</th>
               <th style="text-align:center">Villa net (LKR)</th>
@@ -456,7 +471,12 @@
           <div class="cash-card-label">Kalava Villa Card</div>
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
+        <div class="cash-card" style="background:linear-gradient(135deg, #f08c00, #b56500);">
+          <div class="cash-card-label">Direct Villa Purchases (all time)</div>
+          <div class="cash-card-balance" id="directPurchasesTotal">LKR 0</div>
+        </div>
       </div>
+      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">"Direct" = stock bought straight for a villa/office (bypassing Store) — already counted in the card balances above, shown here separately just so it's easy to measure.</div>
 
       <div class="toolbar">
         <div class="status-msg" id="cashStatusMsg">Loading…</div>
@@ -498,26 +518,11 @@
       </table>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
-        <div class="manage-title">Purchase &amp; distribution history</div>
-        <div id="invHistoryList" class="manage-list" style="max-height:320px;"></div>
-      </div>
-
-      <div class="manage-section">
-        <div class="toolbar" style="margin-bottom:8px;">
-          <div class="manage-title">Monthly summary — by villa</div>
-          <div class="weeknav">
-            <button id="invPrevMonth">◀ Prev</button>
-            <span id="invMonthLabel">Month of ...</span>
-            <button id="invNextMonth">Next ▶</button>
-            <button id="invThisMonth">This month</button>
-          </div>
+        <div class="villatabs" style="margin-bottom:8px;">
+          <button class="villatab-btn active" id="histTabPurchase" style="background:var(--ink);color:#fff;">Purchase History</button>
+          <button class="villatab-btn" id="histTabDistribute">Distribution History</button>
         </div>
-        <table class="inv-table">
-          <thead>
-            <tr><th>Villa / Office</th><th style="text-align:center">Items distributed (qty)</th><th style="text-align:center">Petty cash spent (LKR)</th></tr>
-          </thead>
-          <tbody id="invMonthlyBody"></tbody>
-        </table>
+        <div id="invHistoryList" class="manage-list" style="max-height:320px;"></div>
       </div>
     </div>
 
@@ -545,6 +550,29 @@
       <div id="villaReportBody"></div>
     </div>
 
+    <!-- ===================== REPORTS PANEL ===================== -->
+    <div id="reportsPanel" style="display:none">
+      <div class="toolbar no-print">
+        <div class="manage-title">Inventory summary — by villa</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="weeknav">
+            <button id="repPrevMonth">◀ Prev</button>
+            <span id="repMonthLabel">Month of ...</span>
+            <button id="repNextMonth">Next ▶</button>
+            <button id="repThisMonth">This month</button>
+          </div>
+          <button class="add-booking-btn" id="repPrintBtn">🖨️ Print</button>
+        </div>
+      </div>
+      <div class="field-hint" style="margin-bottom:8px;">"Direct" purchases below are items bought straight for a villa/office (bypassing Store) — see the Petty Cash tab for the direct-purchases total.</div>
+      <table class="inv-table">
+        <thead>
+          <tr><th>Villa / Office</th><th style="text-align:center">Items distributed (qty)</th><th style="text-align:center">Petty cash spent (LKR)</th></tr>
+        </thead>
+        <tbody id="repMonthlyBody"></tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 
@@ -566,7 +594,7 @@
     <input type="text" id="fGuest" placeholder="e.g. Smith family">
     <label>Number of guests (optional)</label>
     <input type="number" id="fGuests" min="0" step="1" placeholder="e.g. 4">
-    <label>Rate per night, USD (optional)</label>
+    <label>Rate per night, <span id="fRateCurrencyLabel">USD</span> (optional)</label>
     <input type="number" id="fRateUsd" min="0" step="0.01" placeholder="e.g. 150">
     <div class="field-hint">Leave blank if you don't want this booking counted in the earnings report.</div>
     <div class="modal-error" id="modalError">Check-out must be after check-in.</div>
@@ -746,6 +774,27 @@
   </div>
 </div>
 
+<!-- Operating expense modal (Salary/Water/Electricity/SLT/Other, per villa) -->
+<div class="modal-overlay" id="opExModalOverlay">
+  <div class="modal">
+    <h3 id="opExModalTitle">Add expense</h3>
+    <label>Date</label>
+    <input type="date" id="opExDate">
+    <label>Amount (LKR)</label>
+    <input type="number" id="opExAmount" min="0" step="1">
+    <label id="opExOtherLabel" style="display:none;">Description</label>
+    <input type="text" id="opExOtherName" style="display:none;" placeholder="e.g. Gardener wages">
+    <label>Note (optional)</label>
+    <input type="text" id="opExNote">
+    <div class="modal-error" id="opExError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="opExCancel">Cancel</button>
+      <button class="btn btn-save" id="opExSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Villa detail modal (invoices + amounts, month-wise) -->
 <div class="modal-overlay" id="villaDetailModalOverlay">
   <div class="modal modal-wide" style="width:420px; max-height:82vh; overflow-y:auto;">
@@ -792,7 +841,7 @@ function checkDeletePassword(){
 }
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
-function rowToBooking(r){ return { id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null }; }
+function rowToBooking(r){ return { id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null, currency:r.currency||'USD' }; }
 function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [] }; }
 function getInvoiceLinks(t){
   const links = [];
@@ -1008,6 +1057,9 @@ function applyRolePermissions(){
     if(!villaReportInited){ initVillaReport(); }
   }
 
+  // Reports tab mirrors Inventory tab's visibility (it's the inventory summary, printable)
+  document.getElementById('reportsTabBtn').style.display = tabs.inventory.style.display === 'none' ? 'none' : '';
+
   // Add a small badge showing who's signed in, top-right of the board, with a logout button
   const badgeWrap = document.createElement('div');
   badgeWrap.style.cssText = 'position:absolute; top:14px; right:18px; display:flex; align-items:center; gap:8px; z-index:5;';
@@ -1047,11 +1099,13 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('inventoryPanel').style.display = tab==='inventory' ? '' : 'none';
     document.getElementById('activityLogPanel').style.display = tab==='activitylog' ? '' : 'none';
     document.getElementById('villaReportPanel').style.display = tab==='villareport' ? '' : 'none';
+    document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
     if(tab === 'pettycash' && !cashInited){ initPettyCash(); }
     if(tab === 'inventory' && !invInited){ initInventory(); if(!cashInited){ initPettyCash(); } }
     if(tab === 'activitylog' && !logInited){ initActivityLog(); }
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
+    if(tab === 'reports' && !reportsInited){ initReports(); }
   });
 });
 
@@ -1229,9 +1283,9 @@ document.getElementById('resetWeek').addEventListener('click', async ()=>{
 
 /* ============================= BOOKINGS CALENDAR ============================= */
 const CAL_VILLAS = [
-  { id:'kalava', name:'Kalava Villa', color:'#0c8599' },
-  { id:'noelia', name:'Noelia Villa', color:'#7048e8' },
-  { id:'brisa', name:'Brisa Villa', color:'#e64980' },
+  { id:'kalava', name:'Kalava Villa', color:'#0c8599', currency:'USD' },
+  { id:'noelia', name:'Noelia Villa', color:'#7048e8', currency:'USD' },
+  { id:'brisa', name:'Brisa Villa', color:'#e64980', currency:'EUR' },
 ];
 let bookingsInited = false;
 let allBookings = [];
@@ -1282,6 +1336,7 @@ async function fetchBookings(){
   allBookings = data.map(rowToBooking);
   bookingStatusMsg.textContent = 'Calendar synced (live)';
   renderCalendar();
+  if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
 }
 
 let pendingStart = null; // ISO date string of first click, awaiting second click
@@ -1464,23 +1519,25 @@ function renderManageList(villaBookings){
 }
 
 /* ============================= EARNINGS (15% Ceymora commission) ============================= */
-// NOTE: uses the historical USD->LKR rate for each booking's check-in date via a free,
-// no-key exchange rate API (frankfurter.app). If a rate can't be found for a specific date
-// (e.g. a public holiday with no published rate), it falls back to the closest available one.
-// This gives real historical accuracy for weekday check-ins; if you later get a paid FX data
-// source, swap the body of getFxRate() below to call that instead.
+// NOTE: uses the historical rate for each booking's check-in date via a free,
+// no-key exchange rate API (frankfurter.app), converting from that booking's own
+// currency (USD for Kalava/Noelia, EUR for Brisa) into LKR. If a rate can't be found for a
+// specific date (e.g. a public holiday with no published rate), it falls back to the closest
+// available one. If you later get a paid FX data source (e.g. Sampath's TEMCO API once you
+// have credentials and a server-side bridge for it), swap the body of getFxRate() below.
 const fxRateCache = {};
-async function getFxRate(dateISO){
-  if(fxRateCache[dateISO] !== undefined) return fxRateCache[dateISO];
+async function getFxRate(dateISO, fromCurrency){
+  const cacheKey = fromCurrency + ':' + dateISO;
+  if(fxRateCache[cacheKey] !== undefined) return fxRateCache[cacheKey];
   try{
-    const res = await fetch(`https://api.frankfurter.app/${dateISO}?from=USD&to=LKR`);
+    const res = await fetch(`https://api.frankfurter.app/${dateISO}?from=${fromCurrency}&to=LKR`);
     const data = await res.json();
     const rate = data && data.rates && data.rates.LKR ? data.rates.LKR : null;
-    fxRateCache[dateISO] = rate;
+    fxRateCache[cacheKey] = rate;
     return rate;
   }catch(e){
-    console.error('FX rate fetch failed for', dateISO, e);
-    fxRateCache[dateISO] = null;
+    console.error('FX rate fetch failed for', cacheKey, e);
+    fxRateCache[cacheKey] = null;
     return null;
   }
 }
@@ -1501,18 +1558,19 @@ async function renderEarnings(){
     b.rateUsd && b.checkIn >= monthStartISO && b.checkIn < monthEndISO
   );
 
-  const totals = {}; // villaId -> { nights, grossUsd, grossLkr }
-  for(const v of CAL_VILLAS) totals[v.id] = { nights:0, grossUsd:0, grossLkr:0 };
+  const totals = {}; // villaId -> { nights, gross, currency, grossLkr }
+  for(const v of CAL_VILLAS) totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0 };
 
   for(const b of relevant){
     const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
-    const grossUsd = nights * b.rateUsd;
-    const rate = await getFxRate(b.checkIn);
+    const gross = nights * b.rateUsd;
+    const bookingCurrency = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const rate = await getFxRate(b.checkIn, bookingCurrency);
     if(myToken !== earningsRenderToken) return; // a newer render started, abandon this one
-    if(!totals[b.villa]) totals[b.villa] = { nights:0, grossUsd:0, grossLkr:0 };
+    if(!totals[b.villa]) totals[b.villa] = { nights:0, gross:0, currency:bookingCurrency, grossLkr:0 };
     totals[b.villa].nights += nights;
-    totals[b.villa].grossUsd += grossUsd;
-    if(rate) totals[b.villa].grossLkr += grossUsd * rate;
+    totals[b.villa].gross += gross;
+    if(rate) totals[b.villa].grossLkr += gross * rate;
   }
 
   statusEl.textContent = relevant.length === 0
@@ -1530,7 +1588,7 @@ async function renderEarnings(){
     tr.innerHTML = `
       <td style="font-weight:600;">${v.name}</td>
       <td class="num ${t.nights===0?'zero':''}">${t.nights}</td>
-      <td class="num ${t.grossUsd===0?'zero':''}">${t.grossUsd.toLocaleString()}</td>
+      <td class="num ${t.gross===0?'zero':''}">${t.currency} ${t.gross.toLocaleString()}</td>
       <td class="num ${t.grossLkr===0?'zero':''}">${Math.round(t.grossLkr).toLocaleString()}</td>
       <td class="num ${fee===0?'zero':''}">${Math.round(fee).toLocaleString()}</td>
       <td class="num ${net===0?'zero':''}">${Math.round(net).toLocaleString()}</td>
@@ -1564,6 +1622,9 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
   editingBookingId = booking ? booking.id : null;
   modalError.style.display = 'none';
   document.getElementById('modalTitle').textContent = booking ? 'Edit booking' : 'Add booking';
+  const villaForCurrency = booking ? booking.villa : currentVillaCal;
+  const currency = (CAL_VILLAS.find(v=>v.id===villaForCurrency) || {}).currency || 'USD';
+  document.getElementById('fRateCurrencyLabel').textContent = currency;
   if(booking){
     fCheckIn.value = booking.checkIn;
     fCheckOut.value = booking.checkOut;
@@ -1618,10 +1679,12 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
   const guest = fGuest.value.trim();
   const guestsRaw = document.getElementById('fGuests').value;
   const rateRaw = document.getElementById('fRateUsd').value;
+  const currency = (CAL_VILLAS.find(v=>v.id===currentVillaCal) || {}).currency || 'USD';
   const payload = {
     villa: currentVillaCal, check_in: ci, check_out: co, type, guest,
     guests: guestsRaw ? parseInt(guestsRaw, 10) : null,
     rate_usd: rateRaw ? parseFloat(rateRaw) : null,
+    currency,
   };
   try{
     let error;
@@ -1630,7 +1693,7 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('update', 'villa_bookings', `Edited booking: ${guest||type} (${ci} → ${co})`);
     } else {
-      ({ error } = await sb.from('villa_bookings').insert(payload)); 
+      ({ error } = await sb.from('villa_bookings').insert(payload));
       if(error) throw error;
       logActivity('create', 'villa_bookings', `Added booking: ${guest||type} (${ci} → ${co}) at ${currentVillaCal}`);
     }
@@ -1686,6 +1749,7 @@ async function fetchCash(){
   cashStatusMsg.textContent = 'Synced (live)';
   renderCash();
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
+  if(typeof reportsInited !== 'undefined' && reportsInited) renderReports();
 }
 
 function updateExpenseCardLock(){
@@ -1703,14 +1767,18 @@ function updateExpenseCardLock(){
 }
 
 function renderCash(){
-  let ceymoraBal = 0, kalavaBal = 0;
+  let ceymoraBal = 0, kalavaBal = 0, directTotal = 0;
   for(const t of allCashTxns){
     const sign = t.type === 'income' ? 1 : -1;
     if(t.card === 'ceymora') ceymoraBal += sign * t.amount;
     else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
+    if(t.type === 'expense' && t.linkedInventory && t.for !== 'store'){
+      directTotal += t.amount;
+    }
   }
   document.getElementById('ceymoraBalance').textContent = 'LKR ' + ceymoraBal.toLocaleString();
   document.getElementById('kalavaCardBalance').textContent = 'LKR ' + kalavaBal.toLocaleString();
+  document.getElementById('directPurchasesTotal').textContent = 'LKR ' + directTotal.toLocaleString();
 
   const list = document.getElementById('cashList');
   list.innerHTML = '';
@@ -1943,11 +2011,20 @@ function initInventory(){
   document.getElementById('addPurchaseBtn').addEventListener('click', ()=> openPurchaseModal());
   document.getElementById('addDistributeBtn').addEventListener('click', ()=> openDistributeModal());
   document.getElementById('distItemName').addEventListener('input', updateDistStockHint);
-  document.getElementById('invPrevMonth').addEventListener('click', ()=>{ invMonthDate.setMonth(invMonthDate.getMonth()-1); renderInventory(); });
-  document.getElementById('invNextMonth').addEventListener('click', ()=>{ invMonthDate.setMonth(invMonthDate.getMonth()+1); renderInventory(); });
-  document.getElementById('invThisMonth').addEventListener('click', ()=>{ invMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderInventory(); });
+  document.getElementById('histTabPurchase').addEventListener('click', ()=>{ invHistoryTab = 'purchase'; updateHistTabButtons(); renderInventory(); });
+  document.getElementById('histTabDistribute').addEventListener('click', ()=>{ invHistoryTab = 'distribute'; updateHistTabButtons(); renderInventory(); });
 
   renderInventory();
+}
+
+let invHistoryTab = 'purchase';
+function updateHistTabButtons(){
+  const pBtn = document.getElementById('histTabPurchase');
+  const dBtn = document.getElementById('histTabDistribute');
+  pBtn.style.background = invHistoryTab==='purchase' ? 'var(--ink)' : '#fff';
+  pBtn.style.color = invHistoryTab==='purchase' ? '#fff' : 'var(--muted)';
+  dBtn.style.background = invHistoryTab==='distribute' ? 'var(--ink)' : '#fff';
+  dBtn.style.color = invHistoryTab==='distribute' ? '#fff' : 'var(--muted)';
 }
 
 async function fetchInv(){
@@ -1957,6 +2034,7 @@ async function fetchInv(){
   invStatusMsg.textContent = 'Synced (live)';
   renderInventory();
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
+  if(typeof reportsInited !== 'undefined' && reportsInited) renderReports();
 }
 
 function computeStock(){
@@ -2017,13 +2095,14 @@ function renderInventory(){
   const dl = document.getElementById('invItemList');
   dl.innerHTML = itemNames.map(n=>`<option value="${n}">`).join('');
 
-  // history list
+  // history list — filtered by Purchase/Distribution sub-tab
   const hist = document.getElementById('invHistoryList');
   hist.innerHTML = '';
-  if(allInvTxns.length === 0){
-    hist.innerHTML = '<div class="manage-empty">No purchase or distribution history yet.</div>';
+  const filteredTxns = allInvTxns.filter(t => t.type === invHistoryTab);
+  if(filteredTxns.length === 0){
+    hist.innerHTML = `<div class="manage-empty">No ${invHistoryTab === 'purchase' ? 'purchase' : 'distribution'} history yet.</div>`;
   } else {
-    const sorted = [...allInvTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const sorted = [...filteredTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
     for(const t of sorted){
       const row = document.createElement('div');
       row.className = 'txn-row';
@@ -2063,17 +2142,28 @@ function renderInventory(){
       hist.appendChild(row);
     }
   }
-
-  renderInvMonthlySummary();
 }
 
-function renderInvMonthlySummary(){
-  document.getElementById('invMonthLabel').textContent = invMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
-  const monthStart = new Date(invMonthDate.getFullYear(), invMonthDate.getMonth(), 1);
-  const monthEndExclusive = new Date(invMonthDate.getFullYear(), invMonthDate.getMonth()+1, 1);
+/* ============================= REPORTS (printable) ============================= */
+let reportsInited = false;
+let repMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+function initReports(){
+  reportsInited = true;
+  document.getElementById('repPrevMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()-1); renderReports(); });
+  document.getElementById('repNextMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()+1); renderReports(); });
+  document.getElementById('repThisMonth').addEventListener('click', ()=>{ repMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderReports(); });
+  document.getElementById('repPrintBtn').addEventListener('click', ()=> window.print());
+  renderReports();
+}
+
+function renderReports(){
+  if(!reportsInited) return;
+  document.getElementById('repMonthLabel').textContent = repMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  const monthStart = new Date(repMonthDate.getFullYear(), repMonthDate.getMonth(), 1);
+  const monthEndExclusive = new Date(repMonthDate.getFullYear(), repMonthDate.getMonth()+1, 1);
   const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
 
-  // itemsByLoc[loc] = { itemName: totalQty, ... }
   const itemsByLoc = { office:{}, kalava:{}, noelia:{}, brisa:{}, store:{} };
   for(const t of allInvTxns){
     if(t.type !== 'distribute') continue;
@@ -2090,7 +2180,7 @@ function renderInvMonthlySummary(){
     }
   }
 
-  const body = document.getElementById('invMonthlyBody');
+  const body = document.getElementById('repMonthlyBody');
   body.innerHTML = '';
   for(const loc of ['kalava','noelia','brisa','office','store']){
     const tr = document.createElement('tr');
@@ -2193,11 +2283,29 @@ const VR_VILLAS = [
   { id:'noelia', name:'Noelia Villa', color:'#7048e8' },
   { id:'brisa',  name:'Brisa Villa',  color:'#e64980' },
 ];
+const OPEX_LABELS = { salary:'Salary', water:'Water Bill', electricity:'Electricity Bill', slt:'SLT Bill', other:'Other expense' };
+let allOpEx = [];
+let opExInited = false;
+
+async function fetchOpEx(){
+  const { data, error } = await sb.from('villa_operating_expenses').select('*');
+  if(error){ console.error(error); return; }
+  allOpEx = data.map(r => ({ id:r.id, villaId:r.villa_id, category:r.category, amount:Number(r.amount), date:r.date, note:r.note }));
+  renderVillaReport();
+}
 
 function initVillaReport(){
   villaReportInited = true;
   if(!cashInited){ initPettyCash(); }
   if(!invInited){ initInventory(); }
+  if(!bookingsInited){ initBookings(); }
+  if(!opExInited){
+    opExInited = true;
+    fetchOpEx();
+    sb.channel('opex_changes')
+      .on('postgres_changes', { event:'*', schema:'public', table:'villa_operating_expenses' }, fetchOpEx)
+      .subscribe();
+  }
 
   if(currentUser.role === 'viewer_villa_fixed'){
     vrSelectedVilla = currentUser.villaScope;
@@ -2227,13 +2335,220 @@ function renderVillaPicker(){
   });
 }
 
-function renderVillaReport(){
+let villaReportToken = 0;
+async function renderVillaReport(){
   if(!villaReportInited) return;
+  const myToken = ++villaReportToken;
   document.getElementById('vrMonthLabel').textContent = vrMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
-  const label = VR_VILLAS.find(v=>v.id===vrSelectedVilla) ? VR_VILLAS.find(v=>v.id===vrSelectedVilla).name : vrSelectedVilla;
-  document.getElementById('villaReportBody').innerHTML =
-    `<div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">${buildVillaReportHTML(vrSelectedVilla, vrMonthDate)}</div>`;
+  document.getElementById('villaReportBody').innerHTML = '<div class="manage-empty">Loading report…</div>';
+
+  const html = await buildVillaProfitReportHTML(vrSelectedVilla, vrMonthDate);
+  if(myToken !== villaReportToken) return; // a newer render started
+
+  document.getElementById('villaReportBody').innerHTML = html;
+
+  // Wire up the "+ category" buttons
+  const btnWrap = document.getElementById('opExButtons');
+  if(btnWrap){
+    const categories = [
+      { key:'salary', label:'+ Salary' },
+      { key:'water', label:'+ Water Bill' },
+      { key:'electricity', label:'+ Electricity Bill' },
+      { key:'slt', label:'+ SLT Bill' },
+      { key:'other', label:'+ Other expense' },
+    ];
+    categories.forEach(c=>{
+      const btn = document.createElement('button');
+      btn.className = 'add-booking-btn no-print';
+      btn.textContent = c.label;
+      btn.addEventListener('click', ()=> openOpExModal(vrSelectedVilla, c.key));
+      btnWrap.appendChild(btn);
+    });
+  }
+  // Wire up delete buttons for operating expense rows
+  document.querySelectorAll('#villaReportBody [data-opex-id]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!checkDeletePassword()) return;
+      if(confirm('Delete this expense?')){
+        try{
+          await sb.from('villa_operating_expenses').delete().eq('id', btn.dataset.opexId);
+          logActivity('delete', 'villa_operating_expenses', 'Deleted an operating expense entry');
+        }catch(e){ console.error(e); }
+      }
+    });
+  });
+  // Print button
+  const printBtn = document.createElement('button');
+  printBtn.className = 'add-booking-btn no-print';
+  printBtn.textContent = '🖨️ Print this report';
+  printBtn.style.cssText = 'margin-top:14px;';
+  printBtn.addEventListener('click', ()=> window.print());
+  document.getElementById('villaReportBody').appendChild(printBtn);
 }
+
+async function buildVillaProfitReportHTML(loc, monthDate){
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEndExclusive = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1);
+  const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
+  const villaInfo = VR_VILLAS.find(v=>v.id===loc) || CAL_VILLAS.find(v=>v.id===loc) || { name: loc };
+  const villaCurrency = (CAL_VILLAS.find(v=>v.id===loc) || {}).currency || 'USD';
+
+  // Bookings for this villa this month
+  const bookings = allBookings
+    .filter(b => b.villa===loc && b.checkIn>=monthStartISO && b.checkIn<monthEndISO)
+    .sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
+
+  let grossLkr = 0;
+  let bookingsHtml = '';
+  if(bookings.length === 0){
+    bookingsHtml = '<div class="manage-empty">No bookings this month.</div>';
+  } else {
+    bookingsHtml = '<div class="manage-list" style="margin-top:6px;">';
+    for(const b of bookings){
+      const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+      let lineLkr = null;
+      if(b.rateUsd){
+        const lineGross = nights * b.rateUsd;
+        const cur = b.currency || villaCurrency;
+        const rate = await getFxRate(b.checkIn, cur);
+        if(rate){ lineLkr = lineGross * rate; grossLkr += lineLkr; }
+      }
+      bookingsHtml += `<div class="txn-row">
+        <span class="txn-badge income">${b.type}</span>
+        <span class="txn-main">
+          <div class="txn-title">${b.guest || 'Guest'}${b.guests ? ` (${b.guests} guests)` : ''}</div>
+          <div class="txn-sub">${b.checkIn} → ${b.checkOut} · ${nights} night${nights===1?'':'s'}${b.rateUsd ? ` · ${b.currency||villaCurrency} ${b.rateUsd}/night` : ' · no rate set'}</div>
+        </span>
+        <span class="txn-amount income">${lineLkr!==null ? 'LKR '+Math.round(lineLkr).toLocaleString() : '—'}</span>
+      </div>`;
+    }
+    bookingsHtml += '</div>';
+  }
+  const commission = grossLkr * 0.15;
+  const villaShare = grossLkr * 0.85;
+
+  // Petty cash expenses for this villa this month
+  const expenses = allCashTxns
+    .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  let pettyCashTotal = 0;
+  let expensesHtml = '';
+  if(expenses.length === 0){
+    expensesHtml = '<div class="manage-empty">None this month.</div>';
+  } else {
+    expensesHtml = '<div class="manage-list" style="margin-top:6px;">';
+    for(const e of expenses){
+      pettyCashTotal += e.amount;
+      const links = getInvoiceLinks(e).map(u=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎 View</a>`).join('');
+      expensesHtml += `<div class="txn-row">
+        <span class="txn-badge expense">petty cash</span>
+        <span class="txn-main"><div class="txn-title">${e.purpose || 'Expense'}${links}${e.linkedInventory ? ' · 📦 direct purchase' : ''}</div><div class="txn-sub">${e.date}${e.note ? ' · '+e.note : ''}</div></span>
+        <span class="txn-amount expense">LKR ${e.amount.toLocaleString()}</span>
+      </div>`;
+    }
+    expensesHtml += '</div>';
+  }
+
+  // Operating expenses (Salary/Water/Electricity/SLT/Other) for this villa this month
+  const opEx = allOpEx
+    .filter(o => o.villaId===loc && o.date>=monthStartISO && o.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  let opExTotal = 0;
+  let opExHtml = '';
+  if(opEx.length === 0){
+    opExHtml = '<div class="manage-empty">None this month.</div>';
+  } else {
+    opExHtml = '<div class="manage-list" style="margin-top:6px;">';
+    for(const o of opEx){
+      opExTotal += o.amount;
+      opExHtml += `<div class="txn-row">
+        <span class="txn-badge expense">${OPEX_LABELS[o.category] || o.category}</span>
+        <span class="txn-main"><div class="txn-title">${o.note || OPEX_LABELS[o.category] || o.category}</div><div class="txn-sub">${o.date}</div></span>
+        <span class="txn-amount expense">LKR ${o.amount.toLocaleString()}</span>
+        <button class="manage-del no-print" data-opex-id="${o.id}">Delete</button>
+      </div>`;
+    }
+    opExHtml += '</div>';
+  }
+
+  const totalExpenses = pettyCashTotal + opExTotal;
+  const netProfit = villaShare - totalExpenses;
+
+  return `
+    <div class="print-header">
+      <h2 style="margin:0;">${villaInfo.name} — Financial Report</h2>
+      <div style="color:var(--muted); font-size:13px;">${monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
+    </div>
+    <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+      <div class="manage-title">Summary</div>
+      <table class="inv-table" style="margin-top:6px;">
+        <tbody>
+          <tr><td>Gross booking revenue</td><td class="num">LKR ${Math.round(grossLkr).toLocaleString()}</td></tr>
+          <tr><td>Ceymora management fee (15%)</td><td class="num" style="color:var(--red);">− LKR ${Math.round(commission).toLocaleString()}</td></tr>
+          <tr><td style="font-weight:600;">Villa's share (85%)</td><td class="num" style="font-weight:600;">LKR ${Math.round(villaShare).toLocaleString()}</td></tr>
+          <tr><td>Petty cash expenses</td><td class="num" style="color:var(--red);">− LKR ${Math.round(pettyCashTotal).toLocaleString()}</td></tr>
+          <tr><td>Operating expenses (salary, bills, other)</td><td class="num" style="color:var(--red);">− LKR ${Math.round(opExTotal).toLocaleString()}</td></tr>
+          <tr style="font-weight:700; border-top:2px solid var(--board-line);">
+            <td>Net profit</td>
+            <td class="num" style="color:${netProfit>=0 ? 'var(--green)' : 'var(--red)'};">LKR ${Math.round(netProfit).toLocaleString()}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="manage-section">
+      <div class="manage-title">Bookings this month</div>
+      ${bookingsHtml}
+    </div>
+    <div class="manage-section">
+      <div class="manage-title">Petty cash expenses</div>
+      ${expensesHtml}
+    </div>
+    <div class="manage-section">
+      <div class="manage-header">
+        <span class="manage-title">Other operating expenses</span>
+        <div class="toolbar-actions no-print" id="opExButtons"></div>
+      </div>
+      ${opExHtml}
+    </div>
+  `;
+}
+
+function openOpExModal(villaId, category){
+  document.getElementById('opExModalTitle').textContent = 'Add ' + (OPEX_LABELS[category] || category).toLowerCase();
+  document.getElementById('opExDate').value = todayISO();
+  document.getElementById('opExAmount').value = '';
+  document.getElementById('opExNote').value = '';
+  document.getElementById('opExError').style.display = 'none';
+  const isOther = category === 'other';
+  document.getElementById('opExOtherLabel').style.display = isOther ? '' : 'none';
+  document.getElementById('opExOtherName').style.display = isOther ? '' : 'none';
+  document.getElementById('opExOtherName').value = '';
+  document.getElementById('opExModalOverlay').dataset.villaId = villaId;
+  document.getElementById('opExModalOverlay').dataset.category = category;
+  document.getElementById('opExModalOverlay').classList.add('open');
+}
+document.getElementById('opExCancel').addEventListener('click', ()=> document.getElementById('opExModalOverlay').classList.remove('open'));
+document.getElementById('opExModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='opExModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('opExSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('opExError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const overlay2 = document.getElementById('opExModalOverlay');
+  const villaId = overlay2.dataset.villaId;
+  const category = overlay2.dataset.category;
+  const date = document.getElementById('opExDate').value;
+  const amount = parseFloat(document.getElementById('opExAmount').value);
+  const otherName = document.getElementById('opExOtherName').value.trim();
+  const note = document.getElementById('opExNote').value.trim();
+  if(!date || !amount || amount <= 0){ errEl.textContent='Enter a date and a valid amount.'; errEl.style.display='block'; return; }
+  if(category === 'other' && !otherName){ errEl.textContent='Enter a description for this expense.'; errEl.style.display='block'; return; }
+  const finalNote = category === 'other' ? (otherName + (note ? ' · '+note : '')) : note;
+  try{
+    const { error } = await sb.from('villa_operating_expenses').insert({ villa_id: villaId, category, amount, date, note: finalNote });
+    if(error) throw error;
+    logActivity('create', 'villa_operating_expenses', `Added ${OPEX_LABELS[category]||category}: LKR ${amount.toLocaleString()} for ${villaId}`);
+    overlay2.classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
 
 let editingInvId = null;
 
