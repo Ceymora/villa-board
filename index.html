@@ -472,16 +472,22 @@
           <div class="cash-card-label">Kalava Villa Card</div>
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
-        <div class="cash-card" style="background:linear-gradient(135deg, #f08c00, #b56500);">
+        <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
           <div class="cash-card-label">Direct Villa Purchases — via Kalava Card</div>
           <div class="cash-card-balance" id="directPurchasesKalava">LKR 0</div>
         </div>
-        <div class="cash-card" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91);">
+        <div class="cash-card" id="directPurchasesCeymoraCard" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91); cursor:pointer;" title="Click to see which transactions make up this total">
           <div class="cash-card-label">Direct Villa Purchases — via Ceymora Card</div>
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
         </div>
       </div>
       <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">"Direct" = stock bought straight for a villa/office (bypassing Store) — already counted in the card balances above, shown here separately just so it's easy to measure per card.</div>
+
+      <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="manage-title">Staff advance balances</div>
+        <div class="field-hint" style="margin:2px 0 8px;">How much cash each person is currently holding: advances given, minus bills they've submitted against it. Give someone an advance with "+ Give advance" below — then when you record their bills, pick their name under "Funded from a staff advance?" so it comes off their balance here instead of the card again.</div>
+        <div id="advanceWalletsSummary" class="cash-summary"></div>
+      </div>
 
       <div class="toolbar">
         <div class="status-msg" id="cashStatusMsg">Loading…</div>
@@ -674,6 +680,11 @@
     <input type="text" id="expPurpose" placeholder="e.g. Cleaning supplies">
     <label>Amount (LKR)</label>
     <input type="number" id="expAmount" min="0" step="1" placeholder="e.g. 3500">
+    <label>Funded from a staff advance? <span id="expAdvanceBalanceHint" style="font-weight:400; color:var(--muted);"></span> (optional)</label>
+    <select id="expFundedByAdvance">
+      <option value="">No — paid fresh from the card above</option>
+    </select>
+    <div class="field-hint">If this bill is being covered out of cash someone's already holding as an advance, pick them here — it verifies where the money's coming from and comes off their balance instead of counting against the card a second time.</div>
     <div class="modal-checkbox-row">
       <input type="checkbox" id="expIsStock">
       <label for="expIsStock" id="expIsStockLabel">This is a stock item — also add to Inventory</label>
@@ -1898,6 +1909,81 @@ btnDelete.addEventListener('click', async ()=>{
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
 const FOR_LABELS = { kalava: 'Kalava Villa', noelia: 'Noelia Villa', brisa: 'Brisa Villa', office: 'Office', store: 'Store' };
+// Always shown as a balance box even at LKR 0, so it's obvious at a glance who's currently
+// holding cash. Anyone else who receives an advance shows up automatically alongside these.
+const ADVANCE_WALLET_DEFAULTS = [
+  { name:'Anuja', label:'Anuja (Office)' },
+  { name:'Chathuranga', label:'Chathuranga (Kalava Villa)' },
+  { name:'Shanika', label:'Shanika (Brisa Villa)' },
+  { name:'Rohan', label:'Rohan (Noelia Villa)' },
+];
+
+// A staff advance wallet's balance = every advance they've been given, minus every expense
+// that was explicitly marked as "funded from their advance" (rather than paid fresh from a
+// card). Both live on the same petty_cash_transactions table, tied together by employee_name.
+function computeAdvanceWallets(){
+  const wallets = {};
+  for(const t of allCashTxns){
+    if(t.type === 'advance' && t.employeeName){
+      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0 };
+      wallets[t.employeeName].given += t.amount;
+    } else if(t.type === 'expense' && t.employeeName){
+      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0 };
+      wallets[t.employeeName].spent += t.amount;
+    }
+  }
+  for(const name in wallets){ wallets[name].balance = wallets[name].given - wallets[name].spent; }
+  return wallets;
+}
+
+function renderAdvanceWallets(){
+  const wrap = document.getElementById('advanceWalletsSummary');
+  if(!wrap) return;
+  const wallets = computeAdvanceWallets();
+  const names = new Set(ADVANCE_WALLET_DEFAULTS.map(d=>d.name));
+  Object.keys(wallets).forEach(n=>names.add(n));
+  wrap.innerHTML = '';
+  for(const name of names){
+    const w = wallets[name] || { given:0, spent:0, balance:0 };
+    const defaultInfo = ADVANCE_WALLET_DEFAULTS.find(d=>d.name===name);
+    const card = document.createElement('div');
+    card.className = 'cash-card';
+    card.style.background = w.balance < 0
+      ? 'linear-gradient(135deg, #e03131, #8a1f1f)'
+      : 'linear-gradient(135deg, #7048e8, #4425a1)';
+    card.innerHTML = `
+      <div class="cash-card-label">${defaultInfo ? defaultInfo.label : name}</div>
+      <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
+      <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}</div>
+    `;
+    wrap.appendChild(card);
+  }
+}
+
+// Populates the "Funded from a staff advance?" dropdown in the expense form with every
+// known wallet holder, and keeps the balance hint next to it up to date.
+function updateExpenseAdvanceOptions(){
+  const sel = document.getElementById('expFundedByAdvance');
+  if(!sel) return;
+  const wallets = computeAdvanceWallets();
+  const names = new Set(ADVANCE_WALLET_DEFAULTS.map(d=>d.name));
+  Object.keys(wallets).forEach(n=>names.add(n));
+  const current = sel.value;
+  sel.innerHTML = '<option value="">No — paid fresh from the card above</option>'
+    + [...names].map(n=>`<option value="${n}">${n}</option>`).join('');
+  sel.value = names.has(current) ? current : '';
+  updateExpenseAdvanceHint();
+}
+function updateExpenseAdvanceHint(){
+  const sel = document.getElementById('expFundedByAdvance');
+  const hint = document.getElementById('expAdvanceBalanceHint');
+  if(!sel || !hint) return;
+  const name = sel.value;
+  if(!name){ hint.textContent = ''; return; }
+  const wallets = computeAdvanceWallets();
+  const balance = wallets[name] ? wallets[name].balance : 0;
+  hint.textContent = `(${name}'s current balance: LKR ${balance.toLocaleString()})`;
+}
 
 let cashInited = false;
 let allCashTxns = [];
@@ -1921,9 +2007,12 @@ function initPettyCash(){
   document.getElementById('expIsStock').addEventListener('change', (e)=>{
     document.getElementById('expStockFields').style.display = e.target.checked ? '' : 'none';
   });
+  document.getElementById('expFundedByAdvance').addEventListener('change', updateExpenseAdvanceHint);
   document.getElementById('advSettled').addEventListener('change', (e)=>{
     document.getElementById('advSettledNoteWrap').style.display = e.target.checked ? '' : 'none';
   });
+  document.getElementById('directPurchasesKalavaCard').addEventListener('click', ()=> openDirectPurchasesDetail('kalava_card'));
+  document.getElementById('directPurchasesCeymoraCard').addEventListener('click', ()=> openDirectPurchasesDetail('ceymora'));
 
   renderCash();
 }
@@ -1989,6 +2078,11 @@ function findLegacyLinkedInventory(record){
 function renderCash(){
   let ceymoraBal = 0, kalavaBal = 0, directKalava = 0, directCeymora = 0;
   for(const t of allCashTxns){
+    // An expense explicitly marked as "funded from a staff advance" already left the card
+    // when that advance was handed out — counting it against the card again here would
+    // double-debit the same money. It only comes off that person's wallet (computeAdvanceWallets).
+    const fundedByAdvance = t.type === 'expense' && !!t.employeeName;
+    if(fundedByAdvance) continue;
     const sign = t.type === 'income' ? 1 : -1;
     if(t.card === 'ceymora') ceymoraBal += sign * t.amount;
     else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
@@ -2001,6 +2095,7 @@ function renderCash(){
   document.getElementById('kalavaCardBalance').textContent = 'LKR ' + kalavaBal.toLocaleString();
   document.getElementById('directPurchasesKalava').textContent = 'LKR ' + directKalava.toLocaleString();
   document.getElementById('directPurchasesCeymora').textContent = 'LKR ' + directCeymora.toLocaleString();
+  renderAdvanceWallets();
 
   const list = document.getElementById('cashList');
   list.innerHTML = '';
@@ -2041,6 +2136,7 @@ function renderCash(){
     } else {
       details = (t.purpose || 'Expense') + ` <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>`
         + (t.linkedInventory ? ' 📦' : '')
+        + (t.employeeName ? ` <span style="color:var(--amber); font-size:11px; font-weight:600;">(from ${t.employeeName}'s advance)</span>` : '')
         + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
     }
     const invoiceLink = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
@@ -2184,6 +2280,10 @@ function openExpenseModal(record){
     document.getElementById('expPurpose').value = record ? record.purpose : '';
     document.getElementById('expAmount').value = record ? record.amount : '';
 
+    updateExpenseAdvanceOptions();
+    document.getElementById('expFundedByAdvance').value = record ? (record.employeeName || '') : '';
+    updateExpenseAdvanceHint();
+
     const wasStock = record ? !!record.linkedInventory : false;
     document.getElementById('expIsStock').checked = wasStock;
     document.getElementById('expStockFields').style.display = wasStock ? '' : 'none';
@@ -2220,6 +2320,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('expAmount').value);
   const note = document.getElementById('expNote').value.trim();
   const isStock = document.getElementById('expIsStock').checked;
+  const fundedByEmployee = document.getElementById('expFundedByAdvance').value || null;
   const itemName = document.getElementById('expItemName').value.trim();
   const itemQtyRaw = document.getElementById('expItemQty').value;
   const itemQty = itemQtyRaw ? parseFloat(itemQtyRaw) : 1;
@@ -2299,7 +2400,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
         logActivity('update', 'inventory_transactions', `Removed stock link from expense: ${purpose}`);
       }
 
-      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId };
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee };
       if(newUrls.length){
         const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
@@ -2312,7 +2413,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     }
 
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
-      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls
+      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee
     }).select().single();
     if(error) throw error;
     logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
@@ -2758,6 +2859,38 @@ function buildVillaReportHTML(loc, monthDate){
   return html;
 }
 
+function openDirectPurchasesDetail(card){
+  const cardLabel = CARD_LABELS[card] || card;
+  const rows = allCashTxns.filter(t =>
+    t.type === 'expense' && t.linkedInventory && t.for !== 'store' && t.card === card && !t.employeeName
+  ).sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+
+  document.getElementById('villaDetailTitle').textContent = `Direct Villa Purchases — via ${cardLabel}`;
+
+  let html = '';
+  if(rows.length === 0){
+    html = '<div class="manage-empty">No direct villa purchases via this card yet.</div>';
+  } else {
+    let total = 0;
+    html = '<div class="manage-list" style="margin-top:6px;">';
+    for(const t of rows){
+      total += t.amount;
+      const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+      html += `<div class="txn-row">
+        <span class="txn-badge expense">expense</span>
+        <span class="txn-main">
+          <div class="txn-title">${t.purpose || 'Expense'} <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>${links ? ' '+links : ''}</div>
+          <div class="txn-sub">${t.date}${t.note ? ' · '+t.note : ''}</div>
+        </span>
+        <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
+      </div>`;
+    }
+    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${total.toLocaleString()}</div>`;
+  }
+  document.getElementById('villaDetailBody').innerHTML = html;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+}
+
 function openVillaDetail(loc){
   document.getElementById('villaDetailTitle').textContent =
     `${INV_LOCATION_LABELS[loc]} — ${invMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`;
@@ -2938,7 +3071,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       const links = getInvoiceLinks(e).map(u=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎 View</a>`).join('');
       expensesHtml += `<div class="txn-row">
         <span class="txn-badge expense">petty cash</span>
-        <span class="txn-main"><div class="txn-title">${e.purpose || 'Expense'}${links}${e.linkedInventory ? ' · 📦 direct purchase' : ''}</div><div class="txn-sub">${e.date}${e.note ? ' · '+e.note : ''}</div></span>
+        <span class="txn-main"><div class="txn-title">${e.purpose || 'Expense'}${links}${e.linkedInventory ? ' · 📦 direct purchase' : ''}${e.employeeName ? ` · <span style="color:var(--amber);">from ${e.employeeName}'s advance</span>` : ''}</div><div class="txn-sub">${e.date}${e.note ? ' · '+e.note : ''}</div></span>
         <span class="txn-amount expense">LKR ${e.amount.toLocaleString()}</span>
       </div>`;
     }
