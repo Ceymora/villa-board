@@ -434,6 +434,52 @@
     .rpt-table td, .rpt-table thead th{ padding:5px 5px; }
   }
 
+  /* ===================== COMPANY ACCOUNTS ENTRY ===================== */
+  .co-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+  .co-groups{ display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:14px; align-items:start; }
+  .co-group{ border:1px solid var(--board-line); border-radius:10px; background:#fff; padding:11px 13px; }
+  .co-group-title{
+    font-family:'Kalam',cursive; font-size:15px; font-weight:700;
+    display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+    border-bottom:1.5px solid var(--board-line); padding-bottom:5px; margin-bottom:7px;
+  }
+  .co-group-total{ font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700; color:var(--frame); font-variant-numeric:tabular-nums; }
+  .co-line{ display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12.5px; }
+  .co-line > span{ flex:1; min-width:0; }
+  .co-line input, .co-dyn input{
+    font-family:'Inter',sans-serif; font-size:12.5px; padding:4px 7px;
+    border:1px solid var(--board-line); border-radius:6px; background:#fff; color:var(--ink);
+  }
+  .co-line input{ width:112px; text-align:right; font-variant-numeric:tabular-nums; }
+  .co-line input:focus, .co-dyn input:focus{ outline:2px solid var(--frame); outline-offset:-1px; }
+  .co-line input.auto{ background:#f4f9f4; border-color:var(--green); }
+  .co-dyn{ display:flex; align-items:center; gap:6px; padding:3px 0; }
+  .co-dyn input.co-name{ flex:1; min-width:0; }
+  .co-dyn input.co-amt{ width:105px; text-align:right; font-variant-numeric:tabular-nums; }
+  .co-dyn button{
+    background:var(--red-bg); color:var(--red); border:none; border-radius:6px;
+    padding:4px 8px; font-size:11px; font-weight:700; cursor:pointer; flex-shrink:0;
+  }
+  .co-savebar{
+    position:sticky; bottom:0; margin-top:16px; padding:12px 0 4px;
+    background:linear-gradient(to top, var(--board) 70%, transparent);
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .co-empty-hint{ font-size:11.5px; color:var(--muted); font-style:italic; padding:4px 0; }
+
+  /* Variance colouring in the company reports */
+  .var-up{ color:var(--green); font-weight:700; }
+  .var-down{ color:var(--red); font-weight:700; }
+  .rpt-table tr.grouphead td{
+    background:#f1ede2 !important; font-weight:800; font-size:11px;
+    text-transform:uppercase; letter-spacing:.5px; color:var(--ink);
+  }
+  .rpt-chart{ width:100%; height:auto; margin-top:10px; overflow:visible; }
+  .rpt-legend{ display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:10px; font-size:11.5px; }
+  .rpt-legend span.k{ display:inline-flex; align-items:center; gap:5px; }
+  .rpt-legend i{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .rpt-split{ display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:18px; align-items:start; }
+
   /* Print support for report sections */
   .print-header{ display:none; }
   @media print{
@@ -498,6 +544,7 @@
       <button class="maintab-btn" data-tab="activitylog" id="activityLogTabBtn" style="display:none">📋 Activity Log</button>
       <button class="maintab-btn" data-tab="villareport" id="villaReportTabBtn" style="display:none">🏘️ Villa Report</button>
       <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
+      <button class="maintab-btn" data-tab="company" id="companyTabBtn" style="display:none">🏢 Company Accounts</button>
     </div>
 
     <!-- ===================== HOUSEKEEPING PANEL ===================== -->
@@ -658,7 +705,19 @@
       </div>
 
       <div class="manage-section">
-        <div class="manage-title">Transactions</div>
+        <div class="manage-header">
+          <span class="manage-title">Transactions</span>
+          <div class="weeknav">
+            <button id="cashPrevMonth">◀ Prev</button>
+            <span id="cashMonthLabel">Month of ...</span>
+            <button id="cashNextMonth">Next ▶</button>
+            <button id="cashThisMonth">This month</button>
+            <button id="cashAllTime">All time</button>
+          </div>
+        </div>
+        <div class="field-hint" style="margin:6px 0 0;">The card balances at the top are always running all-time balances. The figures below are just for the month shown.</div>
+        <div id="cashMonthSummary" class="cash-summary" style="margin-top:10px;"></div>
+        <div id="cashMonthBreakdown"></div>
         <div id="cashList" class="manage-list" style="max-height:420px;"></div>
       </div>
     </div>
@@ -769,6 +828,91 @@
       </div>
       <div id="storeProfitCard" class="cash-card" style="max-width:340px; margin-bottom:16px; background:linear-gradient(135deg, #2f9e44, #1e6b2c);"></div>
       <div id="repReportBody"></div>
+    </div>
+
+    <!-- ===================== COMPANY ACCOUNTS PANEL ===================== -->
+    <div id="companyPanel" style="display:none">
+      <div class="toolbar no-print">
+        <div class="villatabs" style="margin-bottom:0;">
+          <button class="villatab-btn active" id="coTabEntry" style="background:var(--ink);color:#fff;">✏️ Enter figures</button>
+          <button class="villatab-btn" id="coTabReport">📄 Generate report</button>
+        </div>
+        <div class="weeknav">
+          <button id="coPrevMonth">◀ Prev</button>
+          <span id="coMonthLabel">Month of ...</span>
+          <button id="coNextMonth">Next ▶</button>
+          <button id="coThisMonth">This month</button>
+        </div>
+      </div>
+
+      <!-- ---- ENTRY VIEW ---- -->
+      <div id="coEntryView">
+        <div class="cal-hint">
+          Enter this month's company figures once, and every report below is built from them.
+          Anything left blank counts as zero. Figures are saved per month, so switch month with the arrows above
+          and each month keeps its own set. <b id="coEntryStatus" style="color:var(--muted);font-weight:600;"></b>
+        </div>
+
+        <div class="co-actions no-print">
+          <button class="add-booking-btn" id="coPullCommission">⬇ Pull villa commission from Bookings</button>
+          <button class="add-booking-btn" id="coCalcEpf">🧮 Calculate EPF 12% / ETF 3% from salary</button>
+          <button class="add-booking-btn" id="coCopyPrev">📋 Copy last month's figures</button>
+          <span class="field-hint" id="coPettyHint"></span>
+        </div>
+
+        <div class="co-groups">
+          <div class="co-group">
+            <div class="co-group-title"><span>Management Income</span><span class="co-group-total" id="coTotalMgmt">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Your commission income, one line per villa or client.</div>
+            <div id="coMgmtRows"></div>
+            <button class="rpt-quick no-print" data-add="management_income">+ Add income line</button>
+          </div>
+
+          <div class="co-group">
+            <div class="co-group-title"><span>Other Income</span><span class="co-group-total" id="coTotalOther">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Anything earned outside management commission.</div>
+            <div id="coOtherRows"></div>
+            <button class="rpt-quick no-print" data-add="other_income">+ Add income line</button>
+          </div>
+
+          <div class="co-group">
+            <div class="co-group-title"><span>Cash &amp; Bank Balances</span><span class="co-group-total" id="coTotalCash">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Closing balance at month end, one line per account.</div>
+            <div id="coCashRows"></div>
+            <button class="rpt-quick no-print" data-add="cash">+ Add account</button>
+          </div>
+
+          <div id="coExpenseGroups" style="display:contents;"></div>
+
+          <div class="co-group">
+            <div class="co-group-title"><span>Non-recurring / Annual</span><span class="co-group-total" id="coTotalAnnual">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Yearly costs, entered in the month they're charged.</div>
+            <div id="coAnnualLines"></div>
+          </div>
+        </div>
+
+        <div class="co-savebar no-print">
+          <button class="add-booking-btn" id="coSaveBtn" style="background:var(--frame); color:#fff; border-color:var(--frame); font-size:14px; padding:9px 20px;">💾 Save this month</button>
+          <span class="field-hint" id="coSaveMsg"></span>
+        </div>
+      </div>
+
+      <!-- ---- REPORT VIEW ---- -->
+      <div id="coReportView" style="display:none">
+        <div class="rpt-picker no-print" id="coSections">
+          <span class="rpt-picker-label">Include:</span>
+          <label><input type="checkbox" data-sec="dashboard" checked> Dashboard</label>
+          <label><input type="checkbox" data-sec="income" checked> Income Statement</label>
+          <label><input type="checkbox" data-sec="operating" checked> Operating Statement</label>
+          <label><input type="checkbox" data-sec="sales" checked> Sales / Commission Summary</label>
+          <span class="sep"></span>
+          <button class="rpt-quick" data-preset="summary">Dashboard only</button>
+          <button class="rpt-quick" data-preset="all">Everything</button>
+          <span class="sep"></span>
+          <button class="add-booking-btn" id="coPrintBtn">🖨️ Print / PDF</button>
+        </div>
+        <div id="coReportBody"></div>
+      </div>
     </div>
 
   </div>
@@ -1293,6 +1437,7 @@ function applyRolePermissions(){
   if(role === 'admin'){
     document.getElementById('activityLogTabBtn').style.display = '';
     document.getElementById('villaReportTabBtn').style.display = '';
+    document.getElementById('companyTabBtn').style.display = '';
     if(!villaReportInited){ initVillaReport(); }
   }
 
@@ -1375,12 +1520,14 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('activityLogPanel').style.display = tab==='activitylog' ? '' : 'none';
     document.getElementById('villaReportPanel').style.display = tab==='villareport' ? '' : 'none';
     document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
+    document.getElementById('companyPanel').style.display = tab==='company' ? '' : 'none';
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
     if(tab === 'pettycash' && !cashInited){ initPettyCash(); }
     if(tab === 'inventory' && !invInited){ initInventory(); if(!cashInited){ initPettyCash(); } }
     if(tab === 'activitylog' && !logInited){ initActivityLog(); }
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
     if(tab === 'reports' && !reportsInited){ initReports(); }
+    if(tab === 'company' && !companyInited){ initCompany(); }
   });
 });
 
@@ -2312,6 +2459,12 @@ function initPettyCash(){
   document.getElementById('directPurchasesKalavaCard').addEventListener('click', ()=> openDirectPurchasesDetail('kalava_card'));
   document.getElementById('directPurchasesCeymoraCard').addEventListener('click', ()=> openDirectPurchasesDetail('ceymora'));
 
+  // Month navigation for the transaction list + monthly spend figures
+  document.getElementById('cashPrevMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()-1); renderCash(); });
+  document.getElementById('cashNextMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()+1); renderCash(); });
+  document.getElementById('cashThisMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderCash(); });
+  document.getElementById('cashAllTime').addEventListener('click', ()=>{ cashShowAll=!cashShowAll; renderCash(); });
+
   renderCash();
 }
 
@@ -2373,6 +2526,80 @@ function findLegacyLinkedInventory(record){
   return { purchase, distribute };
 }
 
+let cashMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let cashShowAll = false;
+
+// Everything spent / received inside the month being viewed. The card balances above
+// stay all-time (they're running balances) — this is purely "what happened in July".
+function renderCashMonth(){
+  const monthStart = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth(), 1);
+  const monthEndExclusive = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth()+1, 1);
+  const fromISO = toISO(monthStart), toISOEnd = toISO(monthEndExclusive);
+
+  document.getElementById('cashMonthLabel').textContent = cashShowAll
+    ? 'All time'
+    : cashMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  const allBtn = document.getElementById('cashAllTime');
+  if(allBtn){ allBtn.style.fontWeight = cashShowAll ? '700' : ''; allBtn.textContent = cashShowAll ? '✓ All time' : 'All time'; }
+
+  const txns = cashShowAll
+    ? [...allCashTxns]
+    : allCashTxns.filter(t => t.date >= fromISO && t.date < toISOEnd);
+
+  let received = 0, spent = 0, advanced = 0;
+  const byCard = {}, byFor = {};
+  for(const t of txns){
+    if(t.type === 'income'){ received += t.amount; }
+    else if(t.type === 'advance'){ advanced += t.amount; }
+    else {
+      spent += t.amount;
+      byFor[t.for] = (byFor[t.for] || 0) + t.amount;
+    }
+    if(t.type !== 'income'){
+      const key = t.employeeName && t.type === 'expense' ? 'advance' : t.card;
+      byCard[key] = (byCard[key] || 0) + t.amount;
+    }
+  }
+
+  document.getElementById('cashMonthSummary').innerHTML = `
+    <div class="cash-card" style="background:linear-gradient(135deg,#2f9e44,#1e6b2c);">
+      <div class="cash-card-label">Money received</div>
+      <div class="cash-card-balance">LKR ${Math.round(received).toLocaleString()}</div>
+    </div>
+    <div class="cash-card" style="background:linear-gradient(135deg,#e03131,#8a1f1f);">
+      <div class="cash-card-label">Petty cash spent</div>
+      <div class="cash-card-balance">LKR ${Math.round(spent).toLocaleString()}</div>
+    </div>
+    <div class="cash-card" style="background:linear-gradient(135deg,#f08c00,#b56500);">
+      <div class="cash-card-label">Advances given out</div>
+      <div class="cash-card-balance">LKR ${Math.round(advanced).toLocaleString()}</div>
+    </div>
+    <div class="cash-card" style="background:linear-gradient(135deg,#2b2b2b,#454545);">
+      <div class="cash-card-label">Net movement</div>
+      <div class="cash-card-balance">LKR ${Math.round(received - spent - advanced).toLocaleString()}</div>
+    </div>`;
+
+  const forRows = Object.keys(byFor).sort((a,b)=> byFor[b]-byFor[a])
+    .map(k=>`<tr><td>${esc(FOR_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byFor[k]).toLocaleString()}</td><td class="r dim">${pct(byFor[k], spent)}</td></tr>`).join('');
+  const cardRows = Object.keys(byCard).sort((a,b)=> byCard[b]-byCard[a])
+    .map(k=>`<tr><td>${k==='advance' ? 'Paid from a staff advance' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
+
+  document.getElementById('cashMonthBreakdown').innerHTML = (spent === 0 && advanced === 0)
+    ? ''
+    : `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin:12px 0 4px;">
+        <div>
+          <div class="rpt-section-title" style="font-size:14px;">Spent on <span class="rpt-section-count">${lkr(spent)}</span></div>
+          <table class="rpt-table"><thead><tr><th>Location</th><th class="r">LKR</th><th class="r">Share</th></tr></thead><tbody>${forRows || '<tr><td colspan="3" class="dim">Nothing yet</td></tr>'}</tbody></table>
+        </div>
+        <div>
+          <div class="rpt-section-title" style="font-size:14px;">Money out, by source</div>
+          <table class="rpt-table"><thead><tr><th>Source</th><th class="r">LKR</th></tr></thead><tbody>${cardRows || '<tr><td colspan="2" class="dim">Nothing yet</td></tr>'}</tbody></table>
+        </div>
+      </div>`;
+
+  return txns;
+}
+
 function renderCash(){
   let ceymoraBal = 0, kalavaBal = 0, directKalava = 0, directCeymora = 0;
   for(const t of allCashTxns){
@@ -2395,14 +2622,16 @@ function renderCash(){
   document.getElementById('directPurchasesCeymora').textContent = 'LKR ' + directCeymora.toLocaleString();
   renderAdvanceWallets();
 
+  const monthTxns = renderCashMonth();
+
   const list = document.getElementById('cashList');
   list.innerHTML = '';
-  if(allCashTxns.length === 0){
-    list.innerHTML = '<div class="manage-empty">No transactions yet.</div>';
+  if(monthTxns.length === 0){
+    list.innerHTML = `<div class="manage-empty">${cashShowAll ? 'No transactions yet.' : 'No transactions recorded in ' + cashMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}) + '.'}</div>`;
     renderAdvances();
     return;
   }
-  const sorted = [...allCashTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const sorted = [...monthTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
   const table = document.createElement('table');
   table.className = 'inv-table';
   table.innerHTML = `
@@ -3879,6 +4108,751 @@ function renderActivityLog(rows){
     list.appendChild(row);
   }
 }
+
+/* ============================================================================
+   COMPANY ACCOUNTS
+   One place to enter the company's monthly figures (the things the board can't
+   know by itself — salaries, EPF/ETF, bills, bank charges) and to generate the
+   four management reports from them: Dashboard, Monthly Income Statement,
+   Operating Statement Summary, and the Sales / Commission Summary.
+   Everything is stored per month in the company_monthly_accounts table.
+   ============================================================================ */
+
+// The expense lines, grouped exactly the way the income statement presents them.
+const CO_GROUPS = [
+  { key:'staff', label:'Staff Cost', items:[
+    ['staff_salary','Staff Salary'], ['staff_welfare','Staff Welfare'],
+    ['epf','EPF Expense (12%)'], ['etf','ETF Expense (3%)'],
+    ['performance_incentive','Performance Incentive'], ['allowance','Allowance'],
+    ['performance_allowance','Performance Allowance'], ['bonus','Bonus'],
+    ['travelling_allowance','Travelling Allowance'], ['wages','Wages'],
+  ]},
+  { key:'utilities', label:'Utilities & Fixed Commitments', items:[
+    ['water','Water'], ['telephone','Telephone'],
+  ]},
+  { key:'professional', label:'Professional Fees', items:[
+    ['accountancy','Monthly Accountancy Fee'], ['professional_fees','Professional Fees'],
+  ]},
+  { key:'admin', label:'Administrative Expenses', items:[
+    ['printing','Printing & Stationery'], ['repair','Repair and Maintenance'],
+    ['travel_transport','Travelling & Transport'], ['office_maintenance','Office Maintenance'],
+    ['cleaning','Cleaning'], ['advertising','Advertising and Promotion'],
+  ]},
+  { key:'selling', label:'Selling & Distribution', items:[
+    ['card_commission','Card Commission'],
+  ]},
+  { key:'financial', label:'Financial & Other Expenses', items:[
+    ['penalty','Penalty & Surcharge'], ['exchange_loss','Exchange Loss'],
+    ['bank_charges','Bank Service Charges'], ['dog_food','Dog Food'],
+  ]},
+];
+const CO_ANNUAL = [
+  ['annual_audit','Annual Accounts and Audit Fee'],
+  ['annual_secretary','Annual Secretary Fee'],
+  ['annual_trade_license','Annual Trade License Fee'],
+];
+const CO_GROUP_COLORS = {
+  staff:'#e8590c', utilities:'#f2c94c', professional:'#4d5bd1',
+  admin:'#adb5bd', selling:'#2f9e44', financial:'#0c8599', net:'#7048e8',
+};
+// Flat lookup: category key -> [groupKey, label]
+const CO_CAT_INDEX = (()=>{
+  const m = {};
+  CO_GROUPS.forEach(g => g.items.forEach(([k,l]) => m[k] = { group:g.key, label:l }));
+  CO_ANNUAL.forEach(([k,l]) => m[k] = { group:'annual', label:l });
+  return m;
+})();
+
+let companyInited = false;
+let allCoRows = [];
+let coMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let coView = 'entry';
+let coDirty = false;
+
+function coPeriodISO(d){ return toISO(new Date(d.getFullYear(), d.getMonth(), 1)); }
+function coPrevPeriodISO(d){ return toISO(new Date(d.getFullYear(), d.getMonth()-1, 1)); }
+function coRowsFor(periodISO, section){
+  return allCoRows.filter(r => r.period === periodISO && r.section === section);
+}
+function coAmount(periodISO, section, category){
+  const r = allCoRows.find(x => x.period===periodISO && x.section===section && x.category===category);
+  return r ? Number(r.amount) : 0;
+}
+
+/* ---------------------------- data ---------------------------- */
+async function fetchCompany(){
+  if(!sb) return;
+  const { data, error } = await sb.from('company_monthly_accounts').select('*');
+  if(error){
+    document.getElementById('coEntryStatus').textContent = 'Could not load — has the company_monthly_accounts table been created?';
+    console.error(error);
+    return;
+  }
+  allCoRows = data.map(r => ({ id:r.id, period:r.period, section:r.section, category:r.category, amount:Number(r.amount)||0 }));
+  document.getElementById('coEntryStatus').textContent = '';
+  if(!coDirty) renderCompany();
+}
+
+function initCompany(){
+  companyInited = true;
+  if(!bookingsInited){ initBookings(); }
+  if(!cashInited){ initPettyCash(); }
+
+  fetchCompany();
+  if(sb){
+    sb.channel('company_accounts_changes')
+      .on('postgres_changes', { event:'*', schema:'public', table:'company_monthly_accounts' }, fetchCompany)
+      .subscribe();
+  }
+
+  const coGoMonth = (delta)=>{
+    if(coDirty && !confirm('You have unsaved figures for this month. Leave without saving?')) return;
+    coDirty = false;
+    if(delta === 0) coMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    else coMonthDate.setMonth(coMonthDate.getMonth() + delta);
+    renderCompany();
+  };
+  document.getElementById('coPrevMonth').addEventListener('click', ()=> coGoMonth(-1));
+  document.getElementById('coNextMonth').addEventListener('click', ()=> coGoMonth(1));
+  document.getElementById('coThisMonth').addEventListener('click', ()=> coGoMonth(0));
+
+  document.getElementById('coTabEntry').addEventListener('click', ()=> setCoView('entry'));
+  document.getElementById('coTabReport').addEventListener('click', ()=> setCoView('report'));
+  document.getElementById('coPrintBtn').addEventListener('click', ()=> window.print());
+  document.getElementById('coSaveBtn').addEventListener('click', saveCompanyMonth);
+  document.getElementById('coPullCommission').addEventListener('click', coPullCommission);
+  document.getElementById('coCalcEpf').addEventListener('click', coCalcEpfEtf);
+  document.getElementById('coCopyPrev').addEventListener('click', coCopyPrevious);
+
+  document.querySelectorAll('#companyPanel .rpt-quick[data-add]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      coAddDynRow(btn.dataset.add, '', '');
+      coDirty = true;
+      coRecalcTotals();
+    });
+  });
+
+  renderCompany();
+}
+
+async function setCoView(v){
+  // Reports are built from what's saved, so switching over with unsaved edits
+  // would quietly show stale figures. Offer to save them first.
+  if(v === 'report' && coDirty){
+    if(confirm('You have figures on this page that haven\'t been saved yet.\n\nSave them now so they appear in the report?')){
+      await saveCompanyMonth();
+    }
+  }
+  coView = v;
+  document.getElementById('coEntryView').style.display = v==='entry' ? '' : 'none';
+  document.getElementById('coReportView').style.display = v==='report' ? '' : 'none';
+  const eBtn = document.getElementById('coTabEntry'), rBtn = document.getElementById('coTabReport');
+  [eBtn, rBtn].forEach(b=>{ b.classList.remove('active'); b.style.background='#fff'; b.style.color='var(--muted)'; });
+  const on = v==='entry' ? eBtn : rBtn;
+  on.classList.add('active'); on.style.background='var(--ink)'; on.style.color='#fff';
+  if(v==='report') renderCompanyReport();
+}
+
+function renderCompany(){
+  if(!companyInited) return;
+  document.getElementById('coMonthLabel').textContent = coMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  renderCompanyEntry();
+  if(coView === 'report') renderCompanyReport();
+}
+
+/* ---------------------------- entry form ---------------------------- */
+function coDynRowHTML(){ return ''; }
+
+function coAddDynRow(section, name, amount){
+  const wrapId = { management_income:'coMgmtRows', other_income:'coOtherRows', cash:'coCashRows' }[section];
+  const wrap = document.getElementById(wrapId);
+  const row = document.createElement('div');
+  row.className = 'co-dyn';
+  row.dataset.section = section;
+  row.innerHTML = `
+    <input class="co-name" type="text" placeholder="${section==='cash' ? 'Account name (e.g. Sampath Current Account)' : 'Name (e.g. Noelia Villa)'}" value="${esc(name)}">
+    <input class="co-amt" type="number" step="0.01" placeholder="0.00" value="${amount===''||amount===null||amount===undefined ? '' : amount}">
+    <button type="button" title="Remove this line">✕</button>`;
+  row.querySelector('button').addEventListener('click', ()=>{ row.remove(); coDirty=true; coRecalcTotals(); });
+  row.querySelectorAll('input').forEach(i=> i.addEventListener('input', ()=>{ coDirty=true; coRecalcTotals(); }));
+  wrap.appendChild(row);
+  return row;
+}
+
+function renderCompanyEntry(){
+  const p = coPeriodISO(coMonthDate);
+
+  // Expense groups — built once, then just refilled each time the month changes.
+  const groupWrap = document.getElementById('coExpenseGroups');
+  if(!groupWrap.dataset.built){
+    groupWrap.dataset.built = '1';
+    groupWrap.innerHTML = CO_GROUPS.map(g=>`
+      <div class="co-group">
+        <div class="co-group-title"><span>${esc(g.label)}</span><span class="co-group-total" data-group-total="${g.key}">0</span></div>
+        ${g.items.map(([k,l])=>`<label class="co-line"><span>${esc(l)}</span><input type="number" step="0.01" placeholder="0.00" data-cat="${k}"></label>`).join('')}
+      </div>`).join('');
+    document.getElementById('coAnnualLines').innerHTML = CO_ANNUAL.map(([k,l])=>
+      `<label class="co-line"><span>${esc(l)}</span><input type="number" step="0.01" placeholder="0.00" data-cat="${k}"></label>`).join('');
+    document.querySelectorAll('#companyPanel input[data-cat]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{ coDirty=true; inp.classList.remove('auto'); coRecalcTotals(); });
+    });
+  }
+
+  // Fill the fixed expense inputs for this month
+  document.querySelectorAll('#companyPanel input[data-cat]').forEach(inp=>{
+    const section = CO_CAT_INDEX[inp.dataset.cat] && CO_CAT_INDEX[inp.dataset.cat].group === 'annual' ? 'annual' : 'expense';
+    const v = coAmount(p, section, inp.dataset.cat);
+    inp.value = v ? v : '';
+    inp.classList.remove('auto');
+  });
+
+  // Fill the free-form rows
+  ['management_income','other_income','cash'].forEach(section=>{
+    const wrapId = { management_income:'coMgmtRows', other_income:'coOtherRows', cash:'coCashRows' }[section];
+    document.getElementById(wrapId).innerHTML = '';
+    const rows = coRowsFor(p, section);
+    if(rows.length === 0){
+      // Sensible starting lines so the form isn't an empty box on a fresh month
+      if(section === 'management_income') CAL_VILLAS.forEach(v => coAddDynRow(section, v.name, ''));
+      else if(section === 'cash') coAddDynRow(section, 'Sampath Current Account', '');
+      else coAddDynRow(section, '', '');
+    } else {
+      rows.forEach(r => coAddDynRow(section, r.category, r.amount));
+    }
+  });
+
+  // Reference figure: what the board itself recorded as petty cash spending this month
+  const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
+  const monthEnd = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()+1, 1));
+  const pettySpent = allCashTxns
+    .filter(t => t.type==='expense' && t.date>=monthStart && t.date<monthEnd)
+    .reduce((s,t)=> s + t.amount, 0);
+  document.getElementById('coPettyHint').textContent = pettySpent
+    ? `For reference: the Petty Cash tab recorded ${lkr(pettySpent)} of spending this month.`
+    : '';
+
+  document.getElementById('coSaveMsg').textContent = '';
+  coDirty = false;
+  coRecalcTotals();
+}
+
+function coRecalcTotals(){
+  let mgmt = 0, other = 0, cash = 0, annual = 0;
+  document.querySelectorAll('#coMgmtRows .co-amt').forEach(i => mgmt += parseFloat(i.value)||0);
+  document.querySelectorAll('#coOtherRows .co-amt').forEach(i => other += parseFloat(i.value)||0);
+  document.querySelectorAll('#coCashRows .co-amt').forEach(i => cash += parseFloat(i.value)||0);
+  document.getElementById('coTotalMgmt').textContent = Math.round(mgmt).toLocaleString();
+  document.getElementById('coTotalOther').textContent = Math.round(other).toLocaleString();
+  document.getElementById('coTotalCash').textContent = Math.round(cash).toLocaleString();
+
+  CO_GROUPS.forEach(g=>{
+    let t = 0;
+    g.items.forEach(([k])=>{
+      const inp = document.querySelector(`#companyPanel input[data-cat="${k}"]`);
+      if(inp) t += parseFloat(inp.value)||0;
+    });
+    const el = document.querySelector(`[data-group-total="${g.key}"]`);
+    if(el) el.textContent = Math.round(t).toLocaleString();
+  });
+  CO_ANNUAL.forEach(([k])=>{
+    const inp = document.querySelector(`#companyPanel input[data-cat="${k}"]`);
+    if(inp) annual += parseFloat(inp.value)||0;
+  });
+  document.getElementById('coTotalAnnual').textContent = Math.round(annual).toLocaleString();
+}
+
+/* ---------------------------- entry helpers ---------------------------- */
+async function coCalcEpfEtf(){
+  const salaryInp = document.querySelector('#companyPanel input[data-cat="staff_salary"]');
+  const salary = parseFloat(salaryInp && salaryInp.value) || 0;
+  if(!salary){ alert('Enter Staff Salary first, then this will work out EPF and ETF from it.'); return; }
+  const epf = document.querySelector('#companyPanel input[data-cat="epf"]');
+  const etf = document.querySelector('#companyPanel input[data-cat="etf"]');
+  epf.value = Math.round(salary * 0.12 * 100) / 100; epf.classList.add('auto');
+  etf.value = Math.round(salary * 0.03 * 100) / 100; etf.classList.add('auto');
+  coDirty = true; coRecalcTotals();
+}
+
+async function coCopyPrevious(){
+  const prev = coPrevPeriodISO(coMonthDate);
+  if(!allCoRows.some(r => r.period === prev)){ alert('There are no saved figures for the previous month to copy.'); return; }
+  if(!confirm('Copy last month\'s figures into this month? Anything you\'ve already typed here will be replaced.')) return;
+
+  document.querySelectorAll('#companyPanel input[data-cat]').forEach(inp=>{
+    const section = CO_CAT_INDEX[inp.dataset.cat].group === 'annual' ? 'annual' : 'expense';
+    const v = coAmount(prev, section, inp.dataset.cat);
+    inp.value = v ? v : '';
+    inp.classList.toggle('auto', !!v);
+  });
+  ['management_income','other_income','cash'].forEach(section=>{
+    const wrapId = { management_income:'coMgmtRows', other_income:'coOtherRows', cash:'coCashRows' }[section];
+    document.getElementById(wrapId).innerHTML = '';
+    const rows = coRowsFor(prev, section);
+    if(rows.length === 0) coAddDynRow(section, '', '');
+    else rows.forEach(r => coAddDynRow(section, r.category, r.amount));
+  });
+  coDirty = true; coRecalcTotals();
+  document.getElementById('coSaveMsg').textContent = 'Copied from last month — check the figures, then Save.';
+}
+
+// Fills Management Income from the bookings already in the calendar: each villa's
+// 15% Ceymora fee for bookings checking in during this month, converted to LKR.
+async function coPullCommission(){
+  const btn = document.getElementById('coPullCommission');
+  const original = btn.textContent;
+  btn.textContent = 'Working out commission…'; btn.disabled = true;
+  try{
+    const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
+    const monthEnd = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()+1, 1));
+    const perVilla = {};
+    for(const b of allBookings){
+      if(!b.rateUsd || b.checkIn < monthStart || b.checkIn >= monthEnd) continue;
+      const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+      const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+      const rate = await getFxRate(b.checkIn, cur);
+      if(!rate) continue;
+      perVilla[b.villa] = (perVilla[b.villa] || 0) + nights * b.rateUsd * rate * 0.15;
+    }
+    const wrap = document.getElementById('coMgmtRows');
+    // Update matching villa lines in place; add a line for any villa not listed yet.
+    CAL_VILLAS.forEach(v=>{
+      const amount = Math.round((perVilla[v.id] || 0) * 100) / 100;
+      let row = [...wrap.querySelectorAll('.co-dyn')].find(r => r.querySelector('.co-name').value.trim().toLowerCase() === v.name.toLowerCase());
+      if(!row){
+        const blank = [...wrap.querySelectorAll('.co-dyn')].find(r => !r.querySelector('.co-name').value.trim());
+        row = blank || coAddDynRow('management_income', '', '');
+        row.querySelector('.co-name').value = v.name;
+      }
+      row.querySelector('.co-amt').value = amount || '';
+    });
+    coDirty = true; coRecalcTotals();
+    document.getElementById('coSaveMsg').textContent = 'Commission pulled from Bookings — review it, then Save.';
+  }catch(e){
+    console.error(e);
+    alert('Could not work out the commission. Check that the bookings have a nightly rate set.');
+  }finally{
+    btn.textContent = original; btn.disabled = false;
+  }
+}
+
+/* ---------------------------- saving ---------------------------- */
+async function saveCompanyMonth(){
+  const msg = document.getElementById('coSaveMsg');
+  if(!sb){ msg.textContent = 'Not connected to Supabase yet.'; return; }
+  if(!isAdmin()){ msg.textContent = 'Only an admin can save company figures.'; return; }
+  const p = coPeriodISO(coMonthDate);
+  const rows = [];
+
+  document.querySelectorAll('#companyPanel input[data-cat]').forEach(inp=>{
+    const amount = parseFloat(inp.value) || 0;
+    if(!amount) return;
+    const section = CO_CAT_INDEX[inp.dataset.cat].group === 'annual' ? 'annual' : 'expense';
+    rows.push({ period:p, section, category:inp.dataset.cat, amount });
+  });
+  ['management_income','other_income','cash'].forEach(section=>{
+    const wrapId = { management_income:'coMgmtRows', other_income:'coOtherRows', cash:'coCashRows' }[section];
+    document.querySelectorAll(`#${wrapId} .co-dyn`).forEach(r=>{
+      const name = r.querySelector('.co-name').value.trim();
+      const amount = parseFloat(r.querySelector('.co-amt').value) || 0;
+      if(!name || !amount) return;
+      rows.push({ period:p, section, category:name, amount });
+    });
+  });
+
+  msg.textContent = 'Saving…';
+  try{
+    // Replace the whole month in one go — simpler and safer than tracking which
+    // individual lines changed, and it keeps deleted lines from lingering.
+    const { error: delErr } = await sb.from('company_monthly_accounts').delete().eq('period', p);
+    if(delErr) throw delErr;
+    if(rows.length){
+      const { error: insErr } = await sb.from('company_monthly_accounts').insert(rows);
+      if(insErr) throw insErr;
+    }
+    logActivity('update', 'company_monthly_accounts', `Saved company figures for ${coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})} (${rows.length} lines)`);
+    coDirty = false;
+    msg.textContent = `Saved ✓ — ${rows.length} line${rows.length===1?'':'s'} recorded for ${coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.`;
+    await fetchCompany();
+  }catch(e){
+    console.error(e);
+    msg.textContent = 'Save failed — check the company_monthly_accounts table exists in Supabase.';
+  }
+}
+
+/* ---------------------------- the numbers ---------------------------- */
+function coSnapshot(periodISO){
+  const mgmtLines = coRowsFor(periodISO, 'management_income');
+  const otherLines = coRowsFor(periodISO, 'other_income');
+  const cashLines = coRowsFor(periodISO, 'cash');
+  const mgmtTotal = mgmtLines.reduce((s,r)=> s+r.amount, 0);
+  const otherTotal = otherLines.reduce((s,r)=> s+r.amount, 0);
+  const cashTotal = cashLines.reduce((s,r)=> s+r.amount, 0);
+
+  const cat = {};
+  allCoRows.filter(r => r.period===periodISO && (r.section==='expense' || r.section==='annual'))
+    .forEach(r => cat[r.category] = r.amount);
+
+  const groupTotals = {};
+  CO_GROUPS.forEach(g => groupTotals[g.key] = g.items.reduce((s,[k])=> s + (cat[k]||0), 0));
+  const annualTotal = CO_ANNUAL.reduce((s,[k])=> s + (cat[k]||0), 0);
+  const monthlyExpenses = CO_GROUPS.reduce((s,g)=> s + groupTotals[g.key], 0);
+  const totalExpenses = monthlyExpenses + annualTotal;
+
+  const grossProfit = mgmtTotal;                       // no cost of sales on management income
+  const monthlyNet = grossProfit + otherTotal - monthlyExpenses;
+  const netProfit = grossProfit + otherTotal - totalExpenses;
+
+  return {
+    period:periodISO, mgmtLines, otherLines, cashLines,
+    mgmtTotal, otherTotal, cashTotal, cat, groupTotals,
+    annualTotal, monthlyExpenses, totalExpenses,
+    grossProfit, monthlyNet, netProfit,
+    grossMargin: mgmtTotal ? grossProfit/mgmtTotal : 0,
+    netMargin: grossProfit ? netProfit/grossProfit : 0,
+    hasData: mgmtTotal !== 0 || otherTotal !== 0 || totalExpenses !== 0 || cashTotal !== 0,
+  };
+}
+
+// Variance the way the accounts sheet reads it: this month versus last month,
+// where a bigger expense is a bad variance and a bigger income is a good one.
+function coVarCell(cur, prev, higherIsBetter){
+  const v = (cur||0) - (prev||0);
+  if(Math.round(v) === 0) return '<td class="r dim">—</td>';
+  const good = higherIsBetter ? v > 0 : v < 0;
+  const shown = v < 0 ? `(${Math.abs(Math.round(v)).toLocaleString()})` : Math.round(v).toLocaleString();
+  return `<td class="r ${good ? 'var-up' : 'var-down'}">${shown}</td>`;
+}
+function coNum(n){
+  const v = Math.round(Number(n)||0);
+  if(v === 0) return '<span class="dim">—</span>';
+  return v < 0 ? `(${Math.abs(v).toLocaleString()})` : v.toLocaleString();
+}
+
+/* ---------------------------- reports ---------------------------- */
+function renderCompanyReport(){
+  const body = document.getElementById('coReportBody');
+  const p = coPeriodISO(coMonthDate), pv = coPrevPeriodISO(coMonthDate);
+  const cur = coSnapshot(p), prev = coSnapshot(pv);
+  const curLabel = coMonthDate.toLocaleDateString('en-GB', { month:'long' });
+  const prevLabel = new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()-1, 1).toLocaleDateString('en-GB', { month:'long' });
+
+  if(!cur.hasData){
+    body.innerHTML = `<div class="rpt-doc"><div class="rpt-empty">
+      No figures have been entered for ${esc(coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}))} yet.
+      Switch to "✏️ Enter figures" above, fill the month in, and press Save — the reports build themselves from that.
+    </div></div>`;
+    return;
+  }
+
+  body.innerHTML = `
+  <div class="rpt-doc">
+    ${reportHeaderHTML('Ceymora (Pvt) Ltd', 'Management Accounts', coMonthDate, 'All figures in <b>LKR</b>')}
+    <div data-rpt-section="dashboard">${coDashboardHTML(cur, prev, curLabel, prevLabel)}</div>
+    <div data-rpt-section="income">${coIncomeStatementHTML(cur, prev, curLabel, prevLabel)}</div>
+    <div data-rpt-section="operating">${coOperatingStatementHTML(cur, prev, curLabel, prevLabel)}</div>
+    <div data-rpt-section="sales">${coSalesSummaryHTML()}</div>
+    <div class="rpt-foot">
+      Prepared by Ceymora · ${esc(coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}))}.
+      Built from the figures entered on the "Enter figures" tab for this month and the month before it.
+      Figures in brackets are negative. Percentages are measured against management income unless stated otherwise.
+    </div>
+  </div>`;
+
+  wireReportSections('coSections', 'coReportBody');
+  applyReportSections('coSections', 'coReportBody');
+}
+
+/* ---- 1. Dashboard ---- */
+function coDashboardHTML(cur, prev, curLabel, prevLabel){
+  // "Improvement" is read the way the accounts sheet reads it: the month-on-month
+  // movement expressed against this month's own figure.
+  const revMove = cur.mgmtTotal - prev.mgmtTotal;
+  const revImp = cur.mgmtTotal ? revMove / Math.abs(cur.mgmtTotal) : 0;
+  const netMove = cur.netProfit - prev.netProfit;
+  const netImp = cur.netProfit ? netMove / Math.abs(cur.netProfit) : 0;
+
+  const slices = CO_GROUPS
+    .map(g => ({ key:g.key, label:g.label, value:cur.groupTotals[g.key], color:CO_GROUP_COLORS[g.key] }))
+    .filter(s => s.value > 0);
+  if(cur.annualTotal > 0) slices.push({ key:'annual', label:'Non-recurring / Annual', value:cur.annualTotal, color:'#868e96' });
+
+  const cashRows = cur.cashLines.length
+    ? cur.cashLines.map(r=>`<tr><td>${esc(r.category)}</td><td class="r">${Math.round(r.amount).toLocaleString()}</td></tr>`).join('')
+      + `<tr class="subtotal"><td>Total cash &amp; cash equivalent</td><td class="r">${Math.round(cur.cashTotal).toLocaleString()}</td></tr>`
+    : '<tr><td colspan="2" class="dim">No account balances entered for this month.</td></tr>';
+
+  const compRows = slices.map(s=>`
+    <tr>
+      <td><span class="rpt-legend" style="margin:0;display:inline-flex;"><span class="k"><i style="background:${s.color}"></i>${esc(s.label)}</span></span></td>
+      <td class="r rpt-money-out">${Math.round(s.value).toLocaleString()}</td>
+      <td class="r dim">${pct(s.value, cur.mgmtTotal)}</td>
+    </tr>`).join('');
+
+  return `
+  <div class="rpt-section">
+    <div class="rpt-section-title">Dashboard <span class="rpt-section-count">${esc(curLabel)} vs ${esc(prevLabel)}</span></div>
+
+    <div class="rpt-kpis">
+      <div class="rpt-kpi ${revMove>=0?'pos':'neg'}">
+        <div class="rpt-kpi-label">Revenue movement</div>
+        <div class="rpt-kpi-value">${(revImp*100).toFixed(0)}%</div>
+        <div class="rpt-kpi-note">${coNum(revMove)} vs ${esc(prevLabel)}</div>
+      </div>
+      <div class="rpt-kpi ${netMove>=0?'pos':'neg'}">
+        <div class="rpt-kpi-label">Net profit movement</div>
+        <div class="rpt-kpi-value">${(netImp*100).toFixed(0)}%</div>
+        <div class="rpt-kpi-note">${coNum(netMove)} vs ${esc(prevLabel)}</div>
+      </div>
+      <div class="rpt-kpi">
+        <div class="rpt-kpi-label">Management income</div>
+        <div class="rpt-kpi-value">${Math.round(cur.mgmtTotal).toLocaleString()}</div>
+        <div class="rpt-kpi-note">${esc(prevLabel)}: ${Math.round(prev.mgmtTotal).toLocaleString()}</div>
+      </div>
+      <div class="rpt-kpi">
+        <div class="rpt-kpi-label">Total expenses</div>
+        <div class="rpt-kpi-value">${Math.round(cur.totalExpenses).toLocaleString()}</div>
+        <div class="rpt-kpi-note">${esc(prevLabel)}: ${Math.round(prev.totalExpenses).toLocaleString()}</div>
+      </div>
+      <div class="rpt-kpi ${cur.netProfit>=0?'pos':'neg'}">
+        <div class="rpt-kpi-label">Net operational profit</div>
+        <div class="rpt-kpi-value">${coNum(cur.netProfit)}</div>
+        <div class="rpt-kpi-note">${(cur.netMargin*100).toFixed(0)}% net margin</div>
+      </div>
+    </div>
+
+    <div class="rpt-split">
+      <div>
+        <div class="rpt-section-title" style="font-size:14px;">Where the money goes</div>
+        ${coPieSVG(slices)}
+        <table class="rpt-table">
+          <thead><tr><th>Expense group</th><th class="r">LKR</th><th class="r">% of income</th></tr></thead>
+          <tbody>
+            ${compRows || '<tr><td colspan="3" class="dim">No expenses entered.</td></tr>'}
+            <tr class="subtotal"><td>Total expenses</td><td class="r">${Math.round(cur.totalExpenses).toLocaleString()}</td><td class="r">${pct(cur.totalExpenses, cur.mgmtTotal)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="rpt-section-title" style="font-size:14px;">Margins</div>
+        <table class="rpt-table">
+          <thead><tr><th>Measure</th><th class="r">${esc(curLabel)}</th><th class="r">${esc(prevLabel)}</th></tr></thead>
+          <tbody>
+            <tr><td>Gross profit margin</td><td class="r">${(cur.grossMargin*100).toFixed(0)}%</td><td class="r dim">${(prev.grossMargin*100).toFixed(0)}%</td></tr>
+            <tr><td>Net profit margin</td><td class="r ${cur.netMargin>=0?'var-up':'var-down'}">${(cur.netMargin*100).toFixed(0)}%</td><td class="r dim">${(prev.netMargin*100).toFixed(0)}%</td></tr>
+            <tr><td>Expenses as % of income</td><td class="r">${pct(cur.totalExpenses, cur.mgmtTotal)}</td><td class="r dim">${pct(prev.totalExpenses, prev.mgmtTotal)}</td></tr>
+          </tbody>
+        </table>
+
+        <div class="rpt-section-title" style="font-size:14px; margin-top:18px;">Cash &amp; cash equivalent <span class="rpt-section-count">as at month end</span></div>
+        <table class="rpt-table">
+          <thead><tr><th>Account</th><th class="r">LKR</th></tr></thead>
+          <tbody>${cashRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Small dependency-free pie. Each slice is drawn as an arc wedge.
+function coPieSVG(slices){
+  const total = slices.reduce((s,x)=> s+x.value, 0);
+  if(!total) return '<div class="rpt-empty">Nothing to chart yet.</div>';
+  const cx = 110, cy = 110, r = 96;
+  let angle = -Math.PI/2, paths = '';
+  slices.forEach(s=>{
+    const sweep = (s.value/total) * Math.PI * 2;
+    const x1 = cx + r*Math.cos(angle), y1 = cy + r*Math.sin(angle);
+    const x2 = cx + r*Math.cos(angle+sweep), y2 = cy + r*Math.sin(angle+sweep);
+    const large = sweep > Math.PI ? 1 : 0;
+    // A single slice covering the whole circle can't be drawn as one arc
+    paths += sweep >= Math.PI*2 - 0.0001
+      ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`
+      : `<path d="M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${s.color}" stroke="#fff" stroke-width="1.5"><title>${esc(s.label)}: ${Math.round(s.value).toLocaleString()} (${pct(s.value,total)})</title></path>`;
+    angle += sweep;
+  });
+  const legend = slices.map(s=>`<span class="k"><i style="background:${s.color}"></i>${esc(s.label)} ${pct(s.value,total)}</span>`).join('');
+  return `<svg class="rpt-chart" viewBox="0 0 220 220" style="max-width:230px;" role="img" aria-label="Expense composition">${paths}</svg>
+    <div class="rpt-legend">${legend}</div>`;
+}
+
+/* ---- 2. Monthly Income Statement ---- */
+function coIncomeStatementHTML(cur, prev, curLabel, prevLabel){
+  const head = `<thead><tr>
+      <th>Description</th>
+      <th class="r">${esc(curLabel)}</th>
+      <th class="r">${esc(prevLabel)}</th>
+      <th class="r">Variance</th>
+      <th class="r">% of income</th>
+    </tr></thead>`;
+
+  const incomeNames = [...new Set([...cur.mgmtLines, ...prev.mgmtLines].map(r=>r.category))];
+  const otherNames  = [...new Set([...cur.otherLines, ...prev.otherLines].map(r=>r.category))];
+  const lineOf = (lines, name)=> { const r = lines.find(x=>x.category===name); return r ? r.amount : 0; };
+
+  let rows = '<tr class="grouphead"><td colspan="5">Management income</td></tr>';
+  incomeNames.forEach(n=>{
+    const c = lineOf(cur.mgmtLines, n), p = lineOf(prev.mgmtLines, n);
+    rows += `<tr><td>${esc(n)}</td><td class="r">${coNum(c)}</td><td class="r dim">${coNum(p)}</td>${coVarCell(c,p,true)}<td class="r dim">${pct(c, cur.mgmtTotal)}</td></tr>`;
+  });
+  rows += `<tr class="subtotal"><td>Total management income</td><td class="r">${coNum(cur.mgmtTotal)}</td><td class="r">${coNum(prev.mgmtTotal)}</td>${coVarCell(cur.mgmtTotal, prev.mgmtTotal, true)}<td class="r">100%</td></tr>`;
+  rows += `<tr class="subtotal"><td>Gross profit</td><td class="r">${coNum(cur.grossProfit)}</td><td class="r">${coNum(prev.grossProfit)}</td>${coVarCell(cur.grossProfit, prev.grossProfit, true)}<td class="r">${(cur.grossMargin*100).toFixed(0)}%</td></tr>`;
+
+  if(otherNames.length){
+    rows += '<tr class="grouphead"><td colspan="5">Other income</td></tr>';
+    otherNames.forEach(n=>{
+      const c = lineOf(cur.otherLines, n), p = lineOf(prev.otherLines, n);
+      rows += `<tr><td>${esc(n)}</td><td class="r">${coNum(c)}</td><td class="r dim">${coNum(p)}</td>${coVarCell(c,p,true)}<td class="r dim">${pct(c, cur.mgmtTotal)}</td></tr>`;
+    });
+    rows += `<tr class="subtotal"><td>Total other income</td><td class="r">${coNum(cur.otherTotal)}</td><td class="r">${coNum(prev.otherTotal)}</td>${coVarCell(cur.otherTotal, prev.otherTotal, true)}<td class="r">${pct(cur.otherTotal, cur.mgmtTotal)}</td></tr>`;
+  }
+
+  CO_GROUPS.forEach(g=>{
+    const cg = cur.groupTotals[g.key], pg = prev.groupTotals[g.key];
+    if(!cg && !pg) return; // don't print a whole empty group
+    rows += `<tr class="grouphead"><td colspan="5">${esc(g.label)}</td></tr>`;
+    g.items.forEach(([k,l])=>{
+      const c = cur.cat[k] || 0, p = prev.cat[k] || 0;
+      if(!c && !p) return;
+      rows += `<tr><td>${esc(l)}</td><td class="r rpt-money-out">${coNum(c)}</td><td class="r dim">${coNum(p)}</td>${coVarCell(c,p,false)}<td class="r dim">${pct(c, cur.mgmtTotal)}</td></tr>`;
+    });
+    rows += `<tr class="subtotal"><td>Total ${esc(g.label.toLowerCase())}</td><td class="r">${coNum(cg)}</td><td class="r">${coNum(pg)}</td>${coVarCell(cg,pg,false)}<td class="r">${pct(cg, cur.mgmtTotal)}</td></tr>`;
+  });
+
+  rows += `<tr class="subtotal"><td>Total monthly expenses</td><td class="r">${coNum(cur.monthlyExpenses)}</td><td class="r">${coNum(prev.monthlyExpenses)}</td>${coVarCell(cur.monthlyExpenses, prev.monthlyExpenses, false)}<td class="r">${pct(cur.monthlyExpenses, cur.mgmtTotal)}</td></tr>`;
+  rows += `<tr class="subtotal"><td>Monthly net operational profit</td><td class="r ${cur.monthlyNet>=0?'var-up':'var-down'}">${coNum(cur.monthlyNet)}</td><td class="r dim">${coNum(prev.monthlyNet)}</td>${coVarCell(cur.monthlyNet, prev.monthlyNet, true)}<td class="r">${cur.mgmtTotal ? Math.round(cur.monthlyNet/cur.mgmtTotal*100)+'%' : '—'}</td></tr>`;
+
+  if(cur.annualTotal || prev.annualTotal){
+    rows += '<tr class="grouphead"><td colspan="5">Non-recurring / annual</td></tr>';
+    CO_ANNUAL.forEach(([k,l])=>{
+      const c = cur.cat[k] || 0, p = prev.cat[k] || 0;
+      if(!c && !p) return;
+      rows += `<tr><td>${esc(l)}</td><td class="r rpt-money-out">${coNum(c)}</td><td class="r dim">${coNum(p)}</td>${coVarCell(c,p,false)}<td class="r dim">${pct(c, cur.mgmtTotal)}</td></tr>`;
+    });
+    rows += `<tr class="subtotal"><td>Total non-recurring</td><td class="r">${coNum(cur.annualTotal)}</td><td class="r">${coNum(prev.annualTotal)}</td>${coVarCell(cur.annualTotal, prev.annualTotal, false)}<td class="r">${pct(cur.annualTotal, cur.mgmtTotal)}</td></tr>`;
+  }
+
+  rows += `<tr class="subtotal"><td>Total expenses</td><td class="r">${coNum(cur.totalExpenses)}</td><td class="r">${coNum(prev.totalExpenses)}</td>${coVarCell(cur.totalExpenses, prev.totalExpenses, false)}<td class="r">${pct(cur.totalExpenses, cur.mgmtTotal)}</td></tr>`;
+
+  return `
+  <div class="rpt-section">
+    <div class="rpt-section-title">Monthly Income Statement <span class="rpt-section-count">for the period ended ${esc(coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}))}</span></div>
+    <table class="rpt-table">${head}<tbody>${rows}</tbody></table>
+    <table class="rpt-pl" style="margin-top:14px;">
+      <tbody>
+        <tr class="grand"><td>Net operational profit</td><td class="amt ${cur.netProfit>=0?'pos':'neg'}">${coNum(cur.netProfit)}</td></tr>
+        <tr class="line"><td class="lbl">Gross profit margin</td><td class="amt">${(cur.grossMargin*100).toFixed(0)}%</td></tr>
+        <tr class="line"><td class="lbl">Net profit margin</td><td class="amt ${cur.netMargin>=0?'pos':'neg'}">${(cur.netMargin*100).toFixed(0)}%</td></tr>
+      </tbody>
+    </table>
+    <div class="rpt-note">Net operational profit = gross profit + other income − total expenses. A green variance is a favourable movement, red is unfavourable.</div>
+  </div>`;
+}
+
+/* ---- 3. Operating Statement Summary ---- */
+function coOperatingStatementHTML(cur, prev, curLabel, prevLabel){
+  const keys = [...CO_GROUPS.flatMap(g => g.items), ...CO_ANNUAL];
+  let rows = '', anyRow = false;
+  keys.forEach(([k,l])=>{
+    const c = cur.cat[k] || 0, p = prev.cat[k] || 0;
+    if(!c && !p) return;
+    anyRow = true;
+    rows += `<tr><td>${esc(l)}</td><td class="r">${coNum(c)}</td><td class="r">${coNum(p)}</td>${coVarCell(c,p,false)}</tr>`;
+  });
+  if(!anyRow) rows = '<tr><td colspan="4" class="dim">No expenses entered for either month.</td></tr>';
+
+  return `
+  <div class="rpt-section">
+    <div class="rpt-section-title">Operating Statement — Summary <span class="rpt-section-count">${esc(curLabel)} vs ${esc(prevLabel)}</span></div>
+    <table class="rpt-table">
+      <thead><tr><th>Description</th><th class="r">Current</th><th class="r">Previous</th><th class="r">Variance</th></tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="subtotal"><td>Total</td><td class="r">${coNum(cur.totalExpenses)}</td><td class="r">${coNum(prev.totalExpenses)}</td>${coVarCell(cur.totalExpenses, prev.totalExpenses, false)}</tr>
+      </tbody>
+    </table>
+    <div class="rpt-note">Every expense line side by side. Green means you spent less than last month; red means more. Lines with nothing in either month are left out.</div>
+  </div>`;
+}
+
+/* ---- 4. Sales / Commission Summary for the year ---- */
+function coSalesSummaryHTML(){
+  const year = coMonthDate.getFullYear();
+  const months = [];
+  for(let m=0; m<12; m++){
+    const iso = toISO(new Date(year, m, 1));
+    const snap = coSnapshot(iso);
+    months.push({
+      label: new Date(year, m, 1).toLocaleDateString('en-GB', { month:'short' }) + '-' + String(year).slice(2),
+      commission: snap.mgmtTotal,
+      other: snap.otherTotal,
+      isCurrent: m === coMonthDate.getMonth(),
+    });
+  }
+  const yearTotal = months.reduce((s,m)=> s+m.commission, 0);
+  const yearOther = months.reduce((s,m)=> s+m.other, 0);
+  const rows = months.map(m=>`
+    <tr${m.isCurrent ? ' style="font-weight:700;"' : ''}>
+      <td>${esc(m.label)}</td>
+      <td class="r">${coNum(m.commission)}</td>
+      <td class="r dim">${coNum(m.other)}</td>
+      <td class="r">${coNum(m.commission + m.other)}</td>
+    </tr>`).join('');
+
+  return `
+  <div class="rpt-section">
+    <div class="rpt-section-title">Sales &amp; Commission Summary <span class="rpt-section-count">${year} · ${lkr(yearTotal)} commission to date</span></div>
+    ${coBarChartSVG(months, year)}
+    <table class="rpt-table" style="max-width:520px;">
+      <thead><tr><th>Month</th><th class="r">Commission</th><th class="r">Other income</th><th class="r">Total</th></tr></thead>
+      <tbody>${rows}
+        <tr class="subtotal"><td>${year} total</td><td class="r">${coNum(yearTotal)}</td><td class="r">${coNum(yearOther)}</td><td class="r">${coNum(yearTotal + yearOther)}</td></tr>
+      </tbody>
+    </table>
+    <div class="rpt-note">Months with no saved figures show as blank — they'll fill in as each month is entered.</div>
+  </div>`;
+}
+
+function coBarChartSVG(months, year){
+  const max = Math.max(...months.map(m=>m.commission), 0);
+  if(max <= 0) return '<div class="rpt-empty">No commission recorded for this year yet.</div>';
+
+  const W = 760, H = 300, padL = 74, padR = 12, padT = 28, padB = 42;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  // Round the axis top up to something readable
+  const step = Math.pow(10, Math.floor(Math.log10(max)));
+  const top = Math.ceil(max / (step/2)) * (step/2) || max;
+
+  let grid = '', ticks = 4;
+  for(let i=0; i<=ticks; i++){
+    const v = top * i / ticks;
+    const y = padT + plotH - (plotH * i / ticks);
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#e5e1d6" stroke-width="1"/>
+      <text x="${padL-8}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#8a8578">${Math.round(v).toLocaleString()}</text>`;
+  }
+
+  const slot = plotW / months.length;
+  const barW = Math.min(slot * 0.58, 42);
+  let bars = '';
+  months.forEach((m,i)=>{
+    const x = padL + slot*i + (slot - barW)/2;
+    const h = m.commission > 0 ? (m.commission / top) * plotH : 0;
+    const y = padT + plotH - h;
+    if(h > 0){
+      bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2"
+        fill="${m.isCurrent ? '#d9480f' : '#f08c00'}"><title>${esc(m.label)}: ${Math.round(m.commission).toLocaleString()}</title></rect>`;
+      if(h > 22) bars += `<text x="${(x+barW/2).toFixed(1)}" y="${(y-5).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="#6b6559">${Math.round(m.commission/1000)}k</text>`;
+    }
+    bars += `<text x="${(x+barW/2).toFixed(1)}" y="${(padT+plotH+15).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="#8a8578">${esc(m.label)}</text>`;
+  });
+
+  return `<svg class="rpt-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Commission by month ${year}">
+    <text x="${W/2}" y="16" text-anchor="middle" font-size="13" font-weight="700" fill="#3d3a33">Commission by month — ${year}</text>
+    ${grid}
+    <line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="#b8b2a3" stroke-width="1.2"/>
+    ${bars}
+  </svg>`;
+}
+
 </script>
 </body>
 </html>
