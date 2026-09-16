@@ -235,6 +235,7 @@
   }
   .txn-badge.income{ background:var(--green-bg); color:var(--green); }
   .txn-badge.expense{ background:var(--red-bg); color:var(--red); }
+  .txn-badge.advance{ background:var(--amber-bg); color:var(--amber); }
   .txn-main{ flex:1; min-width:0; }
   .txn-title{ font-weight:600; overflow-wrap:break-word; }
   .txn-sub{ color:var(--muted); font-size:11.5px; overflow-wrap:break-word; }
@@ -487,10 +488,17 @@
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addIncomeBtn">+ Money received</button>
           <button class="add-booking-btn" id="addExpenseBtn">+ Record expense</button>
+          <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
         </div>
       </div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="manage-title">Advances to staff</div>
+        <div class="field-hint" style="margin:2px 0 8px;">Money handed to someone (e.g. from the Ceymora Card) that they still need to settle — with receipts, or by returning what's unused. Once you mark it settled it drops off this list, but stays in Transactions below for the record.</div>
+        <div id="advancesList" class="manage-list"></div>
+      </div>
+
+      <div class="manage-section">
         <div class="manage-title">Transactions</div>
         <div id="cashList" class="manage-list" style="max-height:420px;"></div>
       </div>
@@ -557,8 +565,15 @@
     <!-- ===================== REPORTS PANEL ===================== -->
     <div id="reportsPanel" style="display:none">
       <div class="toolbar no-print">
-        <div class="manage-title">Inventory summary — by villa</div>
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div class="manage-title">Financial Report</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <select id="repLocationSelect">
+            <option value="kalava">Kalava Villa</option>
+            <option value="noelia">Noelia Villa</option>
+            <option value="brisa">Brisa Villa</option>
+            <option value="office">Office</option>
+            <option value="store">Store</option>
+          </select>
           <div class="weeknav">
             <button id="repPrevMonth">◀ Prev</button>
             <span id="repMonthLabel">Month of ...</span>
@@ -570,12 +585,7 @@
       </div>
       <div class="field-hint" style="margin-bottom:8px;">"Direct" purchases below are items bought straight for a villa/office (bypassing Store) — see the Petty Cash tab for the direct-purchases total.</div>
       <div id="storeProfitCard" class="cash-card" style="max-width:340px; margin-bottom:16px; background:linear-gradient(135deg, #2f9e44, #1e6b2c);"></div>
-      <table class="inv-table">
-        <thead>
-          <tr><th>Villa / Office</th><th style="text-align:center">Items distributed (qty)</th><th style="text-align:center">Petty cash spent (LKR)</th></tr>
-        </thead>
-        <tbody id="repMonthlyBody"></tbody>
-      </table>
+      <div id="repReportBody"></div>
     </div>
 
   </div>
@@ -666,13 +676,15 @@
     <input type="number" id="expAmount" min="0" step="1" placeholder="e.g. 3500">
     <div class="modal-checkbox-row">
       <input type="checkbox" id="expIsStock">
-      <label for="expIsStock">This is a stock item — also add to Inventory</label>
+      <label for="expIsStock" id="expIsStockLabel">This is a stock item — also add to Inventory</label>
     </div>
+    <div class="field-hint" id="expIsStockHint" style="margin-top:-6px;"></div>
     <div id="expStockFields" style="display:none">
       <label>Item name</label>
       <input type="text" id="expItemName" placeholder="e.g. Toilet paper (24 pack)">
       <label>Quantity purchased (optional)</label>
       <input type="number" id="expItemQty" min="0" step="1" placeholder="e.g. 5">
+      <div class="field-hint" id="expStockNoMatchHint" style="display:none; color:var(--amber);">Couldn't match this to its original item record — re-enter the item and quantity to fix it going forward.</div>
     </div>
     <label>Note (optional)</label>
     <input type="text" id="expNote">
@@ -685,6 +697,42 @@
       <div style="flex:1"></div>
       <button class="btn btn-cancel" id="expCancel">Cancel</button>
       <button class="btn btn-save" id="expSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Advance modal (money given to staff, tracked until settled) -->
+<div class="modal-overlay" id="advanceModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Give advance</h3>
+    <label>Date</label>
+    <input type="date" id="advDate">
+    <label>Employee name</label>
+    <input type="text" id="advEmployee" list="staffNameList" placeholder="e.g. Anuja">
+    <datalist id="staffNameList"></datalist>
+    <label>From card</label>
+    <select id="advCard">
+      <option value="ceymora">Ceymora Card</option>
+      <option value="kalava_card">Kalava Villa Card</option>
+    </select>
+    <label>Amount (LKR)</label>
+    <input type="number" id="advAmount" min="0" step="1" placeholder="e.g. 10000">
+    <label>Note (optional)</label>
+    <input type="text" id="advNote" placeholder="e.g. For a Store supplies run">
+    <div class="modal-checkbox-row">
+      <input type="checkbox" id="advSettled">
+      <label for="advSettled">Settled (receipts submitted / unused cash returned)</label>
+    </div>
+    <div id="advSettledNoteWrap" style="display:none; margin-top:6px;">
+      <label>Settlement note (optional)</label>
+      <input type="text" id="advSettledNote" placeholder="e.g. Receipts submitted, or returned LKR 500 unused">
+    </div>
+    <div class="modal-error" id="advError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="advDeleteBtn" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="advCancel">Cancel</button>
+      <button class="btn btn-save" id="advSave">Save</button>
     </div>
   </div>
 </div>
@@ -860,7 +908,7 @@ function checkDeletePassword(){
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
 function rowToBooking(r){ return { id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null, currency:r.currency||'USD' }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [] }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -876,6 +924,24 @@ async function uploadReceiptFile(file){
   if(error) throw error;
   const { data } = sb.storage.from('receipts').getPublicUrl(path);
   return data.publicUrl;
+}
+
+// Deletes the actual uploaded files from the 'receipts' storage bucket, given the public
+// URLs stored on a row. Called whenever a row with attachments is deleted, so removing a
+// transaction/expense also cleans up its receipt images instead of leaving them orphaned
+// in storage forever.
+async function deleteReceiptFiles(urls){
+  if(!sb || !urls || !urls.length) return;
+  const marker = '/object/public/receipts/';
+  const paths = urls.map(u => {
+    const idx = typeof u === 'string' ? u.indexOf(marker) : -1;
+    return idx === -1 ? null : decodeURIComponent(u.slice(idx + marker.length));
+  }).filter(Boolean);
+  if(!paths.length) return;
+  try{
+    const { error } = await sb.storage.from('receipts').remove(paths);
+    if(error) console.error('Failed to delete receipt file(s):', error);
+  }catch(e){ console.error('Failed to delete receipt file(s):', e); }
 }
 
 // Lets a person attach one file, then asks "attach another?" and repeats until they say no.
@@ -1848,10 +1914,15 @@ function initPettyCash(){
 
   document.getElementById('addIncomeBtn').addEventListener('click', ()=> openIncomeModal());
   document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
+  document.getElementById('addAdvanceBtn').addEventListener('click', ()=> openAdvanceModal());
 
   document.getElementById('expCard').addEventListener('change', updateExpenseCardLock);
+  document.getElementById('expFor').addEventListener('change', updateExpenseStockLabel);
   document.getElementById('expIsStock').addEventListener('change', (e)=>{
     document.getElementById('expStockFields').style.display = e.target.checked ? '' : 'none';
+  });
+  document.getElementById('advSettled').addEventListener('change', (e)=>{
+    document.getElementById('advSettledNoteWrap').style.display = e.target.checked ? '' : 'none';
   });
 
   renderCash();
@@ -1879,6 +1950,40 @@ function updateExpenseCardLock(){
     forSelect.disabled = false;
     hint.textContent = 'Ceymora Card can be used for any villa or the office.';
   }
+  updateExpenseStockLabel();
+}
+
+// Spells out, in the checkbox itself, whether ticking it will go into Store (needing a
+// later Distribute step) or straight into that villa's stock as a direct purchase — so
+// picking "direct to villa" is an explicit, visible choice instead of an implicit side
+// effect of which "For" villa happens to be selected.
+function updateExpenseStockLabel(){
+  const forWhom = document.getElementById('expFor').value;
+  const label = document.getElementById('expIsStockLabel');
+  const hint = document.getElementById('expIsStockHint');
+  if(!label || !hint) return;
+  if(forWhom === 'store'){
+    label.textContent = 'This is a stock item — add to Store inventory';
+    hint.textContent = 'Goes into Store; you\'ll distribute it to a villa later from the Inventory tab.';
+  } else {
+    const name = FOR_LABELS[forWhom] || forWhom;
+    label.textContent = `This is a stock item — direct purchase for ${name} (skips Store)`;
+    hint.textContent = `Goes straight into ${name}'s stock without passing through Store.`;
+  }
+}
+
+// Older expenses (recorded before linked_purchase_id/linked_distribute_id existed) have no
+// direct pointer to the inventory rows they created. This does a best-effort match so those
+// older records can still be edited — the match gets saved as a real link the first time it's
+// used, so it's a one-time lookup per record.
+function findLegacyLinkedInventory(record){
+  if(!record || !record.linkedInventory) return { purchase:null, distribute:null };
+  const purchase = allInvTxns.find(t => t.type==='purchase' && t.date===record.date && t.amount===record.amount && t.note === ('Via petty cash: ' + record.purpose)) || null;
+  let distribute = null;
+  if(purchase && record.for !== 'store'){
+    distribute = allInvTxns.find(t => t.type==='distribute' && t.date===record.date && t.item===purchase.item && t.qty===purchase.qty && t.toVilla===record.for) || null;
+  }
+  return { purchase, distribute };
 }
 
 function renderCash(){
@@ -1901,6 +2006,7 @@ function renderCash(){
   list.innerHTML = '';
   if(allCashTxns.length === 0){
     list.innerHTML = '<div class="manage-empty">No transactions yet.</div>';
+    renderAdvances();
     return;
   }
   const sorted = [...allCashTxns].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
@@ -1925,6 +2031,13 @@ function renderCash(){
     let details;
     if(t.type === 'income'){
       details = 'Money received' + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
+    } else if(t.type === 'advance'){
+      const statusSpan = t.settled
+        ? '<span style="color:var(--green); font-size:11px; font-weight:600;">(settled)</span>'
+        : '<span style="color:var(--amber); font-size:11px; font-weight:600;">(outstanding)</span>';
+      details = `Advance — ${t.employeeName || 'Unknown'} ${statusSpan}`
+        + (t.note ? `<div class="txn-sub">${t.note}</div>` : '')
+        + (t.settled && t.settledNote ? `<div class="txn-sub">Settled: ${t.settledNote}</div>` : '');
     } else {
       details = (t.purpose || 'Expense') + ` <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>`
         + (t.linkedInventory ? ' 📦' : '')
@@ -1947,7 +2060,9 @@ function renderCash(){
       editBtn.textContent = 'Edit';
       editBtn.style.marginRight = '4px';
       editBtn.addEventListener('click', ()=>{
-        if(t.type === 'income') openIncomeModal(t); else openExpenseModal(t);
+        if(t.type === 'income') openIncomeModal(t);
+        else if(t.type === 'advance') openAdvanceModal(t);
+        else openExpenseModal(t);
       });
       actionTd.appendChild(editBtn);
     }
@@ -1958,8 +2073,10 @@ function renderCash(){
       if(!checkDeletePassword()) return;
       if(confirm('Delete this transaction?')){
         try{
+          await deleteReceiptFiles(getInvoiceLinks(t));
           await sb.from('petty_cash_transactions').delete().eq('id', t.id);
-          logActivity('delete', 'petty_cash_transactions', `Deleted ${t.type}: ${t.type==='income' ? CARD_LABELS[t.card] : t.purpose} — LKR ${t.amount.toLocaleString()}`);
+          const label = t.type==='income' ? CARD_LABELS[t.card] : (t.type==='advance' ? `Advance to ${t.employeeName||''}` : t.purpose);
+          logActivity('delete', 'petty_cash_transactions', `Deleted ${t.type}: ${label} — LKR ${t.amount.toLocaleString()}`);
         }catch(e){ console.error(e); }
       }
     });
@@ -1968,6 +2085,38 @@ function renderCash(){
     tbody.appendChild(tr);
   }
   list.appendChild(table);
+  renderAdvances();
+}
+
+function renderAdvances(){
+  const wrap = document.getElementById('advancesList');
+  if(!wrap) return;
+  const outstanding = allCashTxns
+    .filter(t => t.type === 'advance' && !t.settled)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  if(outstanding.length === 0){
+    wrap.innerHTML = '<div class="manage-empty">No outstanding advances.</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  for(const t of outstanding){
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    row.innerHTML = `
+      <span class="manage-type-dot" style="background:var(--amber);"></span>
+      <span class="manage-guest">${t.employeeName || 'Unknown'} <span style="color:var(--muted); font-weight:400;">— ${CARD_LABELS[t.card]||t.card}</span></span>
+      <span class="manage-dates">${t.date}${t.note ? ' · '+t.note : ''} · LKR ${t.amount.toLocaleString()}</span>
+    `;
+    if(canEdit()){
+      const editBtn = document.createElement('button');
+      editBtn.className = 'manage-edit';
+      editBtn.textContent = 'Settle / Edit';
+      editBtn.style.marginRight = '4px';
+      editBtn.addEventListener('click', ()=> openAdvanceModal(t));
+      row.appendChild(editBtn);
+    }
+    wrap.appendChild(row);
+  }
 }
 
 let editingCashId = null;
@@ -2034,18 +2183,27 @@ function openExpenseModal(record){
     document.getElementById('expFor').disabled = false;
     document.getElementById('expPurpose').value = record ? record.purpose : '';
     document.getElementById('expAmount').value = record ? record.amount : '';
-    document.getElementById('expIsStock').checked = false;
-    document.getElementById('expStockFields').style.display = 'none';
-    document.getElementById('expItemName').value = '';
-    document.getElementById('expItemQty').value = '';
+
+    const wasStock = record ? !!record.linkedInventory : false;
+    document.getElementById('expIsStock').checked = wasStock;
+    document.getElementById('expStockFields').style.display = wasStock ? '' : 'none';
+
+    let linkedPurchase = null;
+    if(wasStock){
+      linkedPurchase = record.linkedPurchaseId
+        ? (allInvTxns.find(t=>t.id===record.linkedPurchaseId) || null)
+        : findLegacyLinkedInventory(record).purchase;
+    }
+    document.getElementById('expItemName').value = linkedPurchase ? linkedPurchase.item : '';
+    document.getElementById('expItemQty').value = linkedPurchase ? linkedPurchase.qty : '';
+    document.getElementById('expStockNoMatchHint').style.display = (wasStock && !linkedPurchase) ? '' : 'none';
+
     document.getElementById('expNote').value = record ? (record.note || '') : '';
     expFileHandler.reset();
     const existing = record ? getInvoiceLinks(record) : [];
     document.getElementById('expFileHint').textContent = existing.length ? `${existing.length} file(s) already attached. New files you add here will be added alongside them.` : '';
     document.getElementById('expError').style.display = 'none';
-    // Hide the "add to inventory" checkbox when editing, to avoid creating duplicate inventory entries
-    document.getElementById('expIsStock').closest('.modal-checkbox-row').style.display = record ? 'none' : '';
-    updateExpenseCardLock();
+    updateExpenseCardLock(); // also refreshes the stock checkbox's label/hint for the current "For"
     document.querySelector('#expenseModalOverlay h3').textContent = record ? 'Edit expense' : 'Record expense';
     document.getElementById('expenseModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
@@ -2078,12 +2236,72 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       newUrls.push(await uploadReceiptFile(f));
     }
     document.getElementById('expFileHint').textContent = '';
+    const qtyLabel = itemQtyRaw ? ` (qty ${itemQty})` : '';
 
     if(editingCashId){
-      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note };
+      const original = allCashTxns.find(t=>t.id===editingCashId) || {};
+      const wasStock = !!original.linkedInventory;
+
+      // Find whatever inventory rows this expense previously created, so we update them
+      // in place instead of creating duplicates. Older records with no saved link get a
+      // one-time best-effort match, which is then saved as a real link below.
+      let existingPurchase = null, existingDistribute = null;
+      if(wasStock){
+        existingPurchase = original.linkedPurchaseId ? (allInvTxns.find(t=>t.id===original.linkedPurchaseId) || null) : null;
+        existingDistribute = original.linkedDistributeId ? (allInvTxns.find(t=>t.id===original.linkedDistributeId) || null) : null;
+        if(!original.linkedPurchaseId){
+          const found = findLegacyLinkedInventory(original);
+          existingPurchase = existingPurchase || found.purchase;
+          existingDistribute = existingDistribute || found.distribute;
+        }
+      }
+
+      let newLinkedPurchaseId = existingPurchase ? existingPurchase.id : null;
+      let newLinkedDistributeId = existingDistribute ? existingDistribute.id : null;
+
+      if(isStock){
+        // Purchase side: update in place if we found the original row, otherwise create one
+        // (covers both "newly marked as stock" and "couldn't match the legacy record").
+        if(existingPurchase){
+          const { error } = await sb.from('inventory_transactions').update({ date, item:itemName, qty:itemQty, amount, note:'Via petty cash: '+purpose }).eq('id', existingPurchase.id);
+          if(error) throw error;
+        } else {
+          const { data: purchaseRow, error } = await sb.from('inventory_transactions').insert({
+            type:'purchase', date, item:itemName, qty:itemQty, amount, note:'Via petty cash: '+purpose
+          }).select().single();
+          if(error) throw error;
+          newLinkedPurchaseId = purchaseRow.id;
+        }
+
+        // Distribute side: only exists for a direct-to-villa purchase, not a Store purchase.
+        if(forWhom === 'store'){
+          if(existingDistribute){
+            const { error } = await sb.from('inventory_transactions').delete().eq('id', existingDistribute.id);
+            if(error) throw error;
+          }
+          newLinkedDistributeId = null;
+        } else if(existingDistribute){
+          const { error } = await sb.from('inventory_transactions').update({ date, item:itemName, qty:itemQty, to_villa:forWhom, note:'Direct purchase via petty cash: '+purpose }).eq('id', existingDistribute.id);
+          if(error) throw error;
+        } else {
+          const { data: distRow, error } = await sb.from('inventory_transactions').insert({
+            type:'distribute', date, item:itemName, qty:itemQty, to_villa:forWhom, note:'Direct purchase via petty cash: '+purpose
+          }).select().single();
+          if(error) throw error;
+          newLinkedDistributeId = distRow.id;
+        }
+        logActivity('update', 'inventory_transactions', `Updated stock link on expense: ${itemName}${qtyLabel} → ${forWhom==='store' ? 'Store' : FOR_LABELS[forWhom]+' (direct)'}`);
+      } else if(wasStock){
+        // Stock link removed — clear out whatever inventory rows it had created.
+        if(existingDistribute){ await sb.from('inventory_transactions').delete().eq('id', existingDistribute.id); }
+        if(existingPurchase){ await sb.from('inventory_transactions').delete().eq('id', existingPurchase.id); }
+        newLinkedPurchaseId = null; newLinkedDistributeId = null;
+        logActivity('update', 'inventory_transactions', `Removed stock link from expense: ${purpose}`);
+      }
+
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId };
       if(newUrls.length){
-        const existingRecord = allCashTxns.find(t=>t.id===editingCashId);
-        const existingUrls = existingRecord ? getInvoiceLinks(existingRecord) : [];
+        const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
       }
       const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
@@ -2093,36 +2311,105 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       return;
     }
 
-    const { error } = await sb.from('petty_cash_transactions').insert({
+    const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
       type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls
-    });
+    }).select().single();
     if(error) throw error;
     logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
     if(isStock){
-      const qtyLabel = itemQtyRaw ? ` (qty ${itemQty})` : '';
+      const { data: purchaseRow, error: invErr } = await sb.from('inventory_transactions').insert({
+        type:'purchase', date, item:itemName, qty:itemQty, amount, note: 'Via petty cash: ' + purpose
+      }).select().single();
+      if(invErr) throw invErr;
+      let distributeId = null;
       if(forWhom === 'store'){
         // Bought generally, not earmarked for a specific villa yet — goes into Store, needs a Distribute step later.
-        const { error: invErr } = await sb.from('inventory_transactions').insert({
-          type:'purchase', date, item:itemName, qty:itemQty, amount, note: 'Via petty cash: ' + purpose
-        });
-        if(invErr) throw invErr;
         logActivity('create', 'inventory_transactions', `Purchased ${itemName}${qtyLabel} → Store (via petty cash expense)`);
       } else {
-        // Bought directly for a specific villa/office — update that location's stock immediately,
+        // Direct purchase for a specific villa/office — update that location's stock immediately,
         // no separate Distribute step needed. (Nets to zero in Store: purchase in, distribute straight out.)
-        const { error: invErr1 } = await sb.from('inventory_transactions').insert({
-          type:'purchase', date, item:itemName, qty:itemQty, amount, note: 'Via petty cash: ' + purpose
-        });
-        if(invErr1) throw invErr1;
-        const { error: invErr2 } = await sb.from('inventory_transactions').insert({
+        const { data: distRow, error: invErr2 } = await sb.from('inventory_transactions').insert({
           type:'distribute', date, item:itemName, qty:itemQty, to_villa: forWhom, note: 'Direct purchase via petty cash: ' + purpose
-        });
+        }).select().single();
         if(invErr2) throw invErr2;
+        distributeId = distRow.id;
         logActivity('create', 'inventory_transactions', `Purchased ${itemName}${qtyLabel} directly for ${FOR_LABELS[forWhom]} (via petty cash expense)`);
       }
+      const { error: linkErr } = await sb.from('petty_cash_transactions').update({ linked_purchase_id: purchaseRow.id, linked_distribute_id: distributeId }).eq('id', expenseRow.id);
+      if(linkErr) throw linkErr;
     }
     document.getElementById('expenseModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+
+function openAdvanceModal(record){
+  editingCashId = record ? record.id : null;
+  try{
+    // Suggest names from staff + system users so it's a quick pick, but still free text.
+    const dl = document.getElementById('staffNameList');
+    const names = new Set([...STAFF.map(s=>s.name), ...Object.keys(USERS)]);
+    dl.innerHTML = [...names].map(n=>`<option value="${n}">`).join('');
+
+    document.getElementById('advDate').value = record ? record.date : todayISO();
+    document.getElementById('advEmployee').value = record ? (record.employeeName || '') : '';
+    document.getElementById('advCard').value = record ? record.card : 'ceymora';
+    document.getElementById('advAmount').value = record ? record.amount : '';
+    document.getElementById('advNote').value = record ? (record.note || '') : '';
+    document.getElementById('advSettled').checked = record ? !!record.settled : false;
+    document.getElementById('advSettledNoteWrap').style.display = (record && record.settled) ? '' : 'none';
+    document.getElementById('advSettledNote').value = record ? (record.settledNote || '') : '';
+    document.getElementById('advError').style.display = 'none';
+    document.getElementById('advDeleteBtn').style.display = record ? '' : 'none';
+    document.querySelector('#advanceModalOverlay h3').textContent = record ? 'Edit advance' : 'Give advance';
+    document.getElementById('advanceModalOverlay').classList.add('open');
+  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
+}
+document.getElementById('advCancel').addEventListener('click', ()=> document.getElementById('advanceModalOverlay').classList.remove('open'));
+document.getElementById('advanceModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='advanceModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('advSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('advError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const date = document.getElementById('advDate').value;
+  const employeeName = document.getElementById('advEmployee').value.trim();
+  const card = document.getElementById('advCard').value;
+  const amount = parseFloat(document.getElementById('advAmount').value);
+  const note = document.getElementById('advNote').value.trim();
+  const settled = document.getElementById('advSettled').checked;
+  const settledNote = document.getElementById('advSettledNote').value.trim();
+  if(!date || !employeeName || !amount || amount <= 0){ errEl.textContent='Enter a date, employee name, and a valid amount.'; errEl.style.display='block'; return; }
+
+  // Keep the original settled_date if this was already settled before this edit;
+  // only stamp today's date the moment it's newly marked settled.
+  const original = editingCashId ? allCashTxns.find(t=>t.id===editingCashId) : null;
+  const settledDate = settled ? ((original && original.settled && original.settledDate) ? original.settledDate : todayISO()) : null;
+
+  const payload = {
+    type:'advance', date, card, employee_name: employeeName, amount, note,
+    settled, settled_date: settledDate, settled_note: settled ? (settledNote || null) : null,
+  };
+  try{
+    if(editingCashId){
+      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
+      if(error) throw error;
+      logActivity('update', 'petty_cash_transactions', `${settled && !(original&&original.settled) ? 'Settled' : 'Edited'} advance: ${employeeName} — LKR ${amount.toLocaleString()}`);
+    } else {
+      const { error } = await sb.from('petty_cash_transactions').insert(payload);
+      if(error) throw error;
+      logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${CARD_LABELS[card]}`);
+    }
+    document.getElementById('advanceModalOverlay').classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
+  if(!editingCashId) return;
+  if(!checkDeletePassword()) return;
+  if(confirm('Delete this advance record?')){
+    try{
+      await sb.from('petty_cash_transactions').delete().eq('id', editingCashId);
+      logActivity('delete', 'petty_cash_transactions', 'Deleted an advance record');
+      document.getElementById('advanceModalOverlay').classList.remove('open');
+    }catch(e){ console.error(e); }
+  }
 });
 
 /* ============================= INVENTORY ============================= */
@@ -2304,6 +2591,7 @@ let repMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 function initReports(){
   reportsInited = true;
+  document.getElementById('repLocationSelect').addEventListener('change', renderReports);
   document.getElementById('repPrevMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()-1); renderReports(); });
   document.getElementById('repNextMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()+1); renderReports(); });
   document.getElementById('repThisMonth').addEventListener('click', ()=>{ repMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderReports(); });
@@ -2317,22 +2605,6 @@ function renderReports(){
   const monthStart = new Date(repMonthDate.getFullYear(), repMonthDate.getMonth(), 1);
   const monthEndExclusive = new Date(repMonthDate.getFullYear(), repMonthDate.getMonth()+1, 1);
   const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
-
-  const itemsByLoc = { office:{}, kalava:{}, noelia:{}, brisa:{}, store:{} };
-  for(const t of allInvTxns){
-    if(t.type !== 'distribute') continue;
-    if(t.date >= monthStartISO && t.date < monthEndISO){
-      if(!itemsByLoc[t.toVilla]) itemsByLoc[t.toVilla] = {};
-      itemsByLoc[t.toVilla][t.item] = (itemsByLoc[t.toVilla][t.item] || 0) + t.qty;
-    }
-  }
-  const amountByLoc = { office:0, kalava:0, noelia:0, brisa:0, store:0 };
-  for(const t of allCashTxns){
-    if(t.type !== 'expense') continue;
-    if(t.date >= monthStartISO && t.date < monthEndISO){
-      amountByLoc[t.for] = (amountByLoc[t.for] || 0) + t.amount;
-    }
-  }
 
   // Store profit: for every distribution this month where a price was actually entered,
   // compare that price against the item's average purchase cost. Lines with no price
@@ -2370,37 +2642,16 @@ function renderReports(){
     `;
   }
 
-  const body = document.getElementById('repMonthlyBody');
-  body.innerHTML = '';
-  for(const loc of ['kalava','noelia','brisa','office','store']){
-    const tr = document.createElement('tr');
-    const nameTd = document.createElement('td');
-    nameTd.textContent = INV_LOCATION_LABELS[loc];
-    nameTd.style.cssText = 'cursor:pointer; color:var(--blue); font-weight:600;';
-    nameTd.title = 'Click to see invoices and amounts for this month';
-    nameTd.addEventListener('click', ()=> openVillaDetail(loc));
-    tr.appendChild(nameTd);
-
-    const items = itemsByLoc[loc] || {};
-    const itemNames = Object.keys(items);
-    const qtyTd = document.createElement('td');
-    if(itemNames.length === 0){
-      qtyTd.className = 'num zero';
-      qtyTd.textContent = '—';
-    } else {
-      qtyTd.className = 'num';
-      qtyTd.style.textAlign = 'left';
-      qtyTd.innerHTML = itemNames.map(name => `${name}${items[name] ? ' ×'+items[name] : ''}`).join('<br>');
-    }
-    tr.appendChild(qtyTd);
-
-    const amtTd = document.createElement('td');
-    amtTd.className = 'num' + (amountByLoc[loc]===0 ? ' zero' : '');
-    amtTd.textContent = amountByLoc[loc].toLocaleString();
-    tr.appendChild(amtTd);
-
-    body.appendChild(tr);
-  }
+  // Below the profit card: one villa/office/store's report at a time, picked from the
+  // dropdown, instead of every location crammed into one table.
+  const loc = document.getElementById('repLocationSelect').value || 'kalava';
+  const body = document.getElementById('repReportBody');
+  body.innerHTML = `
+    <div class="print-header">
+      <h2 style="margin:0;">${INV_LOCATION_LABELS[loc]} — Financial Report</h2>
+      <div style="color:var(--muted); font-size:13px;">${repMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
+    </div>
+  ` + buildVillaReportHTML(loc, repMonthDate);
 }
 
 // Distributions don't carry their own cost (that's recorded once, at purchase time, into
@@ -2614,6 +2865,8 @@ async function renderVillaReport(){
       if(!checkDeletePassword()) return;
       if(confirm('Delete this expense?')){
         try{
+          const opExRecord = allOpEx.find(o => o.id === btn.dataset.opexId);
+          if(opExRecord) await deleteReceiptFiles(opExRecord.invoiceUrls);
           await sb.from('villa_operating_expenses').delete().eq('id', btn.dataset.opexId);
           logActivity('delete', 'villa_operating_expenses', 'Deleted an operating expense entry');
         }catch(e){ console.error(e); }
