@@ -141,10 +141,30 @@
     position:absolute; box-sizing:border-box;
     font-size:10.5px; font-weight:600; color:#fff; padding:0 8px; margin:0 2px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; pointer-events:auto;
-    border-radius:11px; display:flex; align-items:center; height:17px; line-height:17px;
+    border-radius:11px; display:flex; align-items:center; gap:4px; height:17px; line-height:17px;
   }
+  .booking-pill:has(.pill-price){ padding-right:3px; }
   .booking-pill.airbnb{ background:var(--airbnb); }
   .booking-pill.direct{ background:var(--direct); }
+  .pill-guest{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* red price tag pinned to the right-hand corner of a booking pill */
+  .pill-price{
+    margin-left:auto; flex-shrink:0; background:#fff; color:var(--red);
+    font-size:9.5px; font-weight:800; line-height:13px; height:13px;
+    padding:0 5px; border-radius:7px; border:1px solid var(--red);
+    letter-spacing:-.2px;
+  }
+  .manage-money{ color:var(--red); font-weight:700; font-size:11.5px; flex-shrink:0; }
+  .manage-count{ font-size:11.5px; color:var(--muted); font-weight:600; margin-left:8px; }
+  .earn-row-villa{ cursor:pointer; }
+  .earn-row-villa:hover td{ background:#faf9f5; }
+  .earn-row-villa.selected td{ background:#f4f1e8; }
+  .earn-detail-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    flex-wrap:wrap; margin:14px 0 6px;
+  }
+  .earn-detail-title{ font-family:'Kalam',cursive; font-size:14.5px; font-weight:700; }
+  .earn-total-row td{ font-weight:700; border-top:2px solid var(--board-line); background:#faf9f5; }
   .cal-daybg.selecting{ background:var(--amber-bg); box-shadow: inset 0 0 0 2px var(--amber); }
   .cal-hint{
     font-size:12px; color:var(--muted); background:#fff; border:1px dashed var(--board-line);
@@ -438,6 +458,7 @@
       <div class="manage-section">
         <div class="manage-header">
           <span class="manage-title">Bookings this villa</span>
+          <span class="manage-count" id="manageCount"></span>
         </div>
         <div id="manageList" class="manage-list"></div>
       </div>
@@ -457,6 +478,24 @@
             </tr>
           </thead>
           <tbody id="earningsBody"></tbody>
+        </table>
+
+        <div class="earn-detail-head">
+          <span class="earn-detail-title" id="earningsDetailTitle">Breakdown — selected villa</span>
+          <span class="field-hint" id="earningsDetailHint">Tap a villa row above (or a villa tab) to switch.</span>
+        </div>
+        <table class="inv-table" id="earningsDetailTable">
+          <thead>
+            <tr>
+              <th>Guest</th>
+              <th>Dates</th>
+              <th style="text-align:center">Nights</th>
+              <th style="text-align:center">Per night</th>
+              <th style="text-align:center">Total</th>
+              <th style="text-align:center">Total (LKR)</th>
+            </tr>
+          </thead>
+          <tbody id="earningsDetailBody"></tbody>
         </table>
       </div>
     </div>
@@ -1463,6 +1502,7 @@ function initBookings(){
   CAL_VILLAS.forEach(v=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn' + (v.id===currentVillaCal ? ' active':'');
+    b.dataset.villa = v.id;
     b.textContent = v.name;
     b.style.setProperty('--vc', v.color);
     if(v.id===currentVillaCal){ b.style.background=v.color; }
@@ -1542,6 +1582,23 @@ function assignLanes(bookings){
   return laneEnds.length;
 }
 
+/* ---- small money helpers (used by the calendar pills + earnings breakdown) ---- */
+function curSymbol(cur){
+  return cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur === 'LKR' ? 'Rs' : '$';
+}
+// compact form for the tiny pill badge: $120, $1.2k
+function moneyShort(amount, cur){
+  const s = curSymbol(cur || 'USD');
+  const n = Number(amount) || 0;
+  if(n >= 10000) return s + Math.round(n/1000) + 'k';
+  if(n >= 1000) return s + (n/1000).toFixed(1).replace(/\.0$/,'') + 'k';
+  return s + Math.round(n).toLocaleString();
+}
+// full form for tooltips / tables: $1,200
+function moneyFull(amount, cur){
+  return curSymbol(cur || 'USD') + Math.round(Number(amount) || 0).toLocaleString();
+}
+
 function renderCalendar(){
   const monthLabel = document.getElementById('monthLabel');
   monthLabel.textContent = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
@@ -1613,8 +1670,23 @@ function renderCalendar(){
       pill.style.left = (startColIdx / 7 * 100) + '%';
       pill.style.width = (spanDays / 7 * 100) + '%';
       pill.style.top = (b._lane * 19) + 'px';
-      pill.textContent = b.guest ? b.guest : (b.type==='airbnb' ? 'Airbnb' : 'Direct');
-      pill.title = `${b.type==='airbnb'?'Airbnb':'Direct'} · ${b.checkIn} → ${b.checkOut}${b.guest ? ' · '+b.guest : ''}`;
+
+      const totalNights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'pill-guest';
+      nameSpan.textContent = b.guest ? b.guest : (b.type==='airbnb' ? 'Airbnb' : 'Direct');
+      pill.appendChild(nameSpan);
+
+      // red price tag in the corner of the pill (nightly rate)
+      if(b.rateUsd){
+        const priceSpan = document.createElement('span');
+        priceSpan.className = 'pill-price';
+        priceSpan.textContent = moneyShort(b.rateUsd, b.currency);
+        pill.appendChild(priceSpan);
+      }
+
+      pill.title = `${b.type==='airbnb'?'Airbnb':'Direct'} · ${b.checkIn} → ${b.checkOut} · ${totalNights} night${totalNights===1?'':'s'}${b.guest ? ' · '+b.guest : ''}`
+        + (b.rateUsd ? ` · ${moneyFull(b.rateUsd, b.currency)}/night · total ${moneyFull(b.rateUsd*totalNights, b.currency)}` : ' · no rate set');
       pill.addEventListener('click', (e)=>{ e.stopPropagation(); openModal(b, null); });
       overlay.appendChild(pill);
     }
@@ -1650,20 +1722,35 @@ function renderMonthSummary(villaBookings){
 
 function renderManageList(villaBookings){
   const list = document.getElementById('manageList');
+  const countEl = document.getElementById('manageCount');
   list.innerHTML = '';
   if(villaBookings.length === 0){
     list.innerHTML = '<div class="manage-empty">No bookings yet for this villa.</div>';
+    if(countEl) countEl.textContent = '';
     return;
   }
   const sorted = [...villaBookings].sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
+
+  // header tally: how many bookings and how many nights in total for this villa
+  let tallyNights = 0;
+  for(const b of sorted) tallyNights += Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+  if(countEl){
+    countEl.textContent = `${sorted.length} booking${sorted.length===1?'':'s'} · ${tallyNights} night${tallyNights===1?'':'s'} total`;
+  }
+
   for(const b of sorted){
     const row = document.createElement('div');
     row.className = 'manage-row';
     const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const moneyHtml = b.rateUsd
+      ? `<span class="manage-money">${moneyFull(b.rateUsd, cur)}/night · ${moneyFull(b.rateUsd*nights, cur)} total</span>`
+      : `<span class="manage-dates" style="font-style:italic;">no rate set</span>`;
     row.innerHTML = `
       <span class="manage-type-dot ${b.type}"></span>
       <span class="manage-guest">${b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest')}</span>
-      <span class="manage-dates">${b.checkIn} → ${b.checkOut} (${nights} night${nights===1?'':'s'})</span>
+      <span class="manage-dates">${b.checkIn} → ${b.checkOut} · <b>${nights} night${nights===1?'':'s'}</b></span>
+      ${moneyHtml}
     `;
     const delBtn = document.createElement('button');
     delBtn.className = 'manage-del';
@@ -1751,7 +1838,8 @@ async function renderEarnings(){
   );
 
   const totals = {}; // villaId -> { nights, gross, currency, grossLkr }
-  for(const v of CAL_VILLAS) totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0 };
+  const details = {}; // villaId -> [ per-booking rows, for the breakdown table below ]
+  for(const v of CAL_VILLAS){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0 }; details[v.id] = []; }
 
   for(const b of relevant){
     const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
@@ -1760,9 +1848,15 @@ async function renderEarnings(){
     const rate = await getFxRate(b.checkIn, bookingCurrency);
     if(myToken !== earningsRenderToken) return; // a newer render started, abandon this one
     if(!totals[b.villa]) totals[b.villa] = { nights:0, gross:0, currency:bookingCurrency, grossLkr:0 };
+    if(!details[b.villa]) details[b.villa] = [];
     totals[b.villa].nights += nights;
     totals[b.villa].gross += gross;
     if(rate) totals[b.villa].grossLkr += gross * rate;
+    details[b.villa].push({
+      guest: b.guest, type: b.type, checkIn: b.checkIn, checkOut: b.checkOut,
+      nights, rate: b.rateUsd, currency: bookingCurrency, gross,
+      grossLkr: rate ? gross * rate : 0
+    });
   }
 
   statusEl.textContent = relevant.length === 0
@@ -1777,6 +1871,12 @@ async function renderEarnings(){
     const net = t.grossLkr * 0.85;
     grandGrossLkr += t.grossLkr; grandFeeLkr += fee; grandNetLkr += net;
     const tr = document.createElement('tr');
+    tr.className = 'earn-row-villa' + (v.id === currentVillaCal ? ' selected' : '');
+    tr.title = 'Click to see this villa\'s booking-by-booking breakdown';
+    tr.addEventListener('click', ()=>{
+      const tab = document.querySelector(`.villatab-btn[data-villa="${v.id}"]`);
+      if(tab) tab.click(); else { currentVillaCal = v.id; renderCalendar(); }
+    });
     tr.innerHTML = `
       <td style="font-weight:600;">${v.name}</td>
       <td class="num ${t.nights===0?'zero':''}">${t.nights}</td>
@@ -1798,6 +1898,66 @@ async function renderEarnings(){
     <td class="num">${Math.round(grandNetLkr).toLocaleString()}</td>
   `;
   body.appendChild(totalTr);
+
+  renderEarningsDetail(details[currentVillaCal] || []);
+}
+
+// Booking-by-booking breakdown for whichever villa is currently selected:
+// guest name, dates, nights booked, nightly rate, and the line total.
+function renderEarningsDetail(rows){
+  const body = document.getElementById('earningsDetailBody');
+  const titleEl = document.getElementById('earningsDetailTitle');
+  const hintEl = document.getElementById('earningsDetailHint');
+  if(!body) return;
+
+  const villa = CAL_VILLAS.find(v=>v.id===currentVillaCal) || { name:'Selected villa', currency:'USD' };
+  const monthName = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  titleEl.textContent = `Breakdown — ${villa.name} · ${monthName}`;
+
+  body.innerHTML = '';
+  if(rows.length === 0){
+    body.innerHTML = `<tr><td colspan="6" class="inv-empty">No bookings with a nightly rate for ${villa.name} this month.</td></tr>`;
+    if(hintEl) hintEl.textContent = 'Click a villa row above, or a villa tab at the top, to switch villa.';
+    return;
+  }
+
+  const sorted = [...rows].sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
+  let sumNights = 0, sumGross = 0, sumLkr = 0;
+  const cur = sorted[0].currency;
+
+  for(const r of sorted){
+    sumNights += r.nights; sumGross += r.gross; sumLkr += r.grossLkr;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:600;">
+        <span class="manage-type-dot ${r.type}" style="display:inline-block; margin-right:6px;"></span>
+        ${r.guest ? r.guest : (r.type==='airbnb' ? 'Airbnb guest' : 'Direct guest')}
+      </td>
+      <td style="color:var(--muted); font-size:12px;">${r.checkIn} → ${r.checkOut}</td>
+      <td class="num">${r.nights}</td>
+      <td class="num">${moneyFull(r.rate, r.currency)}</td>
+      <td class="num" style="color:var(--red);">${moneyFull(r.gross, r.currency)}</td>
+      <td class="num ${r.grossLkr===0?'zero':''}">${Math.round(r.grossLkr).toLocaleString()}</td>
+    `;
+    body.appendChild(tr);
+  }
+
+  const totalTr = document.createElement('tr');
+  totalTr.className = 'earn-total-row';
+  totalTr.innerHTML = `
+    <td>${sorted.length} booking${sorted.length===1?'':'s'}</td>
+    <td></td>
+    <td class="num">${sumNights}</td>
+    <td></td>
+    <td class="num" style="color:var(--red);">${moneyFull(sumGross, cur)}</td>
+    <td class="num">${Math.round(sumLkr).toLocaleString()}</td>
+  `;
+  body.appendChild(totalTr);
+
+  if(hintEl){
+    const fee = sumLkr * 0.15;
+    hintEl.textContent = `Ceymora fee (15%): LKR ${Math.round(fee).toLocaleString()} · Villa net: LKR ${Math.round(sumLkr - fee).toLocaleString()}`;
+  }
 }
 
 /* ---- Modal ---- */
