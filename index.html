@@ -2499,6 +2499,7 @@ function updateExpenseCardLock(){
 // effect of which "For" villa happens to be selected.
 function updateExpenseStockLabel(){
   const forWhom = document.getElementById('expFor').value;
+  const card = document.getElementById('expCard').value;
   const label = document.getElementById('expIsStockLabel');
   const hint = document.getElementById('expIsStockHint');
   if(!label || !hint) return;
@@ -2508,7 +2509,9 @@ function updateExpenseStockLabel(){
   } else {
     const name = FOR_LABELS[forWhom] || forWhom;
     label.textContent = `This is a stock item — direct purchase for ${name} (skips Store)`;
-    hint.textContent = `Goes straight into ${name}'s stock without passing through Store.`;
+    hint.textContent = card === 'ceymora'
+      ? `Goes straight into ${name}'s stock without passing through Store. Tracked under "Direct Villa Purchases — via Ceymora Card" — it won't reduce the Ceymora Card's petty cash balance, since this cost belongs to ${name}, not to shared petty cash.`
+      : `Goes straight into ${name}'s stock without passing through Store.`;
   }
 }
 
@@ -2556,7 +2559,10 @@ function renderCashMonth(){
       byFor[t.for] = (byFor[t.for] || 0) + t.amount;
     }
     if(t.type !== 'income'){
-      const key = t.employeeName && t.type === 'expense' ? 'advance' : t.card;
+      const isDirectViaSharedCard = t.type === 'expense' && t.linkedInventory && t.for !== 'store' && t.card === 'ceymora';
+      const key = t.employeeName && t.type === 'expense' ? 'advance'
+        : isDirectViaSharedCard ? 'direct_ceymora'
+        : t.card;
       byCard[key] = (byCard[key] || 0) + t.amount;
     }
   }
@@ -2582,7 +2588,7 @@ function renderCashMonth(){
   const forRows = Object.keys(byFor).sort((a,b)=> byFor[b]-byFor[a])
     .map(k=>`<tr><td>${esc(FOR_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byFor[k]).toLocaleString()}</td><td class="r dim">${pct(byFor[k], spent)}</td></tr>`).join('');
   const cardRows = Object.keys(byCard).sort((a,b)=> byCard[b]-byCard[a])
-    .map(k=>`<tr><td>${k==='advance' ? 'Paid from a staff advance' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
+    .map(k=>`<tr><td>${k==='advance' ? 'Paid from a staff advance' : k==='direct_ceymora' ? 'Direct villa purchase (via Ceymora Card)' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
 
   document.getElementById('cashMonthBreakdown').innerHTML = (spent === 0 && advanced === 0)
     ? ''
@@ -2608,8 +2614,15 @@ function renderCash(){
     // double-debit the same money. It only comes off that person's wallet (computeAdvanceWallets).
     const fundedByAdvance = t.type === 'expense' && !!t.employeeName;
     if(fundedByAdvance) continue;
+    // A "direct purchase" (stock bought straight for a villa, bypassing Store) paid from the
+    // shared Ceymora Card isn't a Ceymora/company expense — it's stock cost that belongs to
+    // that villa, tracked in "Direct Villa Purchases" instead. So it shouldn't eat into the
+    // shared float the Ceymora Card balance represents. The Kalava Villa Card is different:
+    // it's that villa's own dedicated card, not a shared float, so its balance still falls
+    // for a direct purchase the same way it would for any other Kalava expense.
+    const isDirectViaSharedCard = t.type === 'expense' && t.linkedInventory && t.for !== 'store' && t.card === 'ceymora';
     const sign = t.type === 'income' ? 1 : -1;
-    if(t.card === 'ceymora') ceymoraBal += sign * t.amount;
+    if(t.card === 'ceymora' && !isDirectViaSharedCard) ceymoraBal += sign * t.amount;
     else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
     if(t.type === 'expense' && t.linkedInventory && t.for !== 'store'){
       if(t.card === 'kalava_card') directKalava += t.amount;
