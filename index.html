@@ -332,6 +332,108 @@
   .viewer-mode .cal-daybg,
   .viewer-mode .booking-pill{ cursor:default !important; pointer-events:none !important; }
 
+  /* ===================== FORMAL REPORT LAYOUT ===================== */
+  /* Section picker (choose what goes into the printed report) */
+  .rpt-picker{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:#fff; border:1px solid var(--board-line); border-radius:9px;
+    padding:9px 12px; margin-bottom:14px; font-size:12.5px;
+  }
+  .rpt-picker-label{ font-weight:700; color:var(--ink); }
+  .rpt-picker label{ display:inline-flex; align-items:center; gap:5px; cursor:pointer; color:var(--ink); }
+  .rpt-picker input[type=checkbox]{ accent-color:var(--frame); width:14px; height:14px; cursor:pointer; }
+  .rpt-quick{
+    background:none; border:none; color:var(--frame); text-decoration:underline;
+    cursor:pointer; font-size:12px; font-weight:600; padding:0;
+  }
+  .rpt-picker .sep{ width:1px; height:16px; background:var(--board-line); }
+
+  /* The report document itself */
+  .rpt-doc{ background:#fff; border:1px solid var(--board-line); border-radius:10px; padding:22px 24px; }
+  .rpt-head{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:18px;
+    flex-wrap:wrap; border-bottom:2.5px solid var(--frame); padding-bottom:12px; margin-bottom:16px;
+  }
+  .rpt-title{ font-family:'Kalam',cursive; font-size:24px; font-weight:700; line-height:1.15; }
+  .rpt-sub{ font-size:13px; color:var(--muted); margin-top:2px; }
+  .rpt-meta{ font-size:11.5px; color:var(--muted); text-align:right; line-height:1.7; }
+  .rpt-meta b{ color:var(--ink); }
+
+  /* KPI strip */
+  .rpt-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:10px; margin-bottom:16px; }
+  .rpt-kpi{ border:1px solid var(--board-line); border-radius:9px; padding:9px 11px; background:#fbfaf6; }
+  .rpt-kpi-label{ font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); font-weight:700; }
+  .rpt-kpi-value{ font-size:17px; font-weight:800; margin-top:3px; line-height:1.2; }
+  .rpt-kpi-note{ font-size:10.5px; color:var(--muted); margin-top:2px; }
+  .rpt-kpi.pos .rpt-kpi-value{ color:var(--green); }
+  .rpt-kpi.neg .rpt-kpi-value{ color:var(--red); }
+
+  /* Sections */
+  .rpt-section{ margin-top:20px; page-break-inside:auto; }
+  .rpt-section-title{
+    font-family:'Kalam',cursive; font-size:16px; font-weight:700;
+    border-bottom:1.5px solid var(--board-line); padding-bottom:5px; margin-bottom:2px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .rpt-section-count{ font-family:'Inter',sans-serif; font-size:11.5px; color:var(--muted); font-weight:600; }
+  .rpt-note{ font-size:11px; color:var(--muted); margin-top:5px; font-style:italic; }
+
+  /* Report tables */
+  .rpt-table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:12.5px; }
+  .rpt-table thead th{
+    font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted);
+    font-weight:700; text-align:left; padding:6px 8px; border-bottom:1.5px solid var(--board-line);
+    white-space:nowrap;
+  }
+  .rpt-table td{ padding:7px 8px; border-bottom:1px solid #eeebe1; vertical-align:top; }
+  .rpt-table tbody tr:nth-child(even) td{ background:#fcfbf8; }
+  .rpt-table .r{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .rpt-table .c{ text-align:center; white-space:nowrap; }
+  .rpt-table .dim{ color:var(--muted); font-size:11.5px; }
+  .rpt-table tr.subtotal td{
+    font-weight:800; border-top:1.5px solid var(--board-line); border-bottom:none;
+    background:#f6f4ec !important; padding-top:8px;
+  }
+  .rpt-money-out{ color:var(--red); font-weight:700; }
+  .rpt-money-in{ color:var(--green); font-weight:700; }
+
+  /* Profit & loss statement */
+  .rpt-pl{ width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; max-width:620px; }
+  .rpt-pl td{ padding:6px 8px; }
+  .rpt-pl td.amt{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; width:150px; }
+  .rpt-pl tr.group td{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);
+    font-weight:700; padding-top:12px; border-bottom:1px solid var(--board-line);
+  }
+  .rpt-pl tr.line td{ border-bottom:1px solid #f1eee5; }
+  .rpt-pl tr.line td.lbl{ padding-left:16px; }
+  .rpt-pl tr.sub td{ font-weight:700; border-top:1.5px solid var(--board-line); border-bottom:none; }
+  .rpt-pl tr.grand td{
+    font-weight:800; font-size:15px; border-top:2.5px solid var(--frame);
+    border-bottom:2.5px double var(--frame); padding:10px 8px;
+  }
+  .rpt-pl .neg{ color:var(--red); }
+  .rpt-pl .pos{ color:var(--green); }
+  .rpt-foot{
+    margin-top:22px; padding-top:10px; border-top:1px solid var(--board-line);
+    font-size:10.5px; color:var(--muted); line-height:1.6;
+  }
+  .rpt-empty{ font-size:12px; color:var(--muted); font-style:italic; padding:10px 2px; }
+  .rpt-badge{
+    display:inline-block; font-size:9.5px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.3px; padding:1px 6px; border-radius:9px; border:1px solid currentColor;
+  }
+  .rpt-badge.airbnb{ color:var(--airbnb); }
+  .rpt-badge.direct{ color:var(--direct); }
+
+  @media (max-width:640px){
+    .rpt-doc{ padding:14px 12px; }
+    .rpt-title{ font-size:19px; }
+    .rpt-meta{ text-align:left; }
+    .rpt-table{ font-size:11.5px; }
+    .rpt-table td, .rpt-table thead th{ padding:5px 5px; }
+  }
+
   /* Print support for report sections */
   .print-header{ display:none; }
   @media print{
@@ -344,6 +446,18 @@
     .print-header{ display:block; margin-bottom:14px; }
     .manage-list{ max-height:none !important; overflow:visible !important; }
     .modal-overlay{ display:none !important; }
+
+    /* Report document print tuning */
+    .rpt-picker{ display:none !important; }
+    .rpt-doc{ border:none; border-radius:0; padding:0; background:#fff; }
+    .rpt-head{ border-bottom:2px solid #000; }
+    .rpt-section{ page-break-inside:avoid; }
+    .rpt-table thead{ display:table-header-group; }
+    .rpt-table tr, .rpt-pl tr{ page-break-inside:avoid; }
+    .rpt-kpi{ border:1px solid #bbb; background:#fff !important; }
+    .rpt-table tbody tr:nth-child(even) td{ background:#fff !important; }
+    .rpt-table tr.subtotal td{ background:#f2f2f2 !important; }
+    @page{ margin:14mm; }
   }
 </style>
 </head>
@@ -604,6 +718,21 @@
           <button id="vrThisMonth">This month</button>
         </div>
       </div>
+
+      <div class="rpt-picker no-print" id="vrSections">
+        <span class="rpt-picker-label">Include:</span>
+        <label><input type="checkbox" data-sec="summary" checked> Summary</label>
+        <label><input type="checkbox" data-sec="bookings" checked> Bookings</label>
+        <label><input type="checkbox" data-sec="pettycash" checked> Petty cash</label>
+        <label><input type="checkbox" data-sec="opex" checked> Operating expenses</label>
+        <label><input type="checkbox" data-sec="inventory" checked> Store supplies</label>
+        <span class="sep"></span>
+        <button class="rpt-quick" data-preset="summary">Summary only</button>
+        <button class="rpt-quick" data-preset="all">Everything</button>
+        <span class="sep"></span>
+        <button class="add-booking-btn" id="vrPrintBtn">🖨️ Print / PDF</button>
+      </div>
+
       <div id="villaReportBody"></div>
     </div>
 
@@ -629,6 +758,15 @@
         </div>
       </div>
       <div class="field-hint" style="margin-bottom:8px;">"Direct" purchases below are items bought straight for a villa/office (bypassing Store) — see the Petty Cash tab for the direct-purchases total.</div>
+      <div class="rpt-picker no-print" id="repSections">
+        <span class="rpt-picker-label">Include:</span>
+        <label><input type="checkbox" data-sec="summary" checked> Summary</label>
+        <label><input type="checkbox" data-sec="pettycash" checked> Petty cash</label>
+        <label><input type="checkbox" data-sec="inventory" checked> Store supplies received</label>
+        <span class="sep"></span>
+        <button class="rpt-quick" data-preset="summary">Summary only</button>
+        <button class="rpt-quick" data-preset="all">Everything</button>
+      </div>
       <div id="storeProfitCard" class="cash-card" style="max-width:340px; margin-bottom:16px; background:linear-gradient(135deg, #2f9e44, #1e6b2c);"></div>
       <div id="repReportBody"></div>
     </div>
@@ -1677,11 +1815,11 @@ function renderCalendar(){
       nameSpan.textContent = b.guest ? b.guest : (b.type==='airbnb' ? 'Airbnb' : 'Direct');
       pill.appendChild(nameSpan);
 
-      // red price tag in the corner of the pill (nightly rate)
+      // red price tag in the corner of the pill — the TOTAL for this booking
       if(b.rateUsd){
         const priceSpan = document.createElement('span');
         priceSpan.className = 'pill-price';
-        priceSpan.textContent = moneyShort(b.rateUsd, b.currency);
+        priceSpan.textContent = moneyShort(b.rateUsd * totalNights, b.currency);
         pill.appendChild(priceSpan);
       }
 
@@ -2907,12 +3045,9 @@ function renderReports(){
   // dropdown, instead of every location crammed into one table.
   const loc = document.getElementById('repLocationSelect').value || 'kalava';
   const body = document.getElementById('repReportBody');
-  body.innerHTML = `
-    <div class="print-header">
-      <h2 style="margin:0;">${INV_LOCATION_LABELS[loc]} — Financial Report</h2>
-      <div style="color:var(--muted); font-size:13px;">${repMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
-    </div>
-  ` + buildVillaReportHTML(loc, repMonthDate);
+  body.innerHTML = buildVillaReportHTML(loc, repMonthDate);
+  wireReportSections('repSections', 'repReportBody');
+  applyReportSections('repSections', 'repReportBody');
 }
 
 // Distributions don't carry their own cost (that's recorded once, at purchase time, into
@@ -2934,89 +3069,108 @@ function computeAvgUnitCost(){
   return avg;
 }
 
+// Report for a location that doesn't earn booking revenue of its own (Office, Store) —
+// or a quick villa cost view from the Inventory tab. Same document format as the villa
+// report, minus the revenue side: what was spent, and what came in from Store.
 function buildVillaReportHTML(loc, monthDate){
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEndExclusive = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1);
   const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
+  const locName = (typeof INV_LOCATION_LABELS !== 'undefined' && INV_LOCATION_LABELS[loc]) || loc;
 
+  /* ---- Petty cash ---- */
   const expenses = allCashTxns
     .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
     .sort((a,b)=> a.date.localeCompare(b.date));
-  const received = allInvTxns
-    .filter(t => t.type==='distribute' && t.toVilla===loc && t.date>=monthStartISO && t.date<monthEndISO)
-    .sort((a,b)=> a.date.localeCompare(b.date));
-
-  let html = '<div class="manage-title" style="margin-top:2px;">Petty cash expenses</div>';
-  if(expenses.length === 0){
-    html += '<div class="manage-empty">None this month.</div>';
-  } else {
-    let total = 0;
-    html += '<div class="manage-list" style="margin-top:6px;">';
-    for(const e of expenses){
-      total += e.amount;
-      const links = getInvoiceLinks(e).map(u=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎 View</a>`).join('');
-      html += `<div class="txn-row">
-        <span class="txn-badge expense">expense</span>
-        <span class="txn-main">
-          <div class="txn-title">${e.purpose || 'Expense'}${links}</div>
-          <div class="txn-sub">${e.date}${e.note ? ' · '+e.note : ''} · ${CARD_LABELS[e.card]||e.card}</div>
-        </span>
-        <span class="txn-amount expense">LKR ${e.amount.toLocaleString()}</span>
-      </div>`;
-    }
-    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${total.toLocaleString()}</div>`;
+  let pettyTotal = 0, pettyRows = '';
+  const byCard = {};
+  for(const e of expenses){
+    pettyTotal += e.amount;
+    byCard[e.card] = (byCard[e.card] || 0) + e.amount;
+    const links = getInvoiceLinks(e).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(e).length>1?' '+(i+1):''}</a>`).join(' ');
+    const tags = [];
+    if(e.linkedInventory) tags.push('direct purchase');
+    if(e.employeeName) tags.push(`from ${esc(e.employeeName)}'s advance`);
+    pettyRows += `<tr>
+      <td class="dim">${fmtDay(e.date)}</td>
+      <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
+      <td class="dim">${esc(CARD_LABELS[e.card] || e.card || '')}</td>
+      <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
+      <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
+    </tr>`;
   }
+  const pettyHtml = expenses.length === 0
+    ? '<div class="rpt-empty">No petty cash spending in this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr><th>Date</th><th>Description</th><th>Paid by</th><th>Notes</th><th class="r">Amount (LKR)</th></tr></thead>
+        <tbody>${pettyRows}
+          <tr class="subtotal"><td colspan="4">Total — ${expenses.length} item${expenses.length===1?'':'s'}</td><td class="r">${Math.round(pettyTotal).toLocaleString()}</td></tr>
+        </tbody>
+      </table>`;
 
-  html += '<div class="manage-title" style="margin-top:18px;">Inventory received</div>';
-  if(received.length === 0){
-    html += '<div class="manage-empty">None this month.</div>';
-  } else {
-    const avgUnitCost = computeAvgUnitCost();
-    const sortedReceived = [...received].sort((a,b)=> a.date.localeCompare(b.date));
-    let receivedTotal = 0, anyUnknownPrice = false, anyEstimated = false;
-    html += `<table class="inv-table" style="margin-top:6px;">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Item</th>
-          <th style="text-align:center">Quantity</th>
-          <th style="text-align:center">Price (LKR)</th>
-        </tr>
-      </thead>
-      <tbody>`;
-    for(const r of sortedReceived){
-      let linePrice, isEstimated = false;
-      if(r.amount !== null && r.amount !== undefined){
-        linePrice = r.amount; // price actually entered when this was distributed
-      } else {
-        const unitCost = avgUnitCost[r.item];
-        linePrice = unitCost !== undefined ? Math.round(r.qty * unitCost) : null;
-        isEstimated = linePrice !== null;
-      }
-      if(linePrice !== null) receivedTotal += linePrice; else anyUnknownPrice = true;
-      if(isEstimated) anyEstimated = true;
-      html += `<tr>
-        <td>${r.date}</td>
-        <td>${r.item}${r.note ? `<div class="txn-sub">${r.note}</div>` : ''}</td>
-        <td class="num">${r.qty}</td>
-        <td class="num ${linePrice===null?'zero':''}">${linePrice!==null ? linePrice.toLocaleString()+(isEstimated?' *':'') : '—'}</td>
-      </tr>`;
-    }
-    html += `
-        <tr style="font-weight:700; border-top:2px solid var(--board-line);">
-          <td colspan="3">Total</td>
-          <td class="num">${receivedTotal.toLocaleString()}</td>
-        </tr>
-      </tbody>
-    </table>`;
-    if(anyEstimated){
-      html += '<div class="field-hint" style="margin-top:4px;">* No price was entered for this transfer — estimated from the item\'s average purchase cost instead.</div>';
-    }
-    if(anyUnknownPrice){
-      html += '<div class="field-hint" style="margin-top:4px;">Items showing "—" have no price entered and no purchase cost on record.</div>';
-    }
-  }
-  return html;
+  /* ---- Store supplies received ---- */
+  const supplies = buildSuppliesSection(loc, monthStartISO, monthEndISO);
+  const grandTotal = pettyTotal + supplies.total;
+
+  const cardRows = Object.keys(byCard).map(c =>
+    `<tr class="line"><td class="lbl">${esc(CARD_LABELS[c] || c)}</td>${negCell(byCard[c])}</tr>`
+  ).join('');
+
+  return `
+  <div class="rpt-doc">
+    ${reportHeaderHTML(locName, 'Monthly Cost Report', monthDate, 'All figures in <b>LKR</b>')}
+
+    <div data-rpt-section="summary">
+      <div class="rpt-kpis">
+        <div class="rpt-kpi">
+          <div class="rpt-kpi-label">Petty cash spend</div>
+          <div class="rpt-kpi-value">${Math.round(pettyTotal).toLocaleString()}</div>
+          <div class="rpt-kpi-note">${expenses.length} item${expenses.length===1?'':'s'}</div>
+        </div>
+        <div class="rpt-kpi">
+          <div class="rpt-kpi-label">Store supplies</div>
+          <div class="rpt-kpi-value">${Math.round(supplies.total).toLocaleString()}</div>
+          <div class="rpt-kpi-note">${supplies.count} transfer${supplies.count===1?'':'s'}</div>
+        </div>
+        <div class="rpt-kpi neg">
+          <div class="rpt-kpi-label">Total cost</div>
+          <div class="rpt-kpi-value">${Math.round(grandTotal).toLocaleString()}</div>
+          <div class="rpt-kpi-note">for this period</div>
+        </div>
+      </div>
+
+      <div class="rpt-section" style="margin-top:6px;">
+        <div class="rpt-section-title">Cost Summary</div>
+        <table class="rpt-pl">
+          <tbody>
+            <tr class="group"><td>Petty cash, by card</td><td class="amt">LKR</td></tr>
+            ${cardRows || '<tr class="line"><td class="lbl dim">None this period</td><td class="amt">0</td></tr>'}
+            <tr class="sub"><td>Petty cash total</td>${negCell(pettyTotal)}</tr>
+            <tr class="group"><td>Goods received</td><td class="amt"></td></tr>
+            <tr class="line"><td class="lbl">Store supplies received</td>${negCell(supplies.total)}</tr>
+            <tr class="grand"><td>Total cost for the period</td>${negCell(grandTotal)}</tr>
+          </tbody>
+        </table>
+        <div class="rpt-note">Figures in brackets are amounts spent. "Direct" purchases are items bought straight for this location, bypassing Store.</div>
+      </div>
+    </div>
+
+    <div class="rpt-section" data-rpt-section="pettycash">
+      <div class="rpt-section-title">1. Petty Cash Expenses <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyTotal)}</span></div>
+      ${pettyHtml}
+    </div>
+
+    <div class="rpt-section" data-rpt-section="inventory">
+      <div class="rpt-section-title">2. Store Supplies Received <span class="rpt-section-count">${supplies.count} transfer${supplies.count===1?'':'s'} · ${lkr(supplies.total)}</span></div>
+      ${supplies.html}
+    </div>
+
+    <div class="rpt-foot">
+      Prepared by Ceymora · ${esc(locName)} · ${monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.
+      Generated from the live management board and may change if entries are added or corrected afterwards.
+    </div>
+  </div>
+  `;
 }
 
 function openDirectPurchasesDetail(card){
@@ -3103,6 +3257,7 @@ function initVillaReport(){
   document.getElementById('vrPrevMonth').addEventListener('click', ()=>{ vrMonthDate.setMonth(vrMonthDate.getMonth()-1); renderVillaReport(); });
   document.getElementById('vrNextMonth').addEventListener('click', ()=>{ vrMonthDate.setMonth(vrMonthDate.getMonth()+1); renderVillaReport(); });
   document.getElementById('vrThisMonth').addEventListener('click', ()=>{ vrMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderVillaReport(); });
+  document.getElementById('vrPrintBtn').addEventListener('click', ()=> window.print());
 
   renderVillaReport();
 }
@@ -3167,145 +3322,357 @@ async function renderVillaReport(){
     });
   });
   // Print button
-  const printBtn = document.createElement('button');
-  printBtn.className = 'add-booking-btn no-print';
-  printBtn.textContent = '🖨️ Print this report';
-  printBtn.style.cssText = 'margin-top:14px;';
-  printBtn.addEventListener('click', ()=> window.print());
-  document.getElementById('villaReportBody').appendChild(printBtn);
+  wireReportSections('vrSections', 'villaReportBody');
+  applyReportSections('vrSections', 'villaReportBody');
+}
+
+/* ======================= REPORT FORMATTING HELPERS ======================= */
+// Everything the reports print goes through these so the whole document is
+// consistent: same date style, same money style, same empty-state wording.
+function lkr(n){ return 'LKR ' + Math.round(Number(n)||0).toLocaleString(); }
+function fmtDay(iso){
+  if(!iso) return '';
+  const d = parseISO(iso);
+  return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
+}
+function fmtLongDate(d){ return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }
+function pct(part, whole){ return whole > 0 ? Math.round(part/whole*100) + '%' : '—'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Deduction cell for the P&L: shown in brackets and red, but a plain "0" when there's
+// nothing to deduct — "(0)" reads like an error.
+function negCell(n){
+  const v = Math.round(Number(n)||0);
+  return v > 0 ? `<td class="amt neg">(${v.toLocaleString()})</td>` : '<td class="amt">0</td>';
+}
+
+// Wires a "what goes in this report" checkbox strip to the sections of a report body.
+// Purely a show/hide of already-rendered sections, so ticking a box is instant and the
+// figures in the Summary never change — unticking a section only keeps it off the page.
+function wireReportSections(pickerId, bodyId){
+  const picker = document.getElementById(pickerId);
+  if(!picker || picker.dataset.wired) return;
+  picker.dataset.wired = '1';
+  picker.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=> applyReportSections(pickerId, bodyId));
+  });
+  picker.querySelectorAll('.rpt-quick').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const onlySummary = btn.dataset.preset === 'summary';
+      picker.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+        cb.checked = onlySummary ? (cb.dataset.sec === 'summary') : true;
+      });
+      applyReportSections(pickerId, bodyId);
+    });
+  });
+}
+function applyReportSections(pickerId, bodyId){
+  const picker = document.getElementById(pickerId);
+  const body = document.getElementById(bodyId);
+  if(!picker || !body) return;
+  picker.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    body.querySelectorAll(`[data-rpt-section="${cb.dataset.sec}"]`).forEach(sec=>{
+      sec.style.display = cb.checked ? '' : 'none';
+    });
+  });
+}
+
+// Standard letterhead at the top of every report.
+function reportHeaderHTML(title, subtitle, monthDate, extraMeta){
+  const periodStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const periodEnd = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 0);
+  return `
+    <div class="rpt-head">
+      <div>
+        <div class="rpt-title">${esc(title)}</div>
+        <div class="rpt-sub">${esc(subtitle)}</div>
+      </div>
+      <div class="rpt-meta">
+        <div>Period: <b>${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}</b></div>
+        <div>Prepared by: <b>Ceymora</b></div>
+        <div>Generated: <b>${fmtLongDate(new Date())}</b></div>
+        ${extraMeta ? `<div>${extraMeta}</div>` : ''}
+      </div>
+    </div>`;
 }
 
 async function buildVillaProfitReportHTML(loc, monthDate){
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEndExclusive = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1);
   const monthStartISO = toISO(monthStart), monthEndISO = toISO(monthEndExclusive);
+  const daysInMonth = Math.round((monthEndExclusive - monthStart) / 86400000);
   const villaInfo = VR_VILLAS.find(v=>v.id===loc) || CAL_VILLAS.find(v=>v.id===loc) || { name: loc };
   const villaCurrency = (CAL_VILLAS.find(v=>v.id===loc) || {}).currency || 'USD';
 
-  // Bookings for this villa this month
+  /* ---------------- 1. REVENUE: bookings checking in this month ---------------- */
   const bookings = allBookings
     .filter(b => b.villa===loc && b.checkIn>=monthStartISO && b.checkIn<monthEndISO)
     .sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
 
-  let grossLkr = 0;
-  let bookingsHtml = '';
-  if(bookings.length === 0){
-    bookingsHtml = '<div class="manage-empty">No bookings this month.</div>';
-  } else {
-    bookingsHtml = '<div class="manage-list" style="margin-top:6px;">';
-    for(const b of bookings){
-      const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
-      let lineLkr = null;
-      if(b.rateUsd){
-        const lineGross = nights * b.rateUsd;
-        const cur = b.currency || villaCurrency;
-        const rate = await getFxRate(b.checkIn, cur);
-        if(rate){ lineLkr = lineGross * rate; grossLkr += lineLkr; }
-      }
-      bookingsHtml += `<div class="txn-row">
-        <span class="txn-badge income">${b.type}</span>
-        <span class="txn-main">
-          <div class="txn-title">${b.guest || 'Guest'}${b.guests ? ` (${b.guests} guests)` : ''}</div>
-          <div class="txn-sub">${b.checkIn} → ${b.checkOut} · ${nights} night${nights===1?'':'s'}${b.rateUsd ? ` · ${b.currency||villaCurrency} ${b.rateUsd}/night` : ' · no rate set'}</div>
-        </span>
-        <span class="txn-amount income">${lineLkr!==null ? 'LKR '+Math.round(lineLkr).toLocaleString() : '—'}</span>
-      </div>`;
-    }
-    bookingsHtml += '</div>';
-  }
-  const commission = grossLkr * 0.15;
-  const villaShare = grossLkr * 0.85;
+  let grossLkr = 0, bookedNights = 0, grossNative = 0, unratedCount = 0, noFxCount = 0;
+  let airbnbLkr = 0, directLkr = 0, airbnbCount = 0, directCount = 0;
+  let bookingRowsHtml = '';
 
-  // Petty cash expenses for this villa this month
-  const expenses = allCashTxns
-    .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
-    .sort((a,b)=> a.date.localeCompare(b.date));
-  let pettyCashTotal = 0;
-  let expensesHtml = '';
-  if(expenses.length === 0){
-    expensesHtml = '<div class="manage-empty">None this month.</div>';
-  } else {
-    expensesHtml = '<div class="manage-list" style="margin-top:6px;">';
-    for(const e of expenses){
-      pettyCashTotal += e.amount;
-      const links = getInvoiceLinks(e).map(u=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎 View</a>`).join('');
-      expensesHtml += `<div class="txn-row">
-        <span class="txn-badge expense">petty cash</span>
-        <span class="txn-main"><div class="txn-title">${e.purpose || 'Expense'}${links}${e.linkedInventory ? ' · 📦 direct purchase' : ''}${e.employeeName ? ` · <span style="color:var(--amber);">from ${e.employeeName}'s advance</span>` : ''}</div><div class="txn-sub">${e.date}${e.note ? ' · '+e.note : ''}</div></span>
-        <span class="txn-amount expense">LKR ${e.amount.toLocaleString()}</span>
-      </div>`;
+  for(const b of bookings){
+    const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+    const cur = b.currency || villaCurrency;
+    let lineLkr = null, lineGross = null;
+    if(b.rateUsd){
+      lineGross = nights * b.rateUsd;
+      grossNative += lineGross;
+      const rate = await getFxRate(b.checkIn, cur);
+      if(rate){ lineLkr = lineGross * rate; grossLkr += lineLkr; }
+      else { noFxCount++; }
+      bookedNights += nights;
+      if(b.type === 'airbnb'){ airbnbCount++; if(lineLkr) airbnbLkr += lineLkr; }
+      else { directCount++; if(lineLkr) directLkr += lineLkr; }
+    } else {
+      unratedCount++;
     }
-    expensesHtml += '</div>';
+    bookingRowsHtml += `<tr>
+      <td class="dim">${fmtDay(b.checkIn)} – ${fmtDay(b.checkOut)}</td>
+      <td><b>${esc(b.guest || 'Guest')}</b>${b.guests ? `<div class="dim">${esc(b.guests)} guests</div>` : ''}</td>
+      <td><span class="rpt-badge ${b.type}">${b.type==='airbnb'?'Airbnb':'Direct'}</span></td>
+      <td class="c">${nights}</td>
+      <td class="r">${b.rateUsd ? moneyFull(b.rateUsd, cur) : '—'}</td>
+      <td class="r">${lineGross!==null ? moneyFull(lineGross, cur) : '—'}</td>
+      <td class="r ${lineLkr!==null?'rpt-money-in':'dim'}">${lineLkr!==null ? Math.round(lineLkr).toLocaleString() : '—'}</td>
+    </tr>`;
   }
 
-  // Operating expenses (Salary/Water/Electricity/SLT/Other) for this villa this month
-  const opEx = allOpEx
-    .filter(o => o.villaId===loc && o.date>=monthStartISO && o.date<monthEndISO)
-    .sort((a,b)=> a.date.localeCompare(b.date));
-  let opExTotal = 0;
-  let opExHtml = '';
-  if(opEx.length === 0){
-    opExHtml = '<div class="manage-empty">None this month.</div>';
-  } else {
-    opExHtml = '<div class="manage-list" style="margin-top:6px;">';
-    for(const o of opEx){
-      opExTotal += o.amount;
-      const opInvoiceLinks = (o.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${o.invoiceUrls.length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
-      const titleText = o.category === 'salary' && o.employeeName
-        ? `${OPEX_LABELS[o.category]} — ${o.employeeName}`
-        : (o.note || OPEX_LABELS[o.category] || o.category);
-      opExHtml += `<div class="txn-row">
-        <span class="txn-badge expense">${OPEX_LABELS[o.category] || o.category}</span>
-        <span class="txn-main"><div class="txn-title">${titleText}${opInvoiceLinks ? ' '+opInvoiceLinks : ''}</div><div class="txn-sub">${o.date}${o.category!=='salary' && o.note ? ' · '+o.note : ''}</div></span>
-        <span class="txn-amount expense">LKR ${o.amount.toLocaleString()}</span>
-        <button class="manage-del no-print" data-opex-id="${o.id}">Delete</button>
-      </div>`;
-    }
-    opExHtml += '</div>';
-  }
-
-  const totalExpenses = pettyCashTotal + opExTotal;
-  const netProfit = villaShare - totalExpenses;
-
-  return `
-    <div class="print-header">
-      <h2 style="margin:0;">${villaInfo.name} — Financial Report</h2>
-      <div style="color:var(--muted); font-size:13px;">${monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
-    </div>
-    <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
-      <div class="manage-title">Summary</div>
-      <table class="inv-table" style="margin-top:6px;">
-        <tbody>
-          <tr><td>Gross booking revenue</td><td class="num">LKR ${Math.round(grossLkr).toLocaleString()}</td></tr>
-          <tr><td>Ceymora management fee (15%)</td><td class="num" style="color:var(--red);">− LKR ${Math.round(commission).toLocaleString()}</td></tr>
-          <tr><td style="font-weight:600;">Villa's share (85%)</td><td class="num" style="font-weight:600;">LKR ${Math.round(villaShare).toLocaleString()}</td></tr>
-          <tr><td>Petty cash expenses</td><td class="num" style="color:var(--red);">− LKR ${Math.round(pettyCashTotal).toLocaleString()}</td></tr>
-          <tr><td>Operating expenses (salary, bills, other)</td><td class="num" style="color:var(--red);">− LKR ${Math.round(opExTotal).toLocaleString()}</td></tr>
-          <tr style="font-weight:700; border-top:2px solid var(--board-line);">
-            <td>Net profit</td>
-            <td class="num" style="color:${netProfit>=0 ? 'var(--green)' : 'var(--red)'};">LKR ${Math.round(netProfit).toLocaleString()}</td>
+  const bookingsHtml = bookings.length === 0
+    ? '<div class="rpt-empty">No bookings recorded for this villa in this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr>
+          <th>Stay dates</th><th>Guest</th><th>Source</th>
+          <th class="c">Nights</th><th class="r">Rate / night</th>
+          <th class="r">Gross (${esc(villaCurrency)})</th><th class="r">Gross (LKR)</th>
+        </tr></thead>
+        <tbody>${bookingRowsHtml}
+          <tr class="subtotal">
+            <td colspan="3">Total — ${bookings.length} booking${bookings.length===1?'':'s'}</td>
+            <td class="c">${bookedNights}</td>
+            <td></td>
+            <td class="r">${moneyFull(grossNative, villaCurrency)}</td>
+            <td class="r">${Math.round(grossLkr).toLocaleString()}</td>
           </tr>
         </tbody>
       </table>
+      ${unratedCount ? `<div class="rpt-note">${unratedCount} booking${unratedCount===1?' has':'s have'} no nightly rate entered and ${unratedCount===1?'is':'are'} therefore excluded from revenue.</div>` : ''}
+      ${noFxCount ? `<div class="rpt-note">${noFxCount} booking${noFxCount===1?'':'s'} could not be converted to LKR (no exchange rate available for that date).</div>` : ''}`;
+
+  // Occupancy counts the nights that actually fall inside this month, from any booking
+  // that overlaps it — which is the correct way to measure how full the villa was, even
+  // if the stay started in the previous month.
+  let occupiedNights = 0;
+  for(const b of allBookings){
+    if(b.villa !== loc) continue;
+    const segStart = b.checkIn > monthStartISO ? b.checkIn : monthStartISO;
+    const segEnd = b.checkOut < monthEndISO ? b.checkOut : monthEndISO;
+    if(segStart >= segEnd) continue;
+    occupiedNights += Math.round((parseISO(segEnd) - parseISO(segStart)) / 86400000);
+  }
+
+  const commission = grossLkr * 0.15;
+  const villaShare = grossLkr * 0.85;
+
+  /* ---------------- 2. PETTY CASH ---------------- */
+  const expenses = allCashTxns
+    .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  let pettyCashTotal = 0, pettyRows = '';
+  for(const e of expenses){
+    pettyCashTotal += e.amount;
+    const links = getInvoiceLinks(e).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(e).length>1?' '+(i+1):''}</a>`).join(' ');
+    const tags = [];
+    if(e.linkedInventory) tags.push('direct purchase');
+    if(e.employeeName) tags.push(`from ${esc(e.employeeName)}'s advance`);
+    pettyRows += `<tr>
+      <td class="dim">${fmtDay(e.date)}</td>
+      <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
+      <td class="dim">${esc(CARD_LABELS[e.card] || e.card || '')}</td>
+      <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
+      <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
+    </tr>`;
+  }
+  const pettyHtml = expenses.length === 0
+    ? '<div class="rpt-empty">No petty cash spending in this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr><th>Date</th><th>Description</th><th>Paid by</th><th>Notes</th><th class="r">Amount (LKR)</th></tr></thead>
+        <tbody>${pettyRows}
+          <tr class="subtotal"><td colspan="4">Total — ${expenses.length} item${expenses.length===1?'':'s'}</td><td class="r">${Math.round(pettyCashTotal).toLocaleString()}</td></tr>
+        </tbody>
+      </table>`;
+
+  /* ---------------- 3. OPERATING EXPENSES (salary / bills / other) ---------------- */
+  const opEx = allOpEx
+    .filter(o => o.villaId===loc && o.date>=monthStartISO && o.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  let opExTotal = 0, opExRows = '';
+  const opExByCat = {}; // category -> total, so the summary can break it down
+  for(const o of opEx){
+    opExTotal += o.amount;
+    opExByCat[o.category] = (opExByCat[o.category] || 0) + o.amount;
+    const opLinks = (o.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${o.invoiceUrls.length>1?' '+(i+1):''}</a>`).join(' ');
+    const detail = o.category === 'salary' && o.employeeName ? esc(o.employeeName) : esc(o.note || '');
+    opExRows += `<tr>
+      <td class="dim">${fmtDay(o.date)}</td>
+      <td><b>${esc(OPEX_LABELS[o.category] || o.category)}</b></td>
+      <td>${detail || '<span class="dim">—</span>'}${opLinks ? ' '+opLinks : ''}</td>
+      <td class="r rpt-money-out">${Math.round(o.amount).toLocaleString()}</td>
+      <td class="r no-print"><button class="manage-del no-print" data-opex-id="${o.id}">Delete</button></td>
+    </tr>`;
+  }
+  const opExHtml = opEx.length === 0
+    ? '<div class="rpt-empty">No salaries, bills or other operating costs recorded for this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr><th>Date</th><th>Category</th><th>Detail</th><th class="r">Amount (LKR)</th><th class="no-print"></th></tr></thead>
+        <tbody>${opExRows}
+          <tr class="subtotal"><td colspan="3">Total — ${opEx.length} item${opEx.length===1?'':'s'}</td><td class="r">${Math.round(opExTotal).toLocaleString()}</td><td class="no-print"></td></tr>
+        </tbody>
+      </table>`;
+
+  /* ---------------- 4. STORE SUPPLIES RECEIVED ---------------- */
+  const supplies = buildSuppliesSection(loc, monthStartISO, monthEndISO);
+
+  /* ---------------- 5. THE NUMBERS ---------------- */
+  const totalExpenses = pettyCashTotal + opExTotal + supplies.total;
+  const netProfit = villaShare - totalExpenses;
+  const adr = bookedNights > 0 ? grossLkr / bookedNights : 0;
+  const margin = grossLkr > 0 ? Math.round(netProfit / grossLkr * 100) : null;
+
+  const plCatRows = Object.keys(opExByCat).map(cat =>
+    `<tr class="line"><td class="lbl">${esc(OPEX_LABELS[cat] || cat)}</td>${negCell(opExByCat[cat])}</tr>`
+  ).join('');
+
+  return `
+  <div class="rpt-doc">
+    ${reportHeaderHTML(villaInfo.name, 'Monthly Financial Report', monthDate, 'All figures in <b>LKR</b>')}
+
+    <div data-rpt-section="summary">
+      <div class="rpt-kpis">
+        <div class="rpt-kpi">
+          <div class="rpt-kpi-label">Gross revenue</div>
+          <div class="rpt-kpi-value">${Math.round(grossLkr).toLocaleString()}</div>
+          <div class="rpt-kpi-note">${bookings.length} booking${bookings.length===1?'':'s'}</div>
+        </div>
+        <div class="rpt-kpi">
+          <div class="rpt-kpi-label">Occupancy</div>
+          <div class="rpt-kpi-value">${pct(occupiedNights, daysInMonth)}</div>
+          <div class="rpt-kpi-note">${occupiedNights} of ${daysInMonth} nights</div>
+        </div>
+        <div class="rpt-kpi">
+          <div class="rpt-kpi-label">Avg. nightly rate</div>
+          <div class="rpt-kpi-value">${Math.round(adr).toLocaleString()}</div>
+          <div class="rpt-kpi-note">across ${bookedNights} paid night${bookedNights===1?'':'s'}</div>
+        </div>
+        <div class="rpt-kpi">
+          <div class="rpt-kpi-label">Total expenses</div>
+          <div class="rpt-kpi-value">${Math.round(totalExpenses).toLocaleString()}</div>
+          <div class="rpt-kpi-note">${pct(totalExpenses, villaShare)} of villa share</div>
+        </div>
+        <div class="rpt-kpi ${netProfit>=0?'pos':'neg'}">
+          <div class="rpt-kpi-label">Net profit</div>
+          <div class="rpt-kpi-value">${Math.round(netProfit).toLocaleString()}</div>
+          <div class="rpt-kpi-note">${margin===null ? 'no revenue this period' : margin+'% of gross revenue'}</div>
+        </div>
+      </div>
+
+      <div class="rpt-section" style="margin-top:6px;">
+        <div class="rpt-section-title">Profit &amp; Loss Statement</div>
+        <table class="rpt-pl">
+          <tbody>
+            <tr class="group"><td>Revenue</td><td class="amt">LKR</td></tr>
+            <tr class="line"><td class="lbl">Booking revenue — Airbnb (${airbnbCount})</td><td class="amt">${Math.round(airbnbLkr).toLocaleString()}</td></tr>
+            <tr class="line"><td class="lbl">Booking revenue — Direct (${directCount})</td><td class="amt">${Math.round(directLkr).toLocaleString()}</td></tr>
+            <tr class="sub"><td>Gross booking revenue</td><td class="amt">${Math.round(grossLkr).toLocaleString()}</td></tr>
+            <tr class="line"><td class="lbl">Less: Ceymora management fee (15%)</td>${negCell(commission)}</tr>
+            <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${Math.round(villaShare).toLocaleString()}</td></tr>
+
+            <tr class="group"><td>Expenses</td><td class="amt"></td></tr>
+            <tr class="line"><td class="lbl">Petty cash — day-to-day spending</td>${negCell(pettyCashTotal)}</tr>
+            ${plCatRows}
+            <tr class="line"><td class="lbl">Store supplies received</td>${negCell(supplies.total)}</tr>
+            <tr class="sub"><td>Total expenses</td>${negCell(totalExpenses)}</tr>
+
+            <tr class="grand"><td>Net profit for the period</td><td class="amt ${netProfit>=0?'pos':'neg'}">${netProfit<0 ? '('+Math.abs(Math.round(netProfit)).toLocaleString()+')' : Math.round(netProfit).toLocaleString()}</td></tr>
+          </tbody>
+        </table>
+        <div class="rpt-note">Figures in brackets are amounts deducted. Revenue counts bookings that check in during this period; occupancy counts nights that fall inside it.</div>
+      </div>
     </div>
-    <div class="manage-section">
-      <div class="manage-title">Bookings this month</div>
+
+    <div class="rpt-section" data-rpt-section="bookings">
+      <div class="rpt-section-title">1. Bookings &amp; Revenue <span class="rpt-section-count">${bookings.length} booking${bookings.length===1?'':'s'} · ${bookedNights} paid night${bookedNights===1?'':'s'} · ${lkr(grossLkr)}</span></div>
       ${bookingsHtml}
     </div>
-    <div class="manage-section">
-      <div class="manage-title">Petty cash expenses</div>
-      ${expensesHtml}
+
+    <div class="rpt-section" data-rpt-section="pettycash">
+      <div class="rpt-section-title">2. Petty Cash Expenses <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyCashTotal)}</span></div>
+      ${pettyHtml}
     </div>
-    <div class="manage-section">
-      <div class="manage-header">
-        <span class="manage-title">Other operating expenses</span>
-        <div class="toolbar-actions no-print" id="opExButtons"></div>
+
+    <div class="rpt-section" data-rpt-section="opex">
+      <div class="rpt-section-title">
+        <span>3. Operating Expenses <span class="rpt-section-count">${opEx.length} item${opEx.length===1?'':'s'} · ${lkr(opExTotal)}</span></span>
+        <span class="toolbar-actions no-print" id="opExButtons"></span>
       </div>
       ${opExHtml}
     </div>
+
+    <div class="rpt-section" data-rpt-section="inventory">
+      <div class="rpt-section-title">4. Store Supplies Received <span class="rpt-section-count">${supplies.count} transfer${supplies.count===1?'':'s'} · ${lkr(supplies.total)}</span></div>
+      ${supplies.html}
+    </div>
+
+    <div class="rpt-foot">
+      Prepared by Ceymora · ${esc(villaInfo.name)} · ${monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.
+      Foreign-currency bookings are converted to LKR at the published rate for each booking's check-in date.
+      This report is generated from the live management board and may change if entries are added or corrected afterwards.
+    </div>
+  </div>
   `;
 }
 
+// Items sent from Store to a villa/office during the period. Priced at whatever was
+// entered on the transfer; where nothing was entered, valued at the item's average
+// purchase cost so the total isn't understated (those lines are marked with *).
+function buildSuppliesSection(loc, monthStartISO, monthEndISO){
+  const received = allInvTxns
+    .filter(t => t.type==='distribute' && t.toVilla===loc && t.date>=monthStartISO && t.date<monthEndISO)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  if(received.length === 0){
+    return { total:0, count:0, html:'<div class="rpt-empty">No items received from Store in this period.</div>' };
+  }
+  const avgUnitCost = computeAvgUnitCost();
+  let total = 0, anyEstimated = false, anyUnknown = false, rows = '';
+  for(const r of received){
+    let linePrice, isEstimated = false;
+    if(r.amount !== null && r.amount !== undefined){
+      linePrice = r.amount;
+    } else {
+      const unitCost = avgUnitCost[r.item];
+      linePrice = unitCost !== undefined ? Math.round(r.qty * unitCost) : null;
+      isEstimated = linePrice !== null;
+    }
+    if(linePrice !== null) total += linePrice; else anyUnknown = true;
+    if(isEstimated) anyEstimated = true;
+    rows += `<tr>
+      <td class="dim">${fmtDay(r.date)}</td>
+      <td><b>${esc(r.item)}</b>${r.note ? `<div class="dim">${esc(r.note)}</div>` : ''}</td>
+      <td class="c">${r.qty}</td>
+      <td class="r ${linePrice===null?'dim':'rpt-money-out'}">${linePrice!==null ? linePrice.toLocaleString()+(isEstimated?' *':'') : '—'}</td>
+    </tr>`;
+  }
+  const html = `<table class="rpt-table">
+      <thead><tr><th>Date</th><th>Item</th><th class="c">Qty</th><th class="r">Value (LKR)</th></tr></thead>
+      <tbody>${rows}
+        <tr class="subtotal"><td colspan="3">Total — ${received.length} transfer${received.length===1?'':'s'}</td><td class="r">${total.toLocaleString()}</td></tr>
+      </tbody>
+    </table>
+    ${anyEstimated ? '<div class="rpt-note">* Valued at the item\'s average purchase cost — no price was entered on that transfer.</div>' : ''}
+    ${anyUnknown ? '<div class="rpt-note">Lines showing “—” have no price entered and no purchase cost on record, so they are not included in the total.</div>' : ''}`;
+  return { total, count:received.length, html };
+}
 function openOpExModal(villaId, category){
   document.getElementById('opExModalTitle').textContent = 'Add ' + (OPEX_LABELS[category] || category).toLowerCase();
   document.getElementById('opExDate').value = todayISO();
