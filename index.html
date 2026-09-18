@@ -452,7 +452,7 @@
   }
   .co-line input{ width:112px; text-align:right; font-variant-numeric:tabular-nums; }
   .co-line input:focus, .co-dyn input:focus{ outline:2px solid var(--frame); outline-offset:-1px; }
-  .co-line input.auto{ background:#f4f9f4; border-color:var(--green); }
+  .co-line input.auto, .co-dyn input.auto{ background:#f4f9f4; border-color:var(--green); }
   .co-dyn{ display:flex; align-items:center; gap:6px; padding:3px 0; }
   .co-dyn input.co-name{ flex:1; min-width:0; }
   .co-dyn input.co-amt{ width:105px; text-align:right; font-variant-numeric:tabular-nums; }
@@ -854,7 +854,7 @@
         </div>
 
         <div class="co-actions no-print">
-          <button class="add-booking-btn" id="coPullCommission">⬇ Pull villa commission from Bookings</button>
+          <button class="add-booking-btn" id="coPullCommission">🔄 Refresh commission from Bookings</button>
           <button class="add-booking-btn" id="coCalcEpf">🧮 Calculate EPF 12% / ETF 3% from salary</button>
           <button class="add-booking-btn" id="coCopyPrev">📋 Copy last month's figures</button>
           <span class="field-hint" id="coPettyHint"></span>
@@ -863,7 +863,7 @@
         <div class="co-groups">
           <div class="co-group">
             <div class="co-group-title"><span>Management Income</span><span class="co-group-total" id="coTotalMgmt">0</span></div>
-            <div class="field-hint" style="margin-bottom:6px;">Your commission income, one line per villa or client.</div>
+            <div class="field-hint" style="margin-bottom:6px;">Linked from Bookings automatically on a month you haven't saved yet — one line per villa. Use "Refresh from Bookings" if a booking changes afterwards.</div>
             <div id="coMgmtRows"></div>
             <button class="rpt-quick no-print" data-add="management_income">+ Add income line</button>
           </div>
@@ -905,6 +905,7 @@
           <label><input type="checkbox" data-sec="income" checked> Income Statement</label>
           <label><input type="checkbox" data-sec="operating" checked> Operating Statement</label>
           <label><input type="checkbox" data-sec="sales" checked> Sales / Commission Summary</label>
+          <label><input type="checkbox" data-sec="pettycash" checked> Petty Cash Expenses</label>
           <span class="sep"></span>
           <button class="rpt-quick" data-preset="summary">Dashboard only</button>
           <button class="rpt-quick" data-preset="all">Everything</button>
@@ -2720,6 +2721,14 @@ function renderCash(){
     tr.appendChild(actionTd);
     tbody.appendChild(tr);
   }
+  const netTotal = sorted.reduce((s,t)=> s + (t.type==='income' ? t.amount : -t.amount), 0);
+  const tfoot = document.createElement('tfoot');
+  tfoot.innerHTML = `<tr style="font-weight:800; border-top:2px solid var(--board-line); background:#f6f4ec;">
+      <td colspan="4" style="padding:9px 10px;">Net total — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
+      <td class="num" style="padding:9px 10px; color:${netTotal>=0?'var(--green)':'var(--red)'};">${netTotal>=0?'+':'−'} ${Math.abs(Math.round(netTotal)).toLocaleString()}</td>
+      <td style="padding:9px 10px;"></td>
+    </tr>`;
+  table.appendChild(tfoot);
   list.appendChild(table);
   renderAdvances();
 }
@@ -4141,7 +4150,7 @@ const CO_GROUPS = [
     ['travelling_allowance','Travelling Allowance'], ['wages','Wages'],
   ]},
   { key:'utilities', label:'Utilities & Fixed Commitments', items:[
-    ['water','Water'], ['telephone','Telephone'],
+    ['electricity','Electricity Bill'], ['water','Water'], ['telephone','Telephone'],
   ]},
   { key:'professional', label:'Professional Fees', items:[
     ['accountancy','Monthly Accountancy Fee'], ['professional_fees','Professional Fees'],
@@ -4320,19 +4329,23 @@ function renderCompanyEntry(){
   });
 
   // Fill the free-form rows
+  let mgmtIsFresh = false;
   ['management_income','other_income','cash'].forEach(section=>{
     const wrapId = { management_income:'coMgmtRows', other_income:'coOtherRows', cash:'coCashRows' }[section];
     document.getElementById(wrapId).innerHTML = '';
     const rows = coRowsFor(p, section);
     if(rows.length === 0){
       // Sensible starting lines so the form isn't an empty box on a fresh month
-      if(section === 'management_income') CAL_VILLAS.forEach(v => coAddDynRow(section, v.name, ''));
+      if(section === 'management_income'){ CAL_VILLAS.forEach(v => coAddDynRow(section, v.name, '')); mgmtIsFresh = true; }
       else if(section === 'cash') coAddDynRow(section, 'Sampath Current Account', '');
       else coAddDynRow(section, '', '');
     } else {
       rows.forEach(r => coAddDynRow(section, r.category, r.amount));
     }
   });
+  // A month nobody has entered figures for yet: link Management Income straight from
+  // Bookings so the form opens already populated, instead of a blank sheet to retype.
+  if(mgmtIsFresh) coAutoFillCommissionIfFresh(p);
 
   // Reference figure: what the board itself recorded as petty cash spending this month
   const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
@@ -4408,36 +4421,50 @@ async function coCopyPrevious(){
   document.getElementById('coSaveMsg').textContent = 'Copied from last month — check the figures, then Save.';
 }
 
-// Fills Management Income from the bookings already in the calendar: each villa's
-// 15% Ceymora fee for bookings checking in during this month, converted to LKR.
+// The actual link to Bookings: each villa's 15% Ceymora fee, for bookings checking in
+// during the given month, converted to LKR at each booking's own check-in-date rate.
+// Shared by the manual "Pull commission" button and the automatic fill on a fresh month.
+async function computeCommissionByVilla(monthDate){
+  const monthStart = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+  const monthEnd = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1));
+  const perVilla = {};
+  for(const b of allBookings){
+    if(!b.rateUsd || b.checkIn < monthStart || b.checkIn >= monthEnd) continue;
+    const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const rate = await getFxRate(b.checkIn, cur);
+    if(!rate) continue;
+    perVilla[b.villa] = (perVilla[b.villa] || 0) + nights * b.rateUsd * rate * 0.15;
+  }
+  return perVilla;
+}
+
+// Writes computed commission into the Management Income rows already on screen.
+function applyCommissionToRows(perVilla, markAuto){
+  const wrap = document.getElementById('coMgmtRows');
+  CAL_VILLAS.forEach(v=>{
+    const amount = Math.round((perVilla[v.id] || 0) * 100) / 100;
+    let row = [...wrap.querySelectorAll('.co-dyn')].find(r => r.querySelector('.co-name').value.trim().toLowerCase() === v.name.toLowerCase());
+    if(!row){
+      const blank = [...wrap.querySelectorAll('.co-dyn')].find(r => !r.querySelector('.co-name').value.trim());
+      row = blank || coAddDynRow('management_income', '', '');
+      row.querySelector('.co-name').value = v.name;
+    }
+    const amtInput = row.querySelector('.co-amt');
+    amtInput.value = amount || '';
+    amtInput.classList.toggle('auto', !!markAuto && !!amount);
+  });
+}
+
+// Fills Management Income from the bookings already in the calendar (manual refresh —
+// use this any time bookings changed after the month was first opened).
 async function coPullCommission(){
   const btn = document.getElementById('coPullCommission');
   const original = btn.textContent;
   btn.textContent = 'Working out commission…'; btn.disabled = true;
   try{
-    const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
-    const monthEnd = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()+1, 1));
-    const perVilla = {};
-    for(const b of allBookings){
-      if(!b.rateUsd || b.checkIn < monthStart || b.checkIn >= monthEnd) continue;
-      const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
-      const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
-      const rate = await getFxRate(b.checkIn, cur);
-      if(!rate) continue;
-      perVilla[b.villa] = (perVilla[b.villa] || 0) + nights * b.rateUsd * rate * 0.15;
-    }
-    const wrap = document.getElementById('coMgmtRows');
-    // Update matching villa lines in place; add a line for any villa not listed yet.
-    CAL_VILLAS.forEach(v=>{
-      const amount = Math.round((perVilla[v.id] || 0) * 100) / 100;
-      let row = [...wrap.querySelectorAll('.co-dyn')].find(r => r.querySelector('.co-name').value.trim().toLowerCase() === v.name.toLowerCase());
-      if(!row){
-        const blank = [...wrap.querySelectorAll('.co-dyn')].find(r => !r.querySelector('.co-name').value.trim());
-        row = blank || coAddDynRow('management_income', '', '');
-        row.querySelector('.co-name').value = v.name;
-      }
-      row.querySelector('.co-amt').value = amount || '';
-    });
+    const perVilla = await computeCommissionByVilla(coMonthDate);
+    applyCommissionToRows(perVilla, true);
     coDirty = true; coRecalcTotals();
     document.getElementById('coSaveMsg').textContent = 'Commission pulled from Bookings — review it, then Save.';
   }catch(e){
@@ -4446,6 +4473,22 @@ async function coPullCommission(){
   }finally{
     btn.textContent = original; btn.disabled = false;
   }
+}
+
+// Runs automatically the first time a month with no saved figures is opened, so
+// Management Income already reflects Bookings without anyone needing to click the
+// pull button — it's just there, linked, ready to review and save.
+async function coAutoFillCommissionIfFresh(periodISO){
+  try{
+    const perVilla = await computeCommissionByVilla(coMonthDate);
+    if(coPeriodISO(coMonthDate) !== periodISO) return; // the month changed again before this resolved
+    const hasAny = Object.values(perVilla).some(v => v > 0);
+    if(!hasAny) return;
+    applyCommissionToRows(perVilla, true);
+    coDirty = true;
+    coRecalcTotals();
+    document.getElementById('coSaveMsg').textContent = 'Management income linked from Bookings — review it, then Save.';
+  }catch(e){ console.error(e); }
 }
 
 /* ---------------------------- saving ---------------------------- */
@@ -4564,6 +4607,7 @@ function renderCompanyReport(){
     <div data-rpt-section="income">${coIncomeStatementHTML(cur, prev, curLabel, prevLabel)}</div>
     <div data-rpt-section="operating">${coOperatingStatementHTML(cur, prev, curLabel, prevLabel)}</div>
     <div data-rpt-section="sales">${coSalesSummaryHTML()}</div>
+    <div data-rpt-section="pettycash">${coPettyCashHTML()}</div>
     <div class="rpt-foot">
       Prepared by Ceymora · ${esc(coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}))}.
       Built from the figures entered on the "Enter figures" tab for this month and the month before it.
@@ -4787,7 +4831,47 @@ function coOperatingStatementHTML(cur, prev, curLabel, prevLabel){
   </div>`;
 }
 
-/* ---- 4. Sales / Commission Summary for the year ---- */
+/* ---- 5. Petty Cash Expenses (company-wide, straight from the Petty Cash tab) ---- */
+function coPettyCashHTML(){
+  const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
+  const monthEnd = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()+1, 1));
+  const rows = allCashTxns
+    .filter(t => t.type==='expense' && t.date>=monthStart && t.date<monthEnd)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+
+  if(rows.length === 0){
+    return `<div class="rpt-section">
+      <div class="rpt-section-title">Petty Cash Expenses</div>
+      <div class="rpt-empty">No petty cash spending recorded for this period.</div>
+    </div>`;
+  }
+
+  let total = 0;
+  const body = rows.map(t=>{
+    total += t.amount;
+    const details = (t.purpose || 'Expense') + (t.linkedInventory ? ' 📦' : '') + (t.note ? `<div class="dim">${esc(t.note)}</div>` : '');
+    const tag = t.employeeName ? `from ${esc(t.employeeName)}'s advance` : '';
+    return `<tr>
+      <td class="dim">${fmtDay(t.date)}</td>
+      <td><b>${details}</b></td>
+      <td class="dim">${esc(FOR_LABELS[t.for] || t.for)}</td>
+      <td class="dim">${esc(CARD_LABELS[t.card] || t.card)}${tag ? `<div class="dim">${tag}</div>` : ''}</td>
+      <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="rpt-section">
+    <div class="rpt-section-title">Petty Cash Expenses <span class="rpt-section-count">${rows.length} item${rows.length===1?'':'s'} · ${lkr(total)}</span></div>
+    <table class="rpt-table">
+      <thead><tr><th>Date</th><th>Expense details</th><th>For</th><th>From which card</th><th class="r">Amount (LKR)</th></tr></thead>
+      <tbody>${body}
+        <tr class="subtotal"><td colspan="4">Net Total</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
+      </tbody>
+    </table>
+    <div class="rpt-note">Sourced directly from the Petty Cash tab — every expense recorded company-wide this month, whichever villa or card it was for.</div>
+  </div>`;
+}
+
 function coSalesSummaryHTML(){
   const year = coMonthDate.getFullYear();
   const months = [];
