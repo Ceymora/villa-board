@@ -197,6 +197,14 @@
     background:#fff; border:1px solid var(--board-line); padding:6px 12px;
     border-radius:7px; cursor:pointer; color:var(--ink);
   }
+  /* Same look as .add-booking-btn, but intentionally NOT hidden by .viewer-mode —
+     used for the few actions a "viewer" role is still allowed to do, like Sharon
+     recording his own card purchases. */
+  .allowed-action-btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+    background:#fff; border:1px solid var(--board-line); padding:6px 12px;
+    border-radius:7px; cursor:pointer; color:var(--ink);
+  }
 
   /* Modal */
   .modal-overlay{
@@ -545,6 +553,7 @@
       <button class="maintab-btn" data-tab="villareport" id="villaReportTabBtn" style="display:none">🏘️ Villa Report</button>
       <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
       <button class="maintab-btn" data-tab="company" id="companyTabBtn" style="display:none">🏢 Company Accounts</button>
+      <button class="maintab-btn" data-tab="users" id="usersTabBtn" style="display:none">👤 Users</button>
     </div>
 
     <!-- ===================== HOUSEKEEPING PANEL ===================== -->
@@ -766,6 +775,23 @@
       </div>
     </div>
 
+    <!-- ===================== USERS PANEL (admin only) ===================== -->
+    <div id="usersPanel" style="display:none">
+      <div class="toolbar">
+        <div class="status-msg" id="usersStatusMsg">Loading…</div>
+        <div class="toolbar-actions">
+          <button class="add-booking-btn" id="addUserBtn">+ Add user</button>
+        </div>
+      </div>
+      <div class="field-hint" style="margin-bottom:10px;">New logins here take effect immediately — no file redeploy needed.</div>
+      <table class="inv-table">
+        <thead>
+          <tr><th>Name</th><th>Role</th><th>Villa (if applicable)</th><th></th></tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+
     <!-- ===================== VILLA REPORT PANEL ===================== -->
     <div id="villaReportPanel" style="display:none">
       <div class="toolbar">
@@ -790,7 +816,10 @@
         <button class="rpt-quick" data-preset="all">Everything</button>
         <span class="sep"></span>
         <button class="add-booking-btn" id="vrPrintBtn">🖨️ Print / PDF</button>
+        <button class="allowed-action-btn no-print" id="myPurchaseBtn" style="display:none;">+ Record my purchase</button>
       </div>
+
+      <div id="myPurchasesSummary" style="display:none;"></div>
 
       <div id="villaReportBody"></div>
     </div>
@@ -1194,6 +1223,71 @@
   </div>
 </div>
 
+<!-- Record-a-purchase modal (for viewer_villa_select users like Sharon, who
+     sometimes pay for things on a company card and need to log it themselves) -->
+<div class="modal-overlay" id="myPurchaseModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Record a purchase</h3>
+    <label>Date</label>
+    <input type="date" id="mpDate">
+    <label>Villa this was for</label>
+    <select id="mpVilla"></select>
+    <label>Paid from</label>
+    <select id="mpCard">
+      <option value="ceymora">Ceymora Card</option>
+      <option value="kalava_card">Kalava Villa Card</option>
+    </select>
+    <div class="field-hint" id="mpCardHint"></div>
+    <label>What was it for</label>
+    <input type="text" id="mpPurpose" placeholder="e.g. Pool chemicals">
+    <label>Amount (LKR)</label>
+    <input type="number" id="mpAmount" min="0" step="1">
+    <label>Note (optional)</label>
+    <input type="text" id="mpNote">
+    <label>Attach invoice / receipt (optional)</label>
+    <input type="file" id="mpFile" accept="image/*,.pdf">
+    <div id="mpFileList"></div>
+    <div class="field-hint" id="mpFileHint"></div>
+    <div class="modal-error" id="mpError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="mpCancel">Cancel</button>
+      <button class="btn btn-save" id="mpSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/edit user modal (admin only) -->
+<div class="modal-overlay" id="userModalOverlay">
+  <div class="modal">
+    <h3 id="userModalTitle">Add user</h3>
+    <label>Name (used to log in)</label>
+    <input type="text" id="userName" placeholder="e.g. Kumar">
+    <label>Password</label>
+    <input type="text" id="userPassword" placeholder="e.g. kumar123">
+    <label>Role</label>
+    <select id="userRole">
+      <option value="admin">Admin — full access, can edit/delete everything</option>
+      <option value="cash_inventory">Petty Cash + Inventory only</option>
+      <option value="cash_inventory_bookings">Petty Cash + Inventory + Bookings</option>
+      <option value="viewer">View everything, no editing</option>
+      <option value="viewer_villa_select">View one villa at a time (picks which)</option>
+      <option value="viewer_villa_fixed">Locked to one specific villa</option>
+    </select>
+    <div id="userVillaScopeWrap" style="display:none;">
+      <label>Villa</label>
+      <select id="userVillaScope"></select>
+    </div>
+    <div class="modal-error" id="userError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="userDeleteBtn" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="userCancel">Cancel</button>
+      <button class="btn btn-save" id="userSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Villa detail modal (invoices + amounts, month-wise) -->
 <div class="modal-overlay" id="villaDetailModalOverlay">
   <div class="modal modal-wide" style="width:420px; max-height:82vh; overflow-y:auto;">
@@ -1241,7 +1335,7 @@ function checkDeletePassword(){
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
 function rowToBooking(r){ return { id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null, currency:r.currency||'USD' }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -1336,7 +1430,9 @@ function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, q
 //   'viewer_villa_fixed'       — only sees ONE villa's Petty Cash/Inventory (set via villaScope),
 //                                no Housekeeping/Bookings access at all
 // =====================================================================
-const USERS = {
+// Fallback used only if the app_users table can't be reached yet (e.g. before
+// you've run the setup SQL for it) — keeps the board usable either way.
+const FALLBACK_USERS = {
   'Makky':   { password: 'makky123',   role: 'admin' },
   'Zahny':   { password: 'zahny123',   role: 'cash_inventory' },
   'Anuja':   { password: 'anuja123',   role: 'cash_inventory_bookings' },
@@ -1346,6 +1442,8 @@ const USERS = {
   'Dino':    { password: 'dino123',    role: 'viewer_villa_fixed', villaScope: 'noelia' },
   'Anna':    { password: 'anna123',    role: 'viewer_villa_fixed', villaScope: 'brisa' },
 };
+let USERS = { ...FALLBACK_USERS };
+let usersLoadedFromDB = false;
 
 let currentUser = null; // { username, role }
 
@@ -1365,15 +1463,35 @@ async function logActivity(action, tableName, description){
   }catch(e){ console.error('activity log failed', e); }
 }
 
+async function loadUsersFromDB(){
+  if(!sb) return;
+  try{
+    const { data, error } = await sb.from('app_users').select('*');
+    if(error || !data || data.length === 0) return; // stay on fallback (table not set up yet, or empty)
+    const dbUsers = {};
+    data.forEach(u => {
+      dbUsers[u.username] = { password: u.password, role: u.role, villaScope: u.villa_scope || undefined };
+    });
+    USERS = dbUsers;
+    usersLoadedFromDB = true;
+    populateLoginDropdown();
+  }catch(e){ console.error('Could not load users from database, using built-in defaults', e); }
+}
+
 // Populate the name dropdown
-(function populateLoginDropdown(){
+function populateLoginDropdown(){
   const sel = document.getElementById('loginUsername');
-  Object.keys(USERS).forEach(name=>{
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">Select your name…</option>';
+  Object.keys(USERS).sort().forEach(name=>{
     const opt = document.createElement('option');
     opt.value = name; opt.textContent = name;
     sel.appendChild(opt);
   });
-})();
+  if(USERS[currentVal]) sel.value = currentVal;
+}
+populateLoginDropdown();
+if(sb) loadUsersFromDB();
 
 document.getElementById('loginBtn').addEventListener('click', doLogin);
 document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
@@ -1439,6 +1557,7 @@ function applyRolePermissions(){
     document.getElementById('activityLogTabBtn').style.display = '';
     document.getElementById('villaReportTabBtn').style.display = '';
     document.getElementById('companyTabBtn').style.display = '';
+    document.getElementById('usersTabBtn').style.display = '';
     if(!villaReportInited){ initVillaReport(); }
   }
 
@@ -1522,6 +1641,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('villaReportPanel').style.display = tab==='villareport' ? '' : 'none';
     document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
     document.getElementById('companyPanel').style.display = tab==='company' ? '' : 'none';
+    document.getElementById('usersPanel').style.display = tab==='users' ? '' : 'none';
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
     if(tab === 'pettycash' && !cashInited){ initPettyCash(); }
     if(tab === 'inventory' && !invInited){ initInventory(); if(!cashInited){ initPettyCash(); } }
@@ -1529,6 +1649,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
     if(tab === 'reports' && !reportsInited){ initReports(); }
     if(tab === 'company' && !companyInited){ initCompany(); }
+    if(tab === 'users' && !usersInited){ initUsers(); }
   });
 });
 
@@ -1581,6 +1702,7 @@ document.getElementById('villaSave').addEventListener('click', async ()=>{
 });
 document.getElementById('villaDeleteBtn').addEventListener('click', async ()=>{
   if(!editingVillaId) return;
+  if(!isAdmin()){ alert('Only an admin can delete villas.'); return; }
   if(!checkDeletePassword()) return;
   if(!confirm('Delete this villa? Staff assigned to it will need to be reassigned.')) return;
   try{
@@ -1630,6 +1752,7 @@ document.getElementById('empSave').addEventListener('click', async ()=>{
 });
 document.getElementById('empDeleteBtn').addEventListener('click', async ()=>{
   if(!editingStaffId) return;
+  if(!isAdmin()){ alert('Only an admin can delete employees.'); return; }
   if(!checkDeletePassword()) return;
   if(!confirm('Remove this employee from the board?')) return;
   try{
@@ -3510,6 +3633,12 @@ function initVillaReport(){
   document.getElementById('vrThisMonth').addEventListener('click', ()=>{ vrMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderVillaReport(); });
   document.getElementById('vrPrintBtn').addEventListener('click', ()=> window.print());
 
+  if(currentUser.role === 'viewer_villa_select'){
+    document.getElementById('myPurchaseBtn').style.display = '';
+    document.getElementById('myPurchasesSummary').style.display = '';
+    document.getElementById('myPurchaseBtn').addEventListener('click', ()=> openMyPurchaseModal());
+  }
+
   renderVillaReport();
 }
 
@@ -3538,6 +3667,7 @@ async function renderVillaReport(){
   if(myToken !== villaReportToken) return; // a newer render started
 
   document.getElementById('villaReportBody').innerHTML = html;
+  if(currentUser.role === 'viewer_villa_select'){ renderMyPurchasesSummary(); }
 
   // Wire up the "+ category" buttons — admin only
   const btnWrap = document.getElementById('opExButtons');
@@ -3924,6 +4054,92 @@ function buildSuppliesSection(loc, monthStartISO, monthEndISO){
     ${anyUnknown ? '<div class="rpt-note">Lines showing “—” have no price entered and no purchase cost on record, so they are not included in the total.</div>' : ''}`;
   return { total, count:received.length, html };
 }
+function renderMyPurchasesSummary(){
+  const mine = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy === currentUser.username);
+  const total = mine.reduce((sum,t)=> sum + t.amount, 0);
+  const wrap = document.getElementById('myPurchasesSummary');
+  if(mine.length === 0){
+    wrap.innerHTML = `<div class="field-hint" style="margin:-4px 0 10px;">You haven't recorded any purchases yet — use "+ Record my purchase" above.</div>`;
+    return;
+  }
+  const sorted = [...mine].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  let rows = '';
+  for(const t of sorted){
+    const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+    rows += `<div class="txn-row">
+      <span class="txn-badge expense">${FOR_LABELS[t.for]||t.for}</span>
+      <span class="txn-main"><div class="txn-title">${t.purpose||'Purchase'}${links?' '+links:''}</div><div class="txn-sub">${t.date} · ${CARD_LABELS[t.card]||t.card}${t.note?' · '+t.note:''}</div></span>
+      <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
+    </div>`;
+  }
+  wrap.innerHTML = `
+    <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+      <div class="manage-title">Your purchases (all time) — total LKR ${total.toLocaleString()}</div>
+      <div class="manage-list" style="margin-top:6px; max-height:220px;">${rows}</div>
+    </div>
+  `;
+}
+
+const mpFileHandler = createMultiFileHandler('mpFile', 'mpFileList');
+
+function openMyPurchaseModal(){
+  document.getElementById('mpDate').value = todayISO();
+  const villaSel = document.getElementById('mpVilla');
+  villaSel.innerHTML = VILLAS.filter(v=>['kalava','noelia','brisa'].includes(v.id)).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  villaSel.value = vrSelectedVilla || 'kalava';
+  document.getElementById('mpCard').value = 'ceymora';
+  document.getElementById('mpPurpose').value = '';
+  document.getElementById('mpAmount').value = '';
+  document.getElementById('mpNote').value = '';
+  mpFileHandler.reset();
+  document.getElementById('mpFileHint').textContent = '';
+  document.getElementById('mpError').style.display = 'none';
+  updateMpCardHint();
+  document.getElementById('myPurchaseModalOverlay').classList.add('open');
+}
+function updateMpCardHint(){
+  const card = document.getElementById('mpCard').value;
+  const villaSel = document.getElementById('mpVilla');
+  const hint = document.getElementById('mpCardHint');
+  if(card === 'kalava_card'){
+    villaSel.value = 'kalava'; villaSel.disabled = true;
+    hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa.';
+  } else {
+    villaSel.disabled = false;
+    hint.textContent = 'Ceymora Card can be used for any villa.';
+  }
+}
+document.getElementById('mpCard').addEventListener('change', updateMpCardHint);
+document.getElementById('mpCancel').addEventListener('click', ()=> document.getElementById('myPurchaseModalOverlay').classList.remove('open'));
+document.getElementById('myPurchaseModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='myPurchaseModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('mpSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('mpError');
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const date = document.getElementById('mpDate').value;
+  const villaId = document.getElementById('mpVilla').value;
+  const card = document.getElementById('mpCard').value;
+  const purpose = document.getElementById('mpPurpose').value.trim();
+  const amount = parseFloat(document.getElementById('mpAmount').value);
+  const note = document.getElementById('mpNote').value.trim();
+  const files = mpFileHandler.getFiles();
+  if(!date || !purpose || !amount || amount <= 0){ errEl.textContent='Fill in date, purpose, and a valid amount.'; errEl.style.display='block'; return; }
+  try{
+    const invoiceUrls = [];
+    for(const f of files){
+      document.getElementById('mpFileHint').textContent = `Uploading ${f.name}…`;
+      invoiceUrls.push(await uploadReceiptFile(f));
+    }
+    document.getElementById('mpFileHint').textContent = '';
+    const { error } = await sb.from('petty_cash_transactions').insert({
+      type:'expense', date, card, for: villaId, purpose, amount, note,
+      purchased_by: currentUser.username, invoice_urls: invoiceUrls,
+    });
+    if(error) throw error;
+    logActivity('create', 'petty_cash_transactions', `${currentUser.username} recorded a purchase: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[villaId]})`);
+    document.getElementById('myPurchaseModalOverlay').classList.remove('open');
+  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+});
+
 function openOpExModal(villaId, category){
   document.getElementById('opExModalTitle').textContent = 'Add ' + (OPEX_LABELS[category] || category).toLowerCase();
   document.getElementById('opExDate').value = todayISO();
@@ -4130,6 +4346,137 @@ function renderActivityLog(rows){
     list.appendChild(row);
   }
 }
+
+/* ============================================================================
+   USER MANAGEMENT (admin only) — reads/writes the app_users table so new
+   logins can be added without touching the code.
+   ============================================================================ */
+let usersInited = false;
+const ROLE_LABELS = {
+  admin: 'Admin (full access)',
+  cash_inventory: 'Petty Cash + Inventory',
+  cash_inventory_bookings: 'Petty Cash + Inventory + Bookings',
+  viewer: 'Viewer (everything, read-only)',
+  viewer_villa_select: 'Viewer (pick one villa)',
+  viewer_villa_fixed: 'Viewer (locked to one villa)',
+};
+
+function initUsers(){
+  usersInited = true;
+  if(!sb){ document.getElementById('usersStatusMsg').textContent = 'Not connected to Supabase yet'; return; }
+  document.getElementById('usersStatusMsg').textContent = 'Loading…';
+  fetchAppUsers();
+  sb.channel('app_users_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'app_users' }, fetchAppUsers)
+    .subscribe();
+
+  document.getElementById('addUserBtn').addEventListener('click', ()=> openUserModal(null));
+  document.getElementById('userRole').addEventListener('change', updateUserVillaScopeVisibility);
+}
+
+let allAppUsers = [];
+async function fetchAppUsers(){
+  const { data, error } = await sb.from('app_users').select('*').order('username');
+  if(error){
+    document.getElementById('usersStatusMsg').textContent = 'Could not load — has the app_users table been created? (see supabase-add-users-and-sharon-purchases.sql)';
+    console.error(error);
+    return;
+  }
+  allAppUsers = data;
+  document.getElementById('usersStatusMsg').textContent = 'Synced (live)';
+  renderUsers();
+  // Keep the live in-memory login list up to date too, in case someone
+  // is added while others are still on the login screen.
+  const dbUsers = {};
+  data.forEach(u => { dbUsers[u.username] = { password: u.password, role: u.role, villaScope: u.villa_scope || undefined }; });
+  if(Object.keys(dbUsers).length > 0){ USERS = dbUsers; usersLoadedFromDB = true; }
+}
+
+function renderUsers(){
+  const body = document.getElementById('usersBody');
+  body.innerHTML = '';
+  if(allAppUsers.length === 0){
+    body.innerHTML = '<tr><td colspan="4" class="inv-empty">No users yet — click "+ Add user".</td></tr>';
+    return;
+  }
+  for(const u of allAppUsers){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:600;">${u.username}</td>
+      <td>${ROLE_LABELS[u.role] || u.role}</td>
+      <td>${u.villa_scope ? (VILLAS.find(v=>v.id===u.villa_scope)||{}).name || u.villa_scope : '—'}</td>
+    `;
+    const actionTd = document.createElement('td');
+    const editBtn = document.createElement('button');
+    editBtn.className = 'manage-edit';
+    editBtn.textContent = 'Edit';
+    editBtn.style.marginRight = '4px';
+    editBtn.addEventListener('click', ()=> openUserModal(u));
+    actionTd.appendChild(editBtn);
+    tr.appendChild(actionTd);
+    body.appendChild(tr);
+  }
+}
+
+let editingUsername = null;
+function updateUserVillaScopeVisibility(){
+  const isFixed = document.getElementById('userRole').value === 'viewer_villa_fixed';
+  document.getElementById('userVillaScopeWrap').style.display = isFixed ? '' : 'none';
+}
+function openUserModal(user){
+  editingUsername = user ? user.username : null;
+  document.getElementById('userModalTitle').textContent = user ? 'Edit user' : 'Add user';
+  document.getElementById('userName').value = user ? user.username : '';
+  document.getElementById('userName').disabled = !!user; // username is the primary key — don't let it change once created
+  document.getElementById('userPassword').value = user ? user.password : '';
+  document.getElementById('userRole').value = user ? user.role : 'viewer';
+  const villaSel = document.getElementById('userVillaScope');
+  villaSel.innerHTML = VILLAS.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  if(user && user.villa_scope) villaSel.value = user.villa_scope;
+  updateUserVillaScopeVisibility();
+  document.getElementById('userError').style.display = 'none';
+  document.getElementById('userDeleteBtn').style.display = user ? '' : 'none';
+  document.getElementById('userModalOverlay').classList.add('open');
+}
+document.getElementById('userCancel').addEventListener('click', ()=> document.getElementById('userModalOverlay').classList.remove('open'));
+document.getElementById('userModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='userModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('userSave').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('userError');
+  if(!isAdmin()){ errEl.textContent='Only an admin can manage users.'; errEl.style.display='block'; return; }
+  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const username = document.getElementById('userName').value.trim();
+  const password = document.getElementById('userPassword').value.trim();
+  const role = document.getElementById('userRole').value;
+  const villaScope = role === 'viewer_villa_fixed' ? document.getElementById('userVillaScope').value : null;
+  if(!username || !password){ errEl.textContent='Enter a name and password.'; errEl.style.display='block'; return; }
+  try{
+    if(editingUsername){
+      const { error } = await sb.from('app_users').update({ password, role, villa_scope: villaScope }).eq('username', editingUsername);
+      if(error) throw error;
+      logActivity('update', 'app_users', `Edited user: ${editingUsername}`);
+    } else {
+      const { error } = await sb.from('app_users').insert({ username, password, role, villa_scope: villaScope });
+      if(error) throw error;
+      logActivity('create', 'app_users', `Added user: ${username} (${ROLE_LABELS[role]||role})`);
+    }
+    document.getElementById('userModalOverlay').classList.remove('open');
+  }catch(e){
+    errEl.textContent = e.message && e.message.includes('duplicate') ? 'That name is already taken.' : 'Save failed.';
+    errEl.style.display='block'; console.error(e);
+  }
+});
+document.getElementById('userDeleteBtn').addEventListener('click', async ()=>{
+  if(!editingUsername) return;
+  if(!isAdmin()){ alert('Only an admin can delete users.'); return; }
+  if(!checkDeletePassword()) return;
+  if(editingUsername === currentUser.username){ alert("You can't delete the account you're currently logged in as."); return; }
+  if(!confirm(`Remove ${editingUsername}'s login? They won't be able to sign in anymore.`)) return;
+  try{
+    await sb.from('app_users').delete().eq('username', editingUsername);
+    logActivity('delete', 'app_users', `Removed user: ${editingUsername}`);
+    document.getElementById('userModalOverlay').classList.remove('open');
+  }catch(e){ console.error(e); }
+});
 
 /* ============================================================================
    COMPANY ACCOUNTS
