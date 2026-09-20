@@ -704,7 +704,14 @@
           <button class="add-booking-btn" id="addIncomeBtn">+ Money received</button>
           <button class="add-booking-btn" id="addExpenseBtn">+ Record expense</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
+          <button class="add-booking-btn" id="addSharonExpenseBtn">+ Record Sharon's expense</button>
         </div>
+      </div>
+
+      <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="manage-title">Sharon's direct expenses — by villa</div>
+        <div class="field-hint" style="margin:2px 0 8px;">Sharon sometimes pays for things himself and hands the receipts to Zahny to record — this tracks those separately, per villa, all-time.</div>
+        <div id="sharonExpensesSummary" class="cash-summary"></div>
       </div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
@@ -2570,6 +2577,7 @@ function initPettyCash(){
   document.getElementById('addIncomeBtn').addEventListener('click', ()=> openIncomeModal());
   document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
   document.getElementById('addAdvanceBtn').addEventListener('click', ()=> openAdvanceModal());
+  document.getElementById('addSharonExpenseBtn').addEventListener('click', ()=> openMyPurchaseModal('Sharon'));
 
   document.getElementById('expCard').addEventListener('change', updateExpenseCardLock);
   document.getElementById('expFor').addEventListener('change', updateExpenseStockLabel);
@@ -2758,6 +2766,7 @@ function renderCash(){
   document.getElementById('directPurchasesKalava').textContent = 'LKR ' + directKalava.toLocaleString();
   document.getElementById('directPurchasesCeymora').textContent = 'LKR ' + directCeymora.toLocaleString();
   renderAdvanceWallets();
+  renderSharonExpensesSummary();
 
   const monthTxns = renderCashMonth();
 
@@ -4054,6 +4063,49 @@ function buildSuppliesSection(loc, monthStartISO, monthEndISO){
     ${anyUnknown ? '<div class="rpt-note">Lines showing “—” have no price entered and no purchase cost on record, so they are not included in the total.</div>' : ''}`;
   return { total, count:received.length, html };
 }
+function renderSharonExpensesSummary(){
+  const wrap = document.getElementById('sharonExpensesSummary');
+  if(!wrap) return;
+  const mine = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy === 'Sharon');
+  const byVilla = { kalava:0, noelia:0, brisa:0 };
+  for(const t of mine){ if(byVilla[t.for] !== undefined) byVilla[t.for] += t.amount; }
+  const villaColors = { kalava:'#0c8599', noelia:'#7048e8', brisa:'#e64980' };
+  wrap.innerHTML = VR_VILLAS.map(v => `
+    <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id]}, ${villaColors[v.id]}cc); cursor:pointer;" data-sharon-villa="${v.id}">
+      <div class="cash-card-label">Sharon → ${v.name}</div>
+      <div class="cash-card-balance">LKR ${byVilla[v.id].toLocaleString()}</div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-sharon-villa]').forEach(el=>{
+    el.addEventListener('click', ()=> openSharonExpenseDetail(el.dataset.sharonVilla));
+  });
+}
+
+function openSharonExpenseDetail(villaId){
+  const rows = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy==='Sharon' && t.for===villaId)
+    .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  document.getElementById('villaDetailTitle').textContent = `Sharon's expenses — ${(VR_VILLAS.find(v=>v.id===villaId)||{}).name || villaId}`;
+  let html = '';
+  if(rows.length === 0){
+    html = '<div class="manage-empty">None recorded yet.</div>';
+  } else {
+    let total = 0;
+    html = '<div class="manage-list" style="margin-top:6px;">';
+    for(const t of rows){
+      total += t.amount;
+      const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+      html += `<div class="txn-row">
+        <span class="txn-badge expense">expense</span>
+        <span class="txn-main"><div class="txn-title">${t.purpose||'Expense'}${links?' '+links:''}</div><div class="txn-sub">${t.date} · ${CARD_LABELS[t.card]||t.card}${t.note?' · '+t.note:''}</div></span>
+        <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
+      </div>`;
+    }
+    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${total.toLocaleString()}</div>`;
+  }
+  document.getElementById('villaDetailBody').innerHTML = html;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+}
+
 function renderMyPurchasesSummary(){
   const mine = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy === currentUser.username);
   const total = mine.reduce((sum,t)=> sum + t.amount, 0);
@@ -4082,7 +4134,10 @@ function renderMyPurchasesSummary(){
 
 const mpFileHandler = createMultiFileHandler('mpFile', 'mpFileList');
 
-function openMyPurchaseModal(){
+let mpOnBehalfOf = null; // null = the logged-in user's own purchase; a name = recording for that person
+function openMyPurchaseModal(onBehalfOf){
+  mpOnBehalfOf = onBehalfOf || null;
+  document.querySelector('#myPurchaseModalOverlay h3').textContent = mpOnBehalfOf ? `Record ${mpOnBehalfOf}'s expense` : 'Record a purchase';
   document.getElementById('mpDate').value = todayISO();
   const villaSel = document.getElementById('mpVilla');
   villaSel.innerHTML = VILLAS.filter(v=>['kalava','noelia','brisa'].includes(v.id)).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
@@ -4122,6 +4177,7 @@ document.getElementById('mpSave').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('mpAmount').value);
   const note = document.getElementById('mpNote').value.trim();
   const files = mpFileHandler.getFiles();
+  const recordFor = mpOnBehalfOf || currentUser.username;
   if(!date || !purpose || !amount || amount <= 0){ errEl.textContent='Fill in date, purpose, and a valid amount.'; errEl.style.display='block'; return; }
   try{
     const invoiceUrls = [];
@@ -4132,10 +4188,11 @@ document.getElementById('mpSave').addEventListener('click', async ()=>{
     document.getElementById('mpFileHint').textContent = '';
     const { error } = await sb.from('petty_cash_transactions').insert({
       type:'expense', date, card, for: villaId, purpose, amount, note,
-      purchased_by: currentUser.username, invoice_urls: invoiceUrls,
+      purchased_by: recordFor, invoice_urls: invoiceUrls,
     });
     if(error) throw error;
-    logActivity('create', 'petty_cash_transactions', `${currentUser.username} recorded a purchase: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[villaId]})`);
+    const byline = mpOnBehalfOf ? `${currentUser.username} recorded ${mpOnBehalfOf}'s expense` : `${currentUser.username} recorded a purchase`;
+    logActivity('create', 'petty_cash_transactions', `${byline}: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[villaId]})`);
     document.getElementById('myPurchaseModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
