@@ -545,6 +545,11 @@
     border-radius:20px; border:1.5px solid var(--board-line); background:#fff; color:var(--muted); cursor:pointer;
   }
   .villa-filter button.sel{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .villa-filter-lg{ margin-bottom:2px; }
+  .villa-filter-lg button{
+    font-size:13.5px; font-weight:700; padding:9px 18px; border-radius:9px; border-width:2px;
+  }
+  .set-scope-card{ border-color:var(--ink); }
   .rem-wa{
     font-family:'Inter',sans-serif; font-size:11px; font-weight:600; border:none;
     background:#25D366; color:#fff; padding:4px 10px; border-radius:20px; cursor:pointer; margin-right:4px;
@@ -1087,6 +1092,12 @@
     <!-- ===================== INVOICES & SETUP PANEL (admin only) ===================== -->
     <div id="settingsPanel" style="display:none">
 
+      <div class="set-card set-scope-card">
+        <h4>Which villa?</h4>
+        <div class="field-hint">Pick a villa to see only its deposit, invoice code, invoices, cancellations and balance reminders. The company letterhead below still applies to every villa's invoices.</div>
+        <div class="villa-filter villa-filter-lg" id="settingsVillaScope"></div>
+      </div>
+
       <div class="set-card">
         <h4>Ceymora Management — company details</h4>
         <div class="field-hint">These appear at the top of every invoice you print. Saved once and reused for all villas.</div>
@@ -1126,15 +1137,15 @@
       </div>
 
       <div class="set-card">
-        <h4>Refundable damage deposit per villa</h4>
+        <h4 id="setDepositsTitle">Refundable damage deposit per villa</h4>
         <div class="field-hint">Charged on direct bookings and refunded after check-out. Change any amount here and it will be used for new bookings — you can still override it on an individual booking.</div>
         <div id="setDeposits"></div>
         <div style="margin-top:14px;">
           <div class="set-grid" style="max-width:520px;">
             <div><label>Deposit on confirmation (%)</label><input type="number" id="setDepositPct" min="1" max="100" step="1" placeholder="25"></div>
-            <div><label>Villa invoice code — Kalava</label><input type="text" id="setCodeKalava" maxlength="6" placeholder="KAL"></div>
-            <div><label>Villa invoice code — Noelia</label><input type="text" id="setCodeNoelia" maxlength="6" placeholder="NOE"></div>
-            <div><label>Villa invoice code — Brisa</label><input type="text" id="setCodeBrisa" maxlength="6" placeholder="BRI"></div>
+            <div data-villa-code="kalava"><label>Villa invoice code — Kalava</label><input type="text" id="setCodeKalava" maxlength="6" placeholder="KAL"></div>
+            <div data-villa-code="noelia"><label>Villa invoice code — Noelia</label><input type="text" id="setCodeNoelia" maxlength="6" placeholder="NOE"></div>
+            <div data-villa-code="brisa"><label>Villa invoice code — Brisa</label><input type="text" id="setCodeBrisa" maxlength="6" placeholder="BRI"></div>
           </div>
         </div>
       </div>
@@ -1145,31 +1156,40 @@
       </div>
 
       <div class="set-card">
-        <h4>Balance reminders — chase the remaining payment</h4>
-        <div class="field-hint">Bookings that paid a deposit only, with check-in coming up. Send the guest a reminder for the outstanding balance.</div>
+        <h4 id="setRemindersTitle">Balance reminders — chase the remaining payment</h4>
+        <div class="field-hint">Bookings that paid a deposit only, with check-in coming up. Message the guest directly, or alert your own team to go collect it.</div>
         <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
           <div>
             <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Remind when check-in is within (days)</label>
             <input type="number" id="setReminderDays" min="1" max="365" step="1" style="width:120px; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit;">
           </div>
-          <div style="flex:1; min-width:280px;">
-            <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Reminder message</label>
-            <textarea id="setReminderTemplate" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:96px;"></textarea>
-            <div class="field-hint">Placeholders: {guest} {villa} {checkin} {nights} {balance} {invoice} {total} {paid}</div>
+          <div style="flex:1; min-width:220px;">
+            <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Staff numbers to notify (comma-separated)</label>
+            <input type="text" id="setReminderStaffNumbers" placeholder="e.g. +94 77 111 2222, +94 71 333 4444" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit;">
+            <div class="field-hint">These get a "🔔 Notify staff" button on each reminder — a message asking them to go collect the balance from the guest.</div>
           </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Message to the guest</label>
+          <textarea id="setReminderTemplate" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:88px;"></textarea>
+          <div class="field-hint">Placeholders: {guest} {villa} {checkin} {nights} {balance} {invoice} {total} {paid}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Message to staff</label>
+          <textarea id="setReminderStaffTemplate" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:72px;"></textarea>
+          <div class="field-hint">Placeholders: {guest} {villa} {checkin} {nights} {balance} {invoice} {phone}</div>
         </div>
         <div id="reminderListBody" class="manage-list" style="max-height:340px;"></div>
       </div>
 
       <div class="set-card">
-        <h4>All direct booking invoices</h4>
-        <div class="field-hint">Every direct booking that has been issued an invoice, newest first. Use the villa filter to narrow it down, then print.</div>
-        <div class="villa-filter" id="invoiceVillaFilter"></div>
+        <h4 id="setInvoicesTitle">All direct booking invoices</h4>
+        <div class="field-hint">Every direct booking that has been issued an invoice, newest first.</div>
         <div id="invoiceListBody" class="manage-list" style="max-height:420px;"></div>
       </div>
 
       <div class="set-card">
-        <h4>Cancelled bookings</h4>
+        <h4 id="setCancelledTitle">Cancelled bookings</h4>
         <div class="field-hint">What was cancelled, what you kept, and what was refunded.</div>
         <div class="cancel-stat" id="cancelStats"></div>
         <div id="cancelledListBody" class="manage-list" style="max-height:340px;"></div>
@@ -1748,6 +1768,11 @@ const SETTINGS_DEFAULTS = {
   damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
   depositPercent: 25,
   reminderDays: 30,
+  reminderStaffNumbers: '',
+  reminderStaffTemplate:
+    'Balance due reminder — please follow up:\n\n'
+  + '{guest} · {villa}\nCheck-in: {checkin}\nBalance outstanding: {balance}\nInvoice: {invoice}\nGuest phone: {phone}\n\n'
+  + 'Please contact the guest and arrange collection of the remaining balance before arrival.',
   reminderTemplate:
     'Dear {guest},\n\nWarm greetings from Ceymora Management. We are looking forward to welcoming you to {villa} on {checkin} for {nights} night(s).\n\n'
   + 'This is a friendly reminder that the outstanding balance of {balance} is now due ahead of your arrival.\n\n'
@@ -5721,9 +5746,29 @@ function reminderCandidates(){
   const limit = reminderDays();
   return [...allBookings, ...provisionalBookings]
     .filter(b => b.type === 'direct')
+    .filter(b => settingsVillaScope === 'all' ? true : b.villa === settingsVillaScope)
     .map(b => ({ b, q: bookingBalance(b), days: daysUntil(b.checkIn) }))
     .filter(x => x.days >= 0 && x.days <= limit && x.q.outstanding > 0.01)
     .sort((a, b) => a.days - b.days);
+}
+
+function staffNumberList(){
+  return (APP_SETTINGS.reminderStaffNumbers || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function buildStaffMessage(b, q){
+  const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+  const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+  const tpl = APP_SETTINGS.reminderStaffTemplate || SETTINGS_DEFAULTS.reminderStaffTemplate;
+  return tpl
+    .replace(/\{guest\}/g,   b.fullName || b.guest || 'Guest')
+    .replace(/\{villa\}/g,   villaName)
+    .replace(/\{checkin\}/g, b.checkIn)
+    .replace(/\{nights\}/g,  q.nights)
+    .replace(/\{balance\}/g, money(cur, q.outstanding))
+    .replace(/\{invoice\}/g, b.invoiceNoCo || '—')
+    .replace(/\{phone\}/g,   b.phone || 'not on file');
 }
 
 function buildReminderMessage(b, q){
@@ -5747,7 +5792,8 @@ function renderReminderList(){
   const rows = reminderCandidates();
 
   if(rows.length === 0){
-    wrap.innerHTML = `<div class="manage-empty">No balances to chase — nothing checking in within ${reminderDays()} days is unpaid.</div>`;
+    const who = settingsVillaScope === 'all' ? '' : ` for ${scopedVillaName()}`;
+    wrap.innerHTML = `<div class="manage-empty">No balances to chase${who} — nothing checking in within ${reminderDays()} days is unpaid.</div>`;
     return;
   }
   wrap.innerHTML = '';
@@ -5776,6 +5822,20 @@ function renderReminderList(){
       wa.addEventListener('click', ()=> markReminded(b));
       row.appendChild(wa);
     }
+
+    // One button per configured staff number, each opening WhatsApp with a
+    // message asking that person to go collect the balance from the guest.
+    staffNumberList().forEach(num=>{
+      const digitsStaff = num.replace(/[^0-9]/g, '');
+      if(!digitsStaff) return;
+      const notify = document.createElement('a');
+      notify.className = 'rem-wa';
+      notify.style.background = 'var(--frame)';
+      notify.href = `https://wa.me/${digitsStaff}?text=${encodeURIComponent(buildStaffMessage(b, q))}`;
+      notify.target = '_blank'; notify.rel = 'noopener';
+      notify.textContent = '🔔 Notify staff';
+      row.appendChild(notify);
+    });
 
     const copy = document.createElement('button');
     copy.className = 'manage-invoice';
@@ -5846,8 +5906,9 @@ function initSettings(){
   if(!bookingsInited) initBookings();
 
   fillSettingsForm();
+  renderSettingsVillaScope();
+  updateSettingsSectionTitles();
   renderDepositRows();
-  renderInvoiceVillaFilter();
   renderInvoiceList();
   renderCancelledList();
   renderReminderList();
@@ -5927,7 +5988,9 @@ function fillSettingsForm(){
   g('setCodeNoelia').value = villaCode('noelia');
   g('setCodeBrisa').value  = villaCode('brisa');
   g('setReminderDays').value = reminderDays();
+  g('setReminderStaffNumbers').value = APP_SETTINGS.reminderStaffNumbers || '';
   g('setReminderTemplate').value = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
+  g('setReminderStaffTemplate').value = APP_SETTINGS.reminderStaffTemplate || SETTINGS_DEFAULTS.reminderStaffTemplate;
   renderLogoPreview();
 }
 
@@ -5949,8 +6012,11 @@ function readSettingsForm(){
   };
   const remDays = parseInt(g('setReminderDays'), 10);
   APP_SETTINGS.reminderDays = (isFinite(remDays) && remDays > 0) ? remDays : 30;
+  APP_SETTINGS.reminderStaffNumbers = document.getElementById('setReminderStaffNumbers').value.trim();
   APP_SETTINGS.reminderTemplate = document.getElementById('setReminderTemplate').value.trim()
     || SETTINGS_DEFAULTS.reminderTemplate;
+  APP_SETTINGS.reminderStaffTemplate = document.getElementById('setReminderStaffTemplate').value.trim()
+    || SETTINGS_DEFAULTS.reminderStaffTemplate;
 
   const deps = {};
   CAL_VILLAS.forEach(v=>{
@@ -5963,9 +6029,12 @@ function readSettingsForm(){
 function renderDepositRows(){
   const wrap = document.getElementById('setDeposits');
   wrap.innerHTML = '';
+  // Every villa's input stays in the DOM (readSettingsForm reads all of them on
+  // save) — scoping only hides the rows that aren't the selected villa.
   CAL_VILLAS.forEach(v=>{
     const row = document.createElement('div');
     row.className = 'dep-row';
+    row.style.display = (settingsVillaScope === 'all' || settingsVillaScope === v.id) ? '' : 'none';
     row.innerHTML = `
       <span class="manage-type-dot" style="background:${v.color};"></span>
       <span class="dep-name">${esc(v.name)}</span>
@@ -5974,42 +6043,73 @@ function renderDepositRows(){
     `;
     wrap.appendChild(row);
   });
+  document.querySelectorAll('[data-villa-code]').forEach(el=>{
+    el.style.display = (settingsVillaScope === 'all' || settingsVillaScope === el.dataset.villaCode) ? '' : 'none';
+  });
 }
 
 // Every direct booking that has been through the invoice numbering, newest first.
-let invoiceVillaFilter = 'all';   // 'all' or a villa id
+let settingsVillaScope = 'all';   // drives deposits, invoice codes, invoices, cancellations and reminders together
 
-function renderInvoiceVillaFilter(){
-  const wrap = document.getElementById('invoiceVillaFilter');
+// One villa switch for the whole panel: picking Brisa here shows only Brisa's
+// deposit, invoice code, invoices, cancellations and balance reminders — the
+// company letterhead above stays shared, since it prints on every villa's invoice.
+function renderSettingsVillaScope(){
+  const wrap = document.getElementById('settingsVillaScope');
   if(!wrap) return;
   const list = visibleCalVillas();
+  if(!list.some(v => v.id === settingsVillaScope) && settingsVillaScope !== 'all') settingsVillaScope = 'all';
   wrap.innerHTML = '';
   const mk = (id, label) => {
     const btn = document.createElement('button');
     btn.textContent = label;
-    btn.className = invoiceVillaFilter === id ? 'sel' : '';
-    btn.addEventListener('click', ()=>{ invoiceVillaFilter = id; renderInvoiceVillaFilter(); renderInvoiceList(); });
+    btn.className = settingsVillaScope === id ? 'sel' : '';
+    btn.addEventListener('click', ()=>{
+      settingsVillaScope = id;
+      renderSettingsVillaScope();
+      renderDepositRows();
+      renderInvoiceList();
+      renderCancelledList();
+      renderReminderList();
+      updateSettingsSectionTitles();
+    });
     wrap.appendChild(btn);
   };
   if(list.length > 1) mk('all', 'All villas');
   list.forEach(v => mk(v.id, `${v.name} · ${villaCode(v.id)}`));
 }
 
+function scopedVillaName(){
+  if(settingsVillaScope === 'all') return null;
+  return (CAL_VILLAS.find(v => v.id === settingsVillaScope) || {}).name || settingsVillaScope;
+}
+
+// Relabels each card's heading so it's obvious what you're looking at, e.g.
+// "All direct booking invoices" becomes "Brisa Villa — invoices" once scoped.
+function updateSettingsSectionTitles(){
+  const name = scopedVillaName();
+  const set = (id, all, one) => { const el = document.getElementById(id); if(el) el.textContent = name ? one.replace('{v}', name) : all; };
+  set('setDepositsTitle',  'Refundable damage deposit per villa', '{v} — refundable damage deposit');
+  set('setRemindersTitle', 'Balance reminders — chase the remaining payment', '{v} — balance reminders');
+  set('setInvoicesTitle',  'All direct booking invoices', '{v} — invoices');
+  set('setCancelledTitle', 'Cancelled bookings', '{v} — cancelled bookings');
+}
+
 function renderInvoiceList(){
   const wrap = document.getElementById('invoiceListBody');
   if(!wrap) return;
   const allowed = visibleCalVillas().map(v => v.id);
-  if(invoiceVillaFilter !== 'all' && !allowed.includes(invoiceVillaFilter)) invoiceVillaFilter = allowed.length > 1 ? 'all' : allowed[0];
+  if(settingsVillaScope !== 'all' && !allowed.includes(settingsVillaScope)) settingsVillaScope = allowed.length > 1 ? 'all' : allowed[0];
 
   const rows = allBookingsRaw
     .filter(b => b.type === 'direct')
-    .filter(b => invoiceVillaFilter === 'all' ? true : b.villa === invoiceVillaFilter)
+    .filter(b => settingsVillaScope === 'all' ? true : b.villa === settingsVillaScope)
     .sort((a,b)=> (b.bookingDate || b.checkIn || '').localeCompare(a.bookingDate || a.checkIn || ''));
 
   if(rows.length === 0){
-    const who = invoiceVillaFilter === 'all'
+    const who = settingsVillaScope === 'all'
       ? 'No direct bookings invoiced yet.'
-      : `No invoices for ${(CAL_VILLAS.find(v=>v.id===invoiceVillaFilter)||{}).name || invoiceVillaFilter} yet.`;
+      : `No invoices for ${(CAL_VILLAS.find(v=>v.id===settingsVillaScope)||{}).name || settingsVillaScope} yet.`;
     wrap.innerHTML = `<div class="manage-empty">${who} Add one from the Bookings Calendar: pick the villa, choose “Direct”, then save.</div>`;
     return;
   }
@@ -6047,7 +6147,9 @@ function renderCancelledList(){
   const wrap = document.getElementById('cancelledListBody');
   if(!wrap || !statWrap) return;
 
-  const rows = [...cancelledBookings].sort((a,b)=> (b.cancelledOn||'').localeCompare(a.cancelledOn||''));
+  const rows = cancelledBookings
+    .filter(b => settingsVillaScope === 'all' ? true : b.villa === settingsVillaScope)
+    .sort((a,b)=> (b.cancelledOn||'').localeCompare(a.cancelledOn||''));
   const byCur = {};
   for(const b of rows){
     const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
@@ -6070,7 +6172,8 @@ function renderCancelledList(){
   `;
 
   if(rows.length === 0){
-    wrap.innerHTML = '<div class="manage-empty">No cancellations. 🎉</div>';
+    const who = settingsVillaScope === 'all' ? '' : ` for ${scopedVillaName()}`;
+    wrap.innerHTML = `<div class="manage-empty">No cancellations${who}. 🎉</div>`;
     return;
   }
   wrap.innerHTML = '';
