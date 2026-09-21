@@ -1263,6 +1263,9 @@
     </div>
     <label>Guest / note (optional)</label>
     <input type="text" id="fGuest" placeholder="e.g. Smith family">
+    <label>Guest phone (optional)</label>
+    <input type="text" id="fGuestPhone" placeholder="e.g. +94 77 123 4567">
+    <div class="field-hint" id="fGuestPhoneHint">For Airbnb bookings, this is just for your own records — nothing is invoiced or auto-messaged. For Direct bookings it also drives the WhatsApp balance reminder.</div>
     <label>Number of guests (optional)</label>
     <input type="number" id="fGuests" min="0" step="1" placeholder="e.g. 4">
     <label>Rate per night, <span id="fRateCurrencyLabel">USD</span> (optional)</label>
@@ -1279,16 +1282,9 @@
       <label>Guest address</label>
       <textarea id="dAddress" placeholder="Street, city, postcode, country"></textarea>
 
-      <div class="frm-row">
-        <div>
-          <label>Email</label>
-          <input type="text" id="dEmail" placeholder="guest@example.com">
-        </div>
-        <div>
-          <label>Phone</label>
-          <input type="text" id="dPhone" placeholder="+44 …">
-        </div>
-      </div>
+      <label>Email</label>
+      <input type="text" id="dEmail" placeholder="guest@example.com">
+      <div class="field-hint">Phone for the invoice is the "Guest phone" field above — enter it once, it's used everywhere.</div>
 
       <label>Booking placed on</label>
       <input type="date" id="dBookingDate">
@@ -2986,6 +2982,7 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     fCheckIn.value = booking.checkIn;
     fCheckOut.value = booking.checkOut;
     fGuest.value = booking.guest || '';
+    document.getElementById('fGuestPhone').value = booking.phone || '';
     document.getElementById('fGuests').value = booking.guests || '';
     document.getElementById('fRateUsd').value = booking.rateUsd || '';
     setTypeUI(booking.type);
@@ -2996,6 +2993,7 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     fCheckIn.value = ci;
     fCheckOut.value = co;
     fGuest.value = '';
+    document.getElementById('fGuestPhone').value = '';
     document.getElementById('fGuests').value = '';
     document.getElementById('fRateUsd').value = '';
     setTypeUI('airbnb');
@@ -3047,7 +3045,7 @@ function fillDirectFields(booking){
   g('dGuestName').value   = booking ? (booking.fullName || booking.guest || '') : '';
   g('dAddress').value     = booking ? (booking.address || '') : '';
   g('dEmail').value       = booking ? (booking.email || '') : '';
-  g('dPhone').value       = booking ? (booking.phone || '') : '';
+  g('fGuestPhone').value  = booking ? (booking.phone || '') : '';
   g('dBookingDate').value = booking ? (booking.bookingDate || todayISO()) : todayISO();
   g('dRequests').value    = booking ? (booking.requests || '') : '';
   g('dPaid').value        = booking && booking.amountPaid ? booking.amountPaid : '';
@@ -3255,12 +3253,16 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
   const guestsRaw = document.getElementById('fGuests').value;
   const rateRaw = document.getElementById('fRateUsd').value;
   const currency = (CAL_VILLAS.find(v=>v.id===villaId) || {}).currency || 'USD';
+  const guestPhone = document.getElementById('fGuestPhone').value.trim();
   const payload = {
     villa: villaId, check_in: ci, check_out: co, type, guest,
     guests: guestsRaw ? parseInt(guestsRaw, 10) : null,
     rate_usd: rateRaw ? parseFloat(rateRaw) : null,
     currency,
     status: 'confirmed',
+    // Staff can log a contact number for either booking type — for Airbnb it's kept
+    // for your own records only; for Direct it also drives the WhatsApp reminder.
+    guest_phone: guestPhone || null,
   };
 
   if(type === 'direct'){
@@ -3268,6 +3270,8 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
     const q = readQuoteFromForm();
     // Nothing is truly booked until money has arrived — an unpaid booking is saved as
     // a provisional hold instead, which shows on the calendar but blocks nothing.
+    // (Airbnb bookings skip this gate entirely — Airbnb itself handles payment, so
+    // they're always saved as confirmed and block the calendar immediately.)
     const gate = currentPayState();
     payload.status = gate === 'hold' ? 'provisional' : 'confirmed';
     payload.paid_on = gate === 'hold' ? null : (document.getElementById('dPaidOn').value || todayISO());
@@ -3275,7 +3279,6 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
       guest_full_name:  fullName || guest || null,
       guest_address:    document.getElementById('dAddress').value.trim() || null,
       guest_email:      document.getElementById('dEmail').value.trim() || null,
-      guest_phone:      document.getElementById('dPhone').value.trim() || null,
       booking_date:     document.getElementById('dBookingDate').value || todayISO(),
       special_requests: document.getElementById('dRequests').value.trim() || null,
       payment_terms:    terms,
