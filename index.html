@@ -513,6 +513,97 @@
     .rpt-table tr.subtotal td{ background:#f2f2f2 !important; }
     @page{ margin:14mm; }
   }
+
+  /* ===================== DIRECT BOOKINGS / INVOICES ===================== */
+  .modal.modal-wide{ width:560px; }
+  .modal textarea{
+    width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px;
+    font-size:13px; font-family:inherit; resize:vertical; min-height:56px;
+  }
+  .modal input[type=number], .modal input[type=email], .modal select{
+    width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit;
+  }
+  .modal-scroll{ max-height:74vh; overflow-y:auto; padding-right:4px; }
+  .frm-row{ display:flex; gap:10px; }
+  .frm-row > div{ flex:1; min-width:0; }
+  .direct-block{
+    margin-top:14px; border:1.5px dashed var(--direct); background:var(--direct-bg);
+    border-radius:10px; padding:10px 12px 14px;
+  }
+  .direct-block-title{
+    font-family:'Kalam',cursive; font-size:15px; color:#07795a; margin:0 0 2px;
+  }
+  .pay-choice{ display:flex; gap:8px; margin-top:4px; }
+  .pay-choice label{
+    flex:1; margin:0; display:flex; align-items:center; justify-content:center; gap:6px;
+    border:1.5px solid var(--board-line); background:#fff; border-radius:8px; padding:8px;
+    cursor:pointer; font-weight:600; font-size:12.5px; color:var(--ink); text-align:center;
+  }
+  .pay-choice input{ display:none; }
+  .pay-choice label.sel{ border-color:var(--direct); background:#fff; color:var(--direct); box-shadow:0 0 0 2px rgba(12,166,120,0.18); }
+
+  .quote-box{
+    margin-top:12px; background:#fff; border:1px solid var(--board-line); border-radius:9px; padding:10px 12px;
+    font-size:12.5px;
+  }
+  .quote-line{ display:flex; justify-content:space-between; gap:10px; padding:3px 0; }
+  .quote-line span:last-child{ font-variant-numeric:tabular-nums; font-weight:600; }
+  .quote-line.total{ border-top:1.5px solid var(--board-line); margin-top:5px; padding-top:7px; font-size:13.5px; }
+  .quote-line.due{ color:var(--direct); }
+  .quote-line.muted span{ color:var(--muted); font-weight:500; }
+
+  .inv-no-badge{
+    display:inline-block; font-family:'Inter',sans-serif; font-size:11px; font-weight:700;
+    background:var(--ink); color:#fff; padding:2px 8px; border-radius:20px; letter-spacing:0.4px;
+  }
+  .inv-no-badge.villa{ background:var(--direct); }
+
+  .manage-invoice{
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600; border:1px solid var(--board-line);
+    background:#fff; color:var(--ink); padding:3px 9px; border-radius:20px; cursor:pointer; margin-right:4px;
+  }
+  .manage-invoice:hover{ background:var(--board); }
+  .viewer-mode .manage-invoice{ display:inline-block; }
+
+  .cancelled-row{ opacity:0.72; }
+  .cancelled-row .manage-guest{ text-decoration:line-through; }
+
+  /* Settings panel */
+  .set-card{
+    background:#fff; border:1px solid var(--board-line); border-radius:12px;
+    padding:16px 18px; margin-bottom:16px;
+  }
+  .set-card h4{
+    font-family:'Kalam',cursive; font-size:17px; margin:0 0 3px;
+  }
+  .set-card .field-hint{ margin-bottom:10px; }
+  .set-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
+  .set-grid label{ display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px; }
+  .set-grid input, .set-grid textarea{
+    width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px;
+    font-size:13px; font-family:inherit;
+  }
+  .set-grid textarea{ resize:vertical; min-height:60px; }
+  .logo-preview{
+    width:180px; height:96px; border:1.5px dashed var(--board-line); border-radius:10px;
+    display:flex; align-items:center; justify-content:center; background:var(--board);
+    color:var(--muted); font-size:11.5px; overflow:hidden; text-align:center; padding:6px;
+  }
+  .logo-preview img{ max-width:100%; max-height:100%; object-fit:contain; }
+
+  .dep-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .dep-row .dep-name{ flex:1; font-weight:600; font-size:13px; }
+  .dep-row input{ width:120px; padding:6px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; }
+  .dep-row .dep-cur{ font-size:12px; color:var(--muted); width:34px; }
+
+  .cancel-stat{ display:flex; gap:12px; flex-wrap:wrap; margin:10px 0 14px; }
+  .cancel-stat > div{
+    flex:1; min-width:150px; background:#fff; border:1px solid var(--board-line);
+    border-radius:10px; padding:10px 12px;
+  }
+  .cancel-stat .cs-label{ font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+  .cancel-stat .cs-val{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
+
 </style>
 </head>
 <body>
@@ -554,6 +645,7 @@
       <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
       <button class="maintab-btn" data-tab="company" id="companyTabBtn" style="display:none">🏢 Company Accounts</button>
       <button class="maintab-btn" data-tab="users" id="usersTabBtn" style="display:none">👤 Users</button>
+      <button class="maintab-btn" data-tab="settings" id="settingsTabBtn" style="display:none">🧾 Invoices &amp; Setup</button>
     </div>
 
     <!-- ===================== HOUSEKEEPING PANEL ===================== -->
@@ -704,6 +796,7 @@
           <button class="add-booking-btn" id="addIncomeBtn">+ Money received</button>
           <button class="add-booking-btn" id="addExpenseBtn">+ Record expense</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
+          <button class="add-booking-btn" id="addDirectExpenseBtn">+ Direct expense</button>
           <button class="add-booking-btn" id="addSharonExpenseBtn">+ Record Sharon's expense</button>
         </div>
       </div>
@@ -952,13 +1045,132 @@
       </div>
     </div>
 
+    <!-- ===================== INVOICES & SETUP PANEL (admin only) ===================== -->
+    <div id="settingsPanel" style="display:none">
+
+      <div class="set-card">
+        <h4>Ceymora Management — company details</h4>
+        <div class="field-hint">These appear at the top of every invoice you print. Saved once and reused for all villas.</div>
+        <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+          <div>
+            <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Official logo</label>
+            <div class="logo-preview" id="setLogoPreview">No logo uploaded yet</div>
+            <input type="file" id="setLogoFile" accept="image/*" style="margin-top:8px; font-size:12px; max-width:180px;">
+            <div style="margin-top:6px;">
+              <button class="manage-invoice" id="setLogoRemove" style="display:none;">Remove logo</button>
+            </div>
+            <div class="field-hint" id="setLogoHint" style="max-width:180px;"></div>
+          </div>
+          <div style="flex:1; min-width:280px;">
+            <div class="set-grid">
+              <div><label>Company name</label><input type="text" id="setCoName" placeholder="Ceymora Management"></div>
+              <div><label>Registration / Reg. No.</label><input type="text" id="setCoReg" placeholder="e.g. PV 00123456"></div>
+              <div><label>Phone</label><input type="text" id="setCoPhone" placeholder="e.g. +94 77 123 4567"></div>
+              <div><label>Email</label><input type="text" id="setCoEmail" placeholder="e.g. bookings@ceymora.com"></div>
+              <div><label>Website</label><input type="text" id="setCoWeb" placeholder="e.g. www.ceymora.com"></div>
+              <div><label>Invoice prefix (company)</label><input type="text" id="setCoPrefix" placeholder="CM" maxlength="6"></div>
+            </div>
+            <div style="margin-top:12px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Address</label>
+              <textarea id="setCoAddress" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:56px;" placeholder="Street, city, country"></textarea>
+            </div>
+            <div style="margin-top:12px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Bank / payment details (shown on the invoice)</label>
+              <textarea id="setCoBank" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:72px;" placeholder="Bank name&#10;Account name&#10;Account number&#10;SWIFT / IBAN"></textarea>
+            </div>
+            <div style="margin-top:12px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Terms &amp; conditions footer (optional)</label>
+              <textarea id="setCoTerms" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:60px;" placeholder="e.g. Check-in 2pm, check-out 11am. Damage deposit refunded within 7 days of check-out."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-card">
+        <h4>Refundable damage deposit per villa</h4>
+        <div class="field-hint">Charged on direct bookings and refunded after check-out. Change any amount here and it will be used for new bookings — you can still override it on an individual booking.</div>
+        <div id="setDeposits"></div>
+        <div style="margin-top:14px;">
+          <div class="set-grid" style="max-width:520px;">
+            <div><label>Deposit on confirmation (%)</label><input type="number" id="setDepositPct" min="1" max="100" step="1" placeholder="25"></div>
+            <div><label>Villa invoice code — Kalava</label><input type="text" id="setCodeKalava" maxlength="6" placeholder="KAL"></div>
+            <div><label>Villa invoice code — Noelia</label><input type="text" id="setCodeNoelia" maxlength="6" placeholder="NOE"></div>
+            <div><label>Villa invoice code — Brisa</label><input type="text" id="setCodeBrisa" maxlength="6" placeholder="BRI"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:22px;">
+        <button class="add-booking-btn" id="setSaveBtn" style="background:var(--frame); color:#fff; border-color:var(--frame); font-size:14px; padding:9px 20px;">💾 Save setup</button>
+        <span class="field-hint" id="setSaveMsg"></span>
+      </div>
+
+      <div class="set-card">
+        <h4>All direct booking invoices</h4>
+        <div class="field-hint">Every direct booking that has been issued an invoice, newest first. Click any row to reprint it.</div>
+        <div id="invoiceListBody" class="manage-list" style="max-height:420px;"></div>
+      </div>
+
+      <div class="set-card">
+        <h4>Cancelled bookings</h4>
+        <div class="field-hint">What was cancelled, what you kept, and what was refunded.</div>
+        <div class="cancel-stat" id="cancelStats"></div>
+        <div id="cancelledListBody" class="manage-list" style="max-height:340px;"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+<!-- Cancel booking modal -->
+<div class="modal-overlay" id="cancelModalOverlay">
+  <div class="modal">
+    <h3>Cancel booking</h3>
+    <div class="field-hint" id="cancelWho" style="margin-bottom:8px;"></div>
+
+    <label>Cancelled on</label>
+    <input type="date" id="cxDate">
+
+    <label>Reason for cancellation</label>
+    <input type="text" id="cxReason" placeholder="e.g. Guest changed plans">
+
+    <div class="frm-row" style="margin-top:10px;">
+      <div>
+        <label>Amount we keep (<span class="cxCur">USD</span>)</label>
+        <input type="number" id="cxRetained" min="0" step="0.01" placeholder="0">
+      </div>
+      <div>
+        <label>Amount refunded (<span class="cxCur">USD</span>)</label>
+        <input type="number" id="cxRefunded" min="0" step="0.01" placeholder="0">
+      </div>
+    </div>
+    <div class="field-hint" id="cxHint"></div>
+
+    <label>Note (optional)</label>
+    <input type="text" id="cxNote" placeholder="e.g. Deposit retained as per terms">
+
+    <div class="field-hint" style="margin-top:10px; color:var(--amber);">
+      The dates are released straight away, so the villa becomes bookable again. The record is kept for your cancellation totals.
+    </div>
+
+    <div class="modal-error" id="cxError"></div>
+    <div class="modal-actions">
+      <span></span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-cancel" id="cxClose">Back</button>
+        <button class="btn btn-delete" id="cxConfirm" style="background:var(--red); color:#fff;">Cancel booking</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- Booking modal -->
 <div class="modal-overlay" id="modalOverlay">
-  <div class="modal">
+  <div class="modal" id="bookingModalCard">
     <h3 id="modalTitle">Add booking</h3>
+    <div class="modal-scroll" id="bookingModalScroll">
     <label>Check-in</label>
     <input type="date" id="fCheckIn">
     <label>Check-out</label>
@@ -975,10 +1187,68 @@
     <input type="number" id="fGuests" min="0" step="1" placeholder="e.g. 4">
     <label>Rate per night, <span id="fRateCurrencyLabel">USD</span> (optional)</label>
     <input type="number" id="fRateUsd" min="0" step="0.01" placeholder="e.g. 150">
+
+    <!-- ============ DIRECT BOOKING DETAILS (shown only when type = Direct) ============ -->
+    <div class="direct-block" id="directFields" style="display:none">
+      <div class="direct-block-title">Direct booking &amp; invoice details</div>
+      <div class="field-hint" style="margin-bottom:2px;">Filled in once — the invoice, the calendar and the reports all read from here.</div>
+
+      <label>Guest full name (as it should appear on the invoice)</label>
+      <input type="text" id="dGuestName" placeholder="e.g. Mr. James Smith">
+
+      <label>Guest address</label>
+      <textarea id="dAddress" placeholder="Street, city, postcode, country"></textarea>
+
+      <div class="frm-row">
+        <div>
+          <label>Email</label>
+          <input type="text" id="dEmail" placeholder="guest@example.com">
+        </div>
+        <div>
+          <label>Phone</label>
+          <input type="text" id="dPhone" placeholder="+44 …">
+        </div>
+      </div>
+
+      <label>Booking placed on</label>
+      <input type="date" id="dBookingDate">
+
+      <label>Special requests</label>
+      <textarea id="dRequests" placeholder="e.g. Airport pickup at 14:00, cot for infant, late check-out"></textarea>
+
+      <label>Payment terms</label>
+      <div class="pay-choice">
+        <label id="lblPay25"><input type="radio" name="payterms" value="deposit"> <span id="lblPay25Text">25% now, balance later</span></label>
+        <label id="lblPay100"><input type="radio" name="payterms" value="full"> 100% paid in full</label>
+      </div>
+
+      <div class="frm-row" style="margin-top:10px;">
+        <div>
+          <label>Refundable damage deposit (<span class="dCurLabel">USD</span>)</label>
+          <input type="number" id="dDamage" min="0" step="1" placeholder="250">
+        </div>
+        <div>
+          <label>Amount actually received so far (<span class="dCurLabel">USD</span>)</label>
+          <input type="number" id="dPaid" min="0" step="0.01" placeholder="0">
+        </div>
+      </div>
+      <div class="field-hint" id="dDamageHint">The damage deposit is collected on top of the stay and refunded after check-out.</div>
+
+      <div class="quote-box" id="dQuote"></div>
+
+      <div id="dInvoiceNos" style="margin-top:10px; display:none;">
+        <label style="margin-bottom:6px;">Invoice numbers</label>
+        <span class="inv-no-badge" id="dInvCo">—</span>
+        <span class="inv-no-badge villa" id="dInvVilla" style="margin-left:6px;">—</span>
+        <div class="field-hint" style="margin-top:5px;">Issued automatically when the booking is first saved. They never change.</div>
+      </div>
+    </div>
     <div class="field-hint">Leave blank if you don't want this booking counted in the earnings report.</div>
+    </div><!-- /.modal-scroll -->
     <div class="modal-error" id="modalError">Check-out must be after check-in.</div>
     <div class="modal-actions">
       <button class="btn btn-delete" id="btnDelete" style="display:none">Delete</button>
+      <button class="btn" id="btnInvoice" style="display:none; background:var(--direct); color:#fff;">🧾 Invoice</button>
       <div style="flex:1"></div>
       <button class="btn btn-cancel" id="btnCancel">Cancel</button>
       <button class="btn btn-save" id="btnSave">Save</button>
@@ -1043,7 +1313,7 @@
       <option value="">No — paid fresh from the card above</option>
     </select>
     <div class="field-hint">If this bill is being covered out of cash someone's already holding as an advance, pick them here — it verifies where the money's coming from and comes off their balance instead of counting against the card a second time.</div>
-    <div class="modal-checkbox-row">
+    <div class="modal-checkbox-row" id="expStockRow">
       <input type="checkbox" id="expIsStock">
       <label for="expIsStock" id="expIsStockLabel">This is a stock item — also add to Inventory</label>
     </div>
@@ -1088,6 +1358,10 @@
     <input type="number" id="advAmount" min="0" step="1" placeholder="e.g. 10000">
     <label>Note (optional)</label>
     <input type="text" id="advNote" placeholder="e.g. For a Store supplies run">
+    <label>Attach the invoice / voucher for this advance (optional)</label>
+    <input type="file" id="advFile" accept="image/*,.pdf">
+    <div id="advFileList"></div>
+    <div class="field-hint" id="advFileHint"></div>
     <div class="modal-checkbox-row">
       <input type="checkbox" id="advSettled">
       <label for="advSettled">Settled (receipts submitted / unused cash returned)</label>
@@ -1095,6 +1369,10 @@
     <div id="advSettledNoteWrap" style="display:none; margin-top:6px;">
       <label>Settlement note (optional)</label>
       <input type="text" id="advSettledNote" placeholder="e.g. Receipts submitted, or returned LKR 500 unused">
+      <label>Attach the bills / receipts for the settlement</label>
+      <input type="file" id="advSettledFile" accept="image/*,.pdf">
+      <div id="advSettledFileList"></div>
+      <div class="field-hint" id="advSettledFileHint"></div>
     </div>
     <div class="modal-error" id="advError"></div>
     <div class="modal-actions">
@@ -1341,13 +1619,153 @@ function checkDeletePassword(){
 }
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
-function rowToBooking(r){ return { id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null, currency:r.currency||'USD' }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null }; }
+function rowToBooking(r){ return {
+  id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest,
+  guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null,
+  currency:r.currency||'USD',
+  // --- direct booking / invoice fields (all optional; Airbnb bookings simply leave them null) ---
+  status: r.status || 'confirmed',
+  address: r.guest_address || '',
+  email: r.guest_email || '',
+  phone: r.guest_phone || '',
+  bookingDate: r.booking_date || null,
+  requests: r.special_requests || '',
+  payTerms: r.payment_terms || null,          // 'deposit' | 'full'
+  damageDeposit: r.damage_deposit !== null && r.damage_deposit !== undefined ? Number(r.damage_deposit) : null,
+  amountPaid: r.amount_paid !== null && r.amount_paid !== undefined ? Number(r.amount_paid) : 0,
+  fullName: r.guest_full_name || '',
+  invoiceNoCo: r.invoice_no_company || null,
+  invoiceNoVilla: r.invoice_no_villa || null,
+  cancelledOn: r.cancelled_on || null,
+  cancelReason: r.cancel_reason || '',
+  cancelNote: r.cancel_note || '',
+  retainedAmount: r.retained_amount !== null && r.retained_amount !== undefined ? Number(r.retained_amount) : 0,
+  refundedAmount: r.refunded_amount !== null && r.refunded_amount !== undefined ? Number(r.refunded_amount) : 0,
+}; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [] }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
   if(t.invoiceUrls && Array.isArray(t.invoiceUrls)) links.push(...t.invoiceUrls);
   return links;
+}
+
+// =====================================================================
+// APP SETTINGS — one row in `app_settings` (key = 'main') holding the
+// company letterhead, the logo, the per-villa refundable damage deposits
+// and the invoice numbering codes. Everything here is editable from the
+// "Invoices & Setup" tab, so nothing below needs a code change to alter.
+// =====================================================================
+const SETTINGS_DEFAULTS = {
+  company: {
+    name: 'Ceymora Management',
+    reg: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    bank: '',
+    terms: 'Check-in from 2:00 pm · Check-out by 11:00 am. The refundable damage deposit is returned within 7 days of check-out, less any damages.',
+  },
+  logoUrl: '',
+  invoicePrefix: 'CM',
+  villaCodes: { kalava: 'KAL', noelia: 'NOE', brisa: 'BRI' },
+  damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
+  depositPercent: 25,
+};
+
+// Deep-ish merge so a settings row saved before a new field existed still
+// picks up that field's default instead of coming back undefined.
+function mergeSettings(base, incoming){
+  const out = JSON.parse(JSON.stringify(base));
+  if(!incoming || typeof incoming !== 'object') return out;
+  for(const k of Object.keys(incoming)){
+    const v = incoming[k];
+    if(v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object'){
+      out[k] = Object.assign({}, out[k], v);
+    } else if(v !== null && v !== undefined){
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+let APP_SETTINGS = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
+let settingsLoaded = false;
+
+async function fetchSettings(){
+  if(!sb) return;
+  try{
+    const { data, error } = await sb.from('app_settings').select('*').eq('key','main').maybeSingle();
+    if(error) throw error;
+    if(data && data.value) APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, data.value);
+    settingsLoaded = true;
+  }catch(e){
+    console.error('Could not load app_settings — using built-in defaults. Run the setup SQL to enable saving.', e);
+  }
+}
+
+async function saveSettings(){
+  if(!sb) throw new Error('Not connected');
+  const { error } = await sb.from('app_settings')
+    .upsert({ key:'main', value: APP_SETTINGS, updated_at: new Date().toISOString() }, { onConflict:'key' });
+  if(error) throw error;
+}
+
+function villaCode(villaId){
+  return (APP_SETTINGS.villaCodes && APP_SETTINGS.villaCodes[villaId]) || villaId.slice(0,3).toUpperCase();
+}
+function damageDepositFor(villaId){
+  const d = APP_SETTINGS.damageDeposits || {};
+  return d[villaId] !== undefined && d[villaId] !== null ? Number(d[villaId]) : 0;
+}
+
+// ---------------------------------------------------------------------
+// INVOICE SERIAL NUMBERS
+// Two run in parallel on every direct booking:
+//   • a Ceymora Management serial  — e.g. CM-2026-0014  (every villa shares it)
+//   • a per-villa serial           — e.g. KAL-2026-0007 (each villa counts separately)
+// The counter lives in Postgres behind next_invoice_no() so two people saving a
+// booking at the same moment can't be handed the same number. If that function
+// isn't installed yet we fall back to "highest number already used + 1", which is
+// fine for a single user but can collide under simultaneous saves.
+// ---------------------------------------------------------------------
+async function nextInvoiceNo(scope){
+  try{
+    const { data, error } = await sb.rpc('next_invoice_no', { p_scope: scope });
+    if(error) throw error;
+    if(data !== null && data !== undefined) return Number(data);
+  }catch(e){
+    console.warn('next_invoice_no() unavailable, falling back to local numbering for', scope, e);
+  }
+  // Fallback: scan every booking we know about for the highest serial in this scope.
+  const prefix = scope + '-';
+  let max = 0;
+  for(const b of allBookingsRaw){
+    for(const no of [b.invoiceNoCo, b.invoiceNoVilla]){
+      if(typeof no === 'string' && no.startsWith(prefix)){
+        const n = parseInt(no.slice(prefix.length), 10);
+        if(!isNaN(n) && n > max) max = n;
+      }
+    }
+  }
+  return max + 1;
+}
+
+function formatInvoiceNo(scope, n){
+  return `${scope}-${String(n).padStart(4,'0')}`;
+}
+
+// Issues the pair of serials for a brand-new direct booking.
+async function issueInvoiceNumbers(villaId, dateISO){
+  const year = (dateISO || todayISO()).slice(0,4);
+  const coScope   = `${APP_SETTINGS.invoicePrefix || 'CM'}-${year}`;
+  const villaScope = `${villaCode(villaId)}-${year}`;
+  const [coN, villaN] = await Promise.all([ nextInvoiceNo(coScope), nextInvoiceNo(villaScope) ]);
+  return {
+    invoice_no_company: formatInvoiceNo(coScope, coN),
+    invoice_no_villa:   formatInvoiceNo(villaScope, villaN),
+  };
 }
 
 async function uploadReceiptFile(file){
@@ -1424,6 +1842,8 @@ function createMultiFileHandler(inputId, listId){
 const incFileHandler = createMultiFileHandler('incFile', 'incFileList');
 const expFileHandler = createMultiFileHandler('expFile', 'expFileList');
 const opExFileHandler = createMultiFileHandler('opExFile', 'opExFileList');
+const advFileHandler = createMultiFileHandler('advFile', 'advFileList');
+const advSettledFileHandler = createMultiFileHandler('advSettledFile', 'advSettledFileList');
 function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note, amount:r.amount!==null&&r.amount!==undefined?Number(r.amount):null }; }
 
 // =====================================================================
@@ -1499,6 +1919,7 @@ function populateLoginDropdown(){
 }
 populateLoginDropdown();
 if(sb) loadUsersFromDB();
+if(sb) fetchSettings();
 
 document.getElementById('loginBtn').addEventListener('click', doLogin);
 document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
@@ -1565,6 +1986,7 @@ function applyRolePermissions(){
     document.getElementById('villaReportTabBtn').style.display = '';
     document.getElementById('companyTabBtn').style.display = '';
     document.getElementById('usersTabBtn').style.display = '';
+    document.getElementById('settingsTabBtn').style.display = '';
     if(!villaReportInited){ initVillaReport(); }
   }
 
@@ -1618,6 +2040,8 @@ function applyRolePermissions(){
     cash_inventory: 'Cash & Inventory',
     cash_inventory_bookings: 'Cash, Inventory & Bookings',
     viewer: 'View only',
+    viewer_villa_select: 'All villas — view only',
+    viewer_villa_fixed: 'View only',
   };
   badge.textContent = `${currentUser.username} (${roleLabels[role] || role})`;
 
@@ -1649,6 +2073,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
     document.getElementById('companyPanel').style.display = tab==='company' ? '' : 'none';
     document.getElementById('usersPanel').style.display = tab==='users' ? '' : 'none';
+    document.getElementById('settingsPanel').style.display = tab==='settings' ? '' : 'none';
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
     if(tab === 'pettycash' && !cashInited){ initPettyCash(); }
     if(tab === 'inventory' && !invInited){ initInventory(); if(!cashInited){ initPettyCash(); } }
@@ -1657,6 +2082,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'reports' && !reportsInited){ initReports(); }
     if(tab === 'company' && !companyInited){ initCompany(); }
     if(tab === 'users' && !usersInited){ initUsers(); }
+    if(tab === 'settings' && !settingsInited){ initSettings(); }
   });
 });
 
@@ -1906,16 +2332,31 @@ const CAL_VILLAS = [
   { id:'brisa', name:'Brisa Villa', color:'#e64980', currency:'EUR' },
 ];
 let bookingsInited = false;
-let allBookings = [];
+let allBookings = [];        // confirmed only — everything downstream (calendar, earnings, reports) reads this
+let allBookingsRaw = [];     // confirmed + cancelled, used for invoice numbering + the invoice list
+let cancelledBookings = [];
 let currentVillaCal = 'kalava';
 let currentMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let editingBookingId = null;
 const bookingStatusMsg = document.getElementById('bookingStatusMsg');
 
+// A fixed-villa viewer (e.g. Anna → Brisa, Dino → Noelia) only ever sees their own
+// villa: the tab list is filtered here, and fetchBookings() below drops every other
+// villa's rows before they reach the calendar, earnings table or any report.
+function visibleCalVillas(){
+  if(currentUser && currentUser.role === 'viewer_villa_fixed' && currentUser.villaScope){
+    const only = CAL_VILLAS.filter(v => v.id === currentUser.villaScope);
+    if(only.length) return only;
+  }
+  return CAL_VILLAS;
+}
+
 function initBookings(){
   bookingsInited = true;
   const tabWrap = document.getElementById('villaTabs');
-  CAL_VILLAS.forEach(v=>{
+  const villaList = visibleCalVillas();
+  if(!villaList.some(v => v.id === currentVillaCal)) currentVillaCal = villaList[0].id;
+  villaList.forEach(v=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn' + (v.id===currentVillaCal ? ' active':'');
     b.dataset.villa = v.id;
@@ -1932,7 +2373,7 @@ function initBookings(){
   });
   // style first active tab
   const firstBtn = tabWrap.querySelector('.villatab-btn');
-  if(firstBtn){ firstBtn.style.background = CAL_VILLAS[0].color; firstBtn.style.color='#fff'; }
+  if(firstBtn){ firstBtn.style.background = villaList[0].color; firstBtn.style.color='#fff'; }
 
   if(!sb){ bookingStatusMsg.textContent = 'Not connected to Supabase yet'; renderCalendar(); return; }
   bookingStatusMsg.textContent = 'Loading…';
@@ -1952,9 +2393,23 @@ function initBookings(){
 async function fetchBookings(){
   const { data, error } = await sb.from('villa_bookings').select('*');
   if(error){ bookingStatusMsg.textContent='Connection error'; console.error(error); return; }
-  allBookings = data.map(rowToBooking);
+  let rows = data.map(rowToBooking);
+
+  // Villa-scoped viewers never hold another villa's data in memory at all.
+  if(currentUser && currentUser.role === 'viewer_villa_fixed' && currentUser.villaScope){
+    rows = rows.filter(b => b.villa === currentUser.villaScope);
+  }
+
+  allBookingsRaw   = rows;
+  // A cancelled booking keeps its row (so the money is still reportable) but is
+  // pulled out of allBookings, which instantly frees the dates on the calendar and
+  // removes it from every earnings/report calculation without touching that code.
+  allBookings      = rows.filter(b => b.status !== 'cancelled');
+  cancelledBookings = rows.filter(b => b.status === 'cancelled');
+
   bookingStatusMsg.textContent = 'Calendar synced (live)';
   renderCalendar();
+  if(typeof settingsInited !== 'undefined' && settingsInited){ renderInvoiceList(); renderCancelledList(); }
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
 }
 
@@ -2168,18 +2623,29 @@ function renderManageList(villaBookings){
       <span class="manage-dates">${b.checkIn} → ${b.checkOut} · <b>${nights} night${nights===1?'':'s'}</b></span>
       ${moneyHtml}
     `;
-    const delBtn = document.createElement('button');
-    delBtn.className = 'manage-del';
-    delBtn.textContent = 'Cancel';
-    delBtn.addEventListener('click', async ()=>{
-      if(confirm('Cancel / delete this booking?')){
-        try{
-          await sb.from('villa_bookings').delete().eq('id', b.id);
-          logActivity('delete', 'villa_bookings', `Cancelled booking: ${b.guest||b.type} (${b.checkIn} → ${b.checkOut}) at ${(CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa}`);
-        }catch(e){ console.error(e); }
-      }
-    });
-    row.appendChild(delBtn);
+    // Every direct booking can be reprinted at any time, including by view-only users.
+    if(b.type === 'direct'){
+      const invBtn = document.createElement('button');
+      invBtn.className = 'manage-invoice';
+      invBtn.textContent = '🧾 Invoice';
+      invBtn.title = b.invoiceNoCo ? `${b.invoiceNoCo} · ${b.invoiceNoVilla || ''}` : 'Print this booking\'s invoice';
+      invBtn.addEventListener('click', ()=> printInvoice(b));
+      row.appendChild(invBtn);
+    }
+    if(canEdit()){
+      const editBtn = document.createElement('button');
+      editBtn.className = 'manage-edit';
+      editBtn.textContent = 'Edit';
+      editBtn.style.marginRight = '4px';
+      editBtn.addEventListener('click', ()=> openModal(b, null));
+      row.appendChild(editBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'manage-del';
+      delBtn.textContent = 'Cancel';
+      delBtn.addEventListener('click', ()=> openCancelModal(b));
+      row.appendChild(delBtn);
+    }
     list.appendChild(row);
   }
 }
@@ -2255,7 +2721,8 @@ async function renderEarnings(){
 
   const totals = {}; // villaId -> { nights, gross, currency, grossLkr }
   const details = {}; // villaId -> [ per-booking rows, for the breakdown table below ]
-  for(const v of CAL_VILLAS){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0 }; details[v.id] = []; }
+  const earnVillas = visibleCalVillas();
+  for(const v of earnVillas){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0 }; details[v.id] = []; }
 
   for(const b of relevant){
     const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
@@ -2281,7 +2748,7 @@ async function renderEarnings(){
 
   body.innerHTML = '';
   let grandGrossLkr = 0, grandFeeLkr = 0, grandNetLkr = 0;
-  for(const v of CAL_VILLAS){
+  for(const v of earnVillas){
     const t = totals[v.id];
     const fee = t.grossLkr * 0.15;
     const net = t.grossLkr * 0.85;
@@ -2386,13 +2853,19 @@ const lblDirect = document.getElementById('lblDirect');
 const modalError = document.getElementById('modalError');
 const btnDelete = document.getElementById('btnDelete');
 
+let editingBookingVilla = null;   // the villa a booking being edited belongs to
+let editingBookingRef = null;     // the full booking object, so the Invoice button can print it
+
 function openModal(booking, presetCheckInISO, presetCheckOutISO){
   editingBookingId = booking ? booking.id : null;
+  editingBookingVilla = booking ? booking.villa : currentVillaCal;
+  editingBookingRef = booking || null;
   modalError.style.display = 'none';
   document.getElementById('modalTitle').textContent = booking ? 'Edit booking' : 'Add booking';
-  const villaForCurrency = booking ? booking.villa : currentVillaCal;
-  const currency = (CAL_VILLAS.find(v=>v.id===villaForCurrency) || {}).currency || 'USD';
+  const currency = (CAL_VILLAS.find(v=>v.id===editingBookingVilla) || {}).currency || 'USD';
   document.getElementById('fRateCurrencyLabel').textContent = currency;
+  document.querySelectorAll('.dCurLabel').forEach(el => el.textContent = currency);
+
   if(booking){
     fCheckIn.value = booking.checkIn;
     fCheckOut.value = booking.checkOut;
@@ -2412,13 +2885,138 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     setTypeUI('airbnb');
     btnDelete.style.display = 'none';
   }
+
+  fillDirectFields(booking);
+  setTypeUI(booking ? booking.type : 'airbnb'); // re-run so the direct block visibility matches
   overlay.classList.add('open');
 }
+
+// Fills (or clears) the direct-booking half of the form. For a new booking the
+// damage deposit and the deposit % come from the saved setup, so changing them in
+// "Invoices & Setup" changes every future booking without touching this code.
+function fillDirectFields(booking){
+  const villaId = editingBookingVilla || currentVillaCal;
+  const g = id => document.getElementById(id);
+
+  g('dGuestName').value   = booking ? (booking.fullName || booking.guest || '') : '';
+  g('dAddress').value     = booking ? (booking.address || '') : '';
+  g('dEmail').value       = booking ? (booking.email || '') : '';
+  g('dPhone').value       = booking ? (booking.phone || '') : '';
+  g('dBookingDate').value = booking ? (booking.bookingDate || todayISO()) : todayISO();
+  g('dRequests').value    = booking ? (booking.requests || '') : '';
+  g('dPaid').value        = booking && booking.amountPaid ? booking.amountPaid : '';
+  g('dDamage').value      = (booking && booking.damageDeposit !== null && booking.damageDeposit !== undefined)
+                              ? booking.damageDeposit
+                              : damageDepositFor(villaId);
+
+  setPayTermsUI(booking && booking.payTerms ? booking.payTerms : 'deposit');
+
+  const hasNos = !!(booking && (booking.invoiceNoCo || booking.invoiceNoVilla));
+  g('dInvoiceNos').style.display = hasNos ? '' : 'none';
+  g('dInvCo').textContent    = booking && booking.invoiceNoCo ? booking.invoiceNoCo : '—';
+  g('dInvVilla').textContent = booking && booking.invoiceNoVilla ? booking.invoiceNoVilla : '—';
+
+  document.getElementById('btnInvoice').style.display =
+    (booking && booking.type === 'direct') ? '' : 'none';
+
+  recalcQuote();
+}
+
+function setPayTermsUI(terms){
+  document.querySelectorAll('input[name=payterms]').forEach(r => r.checked = (r.value === terms));
+  document.getElementById('lblPay25').classList.toggle('sel', terms === 'deposit');
+  document.getElementById('lblPay100').classList.toggle('sel', terms === 'full');
+}
+
+function depositPct(){
+  const n = Number(APP_SETTINGS.depositPercent);
+  return (isFinite(n) && n > 0 && n <= 100) ? n : 25;
+}
+
+// The single source of truth for every money figure on a direct booking — the
+// on-screen quote box, the saved row and the printed invoice all call this, so
+// they can never disagree with each other.
+function quoteFor(opts){
+  const nights = (opts.checkIn && opts.checkOut && opts.checkOut > opts.checkIn)
+    ? Math.round((parseISO(opts.checkOut) - parseISO(opts.checkIn)) / 86400000) : 0;
+  const rate    = Number(opts.rate) || 0;
+  const accom   = nights * rate;
+  const damage  = Number(opts.damage) || 0;
+  const pct     = opts.terms === 'full' ? 100 : depositPct();
+  const dueOnBooking = accom * pct / 100;
+  const balance      = accom - dueOnBooking;
+  const payableNow   = dueOnBooking + damage;
+  const netTotal     = accom + damage;
+  const paid         = Number(opts.paid) || 0;
+  return { nights, rate, accom, damage, pct, dueOnBooking, balance, payableNow, netTotal, paid,
+           outstanding: Math.max(0, netTotal - paid) };
+}
+
+function readQuoteFromForm(){
+  const terms = (document.querySelector('input[name=payterms]:checked') || {}).value || 'deposit';
+  return quoteFor({
+    checkIn:  fCheckIn.value,
+    checkOut: fCheckOut.value,
+    rate:     document.getElementById('fRateUsd').value,
+    damage:   document.getElementById('dDamage').value,
+    paid:     document.getElementById('dPaid').value,
+    terms,
+  });
+}
+
+function money(cur, n){
+  const sym = curSymbol(cur);
+  return sym + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function recalcQuote(){
+  const box = document.getElementById('dQuote');
+  if(!box) return;
+  const cur = (CAL_VILLAS.find(v => v.id === (editingBookingVilla || currentVillaCal)) || {}).currency || 'USD';
+  const q = readQuoteFromForm();
+  const termsLabel = q.pct === 100 ? 'Paid in full (100%)' : `${q.pct}% on confirmation`;
+  box.innerHTML = `
+    <div class="quote-line muted"><span>Nights</span><span>${q.nights}</span></div>
+    <div class="quote-line muted"><span>Rate per night</span><span>${money(cur, q.rate)}</span></div>
+    <div class="quote-line"><span>Accommodation total</span><span>${money(cur, q.accom)}</span></div>
+    <div class="quote-line muted"><span>Payment terms</span><span>${termsLabel}</span></div>
+    <div class="quote-line due"><span>Due on confirmation (${q.pct}%)</span><span>${money(cur, q.dueOnBooking)}</span></div>
+    <div class="quote-line"><span>Refundable damage deposit</span><span>${money(cur, q.damage)}</span></div>
+    <div class="quote-line total"><span>Total payable now</span><span>${money(cur, q.payableNow)}</span></div>
+    <div class="quote-line muted"><span>Balance due before arrival</span><span>${money(cur, q.balance)}</span></div>
+    <div class="quote-line total"><span>NET TOTAL</span><span>${money(cur, q.netTotal)}</span></div>
+    <div class="quote-line muted"><span>Received so far</span><span>${money(cur, q.paid)}</span></div>
+    <div class="quote-line ${q.outstanding > 0 ? 'due' : ''}"><span>Still outstanding</span><span>${money(cur, q.outstanding)}</span></div>
+  `;
+}
+
+// Recalculate the quote whenever anything that feeds it changes.
+['fCheckIn','fCheckOut','fRateUsd','dDamage','dPaid'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', recalcQuote);
+});
+document.querySelectorAll('input[name=payterms]').forEach(r=>{
+  r.addEventListener('change', ()=>{ setPayTermsUI(r.value); recalcQuote(); });
+});
+// Typing the full invoice name also fills the short calendar label, so you only type once.
+(function(){
+  const full = document.getElementById('dGuestName');
+  if(full) full.addEventListener('input', ()=>{ if(!fGuest.value.trim()) fGuest.value = full.value; });
+})();
 function closeModal(){ overlay.classList.remove('open'); resetSelection(); renderCalendar(); }
 function setTypeUI(type){
   document.querySelectorAll('input[name=btype]').forEach(r=> r.checked = (r.value===type));
   lblAirbnb.classList.toggle('sel-airbnb', type==='airbnb');
   lblDirect.classList.toggle('sel-direct', type==='direct');
+  // The whole invoicing half of the form only applies to direct bookings.
+  const isDirect = type === 'direct';
+  const block = document.getElementById('directFields');
+  if(block) block.style.display = isDirect ? '' : 'none';
+  const card = document.getElementById('bookingModalCard');
+  if(card) card.classList.toggle('modal-wide', isDirect);
+  const lbl25 = document.getElementById('lblPay25Text');
+  if(lbl25) lbl25.textContent = `${depositPct()}% now, balance later`;
+  if(isDirect) recalcQuote();
 }
 document.querySelectorAll('input[name=btype]').forEach(r=>{
   r.addEventListener('change', ()=> setTypeUI(r.value));
@@ -2444,16 +3042,38 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
   }
 
   const type = document.querySelector('input[name=btype]:checked').value;
-  const guest = fGuest.value.trim();
+  const villaId = editingBookingVilla || currentVillaCal;
+  const fullName = document.getElementById('dGuestName').value.trim();
+  const guest = fGuest.value.trim() || fullName;
   const guestsRaw = document.getElementById('fGuests').value;
   const rateRaw = document.getElementById('fRateUsd').value;
-  const currency = (CAL_VILLAS.find(v=>v.id===currentVillaCal) || {}).currency || 'USD';
+  const currency = (CAL_VILLAS.find(v=>v.id===villaId) || {}).currency || 'USD';
   const payload = {
-    villa: currentVillaCal, check_in: ci, check_out: co, type, guest,
+    villa: villaId, check_in: ci, check_out: co, type, guest,
     guests: guestsRaw ? parseInt(guestsRaw, 10) : null,
     rate_usd: rateRaw ? parseFloat(rateRaw) : null,
     currency,
+    status: 'confirmed',
   };
+
+  if(type === 'direct'){
+    const terms = (document.querySelector('input[name=payterms]:checked') || {}).value || 'deposit';
+    const q = readQuoteFromForm();
+    Object.assign(payload, {
+      guest_full_name:  fullName || guest || null,
+      guest_address:    document.getElementById('dAddress').value.trim() || null,
+      guest_email:      document.getElementById('dEmail').value.trim() || null,
+      guest_phone:      document.getElementById('dPhone').value.trim() || null,
+      booking_date:     document.getElementById('dBookingDate').value || todayISO(),
+      special_requests: document.getElementById('dRequests').value.trim() || null,
+      payment_terms:    terms,
+      damage_deposit:   q.damage,
+      amount_paid:      q.paid,
+    });
+  }
+
+  const saveBtn = document.getElementById('btnSave');
+  saveBtn.disabled = true;
   try{
     let error;
     if(editingBookingId){
@@ -2461,14 +3081,33 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('update', 'villa_bookings', `Edited booking: ${guest||type} (${ci} → ${co})`);
     } else {
+      // A brand-new direct booking gets its two permanent serials here, once.
+      if(type === 'direct'){
+        try{
+          Object.assign(payload, await issueInvoiceNumbers(villaId, payload.booking_date));
+        }catch(e){ console.error('Could not issue invoice numbers', e); }
+      }
       ({ error } = await sb.from('villa_bookings').insert(payload));
       if(error) throw error;
-      logActivity('create', 'villa_bookings', `Added booking: ${guest||type} (${ci} → ${co}) at ${currentVillaCal}`);
+      logActivity('create', 'villa_bookings',
+        `Added ${type} booking: ${guest||type} (${ci} → ${co}) at ${villaId}` +
+        (payload.invoice_no_company ? ` · invoice ${payload.invoice_no_company} / ${payload.invoice_no_villa}` : ''));
     }
+    await fetchBookings();
     closeModal();
   }catch(e){
-    modalError.textContent='Save failed — check connection.'; modalError.style.display='block'; console.error(e);
+    modalError.textContent = 'Save failed — ' + (e.message || 'check connection.');
+    modalError.style.display='block'; console.error(e);
+  }finally{
+    saveBtn.disabled = false;
   }
+});
+
+// Print the invoice straight from the open booking form.
+document.getElementById('btnInvoice').addEventListener('click', ()=>{
+  const b = editingBookingId ? (allBookingsRaw.find(x => x.id === editingBookingId) || editingBookingRef) : editingBookingRef;
+  if(!b){ alert('Save the booking first, then print its invoice.'); return; }
+  printInvoice(b);
 });
 btnDelete.addEventListener('click', async ()=>{
   if(!editingBookingId) return;
@@ -2482,8 +3121,264 @@ btnDelete.addEventListener('click', async ()=>{
   }
 });
 
+
+/* ===================== INVOICE PRINTING ===================== */
+// Builds a complete, standalone invoice document and opens it in its own window
+// so the app's own print stylesheet can't interfere with it. Everything on the
+// page (logo, letterhead, bank details, footer terms) comes from APP_SETTINGS,
+// and every figure comes from quoteFor(), the same function the booking form uses.
+function invoiceHTML(b){
+  const co  = APP_SETTINGS.company || {};
+  const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+  const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+  const q = quoteFor({
+    checkIn: b.checkIn, checkOut: b.checkOut, rate: b.rateUsd,
+    damage: b.damageDeposit, paid: b.amountPaid, terms: b.payTerms || 'deposit',
+  });
+  const m = n => money(cur, n);
+  const cancelled = b.status === 'cancelled';
+
+  const nicedate = iso => {
+    if(!iso) return '—';
+    const d = parseISO(iso);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  };
+
+  const rows = [];
+  rows.push(`
+    <tr>
+      <td>
+        <b>Accommodation — ${esc(villaName)}</b><br>
+        <span class="sm">${nicedate(b.checkIn)} → ${nicedate(b.checkOut)}${b.guests ? ' · ' + b.guests + ' guest' + (b.guests==1?'':'s') : ''}</span>
+      </td>
+      <td class="num">${q.nights}</td>
+      <td class="num">${m(q.rate)}</td>
+      <td class="num">${m(q.accom)}</td>
+    </tr>`);
+  if(q.damage > 0){
+    rows.push(`
+    <tr>
+      <td><b>Refundable damage deposit</b><br><span class="sm">Returned after check-out, less any damages</span></td>
+      <td class="num">1</td>
+      <td class="num">${m(q.damage)}</td>
+      <td class="num">${m(q.damage)}</td>
+    </tr>`);
+  }
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Invoice ${esc(b.invoiceNoCo || '')}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{ font-family:'Inter',system-ui,sans-serif; color:#2b2b2b; margin:0; padding:36px 40px; font-size:13px; background:#fff; }
+  .wrap{ max-width:780px; margin:0 auto; position:relative; }
+  .head{ display:flex; justify-content:space-between; gap:24px; align-items:flex-start; border-bottom:3px solid #2b2b2b; padding-bottom:16px; }
+  .logo{ max-width:180px; max-height:96px; object-fit:contain; }
+  .co-name{ font-size:21px; font-weight:700; letter-spacing:-0.3px; }
+  .co-meta{ font-size:11.5px; color:#666; line-height:1.6; margin-top:4px; white-space:pre-line; }
+  .right{ text-align:right; }
+  .title{ font-size:30px; font-weight:700; letter-spacing:2px; margin:0; }
+  .nos{ margin-top:8px; font-size:12px; line-height:1.8; }
+  .nos b{ font-family:'Inter',monospace; letter-spacing:0.6px; }
+  .tag{ display:inline-block; background:#2b2b2b; color:#fff; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.5px; }
+  .tag.villa{ background:#0ca678; }
+  .cols{ display:flex; gap:30px; margin-top:24px; }
+  .cols > div{ flex:1; }
+  .lbl{ font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#999; font-weight:700; margin-bottom:5px; }
+  .val{ line-height:1.65; white-space:pre-line; }
+  table{ width:100%; border-collapse:collapse; margin-top:26px; }
+  th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#999; border-bottom:2px solid #e4e0d6; padding:0 8px 7px; }
+  th.num, td.num{ text-align:right; }
+  td{ padding:11px 8px; border-bottom:1px solid #eee; vertical-align:top; }
+  .sm{ font-size:11px; color:#888; }
+  .totals{ margin-top:18px; margin-left:auto; width:330px; }
+  .tl{ display:flex; justify-content:space-between; padding:5px 0; }
+  .tl span:last-child{ font-variant-numeric:tabular-nums; font-weight:600; }
+  .tl.muted span{ color:#888; font-weight:500; }
+  .tl.big{ border-top:2px solid #2b2b2b; margin-top:7px; padding-top:10px; font-size:16px; font-weight:700; }
+  .tl.due{ background:#e3f9f2; color:#07795a; padding:8px 10px; border-radius:7px; margin-top:7px; font-weight:700; }
+  .tl.out{ color:#e03131; font-weight:700; }
+  .box{ margin-top:26px; border:1px solid #e4e0d6; border-radius:9px; padding:13px 15px; }
+  .box .lbl{ margin-bottom:6px; }
+  .foot{ margin-top:30px; border-top:1px solid #e4e0d6; padding-top:14px; font-size:11px; color:#888; line-height:1.7; white-space:pre-line; }
+  .stamp{
+    position:absolute; top:150px; left:50%; transform:translateX(-50%) rotate(-14deg);
+    font-size:78px; font-weight:700; color:rgba(224,49,49,0.13); letter-spacing:8px;
+    border:7px solid rgba(224,49,49,0.13); padding:6px 28px; border-radius:14px; pointer-events:none;
+  }
+  @media print{ body{ padding:0; } .noprint{ display:none !important; } }
+  .noprint{ text-align:center; margin-bottom:20px; }
+  .noprint button{
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:9px 20px;
+    border-radius:7px; border:none; background:#2b2b2b; color:#fff; cursor:pointer; margin:0 4px;
+  }
+</style></head><body>
+<div class="noprint">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <button onclick="window.close()" style="background:#f1f1ee; color:#2b2b2b;">Close</button>
+</div>
+<div class="wrap">
+  ${cancelled ? '<div class="stamp">CANCELLED</div>' : ''}
+  <div class="head">
+    <div>
+      ${co.logoUrlResolved ? `<img class="logo" src="${esc(co.logoUrlResolved)}" alt="">` : ''}
+      <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
+      <div class="co-meta">${esc([co.reg, co.address, co.phone, co.email, co.website].filter(Boolean).join('\n'))}</div>
+    </div>
+    <div class="right">
+      <h1 class="title">INVOICE</h1>
+      <div class="nos">
+        <div><span class="tag">CEYMORA</span> <b>${esc(b.invoiceNoCo || '—')}</b></div>
+        <div><span class="tag villa">${esc(villaCode(b.villa))}</span> <b>${esc(b.invoiceNoVilla || '—')}</b></div>
+        <div style="color:#888; margin-top:4px;">Issued ${nicedate(b.bookingDate || todayISO())}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <div class="lbl">Invoice to</div>
+      <div class="val"><b>${esc(b.fullName || b.guest || 'Guest')}</b>${b.address ? '\n' + esc(b.address) : ''}${b.email ? '\n' + esc(b.email) : ''}${b.phone ? '\n' + esc(b.phone) : ''}</div>
+    </div>
+    <div>
+      <div class="lbl">Stay details</div>
+      <div class="val"><b>${esc(villaName)}</b>
+Check-in: ${nicedate(b.checkIn)}
+Check-out: ${nicedate(b.checkOut)}
+${q.nights} night${q.nights===1?'':'s'}${b.guests ? ' · ' + b.guests + ' guest' + (b.guests==1?'':'s') : ''}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="tl"><span>Accommodation total</span><span>${m(q.accom)}</span></div>
+    <div class="tl muted"><span>Payment terms</span><span>${q.pct === 100 ? 'Paid in full (100%)' : q.pct + '% on confirmation'}</span></div>
+    <div class="tl"><span>Due on confirmation (${q.pct}%)</span><span>${m(q.dueOnBooking)}</span></div>
+    ${q.damage > 0 ? `<div class="tl"><span>Refundable damage deposit</span><span>${m(q.damage)}</span></div>` : ''}
+    <div class="tl due"><span>Total payable now</span><span>${m(q.payableNow)}</span></div>
+    ${q.balance > 0 ? `<div class="tl muted"><span>Balance due before arrival</span><span>${m(q.balance)}</span></div>` : ''}
+    <div class="tl big"><span>NET TOTAL</span><span>${m(q.netTotal)}</span></div>
+    <div class="tl muted"><span>Received to date</span><span>${m(q.paid)}</span></div>
+    <div class="tl ${q.outstanding > 0 ? 'out' : ''}"><span>Balance outstanding</span><span>${m(q.outstanding)}</span></div>
+  </div>
+
+  ${b.requests ? `<div class="box"><div class="lbl">Special requests</div><div class="val">${esc(b.requests)}</div></div>` : ''}
+  ${co.bank ? `<div class="box"><div class="lbl">Payment details</div><div class="val">${esc(co.bank)}</div></div>` : ''}
+  ${cancelled ? `<div class="box" style="border-color:#e03131;"><div class="lbl" style="color:#e03131;">Cancellation</div><div class="val">Cancelled on ${nicedate(b.cancelledOn)}${b.cancelReason ? '\n' + esc(b.cancelReason) : ''}
+Amount retained: ${m(b.retainedAmount)}
+Amount refunded: ${m(b.refundedAmount)}</div></div>` : ''}
+
+  <div class="foot">${esc(co.terms || '')}
+Thank you for booking directly with ${esc(co.name || 'Ceymora Management')}.</div>
+</div>
+</body></html>`;
+}
+
+function printInvoice(b){
+  // The logo lives on APP_SETTINGS, but invoiceHTML() reads it off the company
+  // object, so hand it over on a throwaway copy rather than mutating settings.
+  const co = Object.assign({}, APP_SETTINGS.company || {}, { logoUrlResolved: APP_SETTINGS.logoUrl || '' });
+  const saved = APP_SETTINGS.company;
+  APP_SETTINGS.company = co;
+  let html;
+  try{ html = invoiceHTML(b); } finally { APP_SETTINGS.company = saved; }
+
+  const w = window.open('', '_blank');
+  if(!w){ alert('Your browser blocked the invoice window. Allow pop-ups for this page and try again.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  logActivity('print', 'villa_bookings', `Printed invoice ${b.invoiceNoCo || ''} for ${b.guest || 'guest'}`);
+}
+
+/* ===================== CANCELLING A BOOKING ===================== */
+// A cancellation never deletes the row. It flips status to 'cancelled', which frees
+// the dates immediately, and records what was kept vs refunded so the totals in
+// "Invoices & Setup" can report on it later.
+let cancellingBooking = null;
+
+function openCancelModal(b){
+  cancellingBooking = b;
+  const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+  const q = quoteFor({ checkIn:b.checkIn, checkOut:b.checkOut, rate:b.rateUsd,
+                       damage:b.damageDeposit, paid:b.amountPaid, terms:b.payTerms||'deposit' });
+  document.querySelectorAll('.cxCur').forEach(el => el.textContent = cur);
+  document.getElementById('cancelWho').innerHTML =
+    `<b>${esc(b.guest || (b.type==='airbnb'?'Airbnb guest':'Direct guest'))}</b> · ${esc(b.checkIn)} → ${esc(b.checkOut)} · ` +
+    `${q.nights} night${q.nights===1?'':'s'}${b.invoiceNoCo ? ' · invoice ' + esc(b.invoiceNoCo) : ''}`;
+  document.getElementById('cxDate').value = todayISO();
+  document.getElementById('cxReason').value = '';
+  document.getElementById('cxNote').value = '';
+  document.getElementById('cxRetained').value = '';
+  document.getElementById('cxRefunded').value = q.paid ? q.paid : '';
+  document.getElementById('cxHint').textContent =
+    `This booking is worth ${money(cur, q.netTotal)} in total, of which ${money(cur, q.paid)} has been received.`;
+  document.getElementById('cxError').style.display = 'none';
+  document.getElementById('cancelModalOverlay').classList.add('open');
+}
+document.getElementById('cxClose').addEventListener('click', ()=> document.getElementById('cancelModalOverlay').classList.remove('open'));
+document.getElementById('cancelModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='cancelModalOverlay') e.currentTarget.classList.remove('open'); });
+
+document.getElementById('cxConfirm').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('cxError');
+  if(!cancellingBooking || !sb) return;
+  const b = cancellingBooking;
+  const retained = parseFloat(document.getElementById('cxRetained').value) || 0;
+  const refunded = parseFloat(document.getElementById('cxRefunded').value) || 0;
+  const payload = {
+    status: 'cancelled',
+    cancelled_on: document.getElementById('cxDate').value || todayISO(),
+    cancel_reason: document.getElementById('cxReason').value.trim() || null,
+    cancel_note:   document.getElementById('cxNote').value.trim() || null,
+    retained_amount: retained,
+    refunded_amount: refunded,
+  };
+  try{
+    const { error } = await sb.from('villa_bookings').update(payload).eq('id', b.id);
+    if(error) throw error;
+    logActivity('cancel', 'villa_bookings',
+      `Cancelled booking: ${b.guest || b.type} (${b.checkIn} → ${b.checkOut}) · kept ${retained} · refunded ${refunded}`);
+    document.getElementById('cancelModalOverlay').classList.remove('open');
+    await fetchBookings();
+  }catch(e){
+    errEl.textContent = 'Could not cancel — ' + (e.message || 'check connection.');
+    errEl.style.display = 'block'; console.error(e);
+  }
+});
+
+// Puts a cancelled booking back on the calendar, if the dates are still free.
+async function restoreBooking(b){
+  const clash = allBookings.find(x => x.villa===b.villa && x.id!==b.id && x.checkIn < b.checkOut && b.checkIn < x.checkOut);
+  if(clash){
+    alert(`Those dates are taken now by ${clash.guest || 'another booking'} (${clash.checkIn} → ${clash.checkOut}). Move or cancel that one first.`);
+    return;
+  }
+  if(!confirm('Restore this booking and block the dates again?')) return;
+  try{
+    await sb.from('villa_bookings').update({
+      status:'confirmed', cancelled_on:null, cancel_reason:null, cancel_note:null,
+      retained_amount:0, refunded_amount:0
+    }).eq('id', b.id);
+    logActivity('update', 'villa_bookings', `Restored cancelled booking: ${b.guest || b.type}`);
+    await fetchBookings();
+  }catch(e){ console.error(e); alert('Could not restore that booking.'); }
+}
+
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
+
+// A "direct cost" is money spent straight on a villa rather than out of the shared
+// Ceymora float. Two things qualify: a stock item bought directly for a villa (the
+// original route, via the stock tick), and anything logged through the newer
+// "+ Direct expense" button, which sets direct_expense on the row. Both feed the
+// "Direct Villa Purchases" / "Direct Ceymora Card Expenses" totals.
+function isDirectCost(t){
+  return t.type === 'expense' && t.for !== 'store' && (t.directExpense || !!t.linkedInventory);
+}
 const FOR_LABELS = { kalava: 'Kalava Villa', noelia: 'Noelia Villa', brisa: 'Brisa Villa', office: 'Office', store: 'Store' };
 // Always shown as a balance box even at LKR 0, so it's obvious at a glance who's currently
 // holding cash. Anyone else who receives an advance shows up automatically alongside these.
@@ -2577,6 +3472,7 @@ function initPettyCash(){
   document.getElementById('addIncomeBtn').addEventListener('click', ()=> openIncomeModal());
   document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
   document.getElementById('addAdvanceBtn').addEventListener('click', ()=> openAdvanceModal());
+  document.getElementById('addDirectExpenseBtn').addEventListener('click', ()=> openExpenseModal(null, true));
   document.getElementById('addSharonExpenseBtn').addEventListener('click', ()=> openMyPurchaseModal('Sharon'));
 
   document.getElementById('expCard').addEventListener('change', updateExpenseCardLock);
@@ -2691,7 +3587,7 @@ function renderCashMonth(){
       byFor[t.for] = (byFor[t.for] || 0) + t.amount;
     }
     if(t.type !== 'income'){
-      const isDirectViaSharedCard = t.type === 'expense' && t.linkedInventory && t.for !== 'store' && t.card === 'ceymora';
+      const isDirectViaSharedCard = isDirectCost(t) && t.card === 'ceymora';
       const key = t.employeeName && t.type === 'expense' ? 'advance'
         : isDirectViaSharedCard ? 'direct_ceymora'
         : t.card;
@@ -2752,11 +3648,11 @@ function renderCash(){
     // shared float the Ceymora Card balance represents. The Kalava Villa Card is different:
     // it's that villa's own dedicated card, not a shared float, so its balance still falls
     // for a direct purchase the same way it would for any other Kalava expense.
-    const isDirectViaSharedCard = t.type === 'expense' && t.linkedInventory && t.for !== 'store' && t.card === 'ceymora';
+    const isDirectViaSharedCard = isDirectCost(t) && t.card === 'ceymora';
     const sign = t.type === 'income' ? 1 : -1;
     if(t.card === 'ceymora' && !isDirectViaSharedCard) ceymoraBal += sign * t.amount;
     else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
-    if(t.type === 'expense' && t.linkedInventory && t.for !== 'store'){
+    if(isDirectCost(t)){
       if(t.card === 'kalava_card') directKalava += t.amount;
       else if(t.card === 'ceymora') directCeymora += t.amount;
     }
@@ -2882,8 +3778,14 @@ function renderAdvances(){
     row.innerHTML = `
       <span class="manage-type-dot" style="background:var(--amber);"></span>
       <span class="manage-guest">${t.employeeName || 'Unknown'} <span style="color:var(--muted); font-weight:400;">— ${CARD_LABELS[t.card]||t.card}</span></span>
-      <span class="manage-dates">${t.date}${t.note ? ' · '+t.note : ''} · LKR ${t.amount.toLocaleString()}</span>
+      <span class="manage-dates">${t.date}${t.note ? ' · '+t.note : ''} · LKR ${t.amount.toLocaleString()}${getInvoiceLinks(t).length ? ' · 📎 '+getInvoiceLinks(t).length : ''}</span>
     `;
+    getInvoiceLinks(t).forEach((u,i)=>{
+      const a = document.createElement('a');
+      a.href = u; a.target = '_blank'; a.className = 'manage-invoice';
+      a.textContent = `📎 ${i+1}`; a.title = 'Invoice attached when this advance was given';
+      row.appendChild(a);
+    });
     if(canEdit()){
       const editBtn = document.createElement('button');
       editBtn.className = 'manage-edit';
@@ -2951,8 +3853,50 @@ document.getElementById('incSave').addEventListener('click', async ()=>{
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
 
-function openExpenseModal(record){
+// "Direct expense" mode: a cost paid straight for a villa on a company card,
+// which belongs to that villa rather than to the shared Ceymora float. It lands
+// in "Direct Kalava Villa Purchases" (Kalava Villa Card) or "Direct Ceymora Card
+// Expenses" (Ceymora Card). No stock tick, no advance funding — just the villa,
+// what it was for and how much.
+let expDirectMode = false;
+
+function applyDirectExpenseUI(){
+  const g = id => document.getElementById(id);
+  const on = expDirectMode;
+
+  g('expStockRow').style.display      = on ? 'none' : '';
+  g('expIsStockHint').style.display   = on ? 'none' : '';
+  if(on){ g('expIsStock').checked = false; g('expStockFields').style.display = 'none'; }
+
+  // A direct expense is paid by the card itself, so it can't also be funded from
+  // someone's advance — the label, the picker and its hint are all hidden and cleared.
+  const advSel = g('expFundedByAdvance');
+  const advLabel = g('expAdvanceBalanceHint').parentElement;   // the <label> wrapping the hint
+  const advHint = advSel.nextElementSibling;                   // the explanatory field-hint
+  advSel.style.display = on ? 'none' : '';
+  advLabel.style.display = on ? 'none' : '';
+  if(advHint && advHint.classList.contains('field-hint')) advHint.style.display = on ? 'none' : '';
+  if(on) advSel.value = '';
+
+  // Direct expenses always belong to a villa, never the office or the store.
+  Array.from(g('expFor').options).forEach(opt=>{
+    const villaOnly = (opt.value === 'office' || opt.value === 'store');
+    opt.hidden = on && villaOnly;
+    opt.disabled = on && villaOnly;
+  });
+  if(on && (g('expFor').value === 'office' || g('expFor').value === 'store')) g('expFor').value = 'kalava';
+
+  const hint = g('expCardHint');
+  if(on){
+    hint.innerHTML = '<b>Kalava Villa Card</b> → Direct Kalava Villa Purchases. &nbsp;<b>Ceymora Card</b> → Direct Ceymora Card Expenses. Either way the cost still counts toward that villa\'s petty cash.';
+  }
+  document.querySelector('#expenseModalOverlay h3').textContent =
+    (editingCashId ? 'Edit ' : 'Record ') + (on ? 'direct expense' : 'expense');
+}
+
+function openExpenseModal(record, forceDirect){
   editingCashId = record ? record.id : null;
+  expDirectMode = (forceDirect !== undefined) ? !!forceDirect : (record ? !!record.directExpense : false);
   try{
     document.getElementById('expDate').value = record ? record.date : todayISO();
     document.getElementById('expCard').value = record ? record.card : 'ceymora';
@@ -2985,7 +3929,7 @@ function openExpenseModal(record){
     document.getElementById('expFileHint').textContent = existing.length ? `${existing.length} file(s) already attached. New files you add here will be added alongside them.` : '';
     document.getElementById('expError').style.display = 'none';
     updateExpenseCardLock(); // also refreshes the stock checkbox's label/hint for the current "For"
-    document.querySelector('#expenseModalOverlay h3').textContent = record ? 'Edit expense' : 'Record expense';
+    applyDirectExpenseUI();
     document.getElementById('expenseModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
 }
@@ -3000,7 +3944,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const purpose = document.getElementById('expPurpose').value.trim();
   const amount = parseFloat(document.getElementById('expAmount').value);
   const note = document.getElementById('expNote').value.trim();
-  const isStock = document.getElementById('expIsStock').checked;
+  const isStock = expDirectMode ? false : document.getElementById('expIsStock').checked;
   const fundedByEmployee = document.getElementById('expFundedByAdvance').value || null;
   const itemName = document.getElementById('expItemName').value.trim();
   const itemQtyRaw = document.getElementById('expItemQty').value;
@@ -3081,7 +4025,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
         logActivity('update', 'inventory_transactions', `Removed stock link from expense: ${purpose}`);
       }
 
-      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee };
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode };
       if(newUrls.length){
         const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
@@ -3094,7 +4038,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     }
 
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
-      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee
+      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode
     }).select().single();
     if(error) throw error;
     logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
@@ -3140,6 +4084,16 @@ function openAdvanceModal(record){
     document.getElementById('advSettled').checked = record ? !!record.settled : false;
     document.getElementById('advSettledNoteWrap').style.display = (record && record.settled) ? '' : 'none';
     document.getElementById('advSettledNote').value = record ? (record.settledNote || '') : '';
+    advFileHandler.reset();
+    advSettledFileHandler.reset();
+    const advExisting = record ? getInvoiceLinks(record) : [];
+    const setExisting = record ? (record.settledInvoiceUrls || []) : [];
+    document.getElementById('advFileHint').innerHTML = advExisting.length
+      ? `${advExisting.length} file(s) already attached: ` + advExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ')
+      : '';
+    document.getElementById('advSettledFileHint').innerHTML = setExisting.length
+      ? `${setExisting.length} settlement bill(s) attached: ` + setExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ')
+      : '';
     document.getElementById('advError').style.display = 'none';
     document.getElementById('advDeleteBtn').style.display = record ? '' : 'none';
     document.querySelector('#advanceModalOverlay h3').textContent = record ? 'Edit advance' : 'Give advance';
@@ -3169,7 +4123,24 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
     type:'advance', date, card, employee_name: employeeName, amount, note,
     settled, settled_date: settledDate, settled_note: settled ? (settledNote || null) : null,
   };
+
+  const advSaveBtn = document.getElementById('advSave');
+  advSaveBtn.disabled = true;
   try{
+    // The advance voucher and the settlement bills are kept in two separate lists
+    // so you can always tell what was handed over from what came back.
+    const newAdvFiles = advFileHandler.getFiles();
+    const newSetFiles = advSettledFileHandler.getFiles();
+    if(newAdvFiles.length){
+      const urls = [];
+      for(const f of newAdvFiles) urls.push(await uploadReceiptFile(f));
+      payload.invoice_urls = [...(original ? getInvoiceLinks(original) : []), ...urls];
+    }
+    if(newSetFiles.length){
+      const urls = [];
+      for(const f of newSetFiles) urls.push(await uploadReceiptFile(f));
+      payload.settled_invoice_urls = [...((original && original.settledInvoiceUrls) || []), ...urls];
+    }
     if(editingCashId){
       const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
       if(error) throw error;
@@ -3180,7 +4151,10 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
       logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${CARD_LABELS[card]}`);
     }
     document.getElementById('advanceModalOverlay').classList.remove('open');
-  }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
+  }catch(e){
+    errEl.textContent = 'Save failed — ' + (e.message || 'check connection.');
+    errEl.style.display='block'; console.error(e);
+  }finally{ advSaveBtn.disabled = false; }
 });
 document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
   if(!editingCashId) return;
@@ -3559,7 +4533,7 @@ function buildVillaReportHTML(loc, monthDate){
 function openDirectPurchasesDetail(card){
   const cardLabel = CARD_LABELS[card] || card;
   const rows = allCashTxns.filter(t =>
-    t.type === 'expense' && t.linkedInventory && t.for !== 'store' && t.card === card && !t.employeeName
+    isDirectCost(t) && t.card === card && !t.employeeName
   ).sort((a,b)=> (b.date||'').localeCompare(a.date||''));
 
   document.getElementById('villaDetailTitle').textContent = `Direct Villa Purchases — via ${cardLabel}`;
@@ -4534,6 +5508,235 @@ document.getElementById('userDeleteBtn').addEventListener('click', async ()=>{
     document.getElementById('userModalOverlay').classList.remove('open');
   }catch(e){ console.error(e); }
 });
+
+
+/* ============================= INVOICES & SETUP ============================= */
+let settingsInited = false;
+
+function initSettings(){
+  settingsInited = true;
+  if(!bookingsInited) initBookings();
+
+  fillSettingsForm();
+  renderDepositRows();
+  renderInvoiceList();
+  renderCancelledList();
+
+  document.getElementById('setLogoFile').addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const hint = document.getElementById('setLogoHint');
+    hint.textContent = 'Uploading…';
+    try{
+      const url = await uploadReceiptFile(file);
+      APP_SETTINGS.logoUrl = url;
+      await saveSettings();
+      renderLogoPreview();
+      hint.textContent = 'Logo saved. It will appear on every invoice.';
+      logActivity('update', 'app_settings', 'Uploaded the Ceymora logo');
+    }catch(err){
+      hint.textContent = 'Upload failed — ' + (err.message || 'try again.');
+      console.error(err);
+    }
+    e.target.value = '';
+  });
+
+  document.getElementById('setLogoRemove').addEventListener('click', async ()=>{
+    if(!confirm('Remove the logo from all invoices?')) return;
+    const old = APP_SETTINGS.logoUrl;
+    APP_SETTINGS.logoUrl = '';
+    try{
+      await saveSettings();
+      if(old) await deleteReceiptFiles([old]);
+      renderLogoPreview();
+      document.getElementById('setLogoHint').textContent = 'Logo removed.';
+    }catch(err){ console.error(err); }
+  });
+
+  document.getElementById('setSaveBtn').addEventListener('click', async ()=>{
+    const msg = document.getElementById('setSaveMsg');
+    readSettingsForm();
+    msg.textContent = 'Saving…';
+    try{
+      await saveSettings();
+      msg.textContent = 'Saved. New bookings will use these figures.';
+      logActivity('update', 'app_settings', 'Updated invoice setup / damage deposits');
+      renderDepositRows();
+      const lbl = document.getElementById('lblPay25Text');
+      if(lbl) lbl.textContent = `${depositPct()}% now, balance later`;
+      setTimeout(()=>{ msg.textContent = ''; }, 4000);
+    }catch(err){
+      msg.textContent = 'Could not save — run the setup SQL for app_settings first.';
+      console.error(err);
+    }
+  });
+}
+
+function renderLogoPreview(){
+  const box = document.getElementById('setLogoPreview');
+  const url = APP_SETTINGS.logoUrl;
+  box.innerHTML = url ? `<img src="${esc(url)}" alt="Ceymora logo">` : 'No logo uploaded yet';
+  document.getElementById('setLogoRemove').style.display = url ? '' : 'none';
+}
+
+function fillSettingsForm(){
+  const co = APP_SETTINGS.company || {};
+  const g = id => document.getElementById(id);
+  g('setCoName').value    = co.name || '';
+  g('setCoReg').value     = co.reg || '';
+  g('setCoPhone').value   = co.phone || '';
+  g('setCoEmail').value   = co.email || '';
+  g('setCoWeb').value     = co.website || '';
+  g('setCoAddress').value = co.address || '';
+  g('setCoBank').value    = co.bank || '';
+  g('setCoTerms').value   = co.terms || '';
+  g('setCoPrefix').value  = APP_SETTINGS.invoicePrefix || 'CM';
+  g('setDepositPct').value = depositPct();
+  g('setCodeKalava').value = villaCode('kalava');
+  g('setCodeNoelia').value = villaCode('noelia');
+  g('setCodeBrisa').value  = villaCode('brisa');
+  renderLogoPreview();
+}
+
+function readSettingsForm(){
+  const g = id => document.getElementById(id).value.trim();
+  APP_SETTINGS.company = {
+    name: g('setCoName') || 'Ceymora Management',
+    reg: g('setCoReg'), phone: g('setCoPhone'), email: g('setCoEmail'),
+    website: g('setCoWeb'), address: g('setCoAddress'),
+    bank: g('setCoBank'), terms: g('setCoTerms'),
+  };
+  APP_SETTINGS.invoicePrefix = (g('setCoPrefix') || 'CM').toUpperCase();
+  const pct = parseFloat(g('setDepositPct'));
+  APP_SETTINGS.depositPercent = (isFinite(pct) && pct > 0 && pct <= 100) ? pct : 25;
+  APP_SETTINGS.villaCodes = {
+    kalava: (g('setCodeKalava') || 'KAL').toUpperCase(),
+    noelia: (g('setCodeNoelia') || 'NOE').toUpperCase(),
+    brisa:  (g('setCodeBrisa')  || 'BRI').toUpperCase(),
+  };
+  const deps = {};
+  CAL_VILLAS.forEach(v=>{
+    const el = document.getElementById('dep_' + v.id);
+    if(el){ const n = parseFloat(el.value); deps[v.id] = isFinite(n) && n >= 0 ? n : 0; }
+  });
+  APP_SETTINGS.damageDeposits = Object.assign({}, APP_SETTINGS.damageDeposits, deps);
+}
+
+function renderDepositRows(){
+  const wrap = document.getElementById('setDeposits');
+  wrap.innerHTML = '';
+  CAL_VILLAS.forEach(v=>{
+    const row = document.createElement('div');
+    row.className = 'dep-row';
+    row.innerHTML = `
+      <span class="manage-type-dot" style="background:${v.color};"></span>
+      <span class="dep-name">${esc(v.name)}</span>
+      <span class="dep-cur">${esc(v.currency)}</span>
+      <input type="number" min="0" step="1" id="dep_${v.id}" value="${damageDepositFor(v.id)}">
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+// Every direct booking that has been through the invoice numbering, newest first.
+function renderInvoiceList(){
+  const wrap = document.getElementById('invoiceListBody');
+  if(!wrap) return;
+  const rows = allBookingsRaw
+    .filter(b => b.type === 'direct')
+    .sort((a,b)=> (b.bookingDate || b.checkIn || '').localeCompare(a.bookingDate || a.checkIn || ''));
+
+  if(rows.length === 0){
+    wrap.innerHTML = '<div class="manage-empty">No direct bookings invoiced yet. Add one from the Bookings Calendar and pick “Direct”.</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  for(const b of rows){
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const q = quoteFor({ checkIn:b.checkIn, checkOut:b.checkOut, rate:b.rateUsd,
+                         damage:b.damageDeposit, paid:b.amountPaid, terms:b.payTerms||'deposit' });
+    const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+    const row = document.createElement('div');
+    row.className = 'manage-row' + (b.status==='cancelled' ? ' cancelled-row' : '');
+    row.innerHTML = `
+      <span class="inv-no-badge">${esc(b.invoiceNoCo || 'no number')}</span>
+      <span class="inv-no-badge villa" style="margin-right:6px;">${esc(b.invoiceNoVilla || '—')}</span>
+      <span class="manage-guest">${esc(b.fullName || b.guest || 'Guest')}</span>
+      <span class="manage-dates">${esc(villaName)} · ${esc(b.checkIn)} → ${esc(b.checkOut)} · ${q.nights} night${q.nights===1?'':'s'}</span>
+      <span class="manage-money">${money(cur, q.netTotal)}${q.outstanding > 0 ? ' · ' + money(cur, q.outstanding) + ' due' : ' · paid'}</span>
+    `;
+    const btn = document.createElement('button');
+    btn.className = 'manage-invoice';
+    btn.textContent = '🧾 Print';
+    btn.addEventListener('click', ()=> printInvoice(b));
+    row.appendChild(btn);
+    wrap.appendChild(row);
+  }
+}
+
+// Cancellations, with the money split into what was kept and what went back.
+// Totals are grouped by currency because Brisa prices in EUR and the others in USD.
+function renderCancelledList(){
+  const statWrap = document.getElementById('cancelStats');
+  const wrap = document.getElementById('cancelledListBody');
+  if(!wrap || !statWrap) return;
+
+  const rows = [...cancelledBookings].sort((a,b)=> (b.cancelledOn||'').localeCompare(a.cancelledOn||''));
+  const byCur = {};
+  for(const b of rows){
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const q = quoteFor({ checkIn:b.checkIn, checkOut:b.checkOut, rate:b.rateUsd,
+                         damage:b.damageDeposit, paid:b.amountPaid, terms:b.payTerms||'deposit' });
+    byCur[cur] = byCur[cur] || { value:0, kept:0, refunded:0, nights:0 };
+    byCur[cur].value    += q.accom;
+    byCur[cur].kept     += b.retainedAmount || 0;
+    byCur[cur].refunded += b.refundedAmount || 0;
+    byCur[cur].nights   += q.nights;
+  }
+
+  const curs = Object.keys(byCur);
+  statWrap.innerHTML = `
+    <div><div class="cs-label">Bookings cancelled</div><div class="cs-val">${rows.length}</div></div>
+    <div><div class="cs-label">Nights released</div><div class="cs-val">${curs.reduce((a,c)=>a+byCur[c].nights,0)}</div></div>
+    <div><div class="cs-label">Value cancelled</div><div class="cs-val">${curs.length ? curs.map(c=>money(c, byCur[c].value)).join('<br>') : '—'}</div></div>
+    <div><div class="cs-label">Amount kept</div><div class="cs-val" style="color:var(--green);">${curs.length ? curs.map(c=>money(c, byCur[c].kept)).join('<br>') : '—'}</div></div>
+    <div><div class="cs-label">Amount refunded</div><div class="cs-val" style="color:var(--red);">${curs.length ? curs.map(c=>money(c, byCur[c].refunded)).join('<br>') : '—'}</div></div>
+  `;
+
+  if(rows.length === 0){
+    wrap.innerHTML = '<div class="manage-empty">No cancellations. 🎉</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  for(const b of rows){
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+    const row = document.createElement('div');
+    row.className = 'manage-row cancelled-row';
+    row.innerHTML = `
+      <span class="manage-type-dot" style="background:var(--red);"></span>
+      <span class="manage-guest">${esc(b.fullName || b.guest || 'Guest')}</span>
+      <span class="manage-dates">${esc(villaName)} · ${esc(b.checkIn)} → ${esc(b.checkOut)} · cancelled ${esc(b.cancelledOn || '—')}${b.cancelReason ? ' · ' + esc(b.cancelReason) : ''}</span>
+      <span class="manage-money">kept ${money(cur, b.retainedAmount)} · refunded ${money(cur, b.refundedAmount)}</span>
+    `;
+    if(b.type === 'direct'){
+      const pb = document.createElement('button');
+      pb.className = 'manage-invoice';
+      pb.textContent = '🧾';
+      pb.title = 'Print the cancelled invoice';
+      pb.addEventListener('click', ()=> printInvoice(b));
+      row.appendChild(pb);
+    }
+    if(canEdit()){
+      const rb = document.createElement('button');
+      rb.className = 'manage-edit';
+      rb.textContent = 'Restore';
+      rb.addEventListener('click', ()=> restoreBooking(b));
+      row.appendChild(rb);
+    }
+    wrap.appendChild(row);
+  }
+}
 
 /* ============================================================================
    COMPANY ACCOUNTS
