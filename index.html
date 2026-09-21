@@ -617,6 +617,8 @@
     background:#fff; border:1px solid var(--board-line); border-radius:12px;
     padding:16px 18px; margin-bottom:16px;
   }
+  .set-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .set-card-head h4{ margin:0; }
   .set-card h4{
     font-family:'Kalam',cursive; font-size:17px; margin:0 0 3px;
   }
@@ -1183,8 +1185,11 @@
       </div>
 
       <div class="set-card">
-        <h4 id="setInvoicesTitle">All direct booking invoices</h4>
-        <div class="field-hint">Every direct booking that has been issued an invoice, newest first.</div>
+        <div class="set-card-head">
+          <h4 id="setInvoicesTitle">All direct booking invoices</h4>
+          <button class="manage-invoice" id="printInvoiceListBtn">🖨️ Print list</button>
+        </div>
+        <div class="field-hint">Every direct booking that has been issued an invoice, newest first. "Print list" prints a one-page register of the rows below — use the 🧾 button on a row to print that booking's own invoice.</div>
         <div id="invoiceListBody" class="manage-list" style="max-height:420px;"></div>
       </div>
 
@@ -5901,6 +5906,126 @@ function renderHoldBanner(){
   el.innerHTML = `⏳ <b>${holds.length} provisional hold${holds.length===1?'':'s'}</b> on this villa — the dates are pencilled in but not booked, and earn nothing until payment is recorded. Next: <b>${esc(soonest.guest || 'guest')}</b>, check-in ${esc(soonest.checkIn)}. Open the booking and mark it paid to confirm it.`;
 }
 
+
+// ---------------------------------------------------------------------
+// PRINT INVOICE LIST — a one-page register of the invoices currently shown
+// in "All direct booking invoices" (whatever villa is selected at the top
+// of the panel), rather than any one guest's invoice. Useful as a paper
+// record of what's been issued, or to hand to an accountant.
+// ---------------------------------------------------------------------
+function invoiceListHTML(rows){
+  const co = APP_SETTINGS.company || {};
+  const scopeLabel = scopedVillaName() || 'All villas';
+  const nicedate = iso => {
+    if(!iso) return '—';
+    const d = parseISO(iso);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  };
+
+  const body = rows.map(b=>{
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+    const q = quoteFor({ checkIn:b.checkIn, checkOut:b.checkOut, rate:b.rateUsd,
+                         damage:b.damageDeposit, paid:b.amountPaid, terms:b.payTerms||'deposit' });
+    const state = b.status === 'cancelled' ? 'Cancelled'
+                : b.status === 'provisional' ? 'Hold — unpaid'
+                : (q.outstanding > 0.01 ? 'Booked — balance due' : 'Booked — paid in full');
+    return `<tr>
+      <td>${esc(b.invoiceNoCo || '—')}</td>
+      <td>${esc(b.invoiceNoVilla || '—')}</td>
+      <td>${esc(villaName)}</td>
+      <td>${esc(b.fullName || b.guest || 'Guest')}</td>
+      <td>${nicedate(b.checkIn)} → ${nicedate(b.checkOut)}</td>
+      <td class="num">${money(cur, q.netTotal)}</td>
+      <td class="num">${money(cur, q.outstanding)}</td>
+      <td>${esc(state)}</td>
+    </tr>`;
+  }).join('');
+
+  const totalsByCur = {};
+  rows.forEach(b=>{
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const q = quoteFor({ checkIn:b.checkIn, checkOut:b.checkOut, rate:b.rateUsd,
+                         damage:b.damageDeposit, paid:b.amountPaid, terms:b.payTerms||'deposit' });
+    totalsByCur[cur] = totalsByCur[cur] || { total:0, due:0 };
+    totalsByCur[cur].total += q.netTotal;
+    totalsByCur[cur].due   += q.outstanding;
+  });
+  const totalsLine = Object.keys(totalsByCur).map(cur=>
+    `${money(cur, totalsByCur[cur].total)} total, ${money(cur, totalsByCur[cur].due)} outstanding`
+  ).join(' · ') || '—';
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Invoice register — ${esc(scopeLabel)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{ font-family:'Inter',system-ui,sans-serif; color:#2b2b2b; margin:0; padding:32px 36px; font-size:12.5px; background:#fff; }
+  .wrap{ max-width:1000px; margin:0 auto; }
+  .head{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #2b2b2b; padding-bottom:14px; gap:20px; }
+  .logo{ max-width:150px; max-height:80px; object-fit:contain; }
+  .co-name{ font-size:18px; font-weight:700; }
+  .title{ font-size:22px; font-weight:700; margin:0; }
+  .sub{ font-size:12px; color:#666; margin-top:4px; }
+  table{ width:100%; border-collapse:collapse; margin-top:22px; }
+  th{ text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:#999; border-bottom:2px solid #e4e0d6; padding:0 7px 7px; }
+  th.num, td.num{ text-align:right; }
+  td{ padding:8px 7px; border-bottom:1px solid #eee; }
+  .totals{ margin-top:18px; padding-top:12px; border-top:2px solid #2b2b2b; font-size:13px; font-weight:600; }
+  .meta{ margin-top:6px; font-size:11px; color:#999; }
+  @media print{ body{ padding:0; } .noprint{ display:none !important; } }
+  .noprint{ text-align:center; margin-bottom:20px; }
+  .noprint button{
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:9px 20px;
+    border-radius:7px; border:none; background:#2b2b2b; color:#fff; cursor:pointer; margin:0 4px;
+  }
+</style></head><body>
+<div class="noprint">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <button onclick="window.close()" style="background:#f1f1ee; color:#2b2b2b;">Close</button>
+</div>
+<div class="wrap">
+  <div class="head">
+    <div>
+      ${APP_SETTINGS.logoUrl ? `<img class="logo" src="${esc(APP_SETTINGS.logoUrl)}" alt="">` : ''}
+      <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
+    </div>
+    <div style="text-align:right;">
+      <h1 class="title">INVOICE REGISTER</h1>
+      <div class="sub">${esc(scopeLabel)} · ${rows.length} invoice${rows.length===1?'':'s'}</div>
+      <div class="sub">Printed ${nicedate(todayISO())}</div>
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Ceymora No.</th><th>Villa No.</th><th>Villa</th><th>Guest</th><th>Stay</th>
+      <th class="num">Total</th><th class="num">Outstanding</th><th>Status</th>
+    </tr></thead>
+    <tbody>${body || '<tr><td colspan="8" style="color:#999;">No invoices to show.</td></tr>'}</tbody>
+  </table>
+  <div class="totals">${esc(totalsLine)}</div>
+  <div class="meta">Generated from Ceymora Management — Invoices &amp; Setup.</div>
+</div>
+</body></html>`;
+}
+
+function printInvoiceList(){
+  const allowed = visibleCalVillas().map(v => v.id);
+  const rows = allBookingsRaw
+    .filter(b => b.type === 'direct')
+    .filter(b => settingsVillaScope === 'all' ? true : b.villa === settingsVillaScope)
+    .filter(b => allowed.includes(b.villa))
+    .sort((a,b)=> (b.bookingDate || b.checkIn || '').localeCompare(a.bookingDate || a.checkIn || ''));
+
+  const html = invoiceListHTML(rows);
+  const w = window.open('', '_blank');
+  if(!w){ alert('Your browser blocked the print window. Allow pop-ups for this page and try again.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  logActivity('print', 'villa_bookings', `Printed invoice register (${scopedVillaName() || 'all villas'}, ${rows.length} rows)`);
+}
+
 /* ============================= INVOICES & SETUP ============================= */
 let settingsInited = false;
 
@@ -5915,6 +6040,8 @@ function initSettings(){
   renderInvoiceList();
   renderCancelledList();
   renderReminderList();
+
+  document.getElementById('printInvoiceListBtn').addEventListener('click', printInvoiceList);
 
   document.getElementById('setLogoFile').addEventListener('change', async (e)=>{
     const file = e.target.files && e.target.files[0];
