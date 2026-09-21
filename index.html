@@ -514,6 +514,45 @@
     @page{ margin:14mm; }
   }
 
+  /* ===================== PAYMENT GATE / REMINDERS ===================== */
+  .pay-gate{
+    margin-top:14px; background:#fff; border:1.5px solid var(--board-line);
+    border-radius:9px; padding:10px 12px 12px;
+  }
+  .gate-choice{ display:flex; gap:7px; flex-wrap:wrap; }
+  .gate-choice label{
+    flex:1; min-width:118px; margin:0; display:flex; align-items:center; justify-content:center;
+    border:1.5px solid var(--board-line); background:#fff; border-radius:8px; padding:8px 6px;
+    cursor:pointer; font-weight:600; font-size:11.5px; color:var(--ink); text-align:center;
+  }
+  .gate-choice input{ display:none; }
+  .gate-choice label.sel{ border-color:var(--direct); color:var(--direct); box-shadow:0 0 0 2px rgba(12,166,120,0.18); }
+  .gate-choice label.sel-hold{ border-color:var(--amber); color:#a06800; box-shadow:0 0 0 2px rgba(240,160,20,0.20); }
+
+  /* A provisional hold is drawn hollow and hatched, so it reads as "not booked yet" */
+  .booking-pill.provisional{
+    background-image:repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 5px, transparent 5px 10px);
+    opacity:0.9; border:1.5px dashed rgba(0,0,0,0.35);
+  }
+  .hold-banner{
+    background:#fff8e6; border:1.5px solid var(--amber); border-radius:9px;
+    padding:9px 13px; margin-bottom:12px; font-size:12.5px; color:#8a5a00;
+  }
+  .hold-banner b{ color:#6b4500; }
+  .villa-filter{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .villa-filter button{
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:5px 12px;
+    border-radius:20px; border:1.5px solid var(--board-line); background:#fff; color:var(--muted); cursor:pointer;
+  }
+  .villa-filter button.sel{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .rem-wa{
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600; border:none;
+    background:#25D366; color:#fff; padding:4px 10px; border-radius:20px; cursor:pointer; margin-right:4px;
+    text-decoration:none; display:inline-block;
+  }
+  .rem-due{ font-size:11px; font-weight:700; color:var(--red); margin-right:6px; white-space:nowrap; }
+  .rem-soon{ color:#a06800; }
+
   /* ===================== DIRECT BOOKINGS / INVOICES ===================== */
   .modal.modal-wide{ width:560px; }
   .modal textarea{
@@ -1106,8 +1145,26 @@
       </div>
 
       <div class="set-card">
+        <h4>Balance reminders — chase the remaining payment</h4>
+        <div class="field-hint">Bookings that paid a deposit only, with check-in coming up. Send the guest a reminder for the outstanding balance.</div>
+        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Remind when check-in is within (days)</label>
+            <input type="number" id="setReminderDays" min="1" max="365" step="1" style="width:120px; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit;">
+          </div>
+          <div style="flex:1; min-width:280px;">
+            <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Reminder message</label>
+            <textarea id="setReminderTemplate" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:96px;"></textarea>
+            <div class="field-hint">Placeholders: {guest} {villa} {checkin} {nights} {balance} {invoice} {total} {paid}</div>
+          </div>
+        </div>
+        <div id="reminderListBody" class="manage-list" style="max-height:340px;"></div>
+      </div>
+
+      <div class="set-card">
         <h4>All direct booking invoices</h4>
-        <div class="field-hint">Every direct booking that has been issued an invoice, newest first. Click any row to reprint it.</div>
+        <div class="field-hint">Every direct booking that has been issued an invoice, newest first. Use the villa filter to narrow it down, then print.</div>
+        <div class="villa-filter" id="invoiceVillaFilter"></div>
         <div id="invoiceListBody" class="manage-list" style="max-height:420px;"></div>
       </div>
 
@@ -1171,6 +1228,9 @@
   <div class="modal" id="bookingModalCard">
     <h3 id="modalTitle">Add booking</h3>
     <div class="modal-scroll" id="bookingModalScroll">
+    <label>Villa</label>
+    <select id="fVilla"></select>
+    <div class="field-hint" id="fVillaHint">The invoice, the serial number and the calendar all follow this villa.</div>
     <label>Check-in</label>
     <input type="date" id="fCheckIn">
     <label>Check-out</label>
@@ -1222,17 +1282,30 @@
         <label id="lblPay100"><input type="radio" name="payterms" value="full"> 100% paid in full</label>
       </div>
 
-      <div class="frm-row" style="margin-top:10px;">
-        <div>
-          <label>Refundable damage deposit (<span class="dCurLabel">USD</span>)</label>
-          <input type="number" id="dDamage" min="0" step="1" placeholder="250">
-        </div>
-        <div>
-          <label>Amount actually received so far (<span class="dCurLabel">USD</span>)</label>
-          <input type="number" id="dPaid" min="0" step="0.01" placeholder="0">
-        </div>
-      </div>
+      <label>Refundable damage deposit (<span class="dCurLabel">USD</span>)</label>
+      <input type="number" id="dDamage" min="0" step="1" placeholder="250">
       <div class="field-hint" id="dDamageHint">The damage deposit is collected on top of the stay and refunded after check-out.</div>
+
+      <!-- ===== The payment gate: the dates are only held, not booked, until money arrives ===== -->
+      <div class="pay-gate">
+        <label style="margin-top:0;">Has the guest paid?</label>
+        <div class="gate-choice">
+          <label id="gateHold"><input type="radio" name="paystate" value="hold"> ⏳ Not yet — hold the dates</label>
+          <label id="gateDeposit"><input type="radio" name="paystate" value="deposit"> ✅ Deposit received</label>
+          <label id="gateFull"><input type="radio" name="paystate" value="full"> ✅ Paid in full</label>
+        </div>
+        <div class="frm-row" style="margin-top:10px;">
+          <div>
+            <label style="margin-top:0;">Amount received so far (<span class="dCurLabel">USD</span>)</label>
+            <input type="number" id="dPaid" min="0" step="0.01" placeholder="0">
+          </div>
+          <div>
+            <label style="margin-top:0;">Date payment received</label>
+            <input type="date" id="dPaidOn">
+          </div>
+        </div>
+        <div class="field-hint" id="dGateHint"></div>
+      </div>
 
       <div class="quote-box" id="dQuote"></div>
 
@@ -1634,6 +1707,8 @@ function rowToBooking(r){ return {
   damageDeposit: r.damage_deposit !== null && r.damage_deposit !== undefined ? Number(r.damage_deposit) : null,
   amountPaid: r.amount_paid !== null && r.amount_paid !== undefined ? Number(r.amount_paid) : 0,
   fullName: r.guest_full_name || '',
+  paidOn: r.paid_on || null,
+  reminderSentOn: r.reminder_sent_on || null,
   invoiceNoCo: r.invoice_no_company || null,
   invoiceNoVilla: r.invoice_no_villa || null,
   cancelledOn: r.cancelled_on || null,
@@ -1672,6 +1747,12 @@ const SETTINGS_DEFAULTS = {
   villaCodes: { kalava: 'KAL', noelia: 'NOE', brisa: 'BRI' },
   damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
   depositPercent: 25,
+  reminderDays: 30,
+  reminderTemplate:
+    'Dear {guest},\n\nWarm greetings from Ceymora Management. We are looking forward to welcoming you to {villa} on {checkin} for {nights} night(s).\n\n'
+  + 'This is a friendly reminder that the outstanding balance of {balance} is now due ahead of your arrival.\n\n'
+  + 'Invoice reference: {invoice}\nTotal: {total}\nReceived so far: {paid}\nBalance due: {balance}\n\n'
+  + 'Kindly share the transfer confirmation once sent and we will acknowledge receipt right away.\n\nThank you,\nCeymora Management',
 };
 
 // Deep-ish merge so a settings row saved before a new field existed still
@@ -2333,7 +2414,8 @@ const CAL_VILLAS = [
 ];
 let bookingsInited = false;
 let allBookings = [];        // confirmed only — everything downstream (calendar, earnings, reports) reads this
-let allBookingsRaw = [];     // confirmed + cancelled, used for invoice numbering + the invoice list
+let allBookingsRaw = [];     // every booking in any state — used for invoice numbering and the invoice list
+let provisionalBookings = []; // dates held, awaiting payment
 let cancelledBookings = [];
 let currentVillaCal = 'kalava';
 let currentMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -2368,6 +2450,7 @@ function initBookings(){
       document.querySelectorAll('.villatab-btn').forEach(x=>{ x.classList.remove('active'); x.style.background='#fff'; x.style.color='var(--muted)'; });
       b.classList.add('active'); b.style.background=v.color; b.style.color='#fff';
       renderCalendar();
+      renderHoldBanner();
     });
     tabWrap.appendChild(b);
   });
@@ -2404,12 +2487,19 @@ async function fetchBookings(){
   // A cancelled booking keeps its row (so the money is still reportable) but is
   // pulled out of allBookings, which instantly frees the dates on the calendar and
   // removes it from every earnings/report calculation without touching that code.
-  allBookings      = rows.filter(b => b.status !== 'cancelled');
-  cancelledBookings = rows.filter(b => b.status === 'cancelled');
+  // Three buckets, and the difference matters:
+  //   confirmed   — money has arrived. Blocks the calendar, counts as revenue.
+  //   provisional — dates held while we wait for payment. Shown on the calendar as a
+  //                 hatched hold so nobody double-sells them, but earns nothing yet.
+  //   cancelled   — kept for the cancellation report, counts for nothing.
+  allBookings        = rows.filter(b => b.status === 'confirmed');
+  provisionalBookings = rows.filter(b => b.status === 'provisional');
+  cancelledBookings  = rows.filter(b => b.status === 'cancelled');
 
   bookingStatusMsg.textContent = 'Calendar synced (live)';
   renderCalendar();
-  if(typeof settingsInited !== 'undefined' && settingsInited){ renderInvoiceList(); renderCancelledList(); }
+  renderHoldBanner();
+  if(typeof settingsInited !== 'undefined' && settingsInited){ renderInvoiceList(); renderCancelledList(); renderReminderList(); }
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
 }
 
@@ -2474,7 +2564,8 @@ function renderCalendar(){
   const monthLabel = document.getElementById('monthLabel');
   monthLabel.textContent = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
 
-  const villaBookings = allBookings.filter(b=>b.villa===currentVillaCal);
+  // Holds appear alongside confirmed bookings so the dates can't be sold twice.
+  const villaBookings = [...allBookings, ...provisionalBookings].filter(b=>b.villa===currentVillaCal);
   assignLanes(villaBookings); // sets b._lane on each booking
 
   const firstOfMonth = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth(), 1);
@@ -2537,7 +2628,7 @@ function renderCalendar(){
       const spanDays = Math.round((parseISO(segEndExclusive) - parseISO(segStart)) / 86400000); // 1-7
 
       const pill = document.createElement('div');
-      pill.className = 'booking-pill ' + b.type;
+      pill.className = 'booking-pill ' + b.type + (b.status === 'provisional' ? ' provisional' : '');
       pill.style.left = (startColIdx / 7 * 100) + '%';
       pill.style.width = (spanDays / 7 * 100) + '%';
       pill.style.top = (b._lane * 19) + 'px';
@@ -2886,10 +2977,40 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     btnDelete.style.display = 'none';
   }
 
+  populateVillaSelect(editingBookingVilla);
   fillDirectFields(booking);
   setTypeUI(booking ? booking.type : 'airbnb'); // re-run so the direct block visibility matches
   overlay.classList.add('open');
 }
+
+// The villa picker drives the currency, the damage deposit and which serial the
+// invoice will carry, so changing it refreshes all three.
+function populateVillaSelect(selectedId){
+  const sel = document.getElementById('fVilla');
+  const list = visibleCalVillas();
+  sel.innerHTML = '';
+  list.forEach(v=>{
+    const o = document.createElement('option');
+    o.value = v.id; o.textContent = `${v.name} (${v.currency})`;
+    sel.appendChild(o);
+  });
+  sel.value = list.some(v=>v.id===selectedId) ? selectedId : list[0].id;
+  sel.disabled = list.length === 1;
+  document.getElementById('fVillaHint').textContent = list.length === 1
+    ? 'Your account covers this villa only.'
+    : 'The invoice, the serial number and the calendar all follow this villa.';
+}
+
+document.getElementById('fVilla').addEventListener('change', (e)=>{
+  editingBookingVilla = e.target.value;
+  const cur = (CAL_VILLAS.find(v=>v.id===editingBookingVilla) || {}).currency || 'USD';
+  document.getElementById('fRateCurrencyLabel').textContent = cur;
+  document.querySelectorAll('.dCurLabel').forEach(el => el.textContent = cur);
+  // Only pull in this villa's standard deposit when the booking is new — never
+  // overwrite a figure that was already agreed with a guest.
+  if(!editingBookingId) document.getElementById('dDamage').value = damageDepositFor(editingBookingVilla);
+  recalcQuote();
+});
 
 // Fills (or clears) the direct-booking half of the form. For a new booking the
 // damage deposit and the deposit % come from the saved setup, so changing them in
@@ -2909,7 +3030,19 @@ function fillDirectFields(booking){
                               ? booking.damageDeposit
                               : damageDepositFor(villaId);
 
+  document.getElementById('dPaidOn').value = booking ? (booking.paidOn || '') : '';
   setPayTermsUI(booking && booking.payTerms ? booking.payTerms : 'deposit');
+
+  // Work out which gate button reflects the saved state.
+  let gate = 'hold';
+  if(booking && booking.status === 'confirmed' && booking.type === 'direct'){
+    const qq = quoteFor({ checkIn:booking.checkIn, checkOut:booking.checkOut, rate:booking.rateUsd,
+                          damage:booking.damageDeposit, paid:booking.amountPaid, terms:booking.payTerms||'deposit' });
+    gate = qq.outstanding <= 0.01 ? 'full' : 'deposit';
+  } else if(!booking){
+    gate = 'hold';
+  }
+  setPayStateUI(gate, false);
 
   const hasNos = !!(booking && (booking.invoiceNoCo || booking.invoiceNoVilla));
   g('dInvoiceNos').style.display = hasNos ? '' : 'none';
@@ -2920,6 +3053,49 @@ function fillDirectFields(booking){
     (booking && booking.type === 'direct') ? '' : 'none';
 
   recalcQuote();
+}
+
+// The payment gate decides whether these dates are actually booked or merely held.
+// "Not yet" saves the booking as a provisional hold: it shows on the calendar hatched
+// so nobody sells the dates twice, but it earns nothing and blocks nothing until the
+// money lands and you switch it to Deposit received or Paid in full.
+function setPayStateUI(state, autofill){
+  document.querySelectorAll('input[name=paystate]').forEach(r => r.checked = (r.value === state));
+  const g = id => document.getElementById(id);
+  g('gateHold').classList.toggle('sel-hold', state === 'hold');
+  g('gateDeposit').classList.toggle('sel', state === 'deposit');
+  g('gateFull').classList.toggle('sel', state === 'full');
+
+  const q = readQuoteFromForm();
+  const cur = (CAL_VILLAS.find(v => v.id === (editingBookingVilla || currentVillaCal)) || {}).currency || 'USD';
+
+  if(autofill){
+    if(state === 'hold'){ g('dPaid').value = ''; g('dPaidOn').value = ''; }
+    else {
+      const amt = state === 'full' ? q.netTotal : (q.accom * depositPct() / 100) + q.damage;
+      g('dPaid').value = Math.round(amt * 100) / 100;
+      if(!g('dPaidOn').value) g('dPaidOn').value = todayISO();
+    }
+  }
+
+  g('dGateHint').innerHTML = state === 'hold'
+    ? '⏳ <b>Provisional hold.</b> The dates are pencilled in on the calendar but not booked, and nothing counts as revenue yet. Come back and mark it paid once the money arrives.'
+    : (state === 'full'
+        ? '✅ <b>Booked.</b> The dates are blocked on the calendar and the stay counts as revenue.'
+        : `✅ <b>Booked.</b> The dates are blocked. The remaining balance will appear in Balance reminders as check-in approaches.`);
+  recalcQuote();
+}
+
+document.querySelectorAll('input[name=paystate]').forEach(r=>{
+  r.addEventListener('change', ()=> setPayStateUI(r.value, true));
+});
+['dPaid'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', recalcQuote);
+});
+
+function currentPayState(){
+  return (document.querySelector('input[name=paystate]:checked') || {}).value || 'hold';
 }
 
 function setPayTermsUI(terms){
@@ -3029,11 +3205,18 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
   const ci = fCheckIn.value, co = fCheckOut.value;
   if(!ci || !co || co <= ci){ modalError.textContent='Check-out must be after check-in.'; modalError.style.display='block'; return; }
 
-  const conflict = allBookings.find(b =>
-    b.villa === currentVillaCal &&
-    b.id !== editingBookingId &&
-    b.checkIn < co && ci < b.checkOut
-  );
+  const villaId = document.getElementById('fVilla').value || editingBookingVilla || currentVillaCal;
+  const overlaps = b => b.villa === villaId && b.id !== editingBookingId && b.checkIn < co && ci < b.checkOut;
+
+  // A confirmed booking is paid for, so it blocks outright. A provisional hold only
+  // warns — you may well want to take a paying guest over someone who hasn't paid.
+  const heldBy = provisionalBookings.find(overlaps);
+  if(heldBy && !confirm(
+      `Those dates are being held for ${heldBy.guest || 'an unpaid booking'} (${heldBy.checkIn} → ${heldBy.checkOut}), who hasn't paid yet.\n\n`
+      + `Continue anyway? You'll need to cancel that hold separately.`)){
+    return;
+  }
+  const conflict = allBookings.find(overlaps);
   if(conflict){
     const who = conflict.guest ? conflict.guest : (conflict.type==='airbnb'?'an Airbnb booking':'a direct booking');
     modalError.textContent = `These dates clash with ${who} (${conflict.checkIn} → ${conflict.checkOut}). Cancel that booking first, or pick different dates.`;
@@ -3042,7 +3225,6 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
   }
 
   const type = document.querySelector('input[name=btype]:checked').value;
-  const villaId = editingBookingVilla || currentVillaCal;
   const fullName = document.getElementById('dGuestName').value.trim();
   const guest = fGuest.value.trim() || fullName;
   const guestsRaw = document.getElementById('fGuests').value;
@@ -3059,6 +3241,11 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
   if(type === 'direct'){
     const terms = (document.querySelector('input[name=payterms]:checked') || {}).value || 'deposit';
     const q = readQuoteFromForm();
+    // Nothing is truly booked until money has arrived — an unpaid booking is saved as
+    // a provisional hold instead, which shows on the calendar but blocks nothing.
+    const gate = currentPayState();
+    payload.status = gate === 'hold' ? 'provisional' : 'confirmed';
+    payload.paid_on = gate === 'hold' ? null : (document.getElementById('dPaidOn').value || todayISO());
     Object.assign(payload, {
       guest_full_name:  fullName || guest || null,
       guest_address:    document.getElementById('dAddress').value.trim() || null,
@@ -5510,6 +5697,147 @@ document.getElementById('userDeleteBtn').addEventListener('click', async ()=>{
 });
 
 
+
+/* ===================== BALANCE REMINDERS ===================== */
+// A guest on 25% terms still owes the other 75%. This finds every booking whose
+// check-in is coming up and whose balance hasn't been settled, and builds the
+// message to send them. Provisional holds are included too, because those guests
+// have paid nothing at all and are the most urgent to chase.
+function reminderDays(){
+  const n = Number(APP_SETTINGS.reminderDays);
+  return (isFinite(n) && n > 0) ? n : 30;
+}
+
+function bookingBalance(b){
+  return quoteFor({ checkIn:b.checkIn, checkOut:b.checkOut, rate:b.rateUsd,
+                    damage:b.damageDeposit, paid:b.amountPaid, terms:b.payTerms || 'deposit' });
+}
+
+function daysUntil(iso){
+  return Math.round((parseISO(iso) - parseISO(todayISO())) / 86400000);
+}
+
+function reminderCandidates(){
+  const limit = reminderDays();
+  return [...allBookings, ...provisionalBookings]
+    .filter(b => b.type === 'direct')
+    .map(b => ({ b, q: bookingBalance(b), days: daysUntil(b.checkIn) }))
+    .filter(x => x.days >= 0 && x.days <= limit && x.q.outstanding > 0.01)
+    .sort((a, b) => a.days - b.days);
+}
+
+function buildReminderMessage(b, q){
+  const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+  const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+  const tpl = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
+  return tpl
+    .replace(/\{guest\}/g,   b.fullName || b.guest || 'Guest')
+    .replace(/\{villa\}/g,   villaName)
+    .replace(/\{checkin\}/g, b.checkIn)
+    .replace(/\{nights\}/g,  q.nights)
+    .replace(/\{balance\}/g, money(cur, q.outstanding))
+    .replace(/\{total\}/g,   money(cur, q.netTotal))
+    .replace(/\{paid\}/g,    money(cur, q.paid))
+    .replace(/\{invoice\}/g, b.invoiceNoCo || '—');
+}
+
+function renderReminderList(){
+  const wrap = document.getElementById('reminderListBody');
+  if(!wrap) return;
+  const rows = reminderCandidates();
+
+  if(rows.length === 0){
+    wrap.innerHTML = `<div class="manage-empty">No balances to chase — nothing checking in within ${reminderDays()} days is unpaid.</div>`;
+    return;
+  }
+  wrap.innerHTML = '';
+  for(const { b, q, days } of rows){
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
+    const isHold = b.status === 'provisional';
+    const msg = buildReminderMessage(b, q);
+    const digits = (b.phone || '').replace(/[^0-9]/g, '');
+
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    row.innerHTML = `
+      <span class="rem-due ${days > 7 ? 'rem-soon' : ''}">${days === 0 ? 'TODAY' : 'in ' + days + 'd'}</span>
+      <span class="manage-guest">${esc(b.fullName || b.guest || 'Guest')}</span>
+      <span class="manage-dates">${esc(villaName)} · check-in ${esc(b.checkIn)} · ${isHold ? '⏳ nothing paid yet' : 'paid ' + money(cur, q.paid)}${b.phone ? ' · ' + esc(b.phone) : ' · ⚠️ no phone number'}${b.reminderSentOn ? ' · reminded ' + esc(b.reminderSentOn) : ''}</span>
+      <span class="manage-money" style="color:var(--red);">${money(cur, q.outstanding)} due</span>
+    `;
+
+    if(digits){
+      const wa = document.createElement('a');
+      wa.className = 'rem-wa';
+      wa.href = `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+      wa.target = '_blank'; wa.rel = 'noopener';
+      wa.textContent = '💬 WhatsApp';
+      wa.addEventListener('click', ()=> markReminded(b));
+      row.appendChild(wa);
+    }
+
+    const copy = document.createElement('button');
+    copy.className = 'manage-invoice';
+    copy.textContent = '📋 Copy';
+    copy.addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(msg);
+        copy.textContent = '✓ Copied';
+        markReminded(b);
+        setTimeout(()=>{ copy.textContent = '📋 Copy'; }, 2000);
+      }catch(e){
+        // Clipboard access is blocked in some browsers — show the text so it can be
+        // selected and copied by hand rather than failing silently.
+        window.prompt('Copy the reminder message:', msg);
+      }
+    });
+    row.appendChild(copy);
+
+    const inv = document.createElement('button');
+    inv.className = 'manage-invoice';
+    inv.textContent = '🧾';
+    inv.title = 'Print the invoice';
+    inv.addEventListener('click', ()=> printInvoice(b));
+    row.appendChild(inv);
+
+    if(canEdit()){
+      const pay = document.createElement('button');
+      pay.className = 'manage-edit';
+      pay.textContent = 'Record payment';
+      pay.addEventListener('click', ()=> openModal(b, null));
+      row.appendChild(pay);
+    }
+    wrap.appendChild(row);
+  }
+}
+
+async function markReminded(b){
+  if(!sb || !canEdit()) return;
+  try{
+    await sb.from('villa_bookings').update({ reminder_sent_on: todayISO() }).eq('id', b.id);
+    logActivity('update', 'villa_bookings', `Sent balance reminder to ${b.guest || 'guest'} for ${b.checkIn}`);
+  }catch(e){ console.error(e); }
+}
+
+// A short warning above the calendar so unpaid holds can't quietly sit there.
+function renderHoldBanner(){
+  let el = document.getElementById('holdBanner');
+  const hint = document.getElementById('calHint');
+  if(!hint) return;
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'holdBanner';
+    el.className = 'hold-banner';
+    hint.parentElement.insertBefore(el, hint);
+  }
+  const holds = provisionalBookings.filter(b => b.villa === currentVillaCal && b.checkOut >= todayISO());
+  if(holds.length === 0){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  const soonest = holds.slice().sort((a,b)=> a.checkIn.localeCompare(b.checkIn))[0];
+  el.innerHTML = `⏳ <b>${holds.length} provisional hold${holds.length===1?'':'s'}</b> on this villa — the dates are pencilled in but not booked, and earn nothing until payment is recorded. Next: <b>${esc(soonest.guest || 'guest')}</b>, check-in ${esc(soonest.checkIn)}. Open the booking and mark it paid to confirm it.`;
+}
+
 /* ============================= INVOICES & SETUP ============================= */
 let settingsInited = false;
 
@@ -5519,8 +5847,10 @@ function initSettings(){
 
   fillSettingsForm();
   renderDepositRows();
+  renderInvoiceVillaFilter();
   renderInvoiceList();
   renderCancelledList();
+  renderReminderList();
 
   document.getElementById('setLogoFile').addEventListener('change', async (e)=>{
     const file = e.target.files && e.target.files[0];
@@ -5562,6 +5892,7 @@ function initSettings(){
       msg.textContent = 'Saved. New bookings will use these figures.';
       logActivity('update', 'app_settings', 'Updated invoice setup / damage deposits');
       renderDepositRows();
+      renderReminderList();
       const lbl = document.getElementById('lblPay25Text');
       if(lbl) lbl.textContent = `${depositPct()}% now, balance later`;
       setTimeout(()=>{ msg.textContent = ''; }, 4000);
@@ -5595,6 +5926,8 @@ function fillSettingsForm(){
   g('setCodeKalava').value = villaCode('kalava');
   g('setCodeNoelia').value = villaCode('noelia');
   g('setCodeBrisa').value  = villaCode('brisa');
+  g('setReminderDays').value = reminderDays();
+  g('setReminderTemplate').value = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
   renderLogoPreview();
 }
 
@@ -5614,6 +5947,11 @@ function readSettingsForm(){
     noelia: (g('setCodeNoelia') || 'NOE').toUpperCase(),
     brisa:  (g('setCodeBrisa')  || 'BRI').toUpperCase(),
   };
+  const remDays = parseInt(g('setReminderDays'), 10);
+  APP_SETTINGS.reminderDays = (isFinite(remDays) && remDays > 0) ? remDays : 30;
+  APP_SETTINGS.reminderTemplate = document.getElementById('setReminderTemplate').value.trim()
+    || SETTINGS_DEFAULTS.reminderTemplate;
+
   const deps = {};
   CAL_VILLAS.forEach(v=>{
     const el = document.getElementById('dep_' + v.id);
@@ -5639,15 +5977,40 @@ function renderDepositRows(){
 }
 
 // Every direct booking that has been through the invoice numbering, newest first.
+let invoiceVillaFilter = 'all';   // 'all' or a villa id
+
+function renderInvoiceVillaFilter(){
+  const wrap = document.getElementById('invoiceVillaFilter');
+  if(!wrap) return;
+  const list = visibleCalVillas();
+  wrap.innerHTML = '';
+  const mk = (id, label) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.className = invoiceVillaFilter === id ? 'sel' : '';
+    btn.addEventListener('click', ()=>{ invoiceVillaFilter = id; renderInvoiceVillaFilter(); renderInvoiceList(); });
+    wrap.appendChild(btn);
+  };
+  if(list.length > 1) mk('all', 'All villas');
+  list.forEach(v => mk(v.id, `${v.name} · ${villaCode(v.id)}`));
+}
+
 function renderInvoiceList(){
   const wrap = document.getElementById('invoiceListBody');
   if(!wrap) return;
+  const allowed = visibleCalVillas().map(v => v.id);
+  if(invoiceVillaFilter !== 'all' && !allowed.includes(invoiceVillaFilter)) invoiceVillaFilter = allowed.length > 1 ? 'all' : allowed[0];
+
   const rows = allBookingsRaw
     .filter(b => b.type === 'direct')
+    .filter(b => invoiceVillaFilter === 'all' ? true : b.villa === invoiceVillaFilter)
     .sort((a,b)=> (b.bookingDate || b.checkIn || '').localeCompare(a.bookingDate || a.checkIn || ''));
 
   if(rows.length === 0){
-    wrap.innerHTML = '<div class="manage-empty">No direct bookings invoiced yet. Add one from the Bookings Calendar and pick “Direct”.</div>';
+    const who = invoiceVillaFilter === 'all'
+      ? 'No direct bookings invoiced yet.'
+      : `No invoices for ${(CAL_VILLAS.find(v=>v.id===invoiceVillaFilter)||{}).name || invoiceVillaFilter} yet.`;
+    wrap.innerHTML = `<div class="manage-empty">${who} Add one from the Bookings Calendar: pick the villa, choose “Direct”, then save.</div>`;
     return;
   }
   wrap.innerHTML = '';
@@ -5658,12 +6021,15 @@ function renderInvoiceList(){
     const villaName = (CAL_VILLAS.find(v=>v.id===b.villa)||{}).name || b.villa;
     const row = document.createElement('div');
     row.className = 'manage-row' + (b.status==='cancelled' ? ' cancelled-row' : '');
+    const state = b.status === 'cancelled' ? '❌ cancelled'
+                : b.status === 'provisional' ? '⏳ hold — unpaid'
+                : (q.outstanding > 0.01 ? '✅ booked · ' + money(cur, q.outstanding) + ' due' : '✅ booked · paid in full');
     row.innerHTML = `
       <span class="inv-no-badge">${esc(b.invoiceNoCo || 'no number')}</span>
       <span class="inv-no-badge villa" style="margin-right:6px;">${esc(b.invoiceNoVilla || '—')}</span>
       <span class="manage-guest">${esc(b.fullName || b.guest || 'Guest')}</span>
-      <span class="manage-dates">${esc(villaName)} · ${esc(b.checkIn)} → ${esc(b.checkOut)} · ${q.nights} night${q.nights===1?'':'s'}</span>
-      <span class="manage-money">${money(cur, q.netTotal)}${q.outstanding > 0 ? ' · ' + money(cur, q.outstanding) + ' due' : ' · paid'}</span>
+      <span class="manage-dates">${esc(villaName)} · ${esc(b.checkIn)} → ${esc(b.checkOut)} · ${q.nights} night${q.nights===1?'':'s'} · ${state}</span>
+      <span class="manage-money">${money(cur, q.netTotal)}</span>
     `;
     const btn = document.createElement('button');
     btn.className = 'manage-invoice';
