@@ -892,7 +892,7 @@
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
         </div>
       </div>
-      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">"Direct" = stock bought straight for a villa/office (bypassing Store) — already counted in the card balances above, shown here separately just so it's easy to measure per card.</div>
+      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the real money left on each card: top-ups and returned cash in, advances and card-paid bills out. "Direct" = bought straight for a villa (bypassing Store) — already inside the card balances, shown separately so you can see how much went to villas directly.</div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div class="manage-title">Staff advance balances</div>
@@ -913,7 +913,7 @@
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div class="manage-title">Sharon's direct expenses — by villa</div>
-        <div class="field-hint" style="margin:2px 0 8px;">Sharon sometimes pays for things himself and hands the receipts to Zahny to record — this tracks those separately, per villa, all-time.</div>
+        <div class="field-hint" style="margin:2px 0 8px;">Everything Sharon bought for each villa, all-time. When he pays from his own pocket (not a petty cash card) it's charged to the villa but doesn't reduce any card balance.</div>
         <div id="sharonExpensesSummary" class="cash-summary"></div>
       </div>
 
@@ -1547,6 +1547,7 @@
     <select id="expCard">
       <option value="ceymora">Ceymora Card</option>
       <option value="kalava_card">Kalava Villa Card</option>
+      <option value="sharon">Sharon paid personally (not petty cash)</option>
     </select>
     <div class="field-hint" id="expCardHint">Ceymora Card can be used for any villa or the office.</div>
     <label>For</label>
@@ -1598,7 +1599,7 @@
 
 <!-- Advance modal (money given to staff, tracked until settled) -->
 <div class="modal-overlay" id="advanceModalOverlay">
-  <div class="modal modal-wide">
+  <div class="modal modal-wide"><div class="modal-scroll">
     <h3>Give advance</h3>
     <label>Date</label>
     <input type="date" id="advDate">
@@ -1618,6 +1619,16 @@
     <input type="file" id="advFile" accept="image/*,.pdf">
     <div id="advFileList"></div>
     <div class="field-hint" id="advFileHint"></div>
+    <div id="advSettlePanel" class="pay-block" style="display:none">
+      <div class="direct-block-title">Settling this advance</div>
+      <div class="field-hint">Record every bill paid out of this advance — each one is charged to the villa or office it was for. Cash that wasn't spent goes back onto the card.</div>
+      <div id="advBillsList"></div>
+      <button type="button" class="rpt-quick" id="advAddBill">+ Record a bill paid from this advance</button>
+      <div id="advLegacyBills"></div>
+      <label>Unused cash handed back (LKR)</label>
+      <input type="number" id="advReturned" min="0" step="1" placeholder="0">
+      <div class="quote-box" id="advRecon"></div>
+    </div>
     <div class="modal-checkbox-row">
       <input type="checkbox" id="advSettled">
       <label for="advSettled">Settled (receipts submitted / unused cash returned)</label>
@@ -1629,6 +1640,7 @@
       <input type="file" id="advSettledFile" accept="image/*,.pdf">
       <div id="advSettledFileList"></div>
       <div class="field-hint" id="advSettledFileHint"></div>
+    </div>
     </div>
     <div class="modal-error" id="advError"></div>
     <div class="modal-actions">
@@ -1775,6 +1787,7 @@
     <select id="mpVilla"></select>
     <label>Paid from</label>
     <select id="mpCard">
+      <option value="sharon">Sharon paid personally (not petty cash)</option>
       <option value="ceymora">Ceymora Card</option>
       <option value="kalava_card">Kalava Villa Card</option>
     </select>
@@ -2060,7 +2073,7 @@ function rowToBooking(r){ return {
   retainedAmount: r.retained_amount !== null && r.retained_amount !== undefined ? Number(r.retained_amount) : 0,
   refundedAmount: r.refunded_amount !== null && r.refunded_amount !== undefined ? Number(r.refunded_amount) : 0,
 }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -2855,7 +2868,7 @@ async function fetchBookings(){
 }
 
 let pendingStart = null; // ISO date string of first click, awaiting second click
-function todayISO(){ return new Date().toISOString().slice(0,10); }
+function todayISO(){ return toISO(new Date()); }
 
 function resetSelection(){
   pendingStart = null;
@@ -2878,7 +2891,9 @@ function handleDayClick(iso){
   resetSelection();
   openModal(null, ci, co);
 }
-function toISO(d){ return d.toISOString().slice(0,10); }
+// Local calendar date as YYYY-MM-DD. (toISOString() converts to UTC first, which in
+// Sri Lanka moves midnight back to the previous day.)
+function toISO(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); return new Date(y, m-1, dd); }
 
 function assignLanes(bookings){
@@ -3133,7 +3148,7 @@ async function getFxRate(dateISO, fromCurrency){
   // If the requested date is in the future, or the historical lookup comes back empty,
   // fall back to the latest known rate so the report never silently shows LKR 0 for a
   // valid booking.
-  const todayISOStr = new Date().toISOString().slice(0,10);
+  const todayISOStr = todayISO();
   const useDate = dateISO > todayISOStr ? 'latest' : dateISO;
 
   let rate = await fetchFxJson(useDate, fromCurrency);
@@ -3914,7 +3929,21 @@ async function restoreBooking(b){
 }
 
 /* ============================= PETTY CASH ============================= */
-const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
+const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', sharon: 'Paid by Sharon personally' };
+
+// How a row moves real money on one of the two petty cash cards. This is the only rule
+// used for card balances, so the balance on screen can be matched to the card statement.
+//   money received / cash returned  +  |  advance handed out  −  |  expense paid from a card  −
+//   a bill paid out of an advance moves nothing (the cash already left with the advance)
+//   a purchase Sharon paid for himself moves nothing (not petty cash money)
+function cardEffect(t){
+  if(t.card !== 'ceymora' && t.card !== 'kalava_card') return 0;
+  if(t.type === 'income') return t.amount;
+  if(t.type === 'advance') return -t.amount;
+  if(t.type === 'expense') return t.employeeName ? 0 : -t.amount;
+  return 0;
+}
+function isSharonCost(t){ return t.type === 'expense' && (t.purchasedBy === 'Sharon' || t.card === 'sharon'); }
 
 // A "direct cost" is money spent straight on a villa rather than out of the shared
 // Ceymora float. Two things qualify: a stock item bought directly for a villa (the
@@ -3941,14 +3970,17 @@ function computeAdvanceWallets(){
   const wallets = {};
   for(const t of allCashTxns){
     if(t.type === 'advance' && t.employeeName){
-      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0 };
+      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0, returned:0 };
       wallets[t.employeeName].given += t.amount;
     } else if(t.type === 'expense' && t.employeeName){
-      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0 };
+      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0, returned:0 };
       wallets[t.employeeName].spent += t.amount;
+    } else if(t.type === 'income' && t.advanceId && t.employeeName){
+      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0, returned:0 };
+      wallets[t.employeeName].returned = (wallets[t.employeeName].returned || 0) + t.amount;
     }
   }
-  for(const name in wallets){ wallets[name].balance = wallets[name].given - wallets[name].spent; }
+  for(const name in wallets){ wallets[name].balance = wallets[name].given - wallets[name].spent - (wallets[name].returned || 0); }
   return wallets;
 }
 
@@ -3970,7 +4002,7 @@ function renderAdvanceWallets(){
     card.innerHTML = `
       <div class="cash-card-label">${defaultInfo ? defaultInfo.label : name}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
-      <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}</div>
+      <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
     `;
     wrap.appendChild(card);
   }
@@ -4060,6 +4092,9 @@ function updateExpenseCardLock(){
     forSelect.value = 'kalava';
     forSelect.disabled = true;
     hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa expenses.';
+  } else if(card === 'sharon'){
+    forSelect.disabled = false;
+    hint.textContent = 'Sharon paid with his own money — charged to the villa/office below, but nothing comes out of petty cash.';
   } else {
     forSelect.disabled = false;
     hint.textContent = 'Ceymora Card can be used for any villa or the office.';
@@ -4084,7 +4119,7 @@ function updateExpenseStockLabel(){
     const name = FOR_LABELS[forWhom] || forWhom;
     label.textContent = `This is a stock item — direct purchase for ${name} (skips Store)`;
     hint.textContent = card === 'ceymora'
-      ? `Goes straight into ${name}'s stock without passing through Store. Tracked under "Direct Villa Purchases — via Ceymora Card" — it won't reduce the Ceymora Card's petty cash balance, since this cost belongs to ${name}, not to shared petty cash.`
+      ? `Goes straight into ${name}'s stock without passing through Store. Charged to ${name} and shown under "Direct Villa Purchases — via Ceymora Card".`
       : `Goes straight into ${name}'s stock without passing through Store.`;
   }
 }
@@ -4123,22 +4158,19 @@ function renderCashMonth(){
     ? [...allCashTxns]
     : allCashTxns.filter(t => t.date >= fromISO && t.date < toISOEnd);
 
-  let received = 0, spent = 0, advanced = 0;
+  let received = 0, returned = 0, spent = 0, advanced = 0, netCard = 0;
   const byCard = {}, byFor = {};
   for(const t of txns){
-    if(t.type === 'income'){ received += t.amount; }
-    else if(t.type === 'advance'){ advanced += t.amount; }
-    else {
-      spent += t.amount;
-      byFor[t.for] = (byFor[t.for] || 0) + t.amount;
-    }
-    if(t.type !== 'income'){
-      const isDirectViaSharedCard = isDirectCost(t) && t.card === 'ceymora';
-      const key = t.employeeName && t.type === 'expense' ? 'advance'
-        : isDirectViaSharedCard ? 'direct_ceymora'
-        : t.card;
-      byCard[key] = (byCard[key] || 0) + t.amount;
-    }
+    netCard += cardEffect(t);
+    if(t.type === 'income'){ if(t.advanceId) returned += t.amount; else received += t.amount; continue; }
+    if(t.type === 'advance'){ advanced += t.amount; continue; }
+    spent += t.amount;
+    byFor[t.for] = (byFor[t.for] || 0) + t.amount;
+    const key = t.employeeName ? 'advance'
+      : t.card === 'sharon' ? 'sharon'
+      : (isDirectCost(t) && t.card === 'ceymora') ? 'direct_ceymora'
+      : t.card;
+    byCard[key] = (byCard[key] || 0) + t.amount;
   }
 
   document.getElementById('cashMonthSummary').innerHTML = `
@@ -4147,22 +4179,23 @@ function renderCashMonth(){
       <div class="cash-card-balance">LKR ${Math.round(received).toLocaleString()}</div>
     </div>
     <div class="cash-card" style="background:linear-gradient(135deg,#e03131,#8a1f1f);">
-      <div class="cash-card-label">Petty cash spent</div>
+      <div class="cash-card-label">Spent (all bills, any source)</div>
       <div class="cash-card-balance">LKR ${Math.round(spent).toLocaleString()}</div>
     </div>
     <div class="cash-card" style="background:linear-gradient(135deg,#f08c00,#b56500);">
       <div class="cash-card-label">Advances given out</div>
       <div class="cash-card-balance">LKR ${Math.round(advanced).toLocaleString()}</div>
+      ${returned ? `<div style="font-size:11px; opacity:0.85; margin-top:4px;">LKR ${Math.round(returned).toLocaleString()} unused cash returned</div>` : ''}
     </div>
     <div class="cash-card" style="background:linear-gradient(135deg,#2b2b2b,#454545);">
-      <div class="cash-card-label">Net movement</div>
-      <div class="cash-card-balance">LKR ${Math.round(received - spent - advanced).toLocaleString()}</div>
+      <div class="cash-card-label">Net change on the cards</div>
+      <div class="cash-card-balance">LKR ${Math.round(netCard).toLocaleString()}</div>
     </div>`;
 
   const forRows = Object.keys(byFor).sort((a,b)=> byFor[b]-byFor[a])
     .map(k=>`<tr><td>${esc(FOR_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byFor[k]).toLocaleString()}</td><td class="r dim">${pct(byFor[k], spent)}</td></tr>`).join('');
   const cardRows = Object.keys(byCard).sort((a,b)=> byCard[b]-byCard[a])
-    .map(k=>`<tr><td>${k==='advance' ? 'Paid from a staff advance' : k==='direct_ceymora' ? 'Direct villa purchase (via Ceymora Card)' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
+    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchase (via Ceymora Card)' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
 
   document.getElementById('cashMonthBreakdown').innerHTML = (spent === 0 && advanced === 0)
     ? ''
@@ -4172,7 +4205,7 @@ function renderCashMonth(){
           <table class="rpt-table"><thead><tr><th>Location</th><th class="r">LKR</th><th class="r">Share</th></tr></thead><tbody>${forRows || '<tr><td colspan="3" class="dim">Nothing yet</td></tr>'}</tbody></table>
         </div>
         <div>
-          <div class="rpt-section-title" style="font-size:14px;">Money out, by source</div>
+          <div class="rpt-section-title" style="font-size:14px;">Bills, by who paid</div>
           <table class="rpt-table"><thead><tr><th>Source</th><th class="r">LKR</th></tr></thead><tbody>${cardRows || '<tr><td colspan="2" class="dim">Nothing yet</td></tr>'}</tbody></table>
         </div>
       </div>`;
@@ -4183,22 +4216,9 @@ function renderCashMonth(){
 function renderCash(){
   let ceymoraBal = 0, kalavaBal = 0, directKalava = 0, directCeymora = 0;
   for(const t of allCashTxns){
-    // An expense explicitly marked as "funded from a staff advance" already left the card
-    // when that advance was handed out — counting it against the card again here would
-    // double-debit the same money. It only comes off that person's wallet (computeAdvanceWallets).
-    const fundedByAdvance = t.type === 'expense' && !!t.employeeName;
-    if(fundedByAdvance) continue;
-    // A "direct purchase" (stock bought straight for a villa, bypassing Store) paid from the
-    // shared Ceymora Card isn't a Ceymora/company expense — it's stock cost that belongs to
-    // that villa, tracked in "Direct Villa Purchases" instead. So it shouldn't eat into the
-    // shared float the Ceymora Card balance represents. The Kalava Villa Card is different:
-    // it's that villa's own dedicated card, not a shared float, so its balance still falls
-    // for a direct purchase the same way it would for any other Kalava expense.
-    const isDirectViaSharedCard = isDirectCost(t) && t.card === 'ceymora';
-    const sign = t.type === 'income' ? 1 : -1;
-    if(t.card === 'ceymora' && !isDirectViaSharedCard) ceymoraBal += sign * t.amount;
-    else if(t.card === 'kalava_card') kalavaBal += sign * t.amount;
-    if(isDirectCost(t)){
+    if(t.card === 'ceymora') ceymoraBal += cardEffect(t);
+    else if(t.card === 'kalava_card') kalavaBal += cardEffect(t);
+    if(isDirectCost(t) && !t.employeeName){
       if(t.card === 'kalava_card') directKalava += t.amount;
       else if(t.card === 'ceymora') directCeymora += t.amount;
     }
@@ -4239,7 +4259,9 @@ function renderCash(){
   for(const t of sorted){
     const cardLabel = CARD_LABELS[t.card] || t.card;
     let details;
-    if(t.type === 'income'){
+    if(t.type === 'income' && t.advanceId){
+      details = `Unused cash returned — ${esc(t.employeeName || '')}` + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
+    } else if(t.type === 'income'){
       details = 'Money received' + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
     } else if(t.type === 'advance'){
       const statusSpan = t.settled
@@ -4272,7 +4294,11 @@ function renderCash(){
       editBtn.textContent = 'Edit';
       editBtn.style.marginRight = '4px';
       editBtn.addEventListener('click', ()=>{
-        if(t.type === 'income') openIncomeModal(t);
+        if(t.type === 'income' && t.advanceId){
+          const adv = allCashTxns.find(a => String(a.id) === String(t.advanceId));
+          if(adv) openAdvanceModal(adv); else openIncomeModal(t);
+        }
+        else if(t.type === 'income') openIncomeModal(t);
         else if(t.type === 'advance') openAdvanceModal(t);
         else openExpenseModal(t);
       });
@@ -4296,10 +4322,10 @@ function renderCash(){
     tr.appendChild(actionTd);
     tbody.appendChild(tr);
   }
-  const netTotal = sorted.reduce((s,t)=> s + (t.type==='income' ? t.amount : -t.amount), 0);
+  const netTotal = sorted.reduce((s,t)=> s + cardEffect(t), 0);
   const tfoot = document.createElement('tfoot');
   tfoot.innerHTML = `<tr style="font-weight:800; border-top:2px solid var(--board-line); background:#f6f4ec;">
-      <td colspan="4" style="padding:9px 10px;">Net total — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
+      <td colspan="4" style="padding:9px 10px;">Net change on the cards — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
       <td class="num" style="padding:9px 10px; color:${netTotal>=0?'var(--green)':'var(--red)'};">${netTotal>=0?'+':'−'} ${Math.abs(Math.round(netTotal)).toLocaleString()}</td>
       <td style="padding:9px 10px;"></td>
     </tr>`;
@@ -4325,7 +4351,9 @@ function renderAdvances(){
     row.innerHTML = `
       <span class="manage-type-dot" style="background:var(--amber);"></span>
       <span class="manage-guest">${t.employeeName || 'Unknown'} <span style="color:var(--muted); font-weight:400;">— ${CARD_LABELS[t.card]||t.card}</span></span>
-      <span class="manage-dates">${t.date}${t.note ? ' · '+t.note : ''} · LKR ${t.amount.toLocaleString()}${getInvoiceLinks(t).length ? ' · 📎 '+getInvoiceLinks(t).length : ''}</span>
+      <span class="manage-dates">${t.date}${t.note ? ' · '+t.note : ''} · LKR ${t.amount.toLocaleString()}${getInvoiceLinks(t).length ? ' · 📎 '+getInvoiceLinks(t).length : ''}
+        · bills LKR ${Math.round(advBillsFor(t).reduce((s,b)=>s+b.amount,0)).toLocaleString()}
+        · <b>LKR ${Math.round(t.amount - advBillsFor(t).reduce((s,b)=>s+b.amount,0) - ((advReturnRow(t)||{}).amount||0)).toLocaleString()} still to account for</b></span>
     `;
     getInvoiceLinks(t).forEach((u,i)=>{
       const a = document.createElement('a');
@@ -4411,9 +4439,8 @@ function applyDirectExpenseUI(){
   const g = id => document.getElementById(id);
   const on = expDirectMode;
 
-  g('expStockRow').style.display      = on ? 'none' : '';
-  g('expIsStockHint').style.display   = on ? 'none' : '';
-  if(on){ g('expIsStock').checked = false; g('expStockFields').style.display = 'none'; }
+  // A direct expense can be goods too — ticking the stock box adds them straight to
+  // that villa's inventory, the same as a direct purchase from "Record expense".
 
   // A direct expense is paid by the card itself, so it can't also be funded from
   // someone's advance — the label, the picker and its hint are all hidden and cleared.
@@ -4441,8 +4468,12 @@ function applyDirectExpenseUI(){
     (editingCashId ? 'Edit ' : 'Record ') + (on ? 'direct expense' : 'expense');
 }
 
-function openExpenseModal(record, forceDirect){
+let expLinkAdvanceId = null, expReturnToAdvance = null;
+function openExpenseModal(record, forceDirect, opts){
+  opts = opts || {};
   editingCashId = record ? record.id : null;
+  expLinkAdvanceId = opts.advanceId != null ? String(opts.advanceId) : (record && record.advanceId) || null;
+  expReturnToAdvance = opts.returnToAdvance != null ? opts.returnToAdvance : null;
   expDirectMode = (forceDirect !== undefined) ? !!forceDirect : (record ? !!record.directExpense : false);
   try{
     document.getElementById('expDate').value = record ? record.date : todayISO();
@@ -4453,7 +4484,13 @@ function openExpenseModal(record, forceDirect){
     document.getElementById('expAmount').value = record ? record.amount : '';
 
     updateExpenseAdvanceOptions();
-    document.getElementById('expFundedByAdvance').value = record ? (record.employeeName || '') : '';
+    const fundedName = record ? (record.employeeName || '') : (opts.fundedBy || '');
+    const advSel = document.getElementById('expFundedByAdvance');
+    if(fundedName && ![...advSel.options].some(o => o.value === fundedName)){
+      advSel.insertAdjacentHTML('beforeend', `<option value="${esc(fundedName)}">${esc(fundedName)}</option>`);
+    }
+    advSel.value = fundedName;
+    if(!record && opts.card) document.getElementById('expCard').value = opts.card;
     updateExpenseAdvanceHint();
 
     const wasStock = record ? !!record.linkedInventory : false;
@@ -4481,7 +4518,18 @@ function openExpenseModal(record, forceDirect){
     document.getElementById('expenseModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
 }
-document.getElementById('expCancel').addEventListener('click', ()=> document.getElementById('expenseModalOverlay').classList.remove('open'));
+// After recording a bill from the settlement panel, go straight back to that advance.
+async function expBackToAdvance(){
+  if(expReturnToAdvance == null) return;
+  const id = expReturnToAdvance; expReturnToAdvance = null;
+  await fetchCash();
+  const adv = allCashTxns.find(t => String(t.id) === String(id));
+  if(adv) openAdvanceModal(adv);
+}
+document.getElementById('expCancel').addEventListener('click', ()=>{
+  document.getElementById('expenseModalOverlay').classList.remove('open');
+  expBackToAdvance();
+});
 document.getElementById('expenseModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='expenseModalOverlay') e.currentTarget.classList.remove('open'); });
 document.getElementById('expSave').addEventListener('click', async ()=>{
   const errEl = document.getElementById('expError');
@@ -4492,7 +4540,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const purpose = document.getElementById('expPurpose').value.trim();
   const amount = parseFloat(document.getElementById('expAmount').value);
   const note = document.getElementById('expNote').value.trim();
-  const isStock = expDirectMode ? false : document.getElementById('expIsStock').checked;
+  const isStock = document.getElementById('expIsStock').checked;
   const fundedByEmployee = document.getElementById('expFundedByAdvance').value || null;
   const itemName = document.getElementById('expItemName').value.trim();
   const itemQtyRaw = document.getElementById('expItemQty').value;
@@ -4503,6 +4551,14 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   if(card === 'kalava_card' && forWhom !== 'kalava'){ errEl.textContent='Kalava Villa Card can only be used for Kalava Villa.'; errEl.style.display='block'; return; }
   if(isStock && !itemName){ errEl.textContent='Enter an item name for the stock item.'; errEl.style.display='block'; return; }
   const accountCode = document.getElementById('expAccount').value || null;
+  // Which advance this bill is paid out of: the one it was opened from, the one it was
+  // already linked to, or else the person's oldest advance that's still open.
+  let advanceId = null;
+  if(fundedByEmployee){
+    const origRec = editingCashId ? allCashTxns.find(t=>t.id===editingCashId) : null;
+    if(expLinkAdvanceId && (!origRec || origRec.employeeName === fundedByEmployee || !origRec.employeeName)) advanceId = String(expLinkAdvanceId);
+    else { const open = oldestOpenAdvanceFor(fundedByEmployee); advanceId = open ? String(open.id) : null; }
+  }
   if(!accountCode){ errEl.textContent='Pick which account this goes into, so the company accounts stay sorted.'; errEl.style.display='block'; return; }
 
   try{
@@ -4575,7 +4631,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
         logActivity('update', 'inventory_transactions', `Removed stock link from expense: ${purpose}`);
       }
 
-      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode };
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId };
       if(newUrls.length){
         const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
@@ -4584,11 +4640,12 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('update', 'petty_cash_transactions', `Edited expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]})`);
       document.getElementById('expenseModalOverlay').classList.remove('open');
+      await expBackToAdvance();
       return;
     }
 
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
-      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode
+      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId
     }).select().single();
     if(error) throw error;
     logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
@@ -4615,6 +4672,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       if(linkErr) throw linkErr;
     }
     document.getElementById('expenseModalOverlay').classList.remove('open');
+    await expBackToAdvance();
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
 
@@ -4646,7 +4704,10 @@ function openAdvanceModal(record){
       : '';
     document.getElementById('advError').style.display = 'none';
     document.getElementById('advDeleteBtn').style.display = record ? '' : 'none';
-    document.querySelector('#advanceModalOverlay h3').textContent = record ? 'Edit advance' : 'Give advance';
+    document.querySelector('#advanceModalOverlay h3').textContent = record ? (record.settled ? 'Settled advance' : 'Settle / edit advance') : 'Give advance';
+    advPanelRecord = record || null;
+    document.getElementById('advReturned').dataset.touched = '';
+    renderAdvSettlePanel();
     document.getElementById('advanceModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
 }
@@ -4668,6 +4729,19 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   // only stamp today's date the moment it's newly marked settled.
   const original = editingCashId ? allCashTxns.find(t=>t.id===editingCashId) : null;
   const settledDate = settled ? ((original && original.settled && original.settledDate) ? original.settledDate : todayISO()) : null;
+  const returnedAmt = original ? (parseFloat(document.getElementById('advReturned').value) || 0) : 0;
+  if(original && settled && !original.settled){
+    const billed = advBillsFor(original).reduce((sum,b)=> sum + b.amount, 0);
+    const diff = Math.round((amount - billed - returnedAmt) * 100) / 100;
+    if(billed === 0 && returnedAmt === 0){
+      if(!confirm(`No bills are recorded against this advance and no cash was returned.\n\nIf you settle it like this, the LKR ${amount.toLocaleString()} won't be charged to any villa. Record the bills first with “+ Record a bill paid from this advance”.\n\nSettle anyway?`)) return;
+    } else if(Math.abs(diff) >= 1){
+      const msg = diff > 0
+        ? `LKR ${diff.toLocaleString()} of this advance isn't covered by bills or returned cash — it stays on ${employeeName}'s balance as money still owed.`
+        : `Bills are LKR ${Math.abs(diff).toLocaleString()} more than the advance — ${employeeName}'s balance goes negative (the company owes them that).`;
+      if(!confirm(msg + '\n\nSettle anyway?')) return;
+    }
+  }
 
   const payload = {
     type:'advance', date, card, employee_name: employeeName, amount, note,
@@ -4694,7 +4768,21 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
     if(editingCashId){
       const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
       if(error) throw error;
-      logActivity('update', 'petty_cash_transactions', `${settled && !(original&&original.settled) ? 'Settled' : 'Edited'} advance: ${employeeName} — LKR ${amount.toLocaleString()}`);
+      // Unused cash handed back goes onto the card it came from, as its own line.
+      const retRow = advReturnRow(original);
+      if(returnedAmt > 0){
+        const retPayload = { type:'income', date: settledDate || todayISO(), card, amount: returnedAmt,
+          employee_name: employeeName, advance_id: String(editingCashId),
+          note: `Unused cash returned from ${employeeName}'s advance of ${date}` };
+        const { error: rErr } = retRow
+          ? await sb.from('petty_cash_transactions').update(retPayload).eq('id', retRow.id)
+          : await sb.from('petty_cash_transactions').insert(retPayload);
+        if(rErr) throw rErr;
+      } else if(retRow){
+        const { error: rErr } = await sb.from('petty_cash_transactions').delete().eq('id', retRow.id);
+        if(rErr) throw rErr;
+      }
+      logActivity('update', 'petty_cash_transactions', `${settled && !(original&&original.settled) ? 'Settled' : 'Edited'} advance: ${employeeName} — LKR ${amount.toLocaleString()}${returnedAmt ? ` (LKR ${returnedAmt.toLocaleString()} returned)` : ''}`);
     } else {
       const { error } = await sb.from('petty_cash_transactions').insert(payload);
       if(error) throw error;
@@ -4711,12 +4799,94 @@ document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
   if(!checkDeletePassword()) return;
   if(confirm('Delete this advance record?')){
     try{
+      const adv = allCashTxns.find(t => t.id === editingCashId);
+      const ret = adv ? advReturnRow(adv) : null;
+      if(ret) await sb.from('petty_cash_transactions').delete().eq('id', ret.id);
+      await sb.from('petty_cash_transactions').update({ advance_id: null }).eq('advance_id', String(editingCashId));
       await sb.from('petty_cash_transactions').delete().eq('id', editingCashId);
       logActivity('delete', 'petty_cash_transactions', 'Deleted an advance record');
       document.getElementById('advanceModalOverlay').classList.remove('open');
     }catch(e){ console.error(e); }
   }
 });
+
+/* ---- Settling an advance: bills in, unused cash back, nothing left floating ---- */
+let advPanelRecord = null;
+function advBillsFor(adv){
+  return allCashTxns.filter(t => t.type === 'expense' && t.advanceId && String(t.advanceId) === String(adv.id))
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+}
+function advReturnRow(adv){
+  if(!adv) return null;
+  return allCashTxns.find(t => t.type === 'income' && t.advanceId && String(t.advanceId) === String(adv.id)) || null;
+}
+function advUnlinkedBills(adv){
+  return allCashTxns.filter(t => t.type === 'expense' && t.employeeName === adv.employeeName && !t.advanceId);
+}
+function oldestOpenAdvanceFor(name){
+  return allCashTxns.filter(t => t.type === 'advance' && !t.settled && t.employeeName === name)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''))[0] || null;
+}
+function renderAdvSettlePanel(){
+  const adv = advPanelRecord;
+  const panel = document.getElementById('advSettlePanel');
+  if(!adv){ panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const bills = advBillsFor(adv);
+  document.getElementById('advBillsList').innerHTML = bills.length
+    ? bills.map(b => `<div class="ce-row"><div class="ce-main"><b>${esc(b.purpose || 'Bill')}</b>
+        <div class="ce-sub">${fmtDay(b.date)} · ${esc(FOR_LABELS[b.for] || b.for || '')}${acctOf(b) && isCompanyAcct(acctOf(b)) ? ' · ' + esc(acctLabel(acctOf(b))) : ''}${getInvoiceLinks(b).length ? ' · 📎' : ''}</div></div>
+        <div class="ce-amt">${Math.round(b.amount).toLocaleString()}</div>
+        <button type="button" class="manage-edit" data-bill="${b.id}">Edit</button></div>`).join('')
+    : '<div class="co-empty-hint">No bills recorded against this advance yet.</div>';
+  document.querySelectorAll('#advBillsList [data-bill]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const bill = allCashTxns.find(t => String(t.id) === btn.dataset.bill);
+      document.getElementById('advanceModalOverlay').classList.remove('open');
+      openExpenseModal(bill, undefined, { returnToAdvance: adv.id });
+    });
+  });
+  const loose = advUnlinkedBills(adv);
+  document.getElementById('advLegacyBills').innerHTML = loose.length
+    ? `<div class="field-hint" style="margin-top:8px;">${loose.length} earlier bill${loose.length===1?'':'s'} from ${esc(adv.employeeName)}'s advances (LKR ${Math.round(loose.reduce((s,b)=>s+b.amount,0)).toLocaleString()}) aren't linked to a particular advance.
+        <button type="button" class="rpt-quick" id="advLinkLoose">Link them to this advance</button></div>` : '';
+  const linkBtn = document.getElementById('advLinkLoose');
+  if(linkBtn) linkBtn.addEventListener('click', async ()=>{
+    if(!confirm(`Link ${loose.length} bill${loose.length===1?'':'s'} to this advance?`)) return;
+    for(const b of loose){ await sb.from('petty_cash_transactions').update({ advance_id: String(adv.id) }).eq('id', b.id); }
+    await fetchCash();
+    advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
+    renderAdvSettlePanel();
+  });
+  const ret = advReturnRow(adv);
+  const retInput = document.getElementById('advReturned');
+  if(!retInput.dataset.touched) retInput.value = ret ? ret.amount : '';
+  advRenderRecon();
+}
+function advRenderRecon(){
+  const adv = advPanelRecord;
+  if(!adv) return;
+  const amount = parseFloat(document.getElementById('advAmount').value) || 0;
+  const billed = advBillsFor(adv).reduce((s,b)=> s + b.amount, 0);
+  const returned = parseFloat(document.getElementById('advReturned').value) || 0;
+  const left = Math.round((amount - billed - returned) * 100) / 100;
+  document.getElementById('advRecon').innerHTML = `
+    <div class="quote-line"><span>Advance given</span><span>${amount.toLocaleString()}</span></div>
+    <div class="quote-line muted"><span>Bills recorded</span><span>− ${Math.round(billed).toLocaleString()}</span></div>
+    <div class="quote-line muted"><span>Cash handed back</span><span>− ${Math.round(returned).toLocaleString()}</span></div>
+    <div class="quote-line total ${left === 0 ? 'due' : ''}" style="${left !== 0 ? 'color:var(--red);' : ''}">
+      <span>${left === 0 ? 'Balances — ready to settle ✓' : left > 0 ? 'Still to account for' : 'Overspent (company owes)'}</span>
+      <span>${Math.abs(left).toLocaleString()}</span></div>`;
+}
+document.getElementById('advReturned').addEventListener('input', (e)=>{ e.target.dataset.touched = '1'; advRenderRecon(); });
+document.getElementById('advAmount').addEventListener('input', advRenderRecon);
+document.getElementById('advAddBill').addEventListener('click', ()=>{
+  const adv = advPanelRecord;
+  if(!adv) return;
+  document.getElementById('advanceModalOverlay').classList.remove('open');
+  openExpenseModal(null, false, { fundedBy: adv.employeeName, advanceId: adv.id, card: adv.card, returnToAdvance: adv.id });
+});
+document.getElementById('advCancel').addEventListener('click', ()=>{ document.getElementById('advReturned').dataset.touched = ''; });
 
 /* ============================= INVENTORY ============================= */
 const INV_VILLAS = ['kalava','noelia','brisa'];
@@ -4979,6 +5149,59 @@ function computeAvgUnitCost(){
 // Report for a location that doesn't earn booking revenue of its own (Office, Store) —
 // or a quick villa cost view from the Inventory tab. Same document format as the villa
 // report, minus the revenue side: what was spent, and what came in from Store.
+
+/* Villa petty cash, split the way it's actually spent:
+     staff  — Zahny / staff day-to-day buying, including bills paid out of an advance
+     direct — goods bought straight for this villa (bypassing Store)
+     sharon — bought by Sharon (from a card or from his own pocket)                  */
+const PETTY_GROUPS = [
+  { key:'staff',  label:'Petty cash — Zahny & staff day-to-day', pl:'Petty cash — day-to-day (Zahny & staff)' },
+  { key:'direct', label:'Direct purchases for this location',    pl:'Direct purchases (bypassing Store)' },
+  { key:'sharon', label:'Bought by Sharon',                      pl:'Bought by Sharon' },
+];
+function pettyGroupOf(e){
+  if(isSharonCost(e)) return 'sharon';
+  if(isDirectCost(e)) return 'direct';
+  return 'staff';
+}
+function pettyGroupsBlock(expenses){
+  const totals = { staff:0, direct:0, sharon:0 }, counts = { staff:0, direct:0, sharon:0 };
+  const rowsBy = { staff:'', direct:'', sharon:'' };
+  for(const e of expenses){
+    const g = pettyGroupOf(e);
+    totals[g] += e.amount; counts[g]++;
+    const links = getInvoiceLinks(e).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(e).length>1?' '+(i+1):''}</a>`).join(' ');
+    const tags = [];
+    if(e.linkedInventory){
+      const pur = e.linkedPurchaseId ? allInvTxns.find(x => String(x.id) === String(e.linkedPurchaseId)) : null;
+      tags.push(pur ? `stock: ${esc(pur.item)} × ${pur.qty}` : 'stock item');
+    }
+    if(e.employeeName) tags.push(`from ${esc(e.employeeName)}'s advance`);
+    if(e.card === 'sharon') tags.push('his own money');
+    rowsBy[g] += `<tr>
+      <td class="dim">${fmtDay(e.date)}</td>
+      <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
+      <td class="dim">${esc(e.employeeName ? 'Staff advance' : (CARD_LABELS[e.card] || e.card || ''))}</td>
+      <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
+      <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
+    </tr>`;
+  }
+  const total = totals.staff + totals.direct + totals.sharon;
+  const html = expenses.length === 0
+    ? '<div class="rpt-empty">No petty cash spending in this period.</div>'
+    : PETTY_GROUPS.filter(g => counts[g.key]).map(g => `
+      <div class="rpt-section-title" style="font-size:13.5px; margin-top:10px;">${esc(g.label)} <span class="rpt-section-count">${counts[g.key]} item${counts[g.key]===1?'':'s'} · ${lkr(totals[g.key])}</span></div>
+      <table class="rpt-table">
+        <thead><tr><th>Date</th><th>Description</th><th>Paid from</th><th>Notes</th><th class="r">Amount (LKR)</th></tr></thead>
+        <tbody>${rowsBy[g.key]}
+          <tr class="subtotal"><td colspan="4">Subtotal</td><td class="r">${Math.round(totals[g.key]).toLocaleString()}</td></tr>
+        </tbody>
+      </table>`).join('') + (PETTY_GROUPS.filter(g => counts[g.key]).length > 1
+        ? `<table class="rpt-table" style="margin-top:8px;"><tbody><tr class="subtotal"><td>All petty cash spending</td><td class="r">${Math.round(total).toLocaleString()}</td></tr></tbody></table>` : '');
+  const plRows = PETTY_GROUPS.map(g => `<tr class="line"><td class="lbl">${esc(g.pl)}</td>${negCell(totals[g.key])}</tr>`).join('');
+  return { total, totals, html, plRows };
+}
+
 function buildVillaReportHTML(loc, monthDate){
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEndExclusive = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 1);
@@ -4989,35 +5212,25 @@ function buildVillaReportHTML(loc, monthDate){
   const expenses = allCashTxns
     .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
     .sort((a,b)=> a.date.localeCompare(b.date));
-  let pettyTotal = 0, pettyRows = '';
+  const pg = pettyGroupsBlock(expenses);
+  let pettyTotal = pg.total, pettyRows = '';
   const byCard = {};
-  for(const e of expenses){
-    pettyTotal += e.amount;
-    byCard[e.card] = (byCard[e.card] || 0) + e.amount;
-    const links = getInvoiceLinks(e).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(e).length>1?' '+(i+1):''}</a>`).join(' ');
-    const tags = [];
-    if(e.linkedInventory) tags.push('direct purchase');
-    if(e.employeeName) tags.push(`from ${esc(e.employeeName)}'s advance`);
-    pettyRows += `<tr>
-      <td class="dim">${fmtDay(e.date)}</td>
-      <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
-      <td class="dim">${esc(CARD_LABELS[e.card] || e.card || '')}</td>
-      <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
-      <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
-    </tr>`;
-  }
-  const pettyHtml = expenses.length === 0
-    ? '<div class="rpt-empty">No petty cash spending in this period.</div>'
-    : `<table class="rpt-table">
-        <thead><tr><th>Date</th><th>Description</th><th>Paid by</th><th>Notes</th><th class="r">Amount (LKR)</th></tr></thead>
-        <tbody>${pettyRows}
-          <tr class="subtotal"><td colspan="4">Total — ${expenses.length} item${expenses.length===1?'':'s'}</td><td class="r">${Math.round(pettyTotal).toLocaleString()}</td></tr>
-        </tbody>
-      </table>`;
+  const pettyHtml = pg.html;
 
   /* ---- Store supplies received ---- */
   const supplies = buildSuppliesSection(loc, monthStartISO, monthEndISO);
-  const grandTotal = pettyTotal + supplies.total;
+  // Store only holds goods: whatever it sends out is charged to the villa/office that
+  // receives it, so Store's own cost is what it bought minus what it passed on.
+  let chargedOut = 0;
+  if(loc === 'store'){
+    const avg = computeAvgUnitCost();
+    for(const r of allInvTxns){
+      if(r.type !== 'distribute' || r.date < monthStartISO || r.date >= monthEndISO || isDirectPurchaseTransfer(r)) continue;
+      const v = (r.amount !== null && r.amount !== undefined) ? r.amount : (avg[r.item] !== undefined ? r.qty * avg[r.item] : 0);
+      chargedOut += v;
+    }
+  }
+  const grandTotal = pettyTotal + supplies.total - chargedOut;
 
   const cardRows = Object.keys(byCard).map(c =>
     `<tr class="line"><td class="lbl">${esc(CARD_LABELS[c] || c)}</td>${negCell(byCard[c])}</tr>`
@@ -5050,15 +5263,16 @@ function buildVillaReportHTML(loc, monthDate){
         <div class="rpt-section-title">Cost Summary</div>
         <table class="rpt-pl">
           <tbody>
-            <tr class="group"><td>Petty cash, by card</td><td class="amt">LKR</td></tr>
-            ${cardRows || '<tr class="line"><td class="lbl dim">None this period</td><td class="amt">0</td></tr>'}
+            <tr class="group"><td>Petty cash spending</td><td class="amt">LKR</td></tr>
+            ${pg.plRows}
             <tr class="sub"><td>Petty cash total</td>${negCell(pettyTotal)}</tr>
             <tr class="group"><td>Goods received</td><td class="amt"></td></tr>
             <tr class="line"><td class="lbl">Store supplies received</td>${negCell(supplies.total)}</tr>
-            <tr class="grand"><td>Total cost for the period</td>${negCell(grandTotal)}</tr>
+            ${loc === 'store' ? `<tr class="line"><td class="lbl">Less: goods sent to villas/office (charged to them)</td><td class="amt">${Math.round(chargedOut).toLocaleString()}</td></tr>` : ''}
+            <tr class="grand"><td>${loc === 'store' ? 'Net cost kept by Store (stock still on hand)' : 'Total cost for the period'}</td>${negCell(grandTotal)}</tr>
           </tbody>
         </table>
-        <div class="rpt-note">Figures in brackets are amounts spent. "Direct" purchases are items bought straight for this location, bypassing Store.</div>
+        <div class="rpt-note">Figures in brackets are amounts spent. "Direct" purchases are goods bought straight for this location, bypassing Store; they're priced once, here, and not again under Store supplies.</div>
       </div>
     </div>
 
@@ -5393,29 +5607,9 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   const expenses = allCashTxns
     .filter(t => t.type==='expense' && t.for===loc && t.date>=monthStartISO && t.date<monthEndISO)
     .sort((a,b)=> a.date.localeCompare(b.date));
-  let pettyCashTotal = 0, pettyRows = '';
-  for(const e of expenses){
-    pettyCashTotal += e.amount;
-    const links = getInvoiceLinks(e).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(e).length>1?' '+(i+1):''}</a>`).join(' ');
-    const tags = [];
-    if(e.linkedInventory) tags.push('direct purchase');
-    if(e.employeeName) tags.push(`from ${esc(e.employeeName)}'s advance`);
-    pettyRows += `<tr>
-      <td class="dim">${fmtDay(e.date)}</td>
-      <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
-      <td class="dim">${esc(CARD_LABELS[e.card] || e.card || '')}</td>
-      <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
-      <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
-    </tr>`;
-  }
-  const pettyHtml = expenses.length === 0
-    ? '<div class="rpt-empty">No petty cash spending in this period.</div>'
-    : `<table class="rpt-table">
-        <thead><tr><th>Date</th><th>Description</th><th>Paid by</th><th>Notes</th><th class="r">Amount (LKR)</th></tr></thead>
-        <tbody>${pettyRows}
-          <tr class="subtotal"><td colspan="4">Total — ${expenses.length} item${expenses.length===1?'':'s'}</td><td class="r">${Math.round(pettyCashTotal).toLocaleString()}</td></tr>
-        </tbody>
-      </table>`;
+  const pg = pettyGroupsBlock(expenses);
+  let pettyCashTotal = pg.total, pettyRows = '';
+  const pettyHtml = pg.html;
 
   /* ---------------- 3. OPERATING EXPENSES (salary / bills / other) ---------------- */
   const opEx = allOpEx
@@ -5503,7 +5697,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
             <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${Math.round(villaShare).toLocaleString()}</td></tr>
 
             <tr class="group"><td>Expenses</td><td class="amt"></td></tr>
-            <tr class="line"><td class="lbl">Petty cash — day-to-day spending</td>${negCell(pettyCashTotal)}</tr>
+            ${pg.plRows}
             ${plCatRows}
             <tr class="line"><td class="lbl">Store supplies received</td>${negCell(supplies.total)}</tr>
             <tr class="sub"><td>Total expenses</td>${negCell(totalExpenses)}</tr>
@@ -5550,9 +5744,16 @@ async function buildVillaProfitReportHTML(loc, monthDate){
 // Items sent from Store to a villa/office during the period. Priced at whatever was
 // entered on the transfer; where nothing was entered, valued at the item's average
 // purchase cost so the total isn't understated (those lines are marked with *).
+// A direct purchase writes a "distribute" row so the villa's stock goes up — but the
+// money is already in petty cash as that villa's expense. Those rows are not Store
+// transfers and must not be priced again here, or the villa pays for them twice.
+function isDirectPurchaseTransfer(r){
+  if(allCashTxns.some(t => t.linkedDistributeId && String(t.linkedDistributeId) === String(r.id))) return true;
+  return /^Direct purchase via petty cash/i.test(r.note || '');
+}
 function buildSuppliesSection(loc, monthStartISO, monthEndISO){
   const received = allInvTxns
-    .filter(t => t.type==='distribute' && t.toVilla===loc && t.date>=monthStartISO && t.date<monthEndISO)
+    .filter(t => t.type==='distribute' && t.toVilla===loc && t.date>=monthStartISO && t.date<monthEndISO && !isDirectPurchaseTransfer(t))
     .sort((a,b)=> a.date.localeCompare(b.date));
   if(received.length === 0){
     return { total:0, count:0, html:'<div class="rpt-empty">No items received from Store in this period.</div>' };
@@ -5591,13 +5792,18 @@ function renderSharonExpensesSummary(){
   const wrap = document.getElementById('sharonExpensesSummary');
   if(!wrap) return;
   const mine = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy === 'Sharon');
-  const byVilla = { kalava:0, noelia:0, brisa:0 };
-  for(const t of mine){ if(byVilla[t.for] !== undefined) byVilla[t.for] += t.amount; }
+  const byVilla = { kalava:0, noelia:0, brisa:0 }, ownByVilla = { kalava:0, noelia:0, brisa:0 };
+  for(const t of allCashTxns.filter(isSharonCost)){
+    if(byVilla[t.for] === undefined) continue;
+    byVilla[t.for] += t.amount;
+    if(t.card === 'sharon') ownByVilla[t.for] += t.amount;
+  }
   const villaColors = { kalava:'#0c8599', noelia:'#7048e8', brisa:'#e64980' };
   wrap.innerHTML = VR_VILLAS.map(v => `
     <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id]}, ${villaColors[v.id]}cc); cursor:pointer;" data-sharon-villa="${v.id}">
       <div class="cash-card-label">Sharon → ${v.name}</div>
       <div class="cash-card-balance">LKR ${byVilla[v.id].toLocaleString()}</div>
+      <div style="font-size:11px; opacity:0.85; margin-top:4px;">${ownByVilla[v.id] ? 'LKR ' + ownByVilla[v.id].toLocaleString() + ' paid from his own pocket' : 'all from petty cash cards'}</div>
     </div>
   `).join('');
   wrap.querySelectorAll('[data-sharon-villa]').forEach(el=>{
@@ -5606,7 +5812,7 @@ function renderSharonExpensesSummary(){
 }
 
 function openSharonExpenseDetail(villaId){
-  const rows = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy==='Sharon' && t.for===villaId)
+  const rows = allCashTxns.filter(t => isSharonCost(t) && t.for===villaId)
     .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
   document.getElementById('villaDetailTitle').textContent = `Sharon's expenses — ${(VR_VILLAS.find(v=>v.id===villaId)||{}).name || villaId}`;
   let html = '';
@@ -5666,7 +5872,8 @@ function openMyPurchaseModal(onBehalfOf){
   const villaSel = document.getElementById('mpVilla');
   villaSel.innerHTML = VILLAS.filter(v=>['kalava','noelia','brisa'].includes(v.id)).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
   villaSel.value = vrSelectedVilla || 'kalava';
-  document.getElementById('mpCard').value = 'ceymora';
+  const mpWho = mpOnBehalfOf || (currentUser && currentUser.username) || '';
+  document.getElementById('mpCard').value = mpWho === 'Sharon' ? 'sharon' : 'ceymora';
   document.getElementById('mpPurpose').value = '';
   document.getElementById('mpAmount').value = '';
   document.getElementById('mpNote').value = '';
@@ -5683,6 +5890,9 @@ function updateMpCardHint(){
   if(card === 'kalava_card'){
     villaSel.value = 'kalava'; villaSel.disabled = true;
     hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa.';
+  } else if(card === 'sharon'){
+    villaSel.disabled = false;
+    hint.textContent = 'Paid with Sharon\'s own money — charged to the villa, but nothing comes out of petty cash.';
   } else {
     villaSel.disabled = false;
     hint.textContent = 'Ceymora Card can be used for any villa.';
@@ -6727,6 +6937,14 @@ let coMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let coView = 'entry';
 let coDirty = false;
 
+// Months saved before the date fix were keyed on the last day of the previous month
+// (a UTC side effect). Reading them as the 1st of the right month keeps them visible.
+function coNormPeriod(v){
+  const s = String(v || '').slice(0,10);
+  const [y,m,d] = s.split('-').map(Number);
+  if(!y || !m || !d || d === 1) return s;
+  return toISO(new Date(y, m-1, d+1));
+}
 function coPeriodISO(d){ return toISO(new Date(d.getFullYear(), d.getMonth(), 1)); }
 function coPrevPeriodISO(d){ return toISO(new Date(d.getFullYear(), d.getMonth()-1, 1)); }
 function coRowsFor(periodISO, section){
@@ -6746,7 +6964,7 @@ async function fetchCompany(){
     console.error(error);
     return;
   }
-  allCoRows = data.map(r => ({ id:r.id, period:r.period, section:r.section, category:r.category, amount:Number(r.amount)||0 }));
+  allCoRows = data.map(r => ({ id:r.id, period:coNormPeriod(r.period), rawPeriod:String(r.period).slice(0,10), section:r.section, category:r.category, amount:Number(r.amount)||0 }));
   document.getElementById('coEntryStatus').textContent = '';
   if(!coDirty) renderCompany();
 }
@@ -7079,7 +7297,8 @@ async function saveCompanyMonth(){
   try{
     // Replace the whole month in one go — simpler and safer than tracking which
     // individual lines changed, and it keeps deleted lines from lingering.
-    const { error: delErr } = await sb.from('company_monthly_accounts').delete().eq('period', p);
+    const oldKeys = [...new Set(allCoRows.filter(r => r.period === p).map(r => r.rawPeriod))];
+    const { error: delErr } = await sb.from('company_monthly_accounts').delete().in('period', [p, ...oldKeys]);
     if(delErr) throw delErr;
     if(rows.length){
       const { error: insErr } = await sb.from('company_monthly_accounts').insert(rows);
