@@ -253,6 +253,8 @@
   .cash-card.kalava{ background:linear-gradient(135deg, var(--kalava), #075c69); }
   .cash-card-label{ font-size:12px; opacity:0.8; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
   .cash-card-balance{ font-family:'Kalam',cursive; font-size:26px; margin-top:4px; }
+  .cash-card-sub{ font-size:11px; opacity:0.9; margin-top:4px; line-height:1.5; }
+  .cash-card-sub b{ font-weight:700; }
   .toolbar-actions{ display:flex; gap:8px; flex-wrap:wrap; }
   .txn-row{
     display:flex; align-items:center; gap:10px; font-size:12.5px;
@@ -895,10 +897,12 @@
         <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
           <div class="cash-card-label">Direct Villa Purchases — via Kalava Card</div>
           <div class="cash-card-balance" id="directPurchasesKalava">LKR 0</div>
+          <div class="cash-card-sub" id="directKalavaSub"></div>
         </div>
         <div class="cash-card" id="directPurchasesCeymoraCard" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91); cursor:pointer;" title="Click to see which transactions make up this total">
           <div class="cash-card-label">Direct Villa Purchases — via Ceymora Card</div>
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
+          <div class="cash-card-sub" id="directCeymoraSub"></div>
         </div>
       </div>
       <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the real money left on each card: top-ups and returned cash in, advances and card-paid bills out. "Direct" = bought straight for a villa (bypassing Store) — already inside the card balances, shown separately so you can see how much went to villas directly.</div>
@@ -3971,6 +3975,13 @@ function cardEffect(t){
   if(t.type === 'expense') return t.employeeName ? 0 : -t.amount;
   return 0;
 }
+// Which petty cash card a direct villa purchase was paid from — including one paid out
+// of a staff advance (the bill keeps the advance's card). Sharon's own-pocket buys are
+// reported under "Bought by Sharon" instead.
+function directCardOf(t){
+  if(!isDirectCost(t) || isSharonCost(t)) return null;
+  return (t.card === 'ceymora' || t.card === 'kalava_card') ? t.card : null;
+}
 function isSharonCost(t){ return t.type === 'expense' && (t.purchasedBy === 'Sharon' || t.card === 'sharon'); }
 
 // A "direct cost" is money spent straight on a villa rather than out of the shared
@@ -4209,7 +4220,8 @@ function renderCashMonth(){
     byFor[t.for] = (byFor[t.for] || 0) + t.amount;
     const key = t.employeeName ? 'advance'
       : t.card === 'sharon' ? 'sharon'
-      : (isDirectCost(t) && t.card === 'ceymora') ? 'direct_ceymora'
+      : directCardOf(t) === 'ceymora' ? 'direct_ceymora'
+      : directCardOf(t) === 'kalava_card' ? 'direct_kalava'
       : t.card;
     byCard[key] = (byCard[key] || 0) + t.amount;
   }
@@ -4236,7 +4248,7 @@ function renderCashMonth(){
   const forRows = Object.keys(byFor).sort((a,b)=> byFor[b]-byFor[a])
     .map(k=>`<tr><td>${esc(FOR_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byFor[k]).toLocaleString()}</td><td class="r dim">${pct(byFor[k], spent)}</td></tr>`).join('');
   const cardRows = Object.keys(byCard).sort((a,b)=> byCard[b]-byCard[a])
-    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchase (via Ceymora Card)' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
+    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchases — Ceymora Card' : k==='direct_kalava' ? 'Direct villa purchases — Kalava Villa Card' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
 
   document.getElementById('cashMonthBreakdown').innerHTML = (spent === 0 && advanced === 0)
     ? ''
@@ -4259,11 +4271,11 @@ function renderCash(){
   for(const t of allCashTxns){
     if(t.card === 'ceymora') ceymoraBal += cardEffect(t);
     else if(t.card === 'kalava_card') kalavaBal += cardEffect(t);
-    if(isDirectCost(t) && !t.employeeName){
-      if(t.card === 'kalava_card') directKalava += t.amount;
-      else if(t.card === 'ceymora') directCeymora += t.amount;
-    }
+    const dc = directCardOf(t);
+    if(dc === 'kalava_card') directKalava += t.amount;
+    else if(dc === 'ceymora') directCeymora += t.amount;
   }
+  renderDirectCardSubs();
   document.getElementById('ceymoraBalance').textContent = 'LKR ' + ceymoraBal.toLocaleString();
   document.getElementById('kalavaCardBalance').textContent = 'LKR ' + kalavaBal.toLocaleString();
   document.getElementById('directPurchasesKalava').textContent = 'LKR ' + directKalava.toLocaleString();
@@ -5435,18 +5447,21 @@ function computeAvgUnitCost(){
      direct — goods bought straight for this villa (bypassing Store)
      sharon — bought by Sharon (from a card or from his own pocket)                  */
 const PETTY_GROUPS = [
-  { key:'staff',  label:'Petty cash — Zahny & staff day-to-day', pl:'Petty cash — day-to-day (Zahny & staff)' },
-  { key:'direct', label:'Direct purchases for this location',    pl:'Direct purchases (bypassing Store)' },
-  { key:'sharon', label:'Bought by Sharon',                      pl:'Bought by Sharon' },
+  { key:'staff',          label:'Petty cash — Zahny & staff day-to-day',        pl:'Petty cash — day-to-day (Zahny & staff)', always:true },
+  { key:'direct_ceymora', label:'Petty cash — direct purchases, Ceymora Card',   pl:'Petty cash — direct purchases (Ceymora Card)' },
+  { key:'direct_kalava',  label:'Petty cash — direct purchases, Kalava Villa Card', pl:'Petty cash — direct purchases (Kalava Villa Card)' },
+  { key:'sharon',         label:'Bought by Sharon',                             pl:'Bought by Sharon', always:true },
 ];
 function pettyGroupOf(e){
   if(isSharonCost(e)) return 'sharon';
-  if(isDirectCost(e)) return 'direct';
+  const dc = directCardOf(e);
+  if(dc === 'ceymora') return 'direct_ceymora';
+  if(dc === 'kalava_card') return 'direct_kalava';
   return 'staff';
 }
 function pettyGroupsBlock(expenses){
-  const totals = { staff:0, direct:0, sharon:0 }, counts = { staff:0, direct:0, sharon:0 };
-  const rowsBy = { staff:'', direct:'', sharon:'' };
+  const totals = {}, counts = {}, rowsBy = {};
+  PETTY_GROUPS.forEach(g => { totals[g.key] = 0; counts[g.key] = 0; rowsBy[g.key] = ''; });
   for(const e of expenses){
     const g = pettyGroupOf(e);
     totals[g] += e.amount; counts[g]++;
@@ -5466,7 +5481,7 @@ function pettyGroupsBlock(expenses){
       <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
     </tr>`;
   }
-  const total = totals.staff + totals.direct + totals.sharon;
+  const total = PETTY_GROUPS.reduce((sum,g)=> sum + totals[g.key], 0);
   const html = expenses.length === 0
     ? '<div class="rpt-empty">No petty cash spending in this period.</div>'
     : PETTY_GROUPS.filter(g => counts[g.key]).map(g => `
@@ -5478,7 +5493,7 @@ function pettyGroupsBlock(expenses){
         </tbody>
       </table>`).join('') + (PETTY_GROUPS.filter(g => counts[g.key]).length > 1
         ? `<table class="rpt-table" style="margin-top:8px;"><tbody><tr class="subtotal"><td>All petty cash spending</td><td class="r">${Math.round(total).toLocaleString()}</td></tr></tbody></table>` : '');
-  const plRows = PETTY_GROUPS.map(g => `<tr class="line"><td class="lbl">${esc(g.pl)}</td>${negCell(totals[g.key])}</tr>`).join('');
+  const plRows = PETTY_GROUPS.filter(g => g.always || totals[g.key]).map(g => `<tr class="line"><td class="lbl">${esc(g.pl)}</td>${negCell(totals[g.key])}</tr>`).join('');
   return { total, totals, html, plRows };
 }
 
@@ -5574,11 +5589,28 @@ function buildVillaReportHTML(loc, monthDate){
   `;
 }
 
+function renderDirectCardSubs(){
+  const { start, end } = monthRangeLocal(cashMonthDate);
+  const mLabel = cashMonthDate.toLocaleDateString('en-GB', { month:'short' });
+  [['ceymora','directCeymoraSub'], ['kalava_card','directKalavaSub']].forEach(([card, id])=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const rows = allCashTxns.filter(t => directCardOf(t) === card);
+    const byVilla = {}; let month = 0;
+    rows.forEach(t=>{
+      byVilla[t.for] = (byVilla[t.for] || 0) + t.amount;
+      if(t.date >= start && t.date < end) month += t.amount;
+    });
+    const villas = Object.keys(byVilla).sort((a,b)=> byVilla[b] - byVilla[a]);
+    el.innerHTML = `${cashShowAll ? '' : `<b>${esc(mLabel)}: LKR ${Math.round(month).toLocaleString()}</b><br>`}`
+      + (villas.length ? villas.map(v => `${esc(FOR_LABELS[v] || v)} LKR ${Math.round(byVilla[v]).toLocaleString()}`).join(' · ') : 'None yet')
+      + ' · all-time';
+  });
+}
 function openDirectPurchasesDetail(card){
   const cardLabel = CARD_LABELS[card] || card;
-  const rows = allCashTxns.filter(t =>
-    isDirectCost(t) && t.card === card && !t.employeeName
-  ).sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const rows = allCashTxns.filter(t => directCardOf(t) === card)
+    .sort((a,b)=> (a.for||'').localeCompare(b.for||'') || (b.date||'').localeCompare(a.date||''));
 
   document.getElementById('villaDetailTitle').textContent = `Direct Villa Purchases — via ${cardLabel}`;
 
@@ -5588,19 +5620,26 @@ function openDirectPurchasesDetail(card){
   } else {
     let total = 0;
     html = '<div class="manage-list" style="margin-top:6px;">';
+    let curVilla = null, villaTotal = 0;
+    const villaTotals = {};
+    rows.forEach(t => villaTotals[t.for] = (villaTotals[t.for] || 0) + t.amount);
     for(const t of rows){
       total += t.amount;
+      if(t.for !== curVilla){
+        curVilla = t.for;
+        html += `<div style="font-weight:700; font-size:12.5px; margin:8px 0 2px; display:flex; justify-content:space-between;"><span>${esc(FOR_LABELS[t.for] || t.for)}</span><span>LKR ${Math.round(villaTotals[t.for]).toLocaleString()}</span></div>`;
+      }
       const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
       html += `<div class="txn-row">
         <span class="txn-badge expense">expense</span>
         <span class="txn-main">
           <div class="txn-title">${t.purpose || 'Expense'} <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>${links ? ' '+links : ''}</div>
-          <div class="txn-sub">${t.date}${t.note ? ' · '+t.note : ''}</div>
+          <div class="txn-sub">${t.date}${t.employeeName ? ' · paid out of ' + esc(t.employeeName) + "'s advance" : ''}${t.note ? ' · '+t.note : ''}</div>
         </span>
         <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
       </div>`;
     }
-    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${total.toLocaleString()}</div>`;
+    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total, all villas: LKR ${total.toLocaleString()}</div>`;
   }
   document.getElementById('villaDetailBody').innerHTML = html;
   document.getElementById('villaDetailModalOverlay').classList.add('open');
