@@ -719,6 +719,10 @@
   .adv-chip.ok{ background:var(--green-bg); color:var(--green); }
   .adv-chip.bad{ background:var(--red-bg); color:var(--red); }
   .adv-chip.wait{ background:var(--amber-bg); color:#a06800; }
+  .adv-undo-btn{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; background:var(--red); color:#fff; border:none; border-radius:7px; padding:6px 11px; cursor:pointer; flex-shrink:0; }
+  .adv-undo-btn:hover{ filter:brightness(0.92); }
+  .adv-undo-btn:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  @media print{ .adv-undo-btn{ display:none !important; } }
   @media (max-width:720px){
     .acct-flow .src{ min-width:45%; border-bottom:1px solid var(--board-line); }
     .pay-table .hide-sm{ display:none; }
@@ -2356,8 +2360,9 @@ let currentUser = null; // { username, role }
 function canEdit(){
   return currentUser && (currentUser.role === 'admin' || currentUser.role === 'cash_inventory' || currentUser.role === 'cash_inventory_bookings');
 }
+const APP_VERSION = 'v2026.09.22-e';
 function isAdmin(){
-  return currentUser && currentUser.role === 'admin';
+  return !!currentUser && String(currentUser.role || '').trim().toLowerCase() === 'admin';
 }
 
 async function logActivity(action, tableName, description){
@@ -2523,7 +2528,8 @@ function applyRolePermissions(){
     viewer_villa_select: 'All villas — view only',
     viewer_villa_fixed: 'View only',
   };
-  badge.textContent = `${currentUser.username} (${roleLabels[role] || role})`;
+  badge.textContent = `${currentUser.username} (${roleLabels[role] || role}) · ${APP_VERSION}`;
+  badge.title = 'App version ' + APP_VERSION + ' — if this is missing, the browser is still using an old copy of the page.';
 
   const logoutBtn = document.createElement('button');
   logoutBtn.textContent = 'Log out';
@@ -4372,6 +4378,15 @@ function renderCash(){
       });
       actionTd.appendChild(editBtn);
     }
+    if(isAdvanceParent(t) && t.settled){
+      const ub = document.createElement('button');
+      ub.className = 'adv-undo-btn'; ub.style.marginRight = '4px';
+      ub.textContent = isAdmin() ? (t.undoRequestedBy ? '↩ Approve undo' : '↩ Undo') : '↩ Request undo';
+      if(isAdmin() || (canEdit() && !t.undoRequestedBy)){
+        ub.addEventListener('click', ()=> isAdmin() ? advApproveUndo(t) : advRequestUndo(t));
+        actionTd.appendChild(ub);
+      }
+    }
     const delBtn = document.createElement('button');
     delBtn.className = 'manage-del';
     delBtn.textContent = 'Delete';
@@ -4948,9 +4963,9 @@ function renderAdvStatus(){
       head += `<br><b>Undo requested by ${esc(adv.undoRequestedBy)}</b>${adv.undoReason ? ' — “' + esc(adv.undoReason) + '”' : ''}. ${isAdmin() ? 'Waiting for your approval.' : 'Waiting for Makky to approve.'}`;
       if(isAdmin()) actions = `<button type="button" class="btn btn-save" data-adv-act="approve">Approve undo</button> <button type="button" class="btn btn-cancel" data-adv-act="reject">Reject</button>`;
     } else if(isAdmin()){
-      actions = `<button type="button" class="btn btn-delete" data-adv-act="undo">Undo settlement</button>`;
+      actions = `<button type="button" class="adv-undo-btn" data-adv-act="undo">↩ Undo settlement</button>`;
     } else if(canEdit()){
-      actions = `<button type="button" class="btn btn-delete" data-adv-act="request">Request undo</button>`;
+      actions = `<button type="button" class="adv-undo-btn" data-adv-act="request">↩ Request undo</button>`;
     }
   }
   wrap.innerHTML = `<div class="adv-status ${cls}">${head}${actions ? `<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">${actions}</div>` : ''}${advLogHTML(adv.settleLog)}</div>`;
@@ -5183,13 +5198,13 @@ function renderSettledAdvances(){
     view.addEventListener('click', ()=> openAdvanceModal(t));
     row.appendChild(view);
     if(isAdmin() && t.undoRequestedBy){
-      const ap = document.createElement('button'); ap.className = 'manage-edit'; ap.textContent = 'Approve undo';
+      const ap = document.createElement('button'); ap.className = 'adv-undo-btn'; ap.textContent = '↩ Approve undo';
       ap.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(ap);
     } else if(isAdmin()){
-      const un = document.createElement('button'); un.className = 'manage-del'; un.textContent = 'Undo';
+      const un = document.createElement('button'); un.className = 'adv-undo-btn'; un.textContent = '↩ Undo settlement';
       un.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(un);
     } else if(canEdit() && !t.undoRequestedBy){
-      const rq = document.createElement('button'); rq.className = 'manage-del'; rq.textContent = 'Request undo';
+      const rq = document.createElement('button'); rq.className = 'adv-undo-btn'; rq.textContent = '↩ Request undo';
       rq.addEventListener('click', ()=> advRequestUndo(t)); row.appendChild(rq);
     }
     wrap.appendChild(row);
