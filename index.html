@@ -708,6 +708,15 @@
   .pay-paid{ font-size:11px; font-weight:700; color:var(--green); }
   .pay-unpaid{ font-size:11px; font-weight:700; color:#a06800; }
   .pay-inactive td{ opacity:.55; }
+  .adv-status{ margin-top:12px; border:1px solid var(--board-line); border-radius:9px; padding:9px 12px; font-size:12px; background:#fff; }
+  .adv-status.ok{ border-color:var(--green); background:var(--green-bg); }
+  .adv-status.warn{ border-color:var(--amber); background:var(--amber-bg); }
+  .adv-status.bad{ border-color:var(--red); background:var(--red-bg); }
+  .adv-status .log{ margin-top:6px; color:var(--muted); font-size:11px; line-height:1.55; }
+  .adv-chip{ display:inline-block; font-size:10.5px; font-weight:700; padding:1px 8px; border-radius:20px; white-space:nowrap; }
+  .adv-chip.ok{ background:var(--green-bg); color:var(--green); }
+  .adv-chip.bad{ background:var(--red-bg); color:var(--red); }
+  .adv-chip.wait{ background:var(--amber-bg); color:#a06800; }
   @media (max-width:720px){
     .acct-flow .src{ min-width:45%; border-bottom:1px solid var(--board-line); }
     .pay-table .hide-sm{ display:none; }
@@ -896,7 +905,7 @@
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div class="manage-title">Staff advance balances</div>
-        <div class="field-hint" style="margin:2px 0 8px;">How much cash each person is currently holding: advances given, minus bills they've submitted against it. Give someone an advance with "+ Give advance" below — then when you record their bills, pick their name under "Funded from a staff advance?" so it comes off their balance here instead of the card again.</div>
+        <div class="field-hint" style="margin:2px 0 8px;">How much cash each person is still holding: advances given, minus bills recorded and cash handed back. Ticking an advance as settled doesn't change this — only recorded bills and returned cash do, so a balance here means money not yet accounted for.</div>
         <div id="advanceWalletsSummary" class="cash-summary"></div>
       </div>
 
@@ -918,9 +927,23 @@
       </div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div id="undoRequestsSection" style="display:none; margin-bottom:14px;">
+          <div class="manage-title">Undo requests waiting for approval</div>
+          <div class="field-hint" style="margin:2px 0 8px;">Someone asked to reopen a settled advance. Nothing changes until it's approved here.</div>
+          <div id="undoRequestsList" class="manage-list"></div>
+        </div>
         <div class="manage-title">Advances to staff</div>
-        <div class="field-hint" style="margin:2px 0 8px;">Money handed to someone (e.g. from the Ceymora Card) that they still need to settle — with receipts, or by returning what's unused. Once you mark it settled it drops off this list, but stays in Transactions below for the record.</div>
+        <div class="field-hint" style="margin:2px 0 8px;">Money handed to someone that they still need to account for. Open one with “Settle / Edit”, record each bill it paid for and any cash handed back — it can only be settled when those add up to the advance. It then moves to Settled advances below.</div>
         <div id="advancesList" class="manage-list"></div>
+      </div>
+
+      <div class="manage-section" id="settledAdvancesSection">
+        <div class="manage-header">
+          <span class="manage-title">Settled advances</span>
+          <select id="settledFilter" class="acct-select" style="max-width:200px;"></select>
+        </div>
+        <div class="field-hint" style="margin:2px 0 8px;">Every advance that's been closed — who settled it, the bills it paid for and the cash that came back. To reopen one, request an undo; Makky approves it.</div>
+        <div id="settledAdvancesList" class="manage-list" style="max-height:380px;"></div>
       </div>
 
       <div class="manage-section">
@@ -1625,11 +1648,16 @@
       <div id="advBillsList"></div>
       <button type="button" class="rpt-quick" id="advAddBill">+ Record a bill paid from this advance</button>
       <div id="advLegacyBills"></div>
-      <label>Unused cash handed back (LKR)</label>
-      <input type="number" id="advReturned" min="0" step="1" placeholder="0">
+      <div class="frm-row">
+        <div><label>Unused cash he handed back (LKR)</label>
+        <input type="number" id="advReturned" min="0" step="1" placeholder="0"></div>
+        <div><label>Extra paid to him to cover bills (LKR)</label>
+        <input type="number" id="advPaidOut" min="0" step="1" placeholder="0"></div>
+      </div>
       <div class="quote-box" id="advRecon"></div>
     </div>
-    <div class="modal-checkbox-row">
+    <div id="advSettledStatus"></div>
+    <div class="modal-checkbox-row" id="advSettledRow">
       <input type="checkbox" id="advSettled">
       <label for="advSettled">Settled (receipts submitted / unused cash returned)</label>
     </div>
@@ -2073,7 +2101,7 @@ function rowToBooking(r){ return {
   retainedAmount: r.retained_amount !== null && r.retained_amount !== undefined ? Number(r.retained_amount) : 0,
   refundedAmount: r.refunded_amount !== null && r.refunded_amount !== undefined ? Number(r.refunded_amount) : 0,
 }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -3994,6 +4022,9 @@ function renderAdvanceWallets(){
   for(const name of names){
     const w = wallets[name] || { given:0, spent:0, balance:0 };
     const defaultInfo = ADVANCE_WALLET_DEFAULTS.find(d=>d.name===name);
+    const gap = allCashTxns.filter(t => isAdvanceParent(t) && t.settled && t.employeeName === name)
+      .reduce((sum,t)=> sum + advFigures(t).left, 0);
+    const openCount = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name).length;
     const card = document.createElement('div');
     card.className = 'cash-card';
     card.style.background = w.balance < 0
@@ -4003,7 +4034,17 @@ function renderAdvanceWallets(){
       <div class="cash-card-label">${defaultInfo ? defaultInfo.label : name}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
+      ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} from ${openCount ? 'a settled' : 'settled'} advance${openCount ? '' : '(s)'} never billed — click to see</div>` : ''}
     `;
+    if(Math.abs(gap) >= 1){
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', ()=>{
+        const sel = document.getElementById('settledFilter');
+        renderSettledAdvances();
+        sel.value = name; renderSettledAdvances();
+        document.getElementById('settledAdvancesSection').scrollIntoView({ behavior:'smooth', block:'start' });
+      });
+    }
     wrap.appendChild(card);
   }
 }
@@ -4263,6 +4304,8 @@ function renderCash(){
       details = `Unused cash returned — ${esc(t.employeeName || '')}` + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     } else if(t.type === 'income'){
       details = 'Money received' + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
+    } else if(t.type === 'advance' && t.advanceId){
+      details = `Extra paid to ${esc(t.employeeName || '')} to cover bills` + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     } else if(t.type === 'advance'){
       const statusSpan = t.settled
         ? '<span style="color:var(--green); font-size:11px; font-weight:600;">(settled)</span>'
@@ -4308,6 +4351,11 @@ function renderCash(){
     delBtn.className = 'manage-del';
     delBtn.textContent = 'Delete';
     delBtn.addEventListener('click', async ()=>{
+      const parentAdv = (t.advanceId && allCashTxns.find(a => String(a.id) === String(t.advanceId))) || (t.type === 'advance' ? t : null);
+      if(!isAdmin() && parentAdv && parentAdv.settled){
+        alert('This line belongs to a settled advance, so only Makky can delete it. Request an undo first if it\'s wrong.');
+        return;
+      }
       if(!checkDeletePassword()) return;
       if(confirm('Delete this transaction?')){
         try{
@@ -4332,45 +4380,6 @@ function renderCash(){
   table.appendChild(tfoot);
   list.appendChild(table);
   renderAdvances();
-}
-
-function renderAdvances(){
-  const wrap = document.getElementById('advancesList');
-  if(!wrap) return;
-  const outstanding = allCashTxns
-    .filter(t => t.type === 'advance' && !t.settled)
-    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-  if(outstanding.length === 0){
-    wrap.innerHTML = '<div class="manage-empty">No outstanding advances.</div>';
-    return;
-  }
-  wrap.innerHTML = '';
-  for(const t of outstanding){
-    const row = document.createElement('div');
-    row.className = 'manage-row';
-    row.innerHTML = `
-      <span class="manage-type-dot" style="background:var(--amber);"></span>
-      <span class="manage-guest">${t.employeeName || 'Unknown'} <span style="color:var(--muted); font-weight:400;">— ${CARD_LABELS[t.card]||t.card}</span></span>
-      <span class="manage-dates">${t.date}${t.note ? ' · '+t.note : ''} · LKR ${t.amount.toLocaleString()}${getInvoiceLinks(t).length ? ' · 📎 '+getInvoiceLinks(t).length : ''}
-        · bills LKR ${Math.round(advBillsFor(t).reduce((s,b)=>s+b.amount,0)).toLocaleString()}
-        · <b>LKR ${Math.round(t.amount - advBillsFor(t).reduce((s,b)=>s+b.amount,0) - ((advReturnRow(t)||{}).amount||0)).toLocaleString()} still to account for</b></span>
-    `;
-    getInvoiceLinks(t).forEach((u,i)=>{
-      const a = document.createElement('a');
-      a.href = u; a.target = '_blank'; a.className = 'manage-invoice';
-      a.textContent = `📎 ${i+1}`; a.title = 'Invoice attached when this advance was given';
-      row.appendChild(a);
-    });
-    if(canEdit()){
-      const editBtn = document.createElement('button');
-      editBtn.className = 'manage-edit';
-      editBtn.textContent = 'Settle / Edit';
-      editBtn.style.marginRight = '4px';
-      editBtn.addEventListener('click', ()=> openAdvanceModal(t));
-      row.appendChild(editBtn);
-    }
-    wrap.appendChild(row);
-  }
 }
 
 let editingCashId = null;
@@ -4469,8 +4478,17 @@ function applyDirectExpenseUI(){
 }
 
 let expLinkAdvanceId = null, expReturnToAdvance = null;
+function billLockedBySettledAdvance(t){
+  if(!t || !t.advanceId || isAdmin()) return false;
+  const parent = allCashTxns.find(a => String(a.id) === String(t.advanceId));
+  return !!(parent && parent.settled);
+}
 function openExpenseModal(record, forceDirect, opts){
   opts = opts || {};
+  if(billLockedBySettledAdvance(record)){
+    alert(`This bill belongs to ${record.employeeName || 'a staff'}'s settled advance, so it's locked.\n\nTo change it, request an undo on that advance (Petty Cash → Settled advances) — Makky approves it.`);
+    return;
+  }
   editingCashId = record ? record.id : null;
   expLinkAdvanceId = opts.advanceId != null ? String(opts.advanceId) : (record && record.advanceId) || null;
   expReturnToAdvance = opts.returnToAdvance != null ? opts.returnToAdvance : null;
@@ -4676,142 +4694,14 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
 
-function openAdvanceModal(record){
-  editingCashId = record ? record.id : null;
-  try{
-    // Suggest names from staff + system users so it's a quick pick, but still free text.
-    const dl = document.getElementById('staffNameList');
-    const names = new Set([...STAFF.map(s=>s.name), ...Object.keys(USERS)]);
-    dl.innerHTML = [...names].map(n=>`<option value="${n}">`).join('');
-
-    document.getElementById('advDate').value = record ? record.date : todayISO();
-    document.getElementById('advEmployee').value = record ? (record.employeeName || '') : '';
-    document.getElementById('advCard').value = record ? record.card : 'ceymora';
-    document.getElementById('advAmount').value = record ? record.amount : '';
-    document.getElementById('advNote').value = record ? (record.note || '') : '';
-    document.getElementById('advSettled').checked = record ? !!record.settled : false;
-    document.getElementById('advSettledNoteWrap').style.display = (record && record.settled) ? '' : 'none';
-    document.getElementById('advSettledNote').value = record ? (record.settledNote || '') : '';
-    advFileHandler.reset();
-    advSettledFileHandler.reset();
-    const advExisting = record ? getInvoiceLinks(record) : [];
-    const setExisting = record ? (record.settledInvoiceUrls || []) : [];
-    document.getElementById('advFileHint').innerHTML = advExisting.length
-      ? `${advExisting.length} file(s) already attached: ` + advExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ')
-      : '';
-    document.getElementById('advSettledFileHint').innerHTML = setExisting.length
-      ? `${setExisting.length} settlement bill(s) attached: ` + setExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ')
-      : '';
-    document.getElementById('advError').style.display = 'none';
-    document.getElementById('advDeleteBtn').style.display = record ? '' : 'none';
-    document.querySelector('#advanceModalOverlay h3').textContent = record ? (record.settled ? 'Settled advance' : 'Settle / edit advance') : 'Give advance';
-    advPanelRecord = record || null;
-    document.getElementById('advReturned').dataset.touched = '';
-    renderAdvSettlePanel();
-    document.getElementById('advanceModalOverlay').classList.add('open');
-  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
-}
-document.getElementById('advCancel').addEventListener('click', ()=> document.getElementById('advanceModalOverlay').classList.remove('open'));
-document.getElementById('advanceModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='advanceModalOverlay') e.currentTarget.classList.remove('open'); });
-document.getElementById('advSave').addEventListener('click', async ()=>{
-  const errEl = document.getElementById('advError');
-  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
-  const date = document.getElementById('advDate').value;
-  const employeeName = document.getElementById('advEmployee').value.trim();
-  const card = document.getElementById('advCard').value;
-  const amount = parseFloat(document.getElementById('advAmount').value);
-  const note = document.getElementById('advNote').value.trim();
-  const settled = document.getElementById('advSettled').checked;
-  const settledNote = document.getElementById('advSettledNote').value.trim();
-  if(!date || !employeeName || !amount || amount <= 0){ errEl.textContent='Enter a date, employee name, and a valid amount.'; errEl.style.display='block'; return; }
-
-  // Keep the original settled_date if this was already settled before this edit;
-  // only stamp today's date the moment it's newly marked settled.
-  const original = editingCashId ? allCashTxns.find(t=>t.id===editingCashId) : null;
-  const settledDate = settled ? ((original && original.settled && original.settledDate) ? original.settledDate : todayISO()) : null;
-  const returnedAmt = original ? (parseFloat(document.getElementById('advReturned').value) || 0) : 0;
-  if(original && settled && !original.settled){
-    const billed = advBillsFor(original).reduce((sum,b)=> sum + b.amount, 0);
-    const diff = Math.round((amount - billed - returnedAmt) * 100) / 100;
-    if(billed === 0 && returnedAmt === 0){
-      if(!confirm(`No bills are recorded against this advance and no cash was returned.\n\nIf you settle it like this, the LKR ${amount.toLocaleString()} won't be charged to any villa. Record the bills first with “+ Record a bill paid from this advance”.\n\nSettle anyway?`)) return;
-    } else if(Math.abs(diff) >= 1){
-      const msg = diff > 0
-        ? `LKR ${diff.toLocaleString()} of this advance isn't covered by bills or returned cash — it stays on ${employeeName}'s balance as money still owed.`
-        : `Bills are LKR ${Math.abs(diff).toLocaleString()} more than the advance — ${employeeName}'s balance goes negative (the company owes them that).`;
-      if(!confirm(msg + '\n\nSettle anyway?')) return;
-    }
-  }
-
-  const payload = {
-    type:'advance', date, card, employee_name: employeeName, amount, note,
-    settled, settled_date: settledDate, settled_note: settled ? (settledNote || null) : null,
-  };
-
-  const advSaveBtn = document.getElementById('advSave');
-  advSaveBtn.disabled = true;
-  try{
-    // The advance voucher and the settlement bills are kept in two separate lists
-    // so you can always tell what was handed over from what came back.
-    const newAdvFiles = advFileHandler.getFiles();
-    const newSetFiles = advSettledFileHandler.getFiles();
-    if(newAdvFiles.length){
-      const urls = [];
-      for(const f of newAdvFiles) urls.push(await uploadReceiptFile(f));
-      payload.invoice_urls = [...(original ? getInvoiceLinks(original) : []), ...urls];
-    }
-    if(newSetFiles.length){
-      const urls = [];
-      for(const f of newSetFiles) urls.push(await uploadReceiptFile(f));
-      payload.settled_invoice_urls = [...((original && original.settledInvoiceUrls) || []), ...urls];
-    }
-    if(editingCashId){
-      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
-      if(error) throw error;
-      // Unused cash handed back goes onto the card it came from, as its own line.
-      const retRow = advReturnRow(original);
-      if(returnedAmt > 0){
-        const retPayload = { type:'income', date: settledDate || todayISO(), card, amount: returnedAmt,
-          employee_name: employeeName, advance_id: String(editingCashId),
-          note: `Unused cash returned from ${employeeName}'s advance of ${date}` };
-        const { error: rErr } = retRow
-          ? await sb.from('petty_cash_transactions').update(retPayload).eq('id', retRow.id)
-          : await sb.from('petty_cash_transactions').insert(retPayload);
-        if(rErr) throw rErr;
-      } else if(retRow){
-        const { error: rErr } = await sb.from('petty_cash_transactions').delete().eq('id', retRow.id);
-        if(rErr) throw rErr;
-      }
-      logActivity('update', 'petty_cash_transactions', `${settled && !(original&&original.settled) ? 'Settled' : 'Edited'} advance: ${employeeName} — LKR ${amount.toLocaleString()}${returnedAmt ? ` (LKR ${returnedAmt.toLocaleString()} returned)` : ''}`);
-    } else {
-      const { error } = await sb.from('petty_cash_transactions').insert(payload);
-      if(error) throw error;
-      logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${CARD_LABELS[card]}`);
-    }
-    document.getElementById('advanceModalOverlay').classList.remove('open');
-  }catch(e){
-    errEl.textContent = 'Save failed — ' + (e.message || 'check connection.');
-    errEl.style.display='block'; console.error(e);
-  }finally{ advSaveBtn.disabled = false; }
-});
-document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
-  if(!editingCashId) return;
-  if(!checkDeletePassword()) return;
-  if(confirm('Delete this advance record?')){
-    try{
-      const adv = allCashTxns.find(t => t.id === editingCashId);
-      const ret = adv ? advReturnRow(adv) : null;
-      if(ret) await sb.from('petty_cash_transactions').delete().eq('id', ret.id);
-      await sb.from('petty_cash_transactions').update({ advance_id: null }).eq('advance_id', String(editingCashId));
-      await sb.from('petty_cash_transactions').delete().eq('id', editingCashId);
-      logActivity('delete', 'petty_cash_transactions', 'Deleted an advance record');
-      document.getElementById('advanceModalOverlay').classList.remove('open');
-    }catch(e){ console.error(e); }
-  }
-});
-
-/* ---- Settling an advance: bills in, unused cash back, nothing left floating ---- */
+/* ============================================================================
+   STAFF ADVANCES — give → record bills → settle → (undo only with approval)
+   A person's balance is always: advances given − bills recorded − cash returned.
+   Ticking "settled" never changes that by itself, so an advance can only be
+   settled once its bills and returned cash add up to exactly what was given.
+   ============================================================================ */
 let advPanelRecord = null;
+function isAdvanceParent(t){ return t.type === 'advance' && !t.advanceId; }
 function advBillsFor(adv){
   return allCashTxns.filter(t => t.type === 'expense' && t.advanceId && String(t.advanceId) === String(adv.id))
     .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
@@ -4820,24 +4710,99 @@ function advReturnRow(adv){
   if(!adv) return null;
   return allCashTxns.find(t => t.type === 'income' && t.advanceId && String(t.advanceId) === String(adv.id)) || null;
 }
+// Extra cash handed to the person when their bills came to more than the advance.
+function advTopUpRow(adv){
+  if(!adv) return null;
+  return allCashTxns.find(t => t.type === 'advance' && t.advanceId && String(t.advanceId) === String(adv.id)) || null;
+}
 function advUnlinkedBills(adv){
   return allCashTxns.filter(t => t.type === 'expense' && t.employeeName === adv.employeeName && !t.advanceId);
 }
 function oldestOpenAdvanceFor(name){
-  return allCashTxns.filter(t => t.type === 'advance' && !t.settled && t.employeeName === name)
+  return allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name)
     .sort((a,b)=> (a.date||'').localeCompare(b.date||''))[0] || null;
 }
+function advFigures(adv){
+  const billed = advBillsFor(adv).reduce((s,b)=> s + b.amount, 0);
+  const ret = advReturnRow(adv), top = advTopUpRow(adv);
+  const returned = ret ? ret.amount : 0, paidOut = top ? top.amount : 0;
+  const left = Math.round((adv.amount + paidOut - billed - returned) * 100) / 100;
+  return { billed, returned, paidOut, left };
+}
+function advStamp(text){ return { text, by: currentUser ? currentUser.username : '', at: new Date().toISOString() }; }
+function advLogHTML(log){
+  if(!log || !log.length) return '';
+  return '<div class="log">' + log.map(e => {
+    const when = e.at ? new Date(e.at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    return `${esc(when)} — ${esc(e.text)}${e.by ? ' · ' + esc(e.by) : ''}`;
+  }).join('<br>') + '</div>';
+}
+function advLocked(record){ return !!(record && record.settled && !isAdmin()); }
+
+function openAdvanceModal(record){
+  // A top-up or returned-cash line belongs to its advance — open that instead.
+  if(record && record.advanceId){
+    const parent = allCashTxns.find(a => String(a.id) === String(record.advanceId));
+    if(parent) record = parent;
+  }
+  editingCashId = record ? record.id : null;
+  try{
+    const g = id => document.getElementById(id);
+    const dl = g('staffNameList');
+    const names = new Set([...STAFF.map(s=>s.name), ...Object.keys(USERS)]);
+    dl.innerHTML = [...names].map(n=>`<option value="${esc(n)}">`).join('');
+
+    g('advDate').value = record ? record.date : todayISO();
+    g('advEmployee').value = record ? (record.employeeName || '') : '';
+    g('advCard').value = record ? record.card : 'ceymora';
+    g('advAmount').value = record ? record.amount : '';
+    g('advNote').value = record ? (record.note || '') : '';
+    g('advSettled').checked = record ? !!record.settled : false;
+    g('advSettledNoteWrap').style.display = (record && record.settled) ? '' : 'none';
+    g('advSettledNote').value = record ? (record.settledNote || '') : '';
+    advFileHandler.reset();
+    advSettledFileHandler.reset();
+    const advExisting = record ? getInvoiceLinks(record) : [];
+    const setExisting = record ? (record.settledInvoiceUrls || []) : [];
+    g('advFileHint').innerHTML = advExisting.length
+      ? `${advExisting.length} file(s) already attached: ` + advExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ') : '';
+    g('advSettledFileHint').innerHTML = setExisting.length
+      ? `${setExisting.length} settlement bill(s) attached: ` + setExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ') : '';
+    g('advError').style.display = 'none';
+
+    // Settling needs bills first, so a brand-new advance can't be ticked settled.
+    g('advSettledRow').style.display = record ? '' : 'none';
+    const locked = advLocked(record);
+    ['advDate','advEmployee','advCard','advAmount','advNote','advReturned','advPaidOut','advSettled','advSettledNote','advFile','advSettledFile']
+      .forEach(id => { g(id).disabled = locked; });
+    g('advSave').style.display = locked ? 'none' : '';
+    g('advDeleteBtn').style.display = (record && !locked) ? '' : 'none';
+    g('advCancel').textContent = locked ? 'Close' : 'Cancel';
+    g('advanceModalOverlay').querySelector('h3').textContent = !record ? 'Give advance'
+      : record.settled ? `Settled advance — ${record.employeeName}` : `Settle / edit advance — ${record.employeeName}`;
+
+    advPanelRecord = record || null;
+    g('advReturned').dataset.touched = ''; g('advPaidOut').dataset.touched = '';
+    renderAdvSettlePanel();
+    renderAdvStatus();
+    g('advanceModalOverlay').classList.add('open');
+  }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
+}
+document.getElementById('advCancel').addEventListener('click', ()=> document.getElementById('advanceModalOverlay').classList.remove('open'));
+document.getElementById('advanceModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='advanceModalOverlay') e.currentTarget.classList.remove('open'); });
+
 function renderAdvSettlePanel(){
   const adv = advPanelRecord;
   const panel = document.getElementById('advSettlePanel');
   if(!adv){ panel.style.display = 'none'; return; }
   panel.style.display = '';
+  const locked = advLocked(adv);
   const bills = advBillsFor(adv);
   document.getElementById('advBillsList').innerHTML = bills.length
     ? bills.map(b => `<div class="ce-row"><div class="ce-main"><b>${esc(b.purpose || 'Bill')}</b>
-        <div class="ce-sub">${fmtDay(b.date)} · ${esc(FOR_LABELS[b.for] || b.for || '')}${acctOf(b) && isCompanyAcct(acctOf(b)) ? ' · ' + esc(acctLabel(acctOf(b))) : ''}${getInvoiceLinks(b).length ? ' · 📎' : ''}</div></div>
+        <div class="ce-sub">${fmtDay(b.date)} · ${esc(FOR_LABELS[b.for] || b.for || '')}${acctOf(b) && isCompanyAcct(acctOf(b)) ? ' · ' + esc(acctLabel(acctOf(b))) : ''}${b.linkedInventory ? ' · 📦' : ''}${getInvoiceLinks(b).length ? ' · 📎' : ''}</div></div>
         <div class="ce-amt">${Math.round(b.amount).toLocaleString()}</div>
-        <button type="button" class="manage-edit" data-bill="${b.id}">Edit</button></div>`).join('')
+        ${locked ? '' : `<button type="button" class="manage-edit" data-bill="${b.id}">Edit</button>`}</div>`).join('')
     : '<div class="co-empty-hint">No bills recorded against this advance yet.</div>';
   document.querySelectorAll('#advBillsList [data-bill]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -4846,9 +4811,10 @@ function renderAdvSettlePanel(){
       openExpenseModal(bill, undefined, { returnToAdvance: adv.id });
     });
   });
-  const loose = advUnlinkedBills(adv);
+  document.getElementById('advAddBill').style.display = locked ? 'none' : '';
+  const loose = locked ? [] : advUnlinkedBills(adv);
   document.getElementById('advLegacyBills').innerHTML = loose.length
-    ? `<div class="field-hint" style="margin-top:8px;">${loose.length} earlier bill${loose.length===1?'':'s'} from ${esc(adv.employeeName)}'s advances (LKR ${Math.round(loose.reduce((s,b)=>s+b.amount,0)).toLocaleString()}) aren't linked to a particular advance.
+    ? `<div class="field-hint" style="margin-top:8px;">${loose.length} earlier bill${loose.length===1?'':'s'} paid from ${esc(adv.employeeName)}'s advances (LKR ${Math.round(loose.reduce((s,b)=>s+b.amount,0)).toLocaleString()}) aren't linked to a particular advance.
         <button type="button" class="rpt-quick" id="advLinkLoose">Link them to this advance</button></div>` : '';
   const linkBtn = document.getElementById('advLinkLoose');
   if(linkBtn) linkBtn.addEventListener('click', async ()=>{
@@ -4858,27 +4824,34 @@ function renderAdvSettlePanel(){
     advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
     renderAdvSettlePanel();
   });
-  const ret = advReturnRow(adv);
-  const retInput = document.getElementById('advReturned');
-  if(!retInput.dataset.touched) retInput.value = ret ? ret.amount : '';
+  const f = advFigures(adv);
+  const ri = document.getElementById('advReturned'), pi = document.getElementById('advPaidOut');
+  if(!ri.dataset.touched) ri.value = f.returned || '';
+  if(!pi.dataset.touched) pi.value = f.paidOut || '';
   advRenderRecon();
 }
-function advRenderRecon(){
+function advFormFigures(){
   const adv = advPanelRecord;
-  if(!adv) return;
   const amount = parseFloat(document.getElementById('advAmount').value) || 0;
-  const billed = advBillsFor(adv).reduce((s,b)=> s + b.amount, 0);
+  const billed = adv ? advBillsFor(adv).reduce((s,b)=> s + b.amount, 0) : 0;
   const returned = parseFloat(document.getElementById('advReturned').value) || 0;
-  const left = Math.round((amount - billed - returned) * 100) / 100;
-  document.getElementById('advRecon').innerHTML = `
-    <div class="quote-line"><span>Advance given</span><span>${amount.toLocaleString()}</span></div>
-    <div class="quote-line muted"><span>Bills recorded</span><span>− ${Math.round(billed).toLocaleString()}</span></div>
-    <div class="quote-line muted"><span>Cash handed back</span><span>− ${Math.round(returned).toLocaleString()}</span></div>
-    <div class="quote-line total ${left === 0 ? 'due' : ''}" style="${left !== 0 ? 'color:var(--red);' : ''}">
-      <span>${left === 0 ? 'Balances — ready to settle ✓' : left > 0 ? 'Still to account for' : 'Overspent (company owes)'}</span>
-      <span>${Math.abs(left).toLocaleString()}</span></div>`;
+  const paidOut = parseFloat(document.getElementById('advPaidOut').value) || 0;
+  const left = Math.round((amount + paidOut - billed - returned) * 100) / 100;
+  return { amount, billed, returned, paidOut, left };
 }
-document.getElementById('advReturned').addEventListener('input', (e)=>{ e.target.dataset.touched = '1'; advRenderRecon(); });
+function advRenderRecon(){
+  if(!advPanelRecord) return;
+  const f = advFormFigures();
+  document.getElementById('advRecon').innerHTML = `
+    <div class="quote-line"><span>Advance given</span><span>${f.amount.toLocaleString()}</span></div>
+    ${f.paidOut ? `<div class="quote-line"><span>Extra paid to cover bills</span><span>+ ${Math.round(f.paidOut).toLocaleString()}</span></div>` : ''}
+    <div class="quote-line muted"><span>Bills recorded</span><span>− ${Math.round(f.billed).toLocaleString()}</span></div>
+    <div class="quote-line muted"><span>Cash handed back</span><span>− ${Math.round(f.returned).toLocaleString()}</span></div>
+    <div class="quote-line total ${f.left === 0 ? 'due' : ''}" style="${f.left !== 0 ? 'color:var(--red);' : ''}">
+      <span>${f.left === 0 ? 'Balances — ready to settle ✓' : f.left > 0 ? 'Still to account for' : 'Bills are more than the cash given'}</span>
+      <span>${Math.abs(f.left).toLocaleString()}</span></div>`;
+}
+['advReturned','advPaidOut'].forEach(id => document.getElementById(id).addEventListener('input', (e)=>{ e.target.dataset.touched = '1'; advRenderRecon(); }));
 document.getElementById('advAmount').addEventListener('input', advRenderRecon);
 document.getElementById('advAddBill').addEventListener('click', ()=>{
   const adv = advPanelRecord;
@@ -4886,7 +4859,314 @@ document.getElementById('advAddBill').addEventListener('click', ()=>{
   document.getElementById('advanceModalOverlay').classList.remove('open');
   openExpenseModal(null, false, { fundedBy: adv.employeeName, advanceId: adv.id, card: adv.card, returnToAdvance: adv.id });
 });
-document.getElementById('advCancel').addEventListener('click', ()=>{ document.getElementById('advReturned').dataset.touched = ''; });
+
+// The coloured box under the form: settled or not, who did it, whether it balances,
+// any undo request, and the full history of the advance.
+function renderAdvStatus(){
+  const wrap = document.getElementById('advSettledStatus');
+  const adv = advPanelRecord;
+  if(!adv || (!adv.settled && !(adv.settleLog || []).length)){ wrap.innerHTML = ''; return; }
+  const f = advFigures(adv);
+  let cls = 'ok', head;
+  if(adv.settled){
+    head = `Settled on ${adv.settledDate ? fmtDay(adv.settledDate) : '—'}${adv.settledBy ? ' by ' + esc(adv.settledBy) : ''}.`;
+    if(Math.abs(f.left) >= 1){
+      cls = 'bad';
+      head += f.left > 0
+        ? ` <b>LKR ${f.left.toLocaleString()} was never recorded as a bill or returned cash</b>, so it still shows on ${esc(adv.employeeName)}'s balance. Reopen it (undo), record the missing bills or cash, then settle again.`
+        : ` <b>Bills are LKR ${Math.abs(f.left).toLocaleString()} more than the cash given.</b> Reopen it and enter the extra paid to him.`;
+    } else {
+      head += ' Bills and returned cash match the advance exactly.';
+    }
+  } else {
+    cls = 'warn';
+    head = 'Open — reopened after being settled.';
+  }
+  let actions = '';
+  if(adv.settled){
+    if(adv.undoRequestedBy){
+      cls = cls === 'bad' ? 'bad' : 'warn';
+      head += `<br><b>Undo requested by ${esc(adv.undoRequestedBy)}</b>${adv.undoReason ? ' — “' + esc(adv.undoReason) + '”' : ''}. ${isAdmin() ? 'Waiting for your approval.' : 'Waiting for Makky to approve.'}`;
+      if(isAdmin()) actions = `<button type="button" class="btn btn-save" data-adv-act="approve">Approve undo</button> <button type="button" class="btn btn-cancel" data-adv-act="reject">Reject</button>`;
+    } else if(isAdmin()){
+      actions = `<button type="button" class="btn btn-delete" data-adv-act="undo">Undo settlement</button>`;
+    } else if(canEdit()){
+      actions = `<button type="button" class="btn btn-delete" data-adv-act="request">Request undo</button>`;
+    }
+  }
+  wrap.innerHTML = `<div class="adv-status ${cls}">${head}${actions ? `<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">${actions}</div>` : ''}${advLogHTML(adv.settleLog)}</div>`;
+  wrap.querySelectorAll('[data-adv-act]').forEach(b => b.addEventListener('click', ()=> advAction(b.dataset.advAct, adv)));
+}
+
+async function advAction(act, adv){
+  if(act === 'request') return advRequestUndo(adv);
+  if(act === 'approve' || act === 'undo') return advApproveUndo(adv);
+  if(act === 'reject') return advRejectUndo(adv);
+}
+async function advReload(id, reopen){
+  await fetchCash();
+  const fresh = allCashTxns.find(t => String(t.id) === String(id));
+  if(reopen && fresh && document.getElementById('advanceModalOverlay').classList.contains('open')) openAdvanceModal(fresh);
+}
+async function advRequestUndo(adv){
+  if(!canEdit()){ alert('Only staff who manage petty cash can request an undo.'); return; }
+  const reason = prompt(`Why should ${adv.employeeName}'s settled advance of LKR ${adv.amount.toLocaleString()} be reopened?\n\nMakky will see this and approve or reject it.`);
+  if(reason === null) return;
+  if(!reason.trim()){ alert('Please give a reason so Makky knows what to check.'); return; }
+  const log = [...(adv.settleLog || []), advStamp('Undo requested: ' + reason.trim())];
+  const { error } = await sb.from('petty_cash_transactions').update({
+    undo_requested_by: currentUser.username, undo_requested_at: new Date().toISOString(), undo_reason: reason.trim(), settle_log: log,
+  }).eq('id', adv.id);
+  if(error){ alert('Could not send the request — has the latest SQL update been run?'); console.error(error); return; }
+  logActivity('update', 'petty_cash_transactions', `Requested undo of ${adv.employeeName}'s settled advance (LKR ${adv.amount.toLocaleString()}): ${reason.trim()}`);
+  await advReload(adv.id, true);
+}
+async function advApproveUndo(adv){
+  if(!isAdmin()){ alert('Only Makky (admin) can undo a settlement.'); return; }
+  const asked = adv.undoRequestedBy ? `${adv.undoRequestedBy} asked: “${adv.undoReason || ''}”\n\n` : '';
+  if(!confirm(`${asked}Reopen ${adv.employeeName}'s advance of LKR ${adv.amount.toLocaleString()}?\n\nIts bills and any returned cash stay recorded (they're real). The advance goes back to “Advances to staff” so the bills can be corrected, then settled again.`)) return;
+  const log = [...(adv.settleLog || []), advStamp(adv.undoRequestedBy ? `Undo approved (asked by ${adv.undoRequestedBy})` : 'Settlement undone')];
+  const { error } = await sb.from('petty_cash_transactions').update({
+    settled:false, settled_date:null, settled_by:null,
+    undo_requested_by:null, undo_requested_at:null, undo_reason:null, settle_log: log,
+  }).eq('id', adv.id);
+  if(error){ alert('Could not undo — has the latest SQL update been run?'); console.error(error); return; }
+  logActivity('update', 'petty_cash_transactions', `Undid settlement of ${adv.employeeName}'s advance (LKR ${adv.amount.toLocaleString()})${adv.undoRequestedBy ? ' — requested by ' + adv.undoRequestedBy : ''}`);
+  await advReload(adv.id, true);
+}
+async function advRejectUndo(adv){
+  if(!isAdmin()) return;
+  const why = prompt('Reason for rejecting (optional):', '');
+  if(why === null) return;
+  const log = [...(adv.settleLog || []), advStamp(`Undo request from ${adv.undoRequestedBy} rejected${why.trim() ? ': ' + why.trim() : ''}`)];
+  const { error } = await sb.from('petty_cash_transactions').update({
+    undo_requested_by:null, undo_requested_at:null, undo_reason:null, settle_log: log,
+  }).eq('id', adv.id);
+  if(error){ alert('Could not update.'); console.error(error); return; }
+  logActivity('update', 'petty_cash_transactions', `Rejected undo request for ${adv.employeeName}'s advance`);
+  await advReload(adv.id, true);
+}
+
+document.getElementById('advSave').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const errEl = g('advError');
+  const fail = m => { errEl.textContent = m; errEl.style.display = 'block'; };
+  if(!sb) return fail('Not connected to Supabase yet.');
+  const date = g('advDate').value;
+  const employeeName = g('advEmployee').value.trim();
+  const card = g('advCard').value;
+  const amount = parseFloat(g('advAmount').value);
+  const note = g('advNote').value.trim();
+  let settled = g('advSettled').checked;
+  const settledNote = g('advSettledNote').value.trim();
+  if(!date || !employeeName || !amount || amount <= 0) return fail('Enter a date, employee name, and a valid amount.');
+
+  const original = editingCashId ? allCashTxns.find(t=>t.id===editingCashId) : null;
+  if(advLocked(original)) return fail('This advance is settled. Request an undo to change it.');
+  const newlySettling = !!(original && settled && !original.settled);
+  const unsettling = !!(original && !settled && original.settled);
+  const f = original ? advFormFigures() : { returned:0, paidOut:0, billed:0, left:0 };
+
+  if(newlySettling && Math.abs(f.left) >= 1){
+    g('advSettled').checked = false;
+    return fail(f.left > 0
+      ? `Can't settle yet — LKR ${f.left.toLocaleString()} isn't covered. Record the remaining bills, or enter the cash he handed back.`
+      : `Can't settle yet — the bills are LKR ${Math.abs(f.left).toLocaleString()} more than the advance. Enter that under “Extra paid to him”.`);
+  }
+  if(unsettling && !confirm(`Undo the settlement of ${employeeName}'s advance?`)){ g('advSettled').checked = true; return; }
+
+  const settledDate = settled ? ((original && original.settled && original.settledDate) ? original.settledDate : todayISO()) : null;
+  const log = [...((original && original.settleLog) || [])];
+  if(newlySettling) log.push(advStamp(`Settled — bills LKR ${Math.round(f.billed).toLocaleString()}, returned LKR ${Math.round(f.returned).toLocaleString()}${f.paidOut ? ', extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}`));
+  if(unsettling) log.push(advStamp('Settlement undone'));
+
+  const payload = {
+    type:'advance', date, card, employee_name: employeeName, amount, note,
+    settled, settled_date: settledDate, settled_note: settled ? (settledNote || null) : null,
+  };
+  if(original){
+    payload.settle_log = log;
+    if(newlySettling) payload.settled_by = currentUser.username;
+    if(unsettling){ payload.settled_by = null; payload.undo_requested_by = null; payload.undo_requested_at = null; payload.undo_reason = null; }
+  }
+
+  const btn = g('advSave'); btn.disabled = true;
+  try{
+    const newAdvFiles = advFileHandler.getFiles(), newSetFiles = advSettledFileHandler.getFiles();
+    if(newAdvFiles.length){
+      const urls = []; for(const fl of newAdvFiles) urls.push(await uploadReceiptFile(fl));
+      payload.invoice_urls = [...(original ? getInvoiceLinks(original) : []), ...urls];
+    }
+    if(newSetFiles.length){
+      const urls = []; for(const fl of newSetFiles) urls.push(await uploadReceiptFile(fl));
+      payload.settled_invoice_urls = [...((original && original.settledInvoiceUrls) || []), ...urls];
+    }
+    if(original){
+      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
+      if(error) throw error;
+      // Cash handed back → a "money in" line on the same card.
+      const ret = advReturnRow(original);
+      if(f.returned > 0){
+        const rp = { type:'income', date: settledDate || todayISO(), card, amount: f.returned, employee_name: employeeName,
+          advance_id: String(editingCashId), note: `Unused cash returned from ${employeeName}'s advance of ${date}` };
+        const { error: e2 } = ret ? await sb.from('petty_cash_transactions').update(rp).eq('id', ret.id)
+                                  : await sb.from('petty_cash_transactions').insert(rp);
+        if(e2) throw e2;
+      } else if(ret){
+        const { error: e2 } = await sb.from('petty_cash_transactions').delete().eq('id', ret.id); if(e2) throw e2;
+      }
+      // Extra paid to cover bills → another (already settled) advance line on the same card.
+      const top = advTopUpRow(original);
+      if(f.paidOut > 0){
+        const tp = { type:'advance', date: settledDate || todayISO(), card, amount: f.paidOut, employee_name: employeeName,
+          advance_id: String(editingCashId), settled: true, settled_date: settledDate || todayISO(),
+          note: `Extra paid to ${employeeName} to cover bills on the advance of ${date}` };
+        const { error: e3 } = top ? await sb.from('petty_cash_transactions').update(tp).eq('id', top.id)
+                                  : await sb.from('petty_cash_transactions').insert(tp);
+        if(e3) throw e3;
+      } else if(top){
+        const { error: e3 } = await sb.from('petty_cash_transactions').delete().eq('id', top.id); if(e3) throw e3;
+      }
+      logActivity('update', 'petty_cash_transactions',
+        `${newlySettling ? 'Settled' : unsettling ? 'Undid settlement of' : 'Edited'} advance: ${employeeName} — LKR ${amount.toLocaleString()}`);
+    } else {
+      const { error } = await sb.from('petty_cash_transactions').insert(payload);
+      if(error) throw error;
+      logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${CARD_LABELS[card]}`);
+    }
+    g('advanceModalOverlay').classList.remove('open');
+  }catch(e){
+    fail('Save failed — ' + (e.message || 'check connection.') + ' (Has the latest SQL update been run?)'); console.error(e);
+  }finally{ btn.disabled = false; }
+});
+document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
+  if(!editingCashId) return;
+  const adv = allCashTxns.find(t => t.id === editingCashId);
+  if(advLocked(adv)){ alert('A settled advance can only be removed by Makky.'); return; }
+  if(!checkDeletePassword()) return;
+  if(!confirm('Delete this advance record? Its bills stay recorded as expenses.')) return;
+  try{
+    const ret = adv ? advReturnRow(adv) : null, top = adv ? advTopUpRow(adv) : null;
+    if(ret) await sb.from('petty_cash_transactions').delete().eq('id', ret.id);
+    if(top) await sb.from('petty_cash_transactions').delete().eq('id', top.id);
+    await sb.from('petty_cash_transactions').update({ advance_id: null }).eq('advance_id', String(editingCashId));
+    await sb.from('petty_cash_transactions').delete().eq('id', editingCashId);
+    logActivity('delete', 'petty_cash_transactions', `Deleted advance: ${adv ? adv.employeeName + ' — LKR ' + adv.amount.toLocaleString() : ''}`);
+    document.getElementById('advanceModalOverlay').classList.remove('open');
+  }catch(e){ console.error(e); }
+});
+
+/* ---- the lists on the Petty Cash page ---- */
+function renderAdvances(){
+  const wrap = document.getElementById('advancesList');
+  if(!wrap) return;
+  const outstanding = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  if(outstanding.length === 0) wrap.innerHTML = '<div class="manage-empty">No outstanding advances.</div>';
+  else {
+    wrap.innerHTML = '';
+    for(const t of outstanding){
+      const f = advFigures(t);
+      const row = document.createElement('div');
+      row.className = 'manage-row';
+      row.innerHTML = `
+        <span class="manage-type-dot" style="background:var(--amber);"></span>
+        <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— ${esc(CARD_LABELS[t.card]||t.card)}</span></span>
+        <span class="manage-dates">${t.date}${t.note ? ' · '+esc(t.note) : ''} · LKR ${t.amount.toLocaleString()} · bills LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}
+          · <b>${f.left === 0 ? 'ready to settle ✓' : 'LKR ' + Math.round(f.left).toLocaleString() + ' still to account for'}</b></span>`;
+      if(canEdit()){
+        const b = document.createElement('button');
+        b.className = 'manage-edit'; b.textContent = 'Settle / Edit';
+        b.addEventListener('click', ()=> openAdvanceModal(t));
+        row.appendChild(b);
+      }
+      wrap.appendChild(row);
+    }
+  }
+  renderSettledAdvances();
+  renderUndoRequests();
+}
+
+function renderSettledAdvances(){
+  const wrap = document.getElementById('settledAdvancesList');
+  const sel = document.getElementById('settledFilter');
+  if(!wrap || !sel) return;
+  const settled = allCashTxns.filter(t => isAdvanceParent(t) && t.settled)
+    .sort((a,b)=> (b.settledDate || b.date || '').localeCompare(a.settledDate || a.date || ''));
+  const names = [...new Set(settled.map(t => t.employeeName).filter(Boolean))].sort();
+  const cur = sel.value || '';
+  sel.innerHTML = '<option value="">Everyone</option><option value="__problem">Only ones that don’t balance</option>'
+    + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : '';
+  if(!sel.dataset.wired){ sel.dataset.wired = '1'; sel.addEventListener('change', renderSettledAdvances); }
+
+  const rows = settled.filter(t => !sel.value || (sel.value === '__problem' ? Math.abs(advFigures(t).left) >= 1 : t.employeeName === sel.value));
+  if(!rows.length){ wrap.innerHTML = `<div class="manage-empty">${settled.length ? 'Nothing matches this filter.' : 'No settled advances yet.'}</div>`; return; }
+  wrap.innerHTML = '';
+  for(const t of rows){
+    const f = advFigures(t);
+    const bad = Math.abs(f.left) >= 1;
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    row.style.flexWrap = 'wrap';
+    const chips = [
+      bad ? `<span class="adv-chip bad">${f.left > 0 ? 'LKR ' + Math.round(f.left).toLocaleString() + ' not accounted for' : 'bills exceed advance'}</span>` : '<span class="adv-chip ok">balanced ✓</span>',
+      t.undoRequestedBy ? `<span class="adv-chip wait">undo requested by ${esc(t.undoRequestedBy)} — waiting for Makky</span>` : '',
+    ].join(' ');
+    row.innerHTML = `
+      <span class="manage-type-dot" style="background:${bad ? 'var(--red)' : 'var(--green)'};"></span>
+      <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— LKR ${t.amount.toLocaleString()} given ${fmtDay(t.date)}</span></span>
+      <span class="manage-dates">settled ${t.settledDate ? fmtDay(t.settledDate) : '—'}${t.settledBy ? ' by ' + esc(t.settledBy) : ''}
+        · ${advBillsFor(t).length} bill${advBillsFor(t).length===1?'':'s'} LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}${f.paidOut ? ' · extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}${(t.settledInvoiceUrls||[]).length ? ' · 📎 ' + t.settledInvoiceUrls.length : ''}
+        ${chips}</span>`;
+    const view = document.createElement('button');
+    view.className = 'manage-invoice'; view.textContent = 'View details';
+    view.addEventListener('click', ()=> openAdvanceModal(t));
+    row.appendChild(view);
+    if(isAdmin() && t.undoRequestedBy){
+      const ap = document.createElement('button'); ap.className = 'manage-edit'; ap.textContent = 'Approve undo';
+      ap.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(ap);
+    } else if(isAdmin()){
+      const un = document.createElement('button'); un.className = 'manage-del'; un.textContent = 'Undo';
+      un.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(un);
+    } else if(canEdit() && !t.undoRequestedBy){
+      const rq = document.createElement('button'); rq.className = 'manage-del'; rq.textContent = 'Request undo';
+      rq.addEventListener('click', ()=> advRequestUndo(t)); row.appendChild(rq);
+    }
+    wrap.appendChild(row);
+  }
+}
+
+function renderUndoRequests(){
+  const sec = document.getElementById('undoRequestsSection');
+  const wrap = document.getElementById('undoRequestsList');
+  if(!sec || !wrap) return;
+  const pending = allCashTxns.filter(t => isAdvanceParent(t) && t.settled && t.undoRequestedBy);
+  const tab = document.querySelector('.maintab-btn[data-tab="pettycash"]');
+  if(tab){
+    if(!tab.dataset.base) tab.dataset.base = tab.textContent;
+    tab.textContent = tab.dataset.base + (isAdmin() && pending.length ? ` 🔔${pending.length}` : '');
+  }
+  if(!isAdmin() || !pending.length){ sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  wrap.innerHTML = '';
+  for(const t of pending){
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    row.innerHTML = `
+      <span class="manage-type-dot" style="background:var(--amber);"></span>
+      <span class="manage-guest">${esc(t.employeeName)} — LKR ${t.amount.toLocaleString()}</span>
+      <span class="manage-dates">asked by <b>${esc(t.undoRequestedBy)}</b>${t.undoRequestedAt ? ' on ' + new Date(t.undoRequestedAt).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : ''} · “${esc(t.undoReason || '')}”</span>`;
+    const v = document.createElement('button'); v.className = 'manage-invoice'; v.textContent = 'View';
+    v.addEventListener('click', ()=> openAdvanceModal(t));
+    const ap = document.createElement('button'); ap.className = 'manage-edit'; ap.textContent = 'Approve';
+    ap.addEventListener('click', ()=> advApproveUndo(t));
+    const rj = document.createElement('button'); rj.className = 'manage-del'; rj.textContent = 'Reject';
+    rj.addEventListener('click', ()=> advRejectUndo(t));
+    row.append(v, ap, rj);
+    wrap.appendChild(row);
+  }
+}
 
 /* ============================= INVENTORY ============================= */
 const INV_VILLAS = ['kalava','noelia','brisa'];
