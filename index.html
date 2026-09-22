@@ -650,6 +650,69 @@
   .cancel-stat .cs-label{ font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
   .cancel-stat .cs-val{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
 
+  /* ===================== ACCOUNTS SORTING / BILLS / PAYROLL ===================== */
+  .acct-flow{
+    display:flex; flex-wrap:wrap; align-items:stretch; gap:0; margin:0 0 14px;
+    background:#fff; border:1px solid var(--board-line); border-radius:10px; overflow:hidden;
+  }
+  .acct-flow .src{
+    flex:1; min-width:150px; padding:9px 12px; border-right:1px solid var(--board-line);
+    font-size:11.5px; color:var(--muted); line-height:1.45;
+  }
+  .acct-flow .src b{ display:block; font-size:14px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .acct-flow .src.warn b{ color:var(--amber); }
+  .acct-flow .src button{
+    background:none; border:none; padding:0; font:inherit; color:var(--blue); text-decoration:underline; cursor:pointer;
+  }
+  .acct-flow .dest{ flex:1 1 200px; padding:9px 14px; background:var(--board); font-size:11.5px; color:var(--muted); display:flex; flex-direction:column; justify-content:center; }
+  .acct-flow .dest b{ font-size:14px; color:var(--frame); font-variant-numeric:tabular-nums; }
+  .acct-summary{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 12px; }
+  .acct-summary > div{
+    flex:1; min-width:150px; background:#fff; border:1px solid var(--board-line); border-radius:9px; padding:8px 11px;
+  }
+  .acct-summary .k{ font-size:11px; color:var(--muted); font-weight:600; }
+  .acct-summary .v{ font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:1px; }
+  .acct-summary .v.warn{ color:var(--amber); }
+  .acct-summary .v.good{ color:var(--green); }
+  .acct-toggle{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink); cursor:pointer; }
+  .acct-select{
+    font-family:'Inter',sans-serif; font-size:12px; padding:4px 6px; border:1px solid var(--board-line);
+    border-radius:6px; background:#fff; max-width:230px; width:100%;
+  }
+  .acct-select.open{ border-color:var(--amber); background:var(--amber-bg); }
+  .acct-select.saved{ border-color:var(--green); }
+  .acct-chip{
+    display:inline-block; font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:20px;
+    background:var(--gray-bg); color:var(--muted); margin-left:4px; white-space:nowrap;
+  }
+  .acct-chip.co{ background:#efeafd; color:#5f3dc4; }
+  .acct-chip.open{ background:var(--amber-bg); color:#a06800; }
+  .co-line .co-link{
+    font-size:10.5px; color:var(--green); background:none; border:none; cursor:pointer; padding:0 2px;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .co-line .co-link.same{ color:#c8c4b8; cursor:default; }
+  .ce-row{ display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed var(--board-line); font-size:12.5px; }
+  .ce-row:last-child{ border-bottom:none; }
+  .ce-row .ce-main{ flex:1; min-width:0; }
+  .ce-row .ce-sub{ font-size:11px; color:var(--muted); }
+  .ce-row .ce-amt{ font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pay-block{
+    margin-top:12px; border:1px solid var(--board-line); background:var(--board);
+    border-radius:10px; padding:8px 12px 12px;
+  }
+  .pay-block .direct-block-title{ color:var(--frame); }
+  .pay-table td.r, .pay-table th.r{ text-align:right; font-variant-numeric:tabular-nums; }
+  .pay-table tr.tot td{ font-weight:700; border-top:2px solid var(--board-line); background:var(--board); }
+  .pay-table td .ce-sub{ font-size:11px; color:var(--muted); }
+  .pay-paid{ font-size:11px; font-weight:700; color:var(--green); }
+  .pay-unpaid{ font-size:11px; font-weight:700; color:#a06800; }
+  .pay-inactive td{ opacity:.55; }
+  @media (max-width:720px){
+    .acct-flow .src{ min-width:45%; border-bottom:1px solid var(--board-line); }
+    .pay-table .hide-sm{ display:none; }
+  }
+
 </style>
 </head>
 <body>
@@ -690,6 +753,7 @@
       <button class="maintab-btn" data-tab="villareport" id="villaReportTabBtn" style="display:none">🏘️ Villa Report</button>
       <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
       <button class="maintab-btn" data-tab="company" id="companyTabBtn" style="display:none">🏢 Company Accounts</button>
+      <button class="maintab-btn" data-tab="payroll" id="payrollTabBtn" style="display:none">🧑‍💼 Staff &amp; Payroll</button>
       <button class="maintab-btn" data-tab="users" id="usersTabBtn" style="display:none">👤 Users</button>
       <button class="maintab-btn" data-tab="settings" id="settingsTabBtn" style="display:none">🧾 Invoices &amp; Setup</button>
     </div>
@@ -1009,14 +1073,63 @@
     <div id="companyPanel" style="display:none">
       <div class="toolbar no-print">
         <div class="villatabs" style="margin-bottom:0;">
-          <button class="villatab-btn active" id="coTabEntry" style="background:var(--ink);color:#fff;">✏️ Enter figures</button>
-          <button class="villatab-btn" id="coTabReport">📄 Generate report</button>
+          <button class="villatab-btn" id="coTabSort" data-coview="sort">📂 Sort expenses</button>
+          <button class="villatab-btn" id="coTabBills" data-coview="bills">📥 Bills, income &amp; bank</button>
+          <button class="villatab-btn active" id="coTabEntry" data-coview="entry" style="background:var(--ink);color:#fff;">✏️ Review &amp; save month</button>
+          <button class="villatab-btn" id="coTabReport" data-coview="report">📄 Generate report</button>
         </div>
         <div class="weeknav">
           <button id="coPrevMonth">◀ Prev</button>
           <span id="coMonthLabel">Month of ...</span>
           <button id="coNextMonth">Next ▶</button>
           <button id="coThisMonth">This month</button>
+        </div>
+      </div>
+
+      <!-- ---- WHERE THE FIGURES COME FROM (shown on every company view) ---- -->
+      <div class="acct-flow no-print" id="coFlow"></div>
+
+      <!-- ---- SORT EXPENSES VIEW ---- -->
+      <div id="coSortView" style="display:none">
+        <div class="cal-hint">
+          Every expense recorded in Petty Cash this month, with the account it goes to. Villa and Store purchases are charged to the villas,
+          so they stay out of the company's own profit &amp; loss. Office and company costs need a company account — pick one from the list and it saves straight away.
+        </div>
+        <div class="co-actions">
+          <label class="acct-toggle"><input type="checkbox" id="coSortOnlyOpen"> Only show expenses that still need an account</label>
+          <button class="add-booking-btn" id="coSortAuto">✨ Suggest accounts for unsorted expenses</button>
+          <span class="field-hint" id="coSortMsg"></span>
+        </div>
+        <div id="coSortSummary" class="acct-summary"></div>
+        <div id="coSortList"></div>
+      </div>
+
+      <!-- ---- BILLS, INCOME & BANK VIEW ---- -->
+      <div id="coBillsView" style="display:none">
+        <div class="cal-hint">
+          Anything the board can't see by itself goes here: bills paid by bank transfer or cheque, income that isn't villa commission,
+          and each account's closing balance. Once it's entered, the monthly figures and reports pick it up automatically.
+        </div>
+        <div class="co-groups">
+          <div class="co-group">
+            <div class="co-group-title"><span>Bills &amp; payments</span><span class="co-group-total" id="ceTotalExpense">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Paid outside petty cash — electricity by standing order, the accountant by transfer, the audit fee by cheque.</div>
+            <div id="ceExpenseList"></div>
+            <button class="rpt-quick no-print" data-ce-add="expense">+ Add a bill or payment</button>
+          </div>
+          <div class="co-group">
+            <div class="co-group-title"><span>Other income</span><span class="co-group-total" id="ceTotalIncome">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Money earned outside villa commission — interest, a one-off service fee, a refund.</div>
+            <div id="ceIncomeList"></div>
+            <button class="rpt-quick no-print" data-ce-add="income">+ Add income</button>
+          </div>
+          <div class="co-group">
+            <div class="co-group-title"><span>Bank &amp; cash balances</span><span class="co-group-total" id="ceTotalBalance">0</span></div>
+            <div class="field-hint" style="margin-bottom:6px;">Closing balance of each account at the end of the month, from the bank statement.</div>
+            <div id="ceBalanceList"></div>
+            <button class="rpt-quick no-print" data-ce-add="balance">+ Add a balance</button>
+            <button class="rpt-quick no-print" id="ceCopyBalances">Copy last month's accounts</button>
+          </div>
         </div>
       </div>
 
@@ -1029,7 +1142,8 @@
         </div>
 
         <div class="co-actions no-print">
-          <button class="add-booking-btn" id="coPullCommission">🔄 Refresh commission from Bookings</button>
+          <button class="add-booking-btn" id="coRebuild" style="background:var(--frame); color:#fff; border-color:var(--frame);">🔄 Rebuild this month from records</button>
+          <button class="add-booking-btn" id="coPullCommission">Refresh commission only</button>
           <button class="add-booking-btn" id="coCalcEpf">🧮 Calculate EPF 12% / ETF 3% from salary</button>
           <button class="add-booking-btn" id="coCopyPrev">📋 Copy last month's figures</button>
           <span class="field-hint" id="coPettyHint"></span>
@@ -1081,6 +1195,8 @@
           <label><input type="checkbox" data-sec="operating" checked> Operating Statement</label>
           <label><input type="checkbox" data-sec="sales" checked> Sales / Commission Summary</label>
           <label><input type="checkbox" data-sec="pettycash" checked> Petty Cash Expenses</label>
+          <label><input type="checkbox" data-sec="payroll" checked> Payroll</label>
+          <label><input type="checkbox" data-sec="bills" checked> Bills &amp; bank</label>
           <span class="sep"></span>
           <button class="rpt-quick" data-preset="summary">Dashboard only</button>
           <button class="rpt-quick" data-preset="all">Everything</button>
@@ -1088,6 +1204,49 @@
           <button class="add-booking-btn" id="coPrintBtn">🖨️ Print / PDF</button>
         </div>
         <div id="coReportBody"></div>
+      </div>
+    </div>
+
+    <!-- ===================== STAFF & PAYROLL PANEL (admin only) ===================== -->
+    <div id="payrollPanel" style="display:none">
+      <div class="toolbar no-print">
+        <div class="villatabs" style="margin-bottom:0;">
+          <button class="villatab-btn active" id="payTabRun" style="background:var(--ink);color:#fff;">💵 Monthly payroll</button>
+          <button class="villatab-btn" id="payTabStaff">👥 Staff profiles</button>
+        </div>
+        <div class="weeknav" id="payMonthNav">
+          <button id="payPrevMonth">◀ Prev</button>
+          <span id="payMonthLabel">Month of ...</span>
+          <button id="payNextMonth">Next ▶</button>
+          <button id="payThisMonth">This month</button>
+        </div>
+      </div>
+
+      <!-- ---- MONTHLY PAYROLL ---- -->
+      <div id="payRunView">
+        <div class="cal-hint">
+          One line per person for the month. Start with <b>Prepare from staff profiles</b> — it copies each active person's basic salary and fixed allowances in.
+          Then open a line to add no-pay days, bonus, overtime or deductions. Salaries paid by the company flow into
+          <b>Company Accounts → Staff Cost</b> by themselves; salaries a villa owner pays are kept out of the company's figures.
+        </div>
+        <div class="co-actions">
+          <button class="add-booking-btn" id="payPrepare" style="background:var(--frame); color:#fff; border-color:var(--frame);">Prepare from staff profiles</button>
+          <button class="add-booking-btn" id="payPrintAll">🖨️ Print all salary sheets</button>
+          <button class="add-booking-btn" id="payPrintRegister">🖨️ Print payroll summary</button>
+          <span class="field-hint" id="payMsg"></span>
+        </div>
+        <div id="paySummary" class="acct-summary"></div>
+        <div id="payList"></div>
+      </div>
+
+      <!-- ---- STAFF PROFILES ---- -->
+      <div id="payStaffView" style="display:none">
+        <div class="co-actions">
+          <button class="add-booking-btn" id="payAddStaff">+ Add staff member</button>
+          <label class="acct-toggle"><input type="checkbox" id="payShowInactive"> Show people who have left</label>
+          <span class="field-hint" id="payStaffMsg"></span>
+        </div>
+        <div id="payStaffList"></div>
       </div>
     </div>
 
@@ -1402,6 +1561,9 @@
     <input type="text" id="expPurpose" placeholder="e.g. Cleaning supplies">
     <label>Amount (LKR)</label>
     <input type="number" id="expAmount" min="0" step="1" placeholder="e.g. 3500">
+    <label>Goes into the accounts as</label>
+    <select id="expAccount"></select>
+    <div class="field-hint" id="expAccountHint"></div>
     <label>Funded from a staff advance? <span id="expAdvanceBalanceHint" style="font-weight:400; color:var(--muted);"></span> (optional)</label>
     <select id="expFundedByAdvance">
       <option value="">No — paid fresh from the card above</option>
@@ -1667,6 +1829,166 @@
   </div>
 </div>
 
+<!-- Company entry modal (bills paid outside petty cash / other income / bank balances) -->
+<div class="modal-overlay" id="ceModalOverlay">
+  <div class="modal modal-wide">
+    <h3 id="ceModalTitle">Add a bill or payment</h3>
+    <div class="frm-row">
+      <div>
+        <label id="ceDateLabel">Date paid</label>
+        <input type="date" id="ceDate">
+      </div>
+      <div>
+        <label>Amount (LKR)</label>
+        <input type="number" id="ceAmount" step="0.01" placeholder="e.g. 18500">
+      </div>
+    </div>
+    <label id="ceDescLabel">What was it for</label>
+    <input type="text" id="ceDesc" list="ceDescList" placeholder="e.g. Office electricity — August">
+    <datalist id="ceDescList"></datalist>
+    <div id="ceAccountWrap">
+      <label>Company account</label>
+      <select id="ceAccount"></select>
+    </div>
+    <div id="ceViaWrap">
+      <label>Paid from</label>
+      <input type="text" id="ceVia" list="ceViaList" placeholder="e.g. Sampath Current Account">
+      <datalist id="ceViaList"></datalist>
+    </div>
+    <div id="ceFileWrap">
+      <label>Attach bill / statement (optional)</label>
+      <input type="file" id="ceFile" accept="image/*,.pdf">
+      <div id="ceFileList"></div>
+      <div class="field-hint" id="ceFileHint"></div>
+    </div>
+    <div class="modal-error" id="ceError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="ceDelete" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="ceCancel">Cancel</button>
+      <button class="btn btn-save" id="ceSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Staff profile modal -->
+<div class="modal-overlay" id="spModalOverlay">
+  <div class="modal modal-wide">
+    <h3 id="spModalTitle">Add staff member</h3>
+    <div class="modal-scroll">
+      <div class="frm-row">
+        <div><label>Full name</label><input type="text" id="spName" list="spNameList" placeholder="e.g. W. A. Anuja Perera"><datalist id="spNameList"></datalist></div>
+        <div><label>Employee no. (optional)</label><input type="text" id="spEmpNo" placeholder="e.g. CM-004"></div>
+      </div>
+      <div class="frm-row">
+        <div><label>Designation</label><input type="text" id="spDesignation" placeholder="e.g. Housekeeper"></div>
+        <div><label>Works at</label><select id="spWorksAt"></select></div>
+      </div>
+      <label>Salary paid by</label>
+      <select id="spPaidBy"></select>
+      <div class="field-hint">Only salaries the company pays go into Company Accounts. A salary a villa owner pays is printed the same way but kept out of the company's figures.</div>
+      <div class="frm-row">
+        <div><label>NIC no.</label><input type="text" id="spNic"></div>
+        <div><label>EPF no.</label><input type="text" id="spEpfNo"></div>
+      </div>
+      <div class="frm-row">
+        <div><label>Date joined</label><input type="date" id="spJoin"></div>
+        <div><label>Phone</label><input type="text" id="spPhone"></div>
+      </div>
+      <label>Address</label>
+      <textarea id="spAddress" rows="2"></textarea>
+      <div class="frm-row">
+        <div><label>Bank</label><input type="text" id="spBank" placeholder="e.g. Sampath Bank — Galle"></div>
+        <div><label>Account no.</label><input type="text" id="spBankAcc"></div>
+      </div>
+      <div class="pay-block">
+        <div class="direct-block-title">Monthly pay</div>
+        <div class="frm-row">
+          <div><label>Basic salary (LKR)</label><input type="number" id="spBasic" min="0" step="0.01"></div>
+          <div><label>Fixed allowance (LKR)</label><input type="number" id="spAllowance" min="0" step="0.01"></div>
+          <div><label>Travelling allowance (LKR)</label><input type="number" id="spTravel" min="0" step="0.01"></div>
+        </div>
+        <div class="modal-checkbox-row">
+          <input type="checkbox" id="spEpf" checked>
+          <label for="spEpf">EPF &amp; ETF apply (8% from the employee, 12% + 3% from the employer)</label>
+        </div>
+      </div>
+      <div class="modal-checkbox-row">
+        <input type="checkbox" id="spActive" checked>
+        <label for="spActive">Currently working here</label>
+      </div>
+      <label>Notes (optional)</label>
+      <input type="text" id="spNotes">
+    </div>
+    <div class="modal-error" id="spError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="spDelete" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="spCancel">Cancel</button>
+      <button class="btn btn-save" id="spSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Monthly payslip line modal -->
+<div class="modal-overlay" id="psModalOverlay">
+  <div class="modal modal-wide">
+    <h3 id="psModalTitle">Salary</h3>
+    <div class="modal-scroll">
+      <div class="field-hint" id="psWho"></div>
+      <div class="pay-block">
+        <div class="direct-block-title">Earnings</div>
+        <div class="frm-row">
+          <div><label>Basic salary</label><input type="number" id="psBasic" step="0.01" data-ps></div>
+          <div><label>No-pay days</label><input type="number" id="psNoPay" step="0.5" min="0" data-ps></div>
+        </div>
+        <div class="frm-row">
+          <div><label>Allowance</label><input type="number" id="psAllowance" step="0.01" data-ps></div>
+          <div><label>Travelling allowance</label><input type="number" id="psTravel" step="0.01" data-ps></div>
+        </div>
+        <div class="frm-row">
+          <div><label>Performance incentive</label><input type="number" id="psPerfInc" step="0.01" data-ps></div>
+          <div><label>Performance allowance</label><input type="number" id="psPerfAllow" step="0.01" data-ps></div>
+        </div>
+        <div class="frm-row">
+          <div><label>Bonus</label><input type="number" id="psBonus" step="0.01" data-ps></div>
+          <div><label>Overtime / extra wages</label><input type="number" id="psOvertime" step="0.01" data-ps></div>
+        </div>
+      </div>
+      <div class="pay-block">
+        <div class="direct-block-title">Deductions</div>
+        <div class="frm-row">
+          <div><label>Salary advance taken</label><input type="number" id="psAdvance" step="0.01" data-ps></div>
+          <div><label>APIT / tax</label><input type="number" id="psApit" step="0.01" data-ps></div>
+        </div>
+        <div class="frm-row">
+          <div><label>Other deductions</label><input type="number" id="psOtherDed" step="0.01" data-ps></div>
+          <div><label>What the other deduction is</label><input type="text" id="psOtherDedNote" placeholder="e.g. Uniform"></div>
+        </div>
+        <div class="modal-checkbox-row">
+          <input type="checkbox" id="psEpf" data-ps>
+          <label for="psEpf">EPF &amp; ETF apply this month</label>
+        </div>
+      </div>
+      <div class="quote-box" id="psPreview"></div>
+      <div class="frm-row">
+        <div><label>Paid on (leave blank until paid)</label><input type="date" id="psPaidOn"></div>
+        <div><label>Paid by</label><input type="text" id="psPaidVia" list="ceViaList" placeholder="e.g. Bank transfer"></div>
+      </div>
+      <label>Note on the salary sheet (optional)</label>
+      <input type="text" id="psNote">
+    </div>
+    <div class="modal-error" id="psError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="psDelete">Remove from this month</button>
+      <button class="btn" id="psPrint" style="background:var(--direct); color:#fff;">🖨️ Salary sheet</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="psCancel">Cancel</button>
+      <button class="btn btn-save" id="psSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Villa detail modal (invoices + amounts, month-wise) -->
 <div class="modal-overlay" id="villaDetailModalOverlay">
   <div class="modal modal-wide" style="width:420px; max-height:82vh; overflow-y:auto;">
@@ -1738,7 +2060,7 @@ function rowToBooking(r){ return {
   retainedAmount: r.retained_amount !== null && r.retained_amount !== undefined ? Number(r.retained_amount) : 0,
   refundedAmount: r.refunded_amount !== null && r.refunded_amount !== undefined ? Number(r.refunded_amount) : 0,
 }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [] }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -2092,6 +2414,7 @@ function applyRolePermissions(){
     document.getElementById('activityLogTabBtn').style.display = '';
     document.getElementById('villaReportTabBtn').style.display = '';
     document.getElementById('companyTabBtn').style.display = '';
+    document.getElementById('payrollTabBtn').style.display = '';
     document.getElementById('usersTabBtn').style.display = '';
     document.getElementById('settingsTabBtn').style.display = '';
     if(!villaReportInited){ initVillaReport(); }
@@ -2179,6 +2502,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('villaReportPanel').style.display = tab==='villareport' ? '' : 'none';
     document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
     document.getElementById('companyPanel').style.display = tab==='company' ? '' : 'none';
+    document.getElementById('payrollPanel').style.display = tab==='payroll' ? '' : 'none';
     document.getElementById('usersPanel').style.display = tab==='users' ? '' : 'none';
     document.getElementById('settingsPanel').style.display = tab==='settings' ? '' : 'none';
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
@@ -2188,6 +2512,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
     if(tab === 'reports' && !reportsInited){ initReports(); }
     if(tab === 'company' && !companyInited){ initCompany(); }
+    if(tab === 'payroll' && !payrollInited){ initPayroll(); }
     if(tab === 'users' && !usersInited){ initUsers(); }
     if(tab === 'settings' && !settingsInited){ initSettings(); }
   });
@@ -3724,6 +4049,7 @@ async function fetchCash(){
   renderCash();
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
   if(typeof reportsInited !== 'undefined' && reportsInited) renderReports();
+  if(companyInited) onAcctDataChanged();
 }
 
 function updateExpenseCardLock(){
@@ -3924,6 +4250,7 @@ function renderCash(){
         + (t.settled && t.settledNote ? `<div class="txn-sub">Settled: ${t.settledNote}</div>` : '');
     } else {
       details = (t.purpose || 'Expense') + ` <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>`
+        + acctChipHTML(t)
         + (t.linkedInventory ? ' 📦' : '')
         + (t.employeeName ? ` <span style="color:var(--amber); font-size:11px; font-weight:600;">(from ${t.employeeName}'s advance)</span>` : '')
         + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
@@ -4150,6 +4477,7 @@ function openExpenseModal(record, forceDirect){
     document.getElementById('expError').style.display = 'none';
     updateExpenseCardLock(); // also refreshes the stock checkbox's label/hint for the current "For"
     applyDirectExpenseUI();
+    initExpenseAccountField(record);
     document.getElementById('expenseModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
 }
@@ -4174,6 +4502,8 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   if(!date || !amount || amount <= 0 || !purpose){ errEl.textContent='Fill in date, purpose, and a valid amount.'; errEl.style.display='block'; return; }
   if(card === 'kalava_card' && forWhom !== 'kalava'){ errEl.textContent='Kalava Villa Card can only be used for Kalava Villa.'; errEl.style.display='block'; return; }
   if(isStock && !itemName){ errEl.textContent='Enter an item name for the stock item.'; errEl.style.display='block'; return; }
+  const accountCode = document.getElementById('expAccount').value || null;
+  if(!accountCode){ errEl.textContent='Pick which account this goes into, so the company accounts stay sorted.'; errEl.style.display='block'; return; }
 
   try{
     const newUrls = [];
@@ -4245,7 +4575,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
         logActivity('update', 'inventory_transactions', `Removed stock link from expense: ${purpose}`);
       }
 
-      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode };
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode };
       if(newUrls.length){
         const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
@@ -4258,7 +4588,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     }
 
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
-      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode
+      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode
     }).select().single();
     if(error) throw error;
     logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
@@ -6427,6 +6757,8 @@ function initCompany(){
   if(!cashInited){ initPettyCash(); }
 
   fetchCompany();
+  ensureAcctData();
+  initCoSortAndBills();
   if(sb){
     sb.channel('company_accounts_changes')
       .on('postgres_changes', { event:'*', schema:'public', table:'company_monthly_accounts' }, fetchCompany)
@@ -6444,8 +6776,10 @@ function initCompany(){
   document.getElementById('coNextMonth').addEventListener('click', ()=> coGoMonth(1));
   document.getElementById('coThisMonth').addEventListener('click', ()=> coGoMonth(0));
 
-  document.getElementById('coTabEntry').addEventListener('click', ()=> setCoView('entry'));
-  document.getElementById('coTabReport').addEventListener('click', ()=> setCoView('report'));
+  document.querySelectorAll('#companyPanel [data-coview]').forEach(b=>{
+    b.addEventListener('click', ()=> setCoView(b.dataset.coview));
+  });
+  document.getElementById('coRebuild').addEventListener('click', ()=> coRebuildFromRecords(true));
   document.getElementById('coPrintBtn').addEventListener('click', ()=> window.print());
   document.getElementById('coSaveBtn').addEventListener('click', saveCompanyMonth);
   document.getElementById('coPullCommission').addEventListener('click', coPullCommission);
@@ -6472,20 +6806,29 @@ async function setCoView(v){
     }
   }
   coView = v;
+  document.getElementById('coSortView').style.display = v==='sort' ? '' : 'none';
+  document.getElementById('coBillsView').style.display = v==='bills' ? '' : 'none';
   document.getElementById('coEntryView').style.display = v==='entry' ? '' : 'none';
   document.getElementById('coReportView').style.display = v==='report' ? '' : 'none';
-  const eBtn = document.getElementById('coTabEntry'), rBtn = document.getElementById('coTabReport');
-  [eBtn, rBtn].forEach(b=>{ b.classList.remove('active'); b.style.background='#fff'; b.style.color='var(--muted)'; });
-  const on = v==='entry' ? eBtn : rBtn;
-  on.classList.add('active'); on.style.background='var(--ink)'; on.style.color='#fff';
+  document.querySelectorAll('#companyPanel [data-coview]').forEach(b=>{
+    const on = b.dataset.coview === v;
+    b.classList.toggle('active', on);
+    b.style.background = on ? 'var(--ink)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--muted)';
+  });
   if(v==='report') renderCompanyReport();
+  if(v==='sort') renderCoSort();
+  if(v==='bills') renderCoBills();
 }
 
 function renderCompany(){
   if(!companyInited) return;
   document.getElementById('coMonthLabel').textContent = coMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
   renderCompanyEntry();
+  renderCoFlow();
   if(coView === 'report') renderCompanyReport();
+  if(coView === 'sort') renderCoSort();
+  if(coView === 'bills') renderCoBills();
 }
 
 /* ---------------------------- entry form ---------------------------- */
@@ -6517,10 +6860,21 @@ function renderCompanyEntry(){
     groupWrap.innerHTML = CO_GROUPS.map(g=>`
       <div class="co-group">
         <div class="co-group-title"><span>${esc(g.label)}</span><span class="co-group-total" data-group-total="${g.key}">0</span></div>
-        ${g.items.map(([k,l])=>`<label class="co-line"><span>${esc(l)}</span><input type="number" step="0.01" placeholder="0.00" data-cat="${k}"></label>`).join('')}
+        ${g.items.map(([k,l])=>`<label class="co-line"><span>${esc(l)}</span><span role="button" tabindex="0" class="co-link" data-link-cat="${k}"></span><input type="number" step="0.01" placeholder="0.00" data-cat="${k}"></label>`).join('')}
       </div>`).join('');
     document.getElementById('coAnnualLines').innerHTML = CO_ANNUAL.map(([k,l])=>
-      `<label class="co-line"><span>${esc(l)}</span><input type="number" step="0.01" placeholder="0.00" data-cat="${k}"></label>`).join('');
+      `<label class="co-line"><span>${esc(l)}</span><span role="button" tabindex="0" class="co-link" data-link-cat="${k}"></span><input type="number" step="0.01" placeholder="0.00" data-cat="${k}"></label>`).join('');
+    document.querySelectorAll('#companyPanel .co-link').forEach(btn=>{
+      const apply = (e)=>{
+        e.preventDefault();
+        if(btn.classList.contains('same') || !btn.dataset.amount) return;
+        const inp = document.querySelector(`#companyPanel input[data-cat="${btn.dataset.linkCat}"]`);
+        inp.value = btn.dataset.amount; inp.classList.add('auto');
+        coDirty = true; coRecalcTotals();
+      };
+      btn.addEventListener('click', apply);
+      btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' ') apply(e); });
+    });
     document.querySelectorAll('#companyPanel input[data-cat]').forEach(inp=>{
       inp.addEventListener('input', ()=>{ coDirty=true; inp.classList.remove('auto'); coRecalcTotals(); });
     });
@@ -6551,17 +6905,16 @@ function renderCompanyEntry(){
   });
   // A month nobody has entered figures for yet: link Management Income straight from
   // Bookings so the form opens already populated, instead of a blank sheet to retype.
-  if(mgmtIsFresh) coAutoFillCommissionIfFresh(p);
+  const monthIsFresh = !allCoRows.some(r => r.period === p);
+  if(monthIsFresh) coAutoBuildIfFresh(p);
+  else if(mgmtIsFresh) coAutoFillCommissionIfFresh(p);
 
   // Reference figure: what the board itself recorded as petty cash spending this month
-  const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
-  const monthEnd = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()+1, 1));
+  const { start: monthStart, end: monthEnd } = monthRangeLocal(coMonthDate);
   const pettySpent = allCashTxns
     .filter(t => t.type==='expense' && t.date>=monthStart && t.date<monthEnd)
     .reduce((s,t)=> s + t.amount, 0);
-  document.getElementById('coPettyHint').textContent = pettySpent
-    ? `For reference: the Petty Cash tab recorded ${lkr(pettySpent)} of spending this month.`
-    : '';
+  document.getElementById('coPettyHint').textContent = '';
 
   document.getElementById('coSaveMsg').textContent = '';
   coDirty = false;
@@ -6591,6 +6944,7 @@ function coRecalcTotals(){
     if(inp) annual += parseFloat(inp.value)||0;
   });
   document.getElementById('coTotalAnnual').textContent = Math.round(annual).toLocaleString();
+  coRefreshLinkLabels();
 }
 
 /* ---------------------------- entry helpers ---------------------------- */
@@ -6801,7 +7155,7 @@ function renderCompanyReport(){
   if(!cur.hasData){
     body.innerHTML = `<div class="rpt-doc"><div class="rpt-empty">
       No figures have been entered for ${esc(coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}))} yet.
-      Switch to "✏️ Enter figures" above, fill the month in, and press Save — the reports build themselves from that.
+      Switch to "✏️ Review &amp; save month" above, fill the month in, and press Save — the reports build themselves from that.
     </div></div>`;
     return;
   }
@@ -6814,9 +7168,11 @@ function renderCompanyReport(){
     <div data-rpt-section="operating">${coOperatingStatementHTML(cur, prev, curLabel, prevLabel)}</div>
     <div data-rpt-section="sales">${coSalesSummaryHTML()}</div>
     <div data-rpt-section="pettycash">${coPettyCashHTML()}</div>
+    <div data-rpt-section="payroll">${coPayrollReportHTML()}</div>
+    <div data-rpt-section="bills">${coBillsReportHTML()}</div>
     <div class="rpt-foot">
       Prepared by Ceymora · ${esc(coMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}))}.
-      Built from the figures entered on the "Enter figures" tab for this month and the month before it.
+      Built from the figures saved on the "Review &amp; save month" tab for this month and the month before it.
       Figures in brackets are negative. Percentages are measured against management income unless stated otherwise.
     </div>
   </div>`;
@@ -7039,8 +7395,7 @@ function coOperatingStatementHTML(cur, prev, curLabel, prevLabel){
 
 /* ---- 5. Petty Cash Expenses (company-wide, straight from the Petty Cash tab) ---- */
 function coPettyCashHTML(){
-  const monthStart = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth(), 1));
-  const monthEnd = toISO(new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()+1, 1));
+  const { start: monthStart, end: monthEnd } = monthRangeLocal(coMonthDate);
   const rows = allCashTxns
     .filter(t => t.type==='expense' && t.date>=monthStart && t.date<monthEnd)
     .sort((a,b)=> a.date.localeCompare(b.date));
@@ -7061,6 +7416,7 @@ function coPettyCashHTML(){
       <td class="dim">${fmtDay(t.date)}</td>
       <td><b>${details}</b></td>
       <td class="dim">${esc(FOR_LABELS[t.for] || t.for)}</td>
+      <td class="dim">${acctOf(t) ? esc(acctLabel(acctOf(t))) : '<b style="color:#a06800;">Not sorted</b>'}</td>
       <td class="dim">${esc(CARD_LABELS[t.card] || t.card)}${tag ? `<div class="dim">${tag}</div>` : ''}</td>
       <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
     </tr>`;
@@ -7069,12 +7425,12 @@ function coPettyCashHTML(){
   return `<div class="rpt-section">
     <div class="rpt-section-title">Petty Cash Expenses <span class="rpt-section-count">${rows.length} item${rows.length===1?'':'s'} · ${lkr(total)}</span></div>
     <table class="rpt-table">
-      <thead><tr><th>Date</th><th>Expense details</th><th>For</th><th>From which card</th><th class="r">Amount (LKR)</th></tr></thead>
+      <thead><tr><th>Date</th><th>Expense details</th><th>For</th><th>Account</th><th>From which card</th><th class="r">Amount (LKR)</th></tr></thead>
       <tbody>${body}
-        <tr class="subtotal"><td colspan="4">Net Total</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
+        <tr class="subtotal"><td colspan="5">Net Total</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
       </tbody>
     </table>
-    <div class="rpt-note">Sourced directly from the Petty Cash tab — every expense recorded company-wide this month, whichever villa or card it was for.</div>
+    <div class="rpt-note">Sourced directly from the Petty Cash tab — every expense recorded this month, whichever villa or card it was for. Only lines sorted to a company account count toward the company's own expenses; villa costs and Store stock are charged to the villas.</div>
   </div>`;
 }
 
@@ -7154,6 +7510,1138 @@ function coBarChartSVG(months, year){
     <line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="#b8b2a3" stroke-width="1.2"/>
     ${bars}
   </svg>`;
+}
+
+
+/* ============================================================================
+   ACCOUNTS SORTING, BILLS & BANK, AND PAYROLL
+   Every figure in Company Accounts now traces back to a record:
+     • Petty Cash expenses carry an account (villa cost, Store stock, or one of
+       the company expense lines) — picked when the expense is entered, or
+       sorted later on the "Sort expenses" view.
+     • Bills paid outside petty cash, other income and bank balances are kept
+       in company_entries ("Bills, income & bank").
+     • Salaries come from payroll_entries (Staff & Payroll tab); only those the
+       company pays count as company staff cost.
+   "Rebuild this month from records" adds all of it up into the monthly figures.
+   ============================================================================ */
+
+const pad2 = n => String(n).padStart(2,'0');
+// Local-calendar month bounds as YYYY-MM-DD strings. (toISO() goes through UTC,
+// which moves midnight back a day in Sri Lanka, so it isn't used for ranges here.)
+function monthRangeLocal(d){
+  const y = d.getFullYear(), m = d.getMonth();
+  const ny = m === 11 ? y+1 : y, nm = m === 11 ? 0 : m+1;
+  return { start:`${y}-${pad2(m+1)}-01`, end:`${ny}-${pad2(nm+1)}-01` };
+}
+function monthLastDayLocal(d){
+  const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
+  return `${last.getFullYear()}-${pad2(last.getMonth()+1)}-${pad2(last.getDate())}`;
+}
+function localTodayISO(){ const t = new Date(); return `${t.getFullYear()}-${pad2(t.getMonth()+1)}-${pad2(t.getDate())}`; }
+function ymKey(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}`; }
+function num(v){ const x = parseFloat(v); return isFinite(x) ? x : 0; }
+function r2(v){ return Math.round(v*100)/100; }
+function fmt2(v){ return Number(v||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+function monthLabel(d){ return d.toLocaleDateString('en-GB', { month:'long', year:'numeric' }); }
+
+/* ---------------------------- accounts ---------------------------- */
+const VILLA_IDS = ['kalava','noelia','brisa'];
+function isCompanyAcct(code){ return !!(code && CO_CAT_INDEX[code]); }
+// Where an expense goes. An explicit choice wins; otherwise villa and Store
+// purchases are obvious, and anything for the Office still needs sorting.
+function acctOf(t){
+  if(t.accountCode) return t.accountCode;
+  if(t.for === 'store') return 'store';
+  if(t.for && t.for !== 'office') return 'villa';
+  return null;
+}
+function acctLabel(code){
+  if(code === 'villa') return 'Villa cost';
+  if(code === 'store') return 'Store stock';
+  return (CO_CAT_INDEX[code] || {}).label || code || '';
+}
+function acctGroupLabel(code){
+  const c = CO_CAT_INDEX[code];
+  if(!c) return '';
+  if(c.group === 'annual') return 'Non-recurring / Annual';
+  return (CO_GROUPS.find(g => g.key === c.group) || {}).label || '';
+}
+function acctOptionsHTML(selected, opts){
+  opts = opts || {};
+  const sel = v => v === selected ? ' selected' : '';
+  let h = `<option value="">${esc(opts.placeholder || '— Pick an account —')}</option>`;
+  if(!opts.companyOnly){
+    h += `<optgroup label="Charged to the villas (not a company expense)">
+      <option value="villa"${sel('villa')}>Villa cost — charged to the villa it was for</option>
+      <option value="store"${sel('store')}>Store stock — charged to villas when distributed</option>
+    </optgroup>`;
+  }
+  CO_GROUPS.forEach(g=>{
+    h += `<optgroup label="Company — ${esc(g.label)}">` +
+      g.items.map(([k,l])=>`<option value="${k}"${sel(k)}>${esc(l)}</option>`).join('') + '</optgroup>';
+  });
+  h += '<optgroup label="Company — Non-recurring / Annual">' +
+    CO_ANNUAL.map(([k,l])=>`<option value="${k}"${sel(k)}>${esc(l)}</option>`).join('') + '</optgroup>';
+  return h;
+}
+// Word cues for suggesting a company account. Order matters: the first match wins.
+const ACCT_KEYWORDS = [
+  [/audit/i,'annual_audit'], [/secretar/i,'annual_secretary'], [/trade\s*licen/i,'annual_trade_license'],
+  [/electric|\bceb\b|leco/i,'electricity'], [/water|nwsdb/i,'water'],
+  [/phone|telephone|dialog|mobitel|\bslt\b|hutch|airtel|internet|wi-?fi|broadband|reload/i,'telephone'],
+  [/accountan/i,'accountancy'], [/lawyer|legal|notary|consult/i,'professional_fees'],
+  [/bank charge|service charge|sms alert|bank fee|card fee/i,'bank_charges'],
+  [/commission/i,'card_commission'], [/penalt|surcharge|late fee|fine\b/i,'penalty'],
+  [/exchange loss|fx loss/i,'exchange_loss'], [/dog/i,'dog_food'],
+  [/print|stationer|paper|\bpen\b|ink|toner|photocop/i,'printing'],
+  [/repair|plumb|electrician|mason|carpent|service(d)? the/i,'repair'],
+  [/fuel|petrol|diesel|\btuk|taxi|uber|pickme|\bbus\b|train|transport|travel|parking|toll/i,'travel_transport'],
+  [/clean|detergent|soap|mop|broom|garbage/i,'cleaning'],
+  [/advert|promo|facebook|instagram|google ads|boost|marketing|flyer|signboard/i,'advertising'],
+  [/welfare|staff meal|staff lunch|tea|refreshment|uniform|medical/i,'staff_welfare'],
+  [/salary|salaries/i,'staff_salary'], [/wage/i,'wages'], [/bonus/i,'bonus'],
+  [/office/i,'office_maintenance'],
+];
+function suggestAccount(text){
+  const t = String(text || '');
+  for(const [re, code] of ACCT_KEYWORDS){ if(re.test(t)) return code; }
+  return null;
+}
+function acctChipHTML(t){
+  if(t.type !== 'expense') return '';
+  const code = acctOf(t);
+  if(!code) return ' <span class="acct-chip open" title="Pick a company account for this — Company Accounts → Sort expenses">needs an account</span>';
+  if(isCompanyAcct(code)) return ` <span class="acct-chip co" title="Company Accounts → ${esc(acctGroupLabel(code))}">${esc(acctLabel(code))}</span>`;
+  return '';
+}
+
+/* ---------------------------- expense form: the account field ---------------------------- */
+let expAccountTouched = false;
+function expAccountAutoValue(){
+  const forWhom = document.getElementById('expFor').value;
+  if(forWhom === 'store') return 'store';
+  if(forWhom !== 'office') return 'villa';
+  const txt = document.getElementById('expPurpose').value + ' ' + document.getElementById('expNote').value;
+  return suggestAccount(txt) || '';
+}
+function updateExpenseAccountHint(auto){
+  const code = document.getElementById('expAccount').value;
+  const forWhom = document.getElementById('expFor').value;
+  const hint = document.getElementById('expAccountHint');
+  let msg;
+  if(!code) msg = 'Pick the company account this belongs to — it decides where it lands in Company Accounts.';
+  else if(code === 'villa') msg = `Charged to ${FOR_LABELS[forWhom] || 'the villa'} — shows in that villa's report, not in the company's profit & loss.`;
+  else if(code === 'store') msg = 'Store stock — charged to the villas as items are distributed, not a company expense.';
+  else msg = `Company expense → Company Accounts › ${acctGroupLabel(code)} › ${acctLabel(code)}.`;
+  if(auto && code && forWhom === 'office') msg = 'Suggested from what you typed. ' + msg;
+  hint.textContent = msg;
+  document.getElementById('expAccount').classList.toggle('open', !code);
+}
+function expAccountAuto(){
+  if(expAccountTouched) return;
+  document.getElementById('expAccount').value = expAccountAutoValue();
+  updateExpenseAccountHint(true);
+}
+function initExpenseAccountField(record){
+  const sel = document.getElementById('expAccount');
+  sel.innerHTML = acctOptionsHTML('', { placeholder:'— Pick where this goes —' });
+  sel.classList.add('acct-select');
+  sel.style.maxWidth = 'none';
+  expAccountTouched = !!(record && record.accountCode);
+  if(record && acctOf(record)){ sel.value = acctOf(record); updateExpenseAccountHint(false); }
+  else { sel.value = ''; expAccountAuto(); }
+}
+(function wireExpenseAccountField(){
+  const sel = document.getElementById('expAccount');
+  if(!sel) return;
+  sel.addEventListener('change', ()=>{ expAccountTouched = true; updateExpenseAccountHint(false); });
+  document.getElementById('expFor').addEventListener('change', ()=> setTimeout(expAccountAuto, 0));
+  document.getElementById('expCard').addEventListener('change', ()=> setTimeout(expAccountAuto, 0));
+  document.getElementById('expPurpose').addEventListener('input', expAccountAuto);
+  document.getElementById('expNote').addEventListener('input', expAccountAuto);
+})();
+
+/* ---------------------------- shared data ---------------------------- */
+let allCoEntries = [];
+let allStaffProfiles = [];
+let allPayroll = [];
+let acctDataPromise = null;
+let acctChannelsOn = false;
+
+function rowToCe(r){ return { id:r.id, kind:r.kind, date:r.date, accountCode:r.account_code || null, description:r.description || '', amount:Number(r.amount)||0, paidVia:r.paid_via || '', invoiceUrls:r.invoice_urls || [] }; }
+function rowToSp(r){ return {
+  id:r.id, fullName:r.full_name || '', employeeNo:r.employee_no || '', designation:r.designation || '',
+  worksAt:r.works_at || 'office', paidBy:r.paid_by || 'company', nic:r.nic || '', epfNo:r.epf_no || '',
+  joinDate:r.join_date || '', phone:r.phone || '', address:r.address || '', bankName:r.bank_name || '',
+  bankAccount:r.bank_account || '', basicSalary:Number(r.basic_salary)||0, allowance:Number(r.allowance)||0,
+  travellingAllowance:Number(r.travelling_allowance)||0, epfApplies:r.epf_applies !== false,
+  active:r.active !== false, notes:r.notes || '' }; }
+function rowToPay(r){ return {
+  id:r.id, period:r.period, profileId:r.profile_id || null, name:r.name || '', designation:r.designation || '',
+  paidBy:r.paid_by || 'company', basic:Number(r.basic)||0, noPayDays:Number(r.no_pay_days)||0,
+  allowance:Number(r.allowance)||0, travellingAllowance:Number(r.travelling_allowance)||0,
+  performanceIncentive:Number(r.performance_incentive)||0, performanceAllowance:Number(r.performance_allowance)||0,
+  bonus:Number(r.bonus)||0, overtime:Number(r.overtime)||0, salaryAdvance:Number(r.salary_advance)||0,
+  apit:Number(r.apit)||0, otherDeductions:Number(r.other_deductions)||0, otherDeductionsNote:r.other_deductions_note || '',
+  epfApplies:r.epf_applies !== false, paidOn:r.paid_on || '', paidVia:r.paid_via || '', note:r.note || '' }; }
+
+async function fetchCoEntries(){
+  if(!sb) return;
+  const { data, error } = await sb.from('company_entries').select('*');
+  if(error){ console.error('company_entries', error); acctTableMissing('company_entries'); return; }
+  allCoEntries = data.map(rowToCe);
+}
+async function fetchStaffProfiles(){
+  if(!sb) return;
+  const { data, error } = await sb.from('staff_profiles').select('*');
+  if(error){ console.error('staff_profiles', error); acctTableMissing('staff_profiles'); return; }
+  allStaffProfiles = data.map(rowToSp).sort((a,b)=> a.fullName.localeCompare(b.fullName));
+}
+async function fetchPayroll(){
+  if(!sb) return;
+  const { data, error } = await sb.from('payroll_entries').select('*');
+  if(error){ console.error('payroll_entries', error); acctTableMissing('payroll_entries'); return; }
+  allPayroll = data.map(rowToPay);
+}
+let acctMissingShown = false;
+function acctTableMissing(name){
+  if(acctMissingShown) return;
+  acctMissingShown = true;
+  const msg = `The ${name} table isn't in Supabase yet — run supabase-accounts-and-payroll.sql in the SQL editor.`;
+  ['coSortMsg','payMsg','payStaffMsg'].forEach(id=>{ const el = document.getElementById(id); if(el) el.textContent = msg; });
+}
+
+function ensureAcctData(){
+  if(acctDataPromise) return acctDataPromise;
+  acctDataPromise = (async ()=>{
+    const jobs = [fetchCoEntries(), fetchStaffProfiles(), fetchPayroll()];
+    if(cashInited && !allCashTxns.length && sb) jobs.push(fetchCash());
+    await Promise.all(jobs);
+    if(sb && !acctChannelsOn){
+      acctChannelsOn = true;
+      sb.channel('company_entries_changes')
+        .on('postgres_changes', { event:'*', schema:'public', table:'company_entries' }, async ()=>{ await fetchCoEntries(); onAcctDataChanged(); })
+        .subscribe();
+      sb.channel('staff_profiles_changes')
+        .on('postgres_changes', { event:'*', schema:'public', table:'staff_profiles' }, async ()=>{ await fetchStaffProfiles(); onAcctDataChanged(); })
+        .subscribe();
+      sb.channel('payroll_entries_changes')
+        .on('postgres_changes', { event:'*', schema:'public', table:'payroll_entries' }, async ()=>{ await fetchPayroll(); onAcctDataChanged(); })
+        .subscribe();
+    }
+    onAcctDataChanged();
+  })();
+  return acctDataPromise;
+}
+
+function onAcctDataChanged(){
+  if(companyInited){
+    renderCoFlow();
+    if(coView === 'sort') renderCoSort();
+    if(coView === 'bills') renderCoBills();
+    if(coView === 'report') renderCompanyReport();
+    if(coView === 'entry'){
+      if(!coDirty) renderCompanyEntry();
+      else coRefreshLinkLabels();
+    }
+  }
+  if(payrollInited) renderPayroll();
+}
+
+/* ---------------------------- adding the records up ---------------------------- */
+// Payroll arithmetic for one person-month (Sri Lanka EPF/ETF rates).
+const EPF_EMPLOYEE = 0.08, EPF_EMPLOYER = 0.12, ETF_RATE = 0.03, NO_PAY_DIVISOR = 30;
+function payCalc(p){
+  const basic = num(p.basic);
+  const noPayDeduction = r2(basic / NO_PAY_DIVISOR * num(p.noPayDays));
+  const basicEarned = r2(basic - noPayDeduction);
+  const additions = num(p.allowance) + num(p.travellingAllowance) + num(p.performanceIncentive)
+    + num(p.performanceAllowance) + num(p.bonus) + num(p.overtime);
+  const gross = r2(basicEarned + additions);
+  const epfBase = p.epfApplies ? basicEarned : 0;
+  const epfEmployee = r2(epfBase * EPF_EMPLOYEE);
+  const epfEmployer = r2(epfBase * EPF_EMPLOYER);
+  const etf = r2(epfBase * ETF_RATE);
+  const deductions = r2(epfEmployee + num(p.salaryAdvance) + num(p.apit) + num(p.otherDeductions));
+  const net = r2(gross - deductions);
+  return { basic, noPayDeduction, basicEarned, gross, epfBase, epfEmployee, epfEmployer, etf, deductions, net,
+           employerCost: r2(gross + epfEmployer + etf) };
+}
+function paidByLabel(v){ return v === 'company' ? 'Ceymora (company)' : `${FOR_LABELS[v] || v} owner`; }
+function worksAtLabel(v){ return v === 'all' ? 'All villas' : (FOR_LABELS[v] || v); }
+
+// Everything the records say about one month, per company expense line.
+function coLinkedFigures(monthDate){
+  const { start, end } = monthRangeLocal(monthDate);
+  const cat = {};
+  const add = (code, src, amt)=>{
+    if(!isCompanyAcct(code) || !amt) return;
+    const c = cat[code] || (cat[code] = { total:0, petty:0, bills:0, payroll:0 });
+    c[src] += amt; c.total += amt;
+  };
+  const petty = { company:0, villa:0, store:0, open:0, openCount:0 };
+  allCashTxns.filter(t => t.type === 'expense' && t.date >= start && t.date < end).forEach(t=>{
+    const code = acctOf(t);
+    if(!code){ petty.open += t.amount; petty.openCount++; return; }
+    if(code === 'villa'){ petty.villa += t.amount; return; }
+    if(code === 'store'){ petty.store += t.amount; return; }
+    petty.company += t.amount;
+    add(code, 'petty', t.amount);
+  });
+
+  let billsTotal = 0;
+  const otherIncome = {}, cashLatest = {};
+  allCoEntries.filter(e => e.date >= start && e.date < end).forEach(e=>{
+    if(e.kind === 'expense'){ billsTotal += e.amount; add(e.accountCode, 'bills', e.amount); }
+    else if(e.kind === 'income'){ const k = e.description || 'Other income'; otherIncome[k] = (otherIncome[k]||0) + e.amount; }
+    else if(e.kind === 'balance'){
+      const k = e.description || 'Account';
+      if(!cashLatest[k] || e.date >= cashLatest[k].date) cashLatest[k] = { date:e.date, amount:e.amount };
+    }
+  });
+  const cash = {}; Object.keys(cashLatest).forEach(k => cash[k] = cashLatest[k].amount);
+
+  const period = ymKey(monthDate);
+  let payrollCompany = 0, payrollVilla = 0;
+  allPayroll.filter(p => p.period === period).forEach(p=>{
+    const c = payCalc(p);
+    if(p.paidBy !== 'company'){ payrollVilla += c.gross; return; }
+    payrollCompany += c.employerCost;
+    add('staff_salary', 'payroll', c.basicEarned);
+    add('allowance', 'payroll', num(p.allowance));
+    add('travelling_allowance', 'payroll', num(p.travellingAllowance));
+    add('performance_incentive', 'payroll', num(p.performanceIncentive));
+    add('performance_allowance', 'payroll', num(p.performanceAllowance));
+    add('bonus', 'payroll', num(p.bonus));
+    add('wages', 'payroll', num(p.overtime));
+    add('epf', 'payroll', c.epfEmployer);
+    add('etf', 'payroll', c.etf);
+  });
+
+  const companyTotal = Object.values(cat).reduce((s,c)=> s + c.total, 0);
+  return { cat, otherIncome, cash, petty, billsTotal, payrollCompany, payrollVilla, companyTotal };
+}
+
+// The little "↻ 12,500" next to each line on the Review view: what the records add
+// up to, clickable to use it. Shows a quiet tick when the line already matches.
+function coRefreshLinkLabels(){
+  const links = document.querySelectorAll('#companyPanel .co-link');
+  if(!links.length) return;
+  const linked = coLinkedFigures(coMonthDate);
+  links.forEach(btn=>{
+    const k = btn.dataset.linkCat;
+    const c = linked.cat[k];
+    const amt = c ? r2(c.total) : 0;
+    const inp = document.querySelector(`#companyPanel input[data-cat="${k}"]`);
+    const cur = inp ? r2(num(inp.value)) : 0;
+    btn.classList.remove('same');
+    if(!amt){ btn.textContent = ''; btn.dataset.amount = ''; btn.removeAttribute('title'); return; }
+    const parts = [];
+    if(c.petty) parts.push('Petty cash ' + Math.round(c.petty).toLocaleString());
+    if(c.bills) parts.push('Bills ' + Math.round(c.bills).toLocaleString());
+    if(c.payroll) parts.push('Payroll ' + Math.round(c.payroll).toLocaleString());
+    btn.dataset.amount = amt;
+    if(cur === amt){
+      btn.textContent = '✓';
+      btn.classList.add('same');
+      btn.title = 'Matches the records: ' + parts.join(' + ');
+    } else {
+      btn.textContent = '↻ ' + Math.round(amt).toLocaleString();
+      btn.title = 'Records add up to ' + parts.join(' + ') + '. Click to use this figure.';
+    }
+  });
+}
+
+function coApplyLinked(linked){
+  document.querySelectorAll('#companyPanel input[data-cat]').forEach(inp=>{
+    const c = linked.cat[inp.dataset.cat];
+    const v = c ? r2(c.total) : 0;
+    inp.value = v ? v : '';
+    inp.classList.toggle('auto', !!v);
+  });
+  const fill = (section, obj)=>{
+    const names = Object.keys(obj);
+    if(!names.length) return;
+    const wrapId = { other_income:'coOtherRows', cash:'coCashRows' }[section];
+    document.getElementById(wrapId).innerHTML = '';
+    names.forEach(n=>{ const row = coAddDynRow(section, n, r2(obj[n])); row.querySelector('.co-amt').classList.add('auto'); });
+  };
+  fill('other_income', linked.otherIncome);
+  fill('cash', linked.cash);
+}
+
+async function coRebuildFromRecords(ask){
+  if(ask && !confirm(
+    'Rebuild ' + monthLabel(coMonthDate) + ' from the records?\n\n' +
+    '• Management income ← Bookings\n' +
+    '• Expense lines ← sorted Petty Cash + Bills + company Payroll\n' +
+    '• Other income and bank balances ← Bills, income & bank\n\n' +
+    'Expense lines are replaced with what the records say. Nothing is saved until you press Save.')) return;
+  const msg = document.getElementById('coSaveMsg');
+  const btn = document.getElementById('coRebuild');
+  btn.disabled = true; msg.textContent = 'Adding up the records…';
+  try{
+    await ensureAcctData();
+    const linked = coLinkedFigures(coMonthDate);
+    coApplyLinked(linked);
+    try{
+      const perVilla = await computeCommissionByVilla(coMonthDate);
+      applyCommissionToRows(perVilla, true);
+    }catch(e){ console.error(e); }
+    coDirty = true; coRecalcTotals();
+    msg.textContent = linked.petty.openCount
+      ? `Built from the records — but ${linked.petty.openCount} petty cash expense${linked.petty.openCount===1?' is':'s are'} still unsorted and left out. Sort them, rebuild, then Save.`
+      : 'Built from the records — review the figures, then Save.';
+  } finally { btn.disabled = false; }
+}
+
+// A month nobody has saved yet opens already built from the records.
+async function coAutoBuildIfFresh(periodISO){
+  try{
+    await ensureAcctData();
+    if(coPeriodISO(coMonthDate) !== periodISO || coDirty) return;
+    const linked = coLinkedFigures(coMonthDate);
+    const perVilla = await computeCommissionByVilla(coMonthDate).catch(()=> ({}));
+    if(coPeriodISO(coMonthDate) !== periodISO || coDirty) return;
+    const hasRecords = linked.companyTotal > 0 || Object.keys(linked.otherIncome).length || Object.keys(linked.cash).length;
+    const hasCommission = Object.values(perVilla).some(v => v > 0);
+    if(!hasRecords && !hasCommission) return;
+    coApplyLinked(linked);
+    if(hasCommission) applyCommissionToRows(perVilla, true);
+    coDirty = true; coRecalcTotals();
+    document.getElementById('coSaveMsg').textContent = 'Built from Bookings, Petty Cash, Bills and Payroll — review it, then Save.';
+  }catch(e){ console.error(e); }
+}
+
+/* ---------------------------- the "where it comes from" strip ---------------------------- */
+function renderCoFlow(){
+  const el = document.getElementById('coFlow');
+  if(!el) return;
+  const L = coLinkedFigures(coMonthDate);
+  const k = n => Math.round(n).toLocaleString();
+  el.innerHTML = `
+    <div class="src"><b>${k(L.petty.company)}</b>Petty cash sorted to company accounts</div>
+    <div class="src ${L.petty.openCount ? 'warn' : ''}"><b>${L.petty.openCount ? k(L.petty.open) : '0'}</b>${L.petty.openCount
+      ? `${L.petty.openCount} expense${L.petty.openCount===1?'':'s'} still need an account · <button type="button" data-go-sort>Sort now</button>`
+      : 'Nothing left to sort'}</div>
+    <div class="src"><b>${k(L.billsTotal)}</b>Bills paid outside petty cash</div>
+    <div class="src"><b>${k(L.payrollCompany)}</b>Payroll cost paid by the company</div>
+    <div class="src"><b>${k(L.petty.villa + L.petty.store)}</b>Charged to villas &amp; Store (kept out)</div>
+    <div class="dest"><b>LKR ${k(L.companyTotal)}</b>company expenses in the records for ${esc(monthLabel(coMonthDate))}</div>`;
+  const go = el.querySelector('[data-go-sort]');
+  if(go) go.addEventListener('click', ()=> setCoView('sort'));
+}
+
+/* ---------------------------- Sort expenses view ---------------------------- */
+function initCoSortAndBills(){
+  document.getElementById('coSortOnlyOpen').addEventListener('change', renderCoSort);
+  document.getElementById('coSortAuto').addEventListener('click', coSortAuto);
+  document.querySelectorAll('#companyPanel [data-ce-add]').forEach(b=>{
+    b.addEventListener('click', ()=> openCeModal(b.dataset.ceAdd, null));
+  });
+  document.getElementById('ceCopyBalances').addEventListener('click', ceCopyBalances);
+}
+
+function renderCoSort(){
+  const wrap = document.getElementById('coSortList');
+  const { start, end } = monthRangeLocal(coMonthDate);
+  const monthTx = allCashTxns.filter(t => t.type === 'expense' && t.date >= start && t.date < end)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  const onlyOpen = document.getElementById('coSortOnlyOpen').checked;
+  const L = coLinkedFigures(coMonthDate);
+
+  document.getElementById('coSortSummary').innerHTML = `
+    <div><div class="k">Expenses this month</div><div class="v">${monthTx.length}</div></div>
+    <div><div class="k">Company accounts</div><div class="v">${lkr(L.petty.company)}</div></div>
+    <div><div class="k">Charged to villas &amp; Store</div><div class="v">${lkr(L.petty.villa + L.petty.store)}</div></div>
+    <div><div class="k">Still need an account</div><div class="v ${L.petty.openCount ? 'warn' : 'good'}">${L.petty.openCount ? L.petty.openCount + ' · ' + lkr(L.petty.open) : 'All sorted ✓'}</div></div>`;
+
+  const rows = onlyOpen ? monthTx.filter(t => !acctOf(t)) : monthTx;
+  if(!rows.length){
+    wrap.innerHTML = `<div class="manage-empty">${monthTx.length
+      ? 'Every expense this month has an account.'
+      : 'No petty cash expenses recorded in ' + esc(monthLabel(coMonthDate)) + '.'}</div>`;
+    return;
+  }
+  const editable = canEdit();
+  wrap.innerHTML = `<table class="inv-table pay-table">
+    <thead><tr><th>Date</th><th>Expense</th><th class="hide-sm">For</th><th class="hide-sm">Card</th><th class="r">LKR</th><th>Goes to</th></tr></thead>
+    <tbody>${rows.map(t=>`
+      <tr>
+        <td>${fmtDay(t.date)}</td>
+        <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="ce-sub">${esc(t.note)}</div>` : ''}</td>
+        <td class="hide-sm">${esc(FOR_LABELS[t.for] || t.for || '')}</td>
+        <td class="hide-sm">${esc(CARD_LABELS[t.card] || t.card || '')}</td>
+        <td class="r">${Math.round(t.amount).toLocaleString()}</td>
+        <td><select class="acct-select ${acctOf(t) ? '' : 'open'}" data-txn="${t.id}" ${editable ? '' : 'disabled'}>${acctOptionsHTML(acctOf(t) || '')}</select></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+  wrap.querySelectorAll('select[data-txn]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const t = allCashTxns.find(x => String(x.id) === sel.dataset.txn);
+      if(!t || !sb) return;
+      sel.disabled = true;
+      const code = sel.value || null;
+      const { error } = await sb.from('petty_cash_transactions').update({ account_code: code }).eq('id', t.id);
+      sel.disabled = false;
+      if(error){
+        console.error(error);
+        document.getElementById('coSortMsg').textContent = 'Could not save — has supabase-accounts-and-payroll.sql been run?';
+        return;
+      }
+      t.accountCode = code;
+      sel.classList.toggle('open', !acctOf(t));
+      sel.classList.add('saved');
+      logActivity('update', 'petty_cash_transactions', `Sorted expense "${t.purpose}" (LKR ${t.amount.toLocaleString()}) → ${code ? acctLabel(code) : 'no account'}`);
+      renderCoFlow();
+      if(!coDirty && coView === 'entry') renderCompanyEntry();
+    });
+  });
+}
+
+async function coSortAuto(){
+  if(!canEdit()){ alert('Only an admin can sort expenses.'); return; }
+  const { start, end } = monthRangeLocal(coMonthDate);
+  const open = allCashTxns.filter(t => t.type === 'expense' && t.date >= start && t.date < end && !acctOf(t));
+  if(!open.length){ document.getElementById('coSortMsg').textContent = 'Nothing to sort this month.'; return; }
+  const plan = open.map(t => ({ t, code: suggestAccount((t.purpose||'') + ' ' + (t.note||'')) })).filter(x => x.code);
+  if(!plan.length){ document.getElementById('coSortMsg').textContent = `No suggestions for the ${open.length} unsorted expense${open.length===1?'':'s'} — pick their accounts by hand.`; return; }
+  const preview = plan.slice(0, 12).map(x => `• ${x.t.purpose} → ${acctLabel(x.code)}`).join('\n') + (plan.length > 12 ? `\n…and ${plan.length-12} more` : '');
+  if(!confirm(`Sort ${plan.length} of ${open.length} unsorted expense${open.length===1?'':'s'} like this?\n\n${preview}`)) return;
+  let done = 0;
+  for(const x of plan){
+    const { error } = await sb.from('petty_cash_transactions').update({ account_code: x.code }).eq('id', x.t.id);
+    if(!error){ x.t.accountCode = x.code; done++; }
+  }
+  logActivity('update', 'petty_cash_transactions', `Auto-sorted ${done} expense(s) for ${monthLabel(coMonthDate)}`);
+  document.getElementById('coSortMsg').textContent = `Sorted ${done}. ${open.length - done ? (open.length - done) + ' left to pick by hand.' : ''}`;
+  renderCoSort(); renderCoFlow();
+}
+
+/* ---------------------------- Bills, income & bank view ---------------------------- */
+const ceFileHandler = createMultiFileHandler('ceFile', 'ceFileList');
+let editingCe = null, ceKind = 'expense';
+
+function renderCoBills(){
+  const { start, end } = monthRangeLocal(coMonthDate);
+  const inMonth = allCoEntries.filter(e => e.date >= start && e.date < end).sort((a,b)=> a.date.localeCompare(b.date));
+  const draw = (kind, listId, totalId)=>{
+    const rows = inMonth.filter(e => e.kind === kind);
+    const total = rows.reduce((s,e)=> s + e.amount, 0);
+    document.getElementById(totalId).textContent = Math.round(total).toLocaleString();
+    const wrap = document.getElementById(listId);
+    if(!rows.length){ wrap.innerHTML = '<div class="co-empty-hint">Nothing entered for this month.</div>'; return; }
+    wrap.innerHTML = '';
+    rows.forEach(e=>{
+      const row = document.createElement('div');
+      row.className = 'ce-row';
+      const sub = kind === 'expense'
+        ? [acctLabel(e.accountCode), e.paidVia].filter(Boolean).join(' · ')
+        : kind === 'income' ? [e.paidVia ? 'into ' + e.paidVia : ''].filter(Boolean).join('')
+        : 'as at ' + fmtDay(e.date);
+      const files = (e.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${e.invoiceUrls.length>1?' '+(i+1):''}</a>`).join(' ');
+      row.innerHTML = `
+        <div class="ce-main"><b>${esc(e.description || '—')}</b> ${files}
+          <div class="ce-sub">${kind === 'balance' ? '' : fmtDay(e.date) + (sub ? ' · ' : '')}${esc(sub)}</div></div>
+        <div class="ce-amt">${Math.round(e.amount).toLocaleString()}</div>`;
+      if(canEdit()){
+        const b = document.createElement('button');
+        b.className = 'manage-edit'; b.textContent = 'Edit';
+        b.addEventListener('click', ()=> openCeModal(kind, e));
+        row.appendChild(b);
+      }
+      wrap.appendChild(row);
+    });
+  };
+  draw('expense', 'ceExpenseList', 'ceTotalExpense');
+  draw('income', 'ceIncomeList', 'ceTotalIncome');
+  draw('balance', 'ceBalanceList', 'ceTotalBalance');
+}
+
+function knownAccountNames(){
+  const names = new Set(['Sampath Current Account']);
+  allCoEntries.forEach(e=>{ if(e.kind === 'balance' && e.description) names.add(e.description); if(e.paidVia) names.add(e.paidVia); });
+  allCoRows.filter(r => r.section === 'cash').forEach(r => names.add(r.category));
+  ['Cash', 'Ceymora Card', 'Cheque'].forEach(n => names.add(n));
+  return [...names];
+}
+
+function openCeModal(kind, record){
+  if(!canEdit()){ alert('Only an admin can add company entries.'); return; }
+  ceKind = kind; editingCe = record;
+  const g = id => document.getElementById(id);
+  const titles = { expense:'a bill or payment', income:'income', balance:'a bank or cash balance' };
+  g('ceModalTitle').textContent = (record ? 'Edit ' : 'Add ') + titles[kind];
+  g('ceDateLabel').textContent = kind === 'balance' ? 'Balance as at' : kind === 'income' ? 'Date received' : 'Date paid';
+  g('ceDescLabel').textContent = kind === 'balance' ? 'Account name' : kind === 'income' ? 'Income from' : 'What was it for';
+  g('ceDesc').placeholder = kind === 'balance' ? 'e.g. Sampath Current Account' : kind === 'income' ? 'e.g. Bank interest' : 'e.g. Office electricity — August';
+  g('ceAccountWrap').style.display = kind === 'expense' ? '' : 'none';
+  g('ceViaWrap').style.display = kind === 'balance' ? 'none' : '';
+  g('ceViaWrap').querySelector('label').textContent = kind === 'income' ? 'Received into' : 'Paid from';
+  g('ceAccount').innerHTML = acctOptionsHTML(record ? record.accountCode : '', { companyOnly:true, placeholder:'— Pick the company account —' });
+  g('ceAccount').className = 'acct-select'; g('ceAccount').style.maxWidth = 'none';
+
+  const names = knownAccountNames();
+  g('ceViaList').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
+  g('ceDescList').innerHTML = kind === 'balance' ? names.filter(n => !['Cash','Ceymora Card','Cheque'].includes(n)).map(n=>`<option value="${esc(n)}">`).join('') : '';
+
+  const { start, end } = monthRangeLocal(coMonthDate);
+  const today = localTodayISO();
+  const defDate = kind === 'balance' ? monthLastDayLocal(coMonthDate) : (today >= start && today < end ? today : monthLastDayLocal(coMonthDate));
+  g('ceDate').value = record ? record.date : defDate;
+  g('ceAmount').value = record ? record.amount : '';
+  g('ceDesc').value = record ? record.description : '';
+  g('ceVia').value = record ? record.paidVia : '';
+  ceFileHandler.reset();
+  g('ceFileHint').textContent = record && record.invoiceUrls.length ? `${record.invoiceUrls.length} file(s) already attached.` : '';
+  g('ceError').style.display = 'none';
+  g('ceDelete').style.display = record ? '' : 'none';
+  g('ceModalOverlay').classList.add('open');
+  // Typing the bill's description suggests its account, until one is picked by hand.
+  g('ceAccount').dataset.touched = record ? '1' : '';
+}
+document.getElementById('ceAccount').addEventListener('change', e=> e.target.dataset.touched = '1');
+document.getElementById('ceDesc').addEventListener('input', ()=>{
+  const sel = document.getElementById('ceAccount');
+  if(ceKind !== 'expense' || sel.dataset.touched) return;
+  sel.value = suggestAccount(document.getElementById('ceDesc').value) || '';
+});
+document.getElementById('ceCancel').addEventListener('click', ()=> document.getElementById('ceModalOverlay').classList.remove('open'));
+document.getElementById('ceModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'ceModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('ceSave').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const err = g('ceError');
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  if(!sb) return fail('Not connected to Supabase yet.');
+  const date = g('ceDate').value, amount = parseFloat(g('ceAmount').value), description = g('ceDesc').value.trim();
+  const accountCode = ceKind === 'expense' ? (g('ceAccount').value || null) : null;
+  const paidVia = ceKind === 'balance' ? null : (g('ceVia').value.trim() || null);
+  if(!date) return fail('Enter the date.');
+  if(!description) return fail(ceKind === 'balance' ? 'Enter the account name.' : 'Say what this was for.');
+  if(!isFinite(amount) || (ceKind !== 'balance' && amount <= 0)) return fail('Enter the amount.');
+  if(ceKind === 'expense' && !accountCode) return fail('Pick the company account this goes to.');
+  try{
+    const newUrls = [];
+    for(const f of ceFileHandler.getFiles()){ g('ceFileHint').textContent = `Uploading ${f.name}…`; newUrls.push(await uploadReceiptFile(f)); }
+    const payload = { kind:ceKind, date, amount, description, account_code:accountCode, paid_via:paidVia };
+    if(editingCe){
+      if(newUrls.length) payload.invoice_urls = [...(editingCe.invoiceUrls||[]), ...newUrls];
+      const { error } = await sb.from('company_entries').update(payload).eq('id', editingCe.id);
+      if(error) throw error;
+      logActivity('update', 'company_entries', `Edited ${ceKind}: ${description} — LKR ${amount.toLocaleString()}`);
+    } else {
+      payload.invoice_urls = newUrls;
+      const { error } = await sb.from('company_entries').insert(payload);
+      if(error) throw error;
+      logActivity('create', 'company_entries', `Added ${ceKind}: ${description} — LKR ${amount.toLocaleString()}`);
+    }
+    g('ceModalOverlay').classList.remove('open');
+    await fetchCoEntries(); onAcctDataChanged();
+  }catch(e){ console.error(e); fail('Save failed — check that supabase-accounts-and-payroll.sql has been run.'); }
+});
+document.getElementById('ceDelete').addEventListener('click', async ()=>{
+  if(!editingCe || !checkDeletePassword()) return;
+  const { error } = await sb.from('company_entries').delete().eq('id', editingCe.id);
+  if(error){ alert('Could not delete.'); return; }
+  logActivity('delete', 'company_entries', `Deleted ${editingCe.kind}: ${editingCe.description}`);
+  document.getElementById('ceModalOverlay').classList.remove('open');
+  await fetchCoEntries(); onAcctDataChanged();
+});
+
+async function ceCopyBalances(){
+  if(!canEdit() || !sb) return;
+  const prev = new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()-1, 1);
+  const pr = monthRangeLocal(prev), cr = monthRangeLocal(coMonthDate);
+  const latest = {};
+  allCoEntries.filter(e => e.kind === 'balance' && e.date >= pr.start && e.date < pr.end).forEach(e=>{
+    if(!latest[e.description] || e.date >= latest[e.description].date) latest[e.description] = e;
+  });
+  const already = new Set(allCoEntries.filter(e => e.kind === 'balance' && e.date >= cr.start && e.date < cr.end).map(e => e.description));
+  const toAdd = Object.values(latest).filter(e => !already.has(e.description));
+  if(!toAdd.length){ alert('There are no balances from last month to copy (or they are already here).'); return; }
+  if(!confirm(`Copy ${toAdd.length} account${toAdd.length===1?'':'s'} from last month with last month's balance? Update each one to this month's closing figure afterwards.`)) return;
+  const { error } = await sb.from('company_entries').insert(toAdd.map(e => ({
+    kind:'balance', date:monthLastDayLocal(coMonthDate), amount:e.amount, description:e.description, invoice_urls:[]
+  })));
+  if(error){ alert('Could not copy the balances.'); console.error(error); return; }
+  await fetchCoEntries(); onAcctDataChanged();
+}
+
+/* ---------------------------- report sections ---------------------------- */
+function coPayrollReportHTML(){
+  const period = ymKey(coMonthDate);
+  const rows = allPayroll.filter(p => p.period === period).sort((a,b)=> a.name.localeCompare(b.name));
+  const co = rows.filter(p => p.paidBy === 'company'), villa = rows.filter(p => p.paidBy !== 'company');
+  if(!rows.length){
+    return `<div class="rpt-section"><div class="rpt-section-title">Payroll</div>
+      <div class="rpt-empty">No payroll prepared for ${esc(monthLabel(coMonthDate))}. It's prepared on the Staff &amp; Payroll tab.</div></div>`;
+  }
+  const t = { gross:0, epfEe:0, ded:0, net:0, epfEr:0, etf:0, cost:0 };
+  const body = co.map(p=>{
+    const c = payCalc(p);
+    t.gross += c.gross; t.epfEe += c.epfEmployee; t.ded += c.deductions - c.epfEmployee; t.net += c.net;
+    t.epfEr += c.epfEmployer; t.etf += c.etf; t.cost += c.employerCost;
+    return `<tr><td>${esc(p.name)}<div class="dim">${esc(p.designation)}</div></td>
+      <td class="r">${coNum(c.gross)}</td><td class="r">${coNum(c.epfEmployee)}</td><td class="r">${coNum(c.deductions - c.epfEmployee)}</td>
+      <td class="r"><b>${coNum(c.net)}</b></td><td class="r">${coNum(c.epfEmployer)}</td><td class="r">${coNum(c.etf)}</td><td class="r rpt-money-out">${coNum(c.employerCost)}</td></tr>`;
+  }).join('');
+  const villaGross = villa.reduce((s,p)=> s + payCalc(p).gross, 0);
+  return `<div class="rpt-section">
+    <div class="rpt-section-title">Payroll <span class="rpt-section-count">${co.length} on the company payroll · ${lkr(t.cost)} total cost</span></div>
+    ${co.length ? `<table class="rpt-table">
+      <thead><tr><th>Employee</th><th class="r">Gross</th><th class="r">EPF 8%</th><th class="r">Other ded.</th><th class="r">Net pay</th><th class="r">EPF 12%</th><th class="r">ETF 3%</th><th class="r">Cost to company</th></tr></thead>
+      <tbody>${body}
+        <tr class="subtotal"><td>Total</td><td class="r">${coNum(t.gross)}</td><td class="r">${coNum(t.epfEe)}</td><td class="r">${coNum(t.ded)}</td><td class="r">${coNum(t.net)}</td><td class="r">${coNum(t.epfEr)}</td><td class="r">${coNum(t.etf)}</td><td class="r">${coNum(t.cost)}</td></tr>
+      </tbody></table>` : '<div class="rpt-empty">Nobody on the company payroll this month.</div>'}
+    <div class="rpt-note">Cost to company = gross pay + employer EPF 12% + ETF 3%, and is what Staff Cost in the income statement is built from.
+      ${villa.length ? `${villa.length} salar${villa.length===1?'y is':'ies are'} paid by villa owners (gross ${lkr(villaGross)}) and ${villa.length===1?'is':'are'} not counted as company cost.` : ''}</div>
+  </div>`;
+}
+
+function coBillsReportHTML(){
+  const { start, end } = monthRangeLocal(coMonthDate);
+  const inMonth = allCoEntries.filter(e => e.date >= start && e.date < end).sort((a,b)=> a.date.localeCompare(b.date));
+  const bills = inMonth.filter(e => e.kind === 'expense'), inc = inMonth.filter(e => e.kind === 'income');
+  if(!bills.length && !inc.length){
+    return `<div class="rpt-section"><div class="rpt-section-title">Bills &amp; payments outside petty cash</div>
+      <div class="rpt-empty">None entered for this period.</div></div>`;
+  }
+  const bt = bills.reduce((s,e)=> s + e.amount, 0), it = inc.reduce((s,e)=> s + e.amount, 0);
+  return `<div class="rpt-section">
+    <div class="rpt-section-title">Bills &amp; payments outside petty cash <span class="rpt-section-count">${bills.length} item${bills.length===1?'':'s'} · ${lkr(bt)}</span></div>
+    ${bills.length ? `<table class="rpt-table">
+      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th>Paid from</th><th class="r">Amount (LKR)</th></tr></thead>
+      <tbody>${bills.map(e=>`<tr><td class="dim">${fmtDay(e.date)}</td><td><b>${esc(e.description)}</b></td><td class="dim">${esc(acctLabel(e.accountCode))}</td><td class="dim">${esc(e.paidVia)}</td><td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td></tr>`).join('')}
+        <tr class="subtotal"><td colspan="4">Total</td><td class="r">${Math.round(bt).toLocaleString()}</td></tr></tbody></table>` : ''}
+    ${inc.length ? `<table class="rpt-table" style="margin-top:12px;">
+      <thead><tr><th>Date</th><th>Other income</th><th>Received into</th><th class="r">Amount (LKR)</th></tr></thead>
+      <tbody>${inc.map(e=>`<tr><td class="dim">${fmtDay(e.date)}</td><td><b>${esc(e.description)}</b></td><td class="dim">${esc(e.paidVia)}</td><td class="r">${Math.round(e.amount).toLocaleString()}</td></tr>`).join('')}
+        <tr class="subtotal"><td colspan="3">Total</td><td class="r">${Math.round(it).toLocaleString()}</td></tr></tbody></table>` : ''}
+  </div>`;
+}
+
+/* ============================================================================
+   STAFF & PAYROLL TAB
+   ============================================================================ */
+let payrollInited = false;
+let payMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let payView = 'run';
+let editingSp = null, editingPs = null;
+
+function initPayroll(){
+  payrollInited = true;
+  ensureAcctData();
+  const g = id => document.getElementById(id);
+  const go = delta => {
+    if(delta === 0) payMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    else payMonthDate = new Date(payMonthDate.getFullYear(), payMonthDate.getMonth() + delta, 1);
+    renderPayroll();
+  };
+  g('payPrevMonth').addEventListener('click', ()=> go(-1));
+  g('payNextMonth').addEventListener('click', ()=> go(1));
+  g('payThisMonth').addEventListener('click', ()=> go(0));
+  g('payTabRun').addEventListener('click', ()=>{ payView = 'run'; renderPayroll(); });
+  g('payTabStaff').addEventListener('click', ()=>{ payView = 'staff'; renderPayroll(); });
+  g('payShowInactive').addEventListener('change', renderPayStaff);
+  g('payAddStaff').addEventListener('click', ()=> openSpModal(null));
+  g('payPrepare').addEventListener('click', payPrepareMonth);
+  g('payPrintAll').addEventListener('click', ()=>{
+    const rows = payRowsForMonth();
+    if(!rows.length){ alert('There is no payroll for this month yet.'); return; }
+    printSalarySheets(rows);
+  });
+  g('payPrintRegister').addEventListener('click', printPayRegister);
+  renderPayroll();
+}
+
+function payRowsForMonth(){
+  const period = ymKey(payMonthDate);
+  return allPayroll.filter(p => p.period === period).sort((a,b)=> a.name.localeCompare(b.name));
+}
+
+function renderPayroll(){
+  if(!payrollInited) return;
+  const g = id => document.getElementById(id);
+  g('payMonthLabel').textContent = monthLabel(payMonthDate);
+  g('payRunView').style.display = payView === 'run' ? '' : 'none';
+  g('payStaffView').style.display = payView === 'staff' ? '' : 'none';
+  g('payMonthNav').style.visibility = payView === 'run' ? '' : 'hidden';
+  [['payTabRun','run'],['payTabStaff','staff']].forEach(([id,v])=>{
+    const b = g(id), on = payView === v;
+    b.classList.toggle('active', on); b.style.background = on ? 'var(--ink)' : '#fff'; b.style.color = on ? '#fff' : 'var(--muted)';
+  });
+  if(payView === 'run') renderPayRun(); else renderPayStaff();
+}
+
+function renderPayRun(){
+  const rows = payRowsForMonth();
+  const list = document.getElementById('payList');
+  let gross = 0, net = 0, coCost = 0, villaGross = 0, paid = 0;
+  rows.forEach(p=>{ const c = payCalc(p); gross += c.gross; net += c.net; if(p.paidBy === 'company') coCost += c.employerCost; else villaGross += c.gross; if(p.paidOn) paid++; });
+  document.getElementById('paySummary').innerHTML = rows.length ? `
+    <div><div class="k">On the payroll</div><div class="v">${rows.length}</div></div>
+    <div><div class="k">Gross pay</div><div class="v">${lkr(gross)}</div></div>
+    <div><div class="k">Net pay to hand over</div><div class="v">${lkr(net)}</div></div>
+    <div><div class="k">Company cost → Company Accounts</div><div class="v">${lkr(coCost)}</div></div>
+    ${villaGross ? `<div><div class="k">Paid by villa owners (kept out)</div><div class="v">${lkr(villaGross)}</div></div>` : ''}
+    <div><div class="k">Marked paid</div><div class="v ${paid === rows.length ? 'good' : 'warn'}">${paid} of ${rows.length}</div></div>` : '';
+
+  if(!rows.length){
+    list.innerHTML = allStaffProfiles.some(s => s.active)
+      ? `<div class="manage-empty">No payroll for ${esc(monthLabel(payMonthDate))} yet. Press “Prepare from staff profiles” to start it.</div>`
+      : `<div class="manage-empty">Add your staff first under 👥 Staff profiles — name, bank details and basic salary — then come back here to prepare the month.</div>`;
+    return;
+  }
+  const t = { basic:0, add:0, gross:0, ded:0, net:0, er:0 };
+  const body = rows.map(p=>{
+    const c = payCalc(p);
+    const add = r2(c.gross - c.basicEarned);
+    t.basic += c.basicEarned; t.add += add; t.gross += c.gross; t.ded += c.deductions; t.net += c.net; t.er += c.epfEmployer + c.etf;
+    return `<tr data-pay="${p.id}">
+      <td><b>${esc(p.name)}</b><div class="ce-sub">${esc(p.designation || '')}${p.paidBy !== 'company' ? ' · paid by ' + esc(paidByLabel(p.paidBy)) : ''}</div></td>
+      <td class="r hide-sm">${fmt2(c.basicEarned)}${p.noPayDays ? `<div class="ce-sub">${p.noPayDays} no-pay day${p.noPayDays===1?'':'s'}</div>` : ''}</td>
+      <td class="r hide-sm">${add ? fmt2(add) : '—'}</td>
+      <td class="r">${fmt2(c.gross)}</td>
+      <td class="r hide-sm">${fmt2(c.deductions)}</td>
+      <td class="r"><b>${fmt2(c.net)}</b></td>
+      <td class="r hide-sm">${fmt2(c.epfEmployer + c.etf)}</td>
+      <td>${p.paidOn ? `<span class="pay-paid">Paid ${fmtDay(p.paidOn)}</span>` : '<span class="pay-unpaid">Not paid</span>'}</td>
+      <td style="white-space:nowrap;"><button class="manage-edit" data-edit>Open</button> <button class="manage-invoice" data-print title="Print salary sheet">🖨️</button></td>
+    </tr>`;
+  }).join('');
+  list.innerHTML = `<table class="inv-table pay-table">
+    <thead><tr><th>Employee</th><th class="r hide-sm">Basic</th><th class="r hide-sm">Additions</th><th class="r">Gross</th><th class="r hide-sm">Deductions</th><th class="r">Net pay</th><th class="r hide-sm">EPF 12% + ETF</th><th>Status</th><th></th></tr></thead>
+    <tbody>${body}
+      <tr class="tot"><td>Total</td><td class="r hide-sm">${fmt2(t.basic)}</td><td class="r hide-sm">${fmt2(t.add)}</td><td class="r">${fmt2(t.gross)}</td><td class="r hide-sm">${fmt2(t.ded)}</td><td class="r">${fmt2(t.net)}</td><td class="r hide-sm">${fmt2(t.er)}</td><td></td><td></td></tr>
+    </tbody></table>`;
+  list.querySelectorAll('tr[data-pay]').forEach(tr=>{
+    const p = allPayroll.find(x => String(x.id) === tr.dataset.pay);
+    tr.querySelector('[data-edit]').addEventListener('click', ()=> openPsModal(p));
+    tr.querySelector('[data-print]').addEventListener('click', ()=> printSalarySheets([p]));
+  });
+}
+
+async function payPrepareMonth(){
+  if(!isAdmin() || !sb){ alert('Only an admin can prepare payroll.'); return; }
+  const period = ymKey(payMonthDate);
+  const have = new Set(allPayroll.filter(p => p.period === period).map(p => p.profileId));
+  const todo = allStaffProfiles.filter(s => s.active && !have.has(s.id));
+  const msg = document.getElementById('payMsg');
+  if(!allStaffProfiles.length){ payView = 'staff'; renderPayroll(); document.getElementById('payStaffMsg').textContent = 'Add each staff member here first, with their basic salary.'; return; }
+  if(!todo.length){ msg.textContent = 'Everyone active is already on this month’s payroll.'; return; }
+  const rows = todo.map(s => ({
+    period, profile_id:s.id, name:s.fullName, designation:s.designation, paid_by:s.paidBy,
+    basic:s.basicSalary, allowance:s.allowance, travelling_allowance:s.travellingAllowance,
+    epf_applies:s.epfApplies,
+  }));
+  const { error } = await sb.from('payroll_entries').insert(rows);
+  if(error){ console.error(error); msg.textContent = 'Could not prepare — has supabase-accounts-and-payroll.sql been run?'; return; }
+  logActivity('create', 'payroll_entries', `Prepared payroll for ${monthLabel(payMonthDate)} (${rows.length} staff)`);
+  msg.textContent = `Added ${rows.length} ${rows.length===1?'person':'people'} for ${monthLabel(payMonthDate)}. Open a line to add no-pay days, bonus or deductions.`;
+  await fetchPayroll(); onAcctDataChanged();
+}
+
+/* ---- staff profiles list + form ---- */
+function renderPayStaff(){
+  const showAll = document.getElementById('payShowInactive').checked;
+  const rows = allStaffProfiles.filter(s => showAll || s.active);
+  const list = document.getElementById('payStaffList');
+  if(!rows.length){
+    list.innerHTML = '<div class="manage-empty">No staff profiles yet. Add each person once — their details print on every salary sheet.</div>';
+    return;
+  }
+  list.innerHTML = `<table class="inv-table pay-table">
+    <thead><tr><th>Name</th><th class="hide-sm">Works at</th><th>Salary paid by</th><th class="r">Basic</th><th class="r hide-sm">Allowances</th><th class="hide-sm">EPF no.</th><th class="hide-sm">Bank</th><th></th></tr></thead>
+    <tbody>${rows.map(s=>`
+      <tr data-sp="${s.id}" class="${s.active ? '' : 'pay-inactive'}">
+        <td><b>${esc(s.fullName)}</b><div class="ce-sub">${esc([s.designation, s.employeeNo].filter(Boolean).join(' · '))}${s.active ? '' : ' · left'}</div></td>
+        <td class="hide-sm">${esc(worksAtLabel(s.worksAt))}</td>
+        <td>${esc(paidByLabel(s.paidBy))}</td>
+        <td class="r">${s.basicSalary ? fmt2(s.basicSalary) : '<span class="pay-unpaid">not set</span>'}</td>
+        <td class="r hide-sm">${(s.allowance + s.travellingAllowance) ? fmt2(s.allowance + s.travellingAllowance) : '—'}</td>
+        <td class="hide-sm">${s.epfApplies ? esc(s.epfNo || '—') : 'No EPF'}</td>
+        <td class="hide-sm">${esc(s.bankAccount ? (s.bankName ? s.bankName + ' · ' : '') + s.bankAccount : '—')}</td>
+        <td><button class="manage-edit">Edit</button></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+  list.querySelectorAll('tr[data-sp] .manage-edit').forEach(b=>{
+    const s = allStaffProfiles.find(x => String(x.id) === b.closest('tr').dataset.sp);
+    b.addEventListener('click', ()=> openSpModal(s));
+  });
+}
+
+function openSpModal(s){
+  if(!isAdmin()){ alert('Only an admin can edit staff profiles.'); return; }
+  editingSp = s;
+  const g = id => document.getElementById(id);
+  g('spModalTitle').textContent = s ? 'Edit ' + s.fullName : 'Add staff member';
+  const places = [['office','Office'], ...VILLA_IDS.map(v=>[v, FOR_LABELS[v]]), ['all','All villas']];
+  g('spWorksAt').innerHTML = places.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('');
+  g('spPaidBy').innerHTML = [['company','Ceymora (company) — counts in Company Accounts'], ...VILLA_IDS.map(v=>[v, `${FOR_LABELS[v]} owner — kept out of company figures`])]
+    .map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('');
+  g('spNameList').innerHTML = (typeof STAFF !== 'undefined' ? STAFF : []).map(x=>`<option value="${esc(x.name)}">`).join('');
+  const v = (id, val) => g(id).value = val == null ? '' : val;
+  v('spName', s && s.fullName); v('spEmpNo', s && s.employeeNo); v('spDesignation', s && s.designation);
+  v('spWorksAt', s ? s.worksAt : 'office'); v('spPaidBy', s ? s.paidBy : 'company');
+  v('spNic', s && s.nic); v('spEpfNo', s && s.epfNo); v('spJoin', s && s.joinDate); v('spPhone', s && s.phone);
+  v('spAddress', s && s.address); v('spBank', s && s.bankName); v('spBankAcc', s && s.bankAccount);
+  v('spBasic', s ? s.basicSalary || '' : ''); v('spAllowance', s ? s.allowance || '' : ''); v('spTravel', s ? s.travellingAllowance || '' : '');
+  g('spEpf').checked = s ? s.epfApplies : true;
+  g('spActive').checked = s ? s.active : true;
+  v('spNotes', s && s.notes);
+  g('spError').style.display = 'none';
+  g('spDelete').style.display = s ? '' : 'none';
+  g('spModalOverlay').classList.add('open');
+}
+document.getElementById('spCancel').addEventListener('click', ()=> document.getElementById('spModalOverlay').classList.remove('open'));
+document.getElementById('spModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'spModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('spSave').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const err = g('spError');
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  if(!sb) return fail('Not connected to Supabase yet.');
+  const fullName = g('spName').value.trim();
+  if(!fullName) return fail('Enter the person’s name.');
+  const payload = {
+    full_name:fullName, employee_no:g('spEmpNo').value.trim() || null, designation:g('spDesignation').value.trim() || null,
+    works_at:g('spWorksAt').value, paid_by:g('spPaidBy').value, nic:g('spNic').value.trim() || null,
+    epf_no:g('spEpfNo').value.trim() || null, join_date:g('spJoin').value || null, phone:g('spPhone').value.trim() || null,
+    address:g('spAddress').value.trim() || null, bank_name:g('spBank').value.trim() || null, bank_account:g('spBankAcc').value.trim() || null,
+    basic_salary:num(g('spBasic').value), allowance:num(g('spAllowance').value), travelling_allowance:num(g('spTravel').value),
+    epf_applies:g('spEpf').checked, active:g('spActive').checked, notes:g('spNotes').value.trim() || null,
+  };
+  try{
+    if(editingSp){
+      const { error } = await sb.from('staff_profiles').update(payload).eq('id', editingSp.id);
+      if(error) throw error;
+      logActivity('update', 'staff_profiles', `Updated staff profile: ${fullName}`);
+    } else {
+      const { error } = await sb.from('staff_profiles').insert(payload);
+      if(error) throw error;
+      logActivity('create', 'staff_profiles', `Added staff profile: ${fullName}`);
+    }
+    g('spModalOverlay').classList.remove('open');
+    await fetchStaffProfiles(); onAcctDataChanged();
+  }catch(e){ console.error(e); fail('Save failed — check that supabase-accounts-and-payroll.sql has been run.'); }
+});
+document.getElementById('spDelete').addEventListener('click', async ()=>{
+  if(!editingSp) return;
+  const used = allPayroll.some(p => p.profileId === editingSp.id);
+  if(used && !confirm(`${editingSp.fullName} has past salary sheets. If they've left, untick “Currently working here” instead — that keeps their details on the old sheets.\n\nDelete the profile anyway?`)) return;
+  if(!checkDeletePassword()) return;
+  const { error } = await sb.from('staff_profiles').delete().eq('id', editingSp.id);
+  if(error){ alert('Could not delete.'); return; }
+  logActivity('delete', 'staff_profiles', `Deleted staff profile: ${editingSp.fullName}`);
+  document.getElementById('spModalOverlay').classList.remove('open');
+  await fetchStaffProfiles(); onAcctDataChanged();
+});
+
+/* ---- one person's month ---- */
+const PS_FIELDS = [
+  ['psBasic','basic'], ['psNoPay','noPayDays'], ['psAllowance','allowance'], ['psTravel','travellingAllowance'],
+  ['psPerfInc','performanceIncentive'], ['psPerfAllow','performanceAllowance'], ['psBonus','bonus'], ['psOvertime','overtime'],
+  ['psAdvance','salaryAdvance'], ['psApit','apit'], ['psOtherDed','otherDeductions'],
+];
+function psFromForm(){
+  const g = id => document.getElementById(id);
+  const o = Object.assign({}, editingPs);
+  PS_FIELDS.forEach(([id,k]) => o[k] = num(g(id).value));
+  o.epfApplies = g('psEpf').checked;
+  o.otherDeductionsNote = g('psOtherDedNote').value.trim();
+  o.paidOn = g('psPaidOn').value || '';
+  o.paidVia = g('psPaidVia').value.trim();
+  o.note = g('psNote').value.trim();
+  return o;
+}
+function psRenderPreview(){
+  const c = payCalc(psFromForm());
+  document.getElementById('psPreview').innerHTML = `
+    ${c.noPayDeduction ? `<div class="quote-line muted"><span>No-pay deduction (basic ÷ ${NO_PAY_DIVISOR} × days)</span><span>− ${fmt2(c.noPayDeduction)}</span></div>` : ''}
+    <div class="quote-line"><span>Gross pay</span><span>${fmt2(c.gross)}</span></div>
+    <div class="quote-line muted"><span>EPF 8% (employee)</span><span>− ${fmt2(c.epfEmployee)}</span></div>
+    <div class="quote-line muted"><span>Advance, tax &amp; other deductions</span><span>− ${fmt2(c.deductions - c.epfEmployee)}</span></div>
+    <div class="quote-line total due"><span>Net pay</span><span>LKR ${fmt2(c.net)}</span></div>
+    <div class="quote-line muted"><span>Employer EPF 12% + ETF 3% (not deducted)</span><span>${fmt2(c.epfEmployer + c.etf)}</span></div>`;
+}
+function openPsModal(p){
+  if(!isAdmin()){ alert('Only an admin can edit payroll.'); return; }
+  editingPs = p;
+  const g = id => document.getElementById(id);
+  g('psModalTitle').textContent = `${p.name} — ${monthLabel(payMonthDate)}`;
+  const prof = allStaffProfiles.find(s => s.id === p.profileId);
+  g('psWho').textContent = [p.designation, prof ? worksAtLabel(prof.worksAt) : '', 'salary paid by ' + paidByLabel(p.paidBy)].filter(Boolean).join(' · ');
+  PS_FIELDS.forEach(([id,k]) => g(id).value = p[k] ? p[k] : '');
+  g('psEpf').checked = p.epfApplies;
+  g('psOtherDedNote').value = p.otherDeductionsNote || '';
+  g('psPaidOn').value = p.paidOn || '';
+  g('psPaidVia').value = p.paidVia || '';
+  g('psNote').value = p.note || '';
+  g('ceViaList').innerHTML = ['Bank transfer','Cash','Cheque', ...knownAccountNames()].filter((v,i,a)=> a.indexOf(v)===i).map(n=>`<option value="${esc(n)}">`).join('');
+  g('psError').style.display = 'none';
+  psRenderPreview();
+  g('psModalOverlay').classList.add('open');
+}
+document.querySelectorAll('#psModalOverlay [data-ps]').forEach(i=> i.addEventListener('input', psRenderPreview));
+document.getElementById('psEpf').addEventListener('change', psRenderPreview);
+document.getElementById('psCancel').addEventListener('click', ()=> document.getElementById('psModalOverlay').classList.remove('open'));
+document.getElementById('psModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'psModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('psPrint').addEventListener('click', ()=> printSalarySheets([psFromForm()]));
+document.getElementById('psSave').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const o = psFromForm();
+  const payload = {
+    basic:o.basic, no_pay_days:o.noPayDays, allowance:o.allowance, travelling_allowance:o.travellingAllowance,
+    performance_incentive:o.performanceIncentive, performance_allowance:o.performanceAllowance, bonus:o.bonus,
+    overtime:o.overtime, salary_advance:o.salaryAdvance, apit:o.apit, other_deductions:o.otherDeductions,
+    other_deductions_note:o.otherDeductionsNote || null, epf_applies:o.epfApplies,
+    paid_on:o.paidOn || null, paid_via:o.paidVia || null, note:o.note || null, updated_at:new Date().toISOString(),
+  };
+  const { error } = await sb.from('payroll_entries').update(payload).eq('id', editingPs.id);
+  if(error){ console.error(error); g('psError').textContent = 'Save failed.'; g('psError').style.display = 'block'; return; }
+  logActivity('update', 'payroll_entries', `Updated ${o.name}'s salary for ${monthLabel(payMonthDate)} — net LKR ${fmt2(payCalc(o).net)}`);
+  g('psModalOverlay').classList.remove('open');
+  await fetchPayroll(); onAcctDataChanged();
+});
+document.getElementById('psDelete').addEventListener('click', async ()=>{
+  if(!editingPs || !confirm(`Take ${editingPs.name} off the ${monthLabel(payMonthDate)} payroll?`)) return;
+  const { error } = await sb.from('payroll_entries').delete().eq('id', editingPs.id);
+  if(error){ alert('Could not remove.'); return; }
+  logActivity('delete', 'payroll_entries', `Removed ${editingPs.name} from ${monthLabel(payMonthDate)} payroll`);
+  document.getElementById('psModalOverlay').classList.remove('open');
+  await fetchPayroll(); onAcctDataChanged();
+});
+
+/* ---- printing ---- */
+function printDocShell(title, bodyHTML, landscape){
+  const co = APP_SETTINGS.company || {};
+  const logo = APP_SETTINGS.logoUrl || '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{ font-family:'Inter',system-ui,sans-serif; color:#2b2b2b; margin:0; padding:30px 36px; font-size:12.5px; background:#fff; }
+  .sheet{ max-width:${landscape ? '1060px' : '780px'}; margin:0 auto 34px; }
+  .sheet + .sheet{ page-break-before:always; }
+  .head{ display:flex; justify-content:space-between; gap:24px; align-items:flex-start; border-bottom:3px solid #2b2b2b; padding-bottom:12px; }
+  .logo{ max-width:160px; max-height:80px; object-fit:contain; display:block; margin-bottom:4px; }
+  .co-name{ font-size:18px; font-weight:700; }
+  .co-meta{ font-size:11px; color:#666; line-height:1.55; margin-top:3px; white-space:pre-line; }
+  .right{ text-align:right; }
+  .title{ font-size:22px; font-weight:700; letter-spacing:1.5px; margin:0; }
+  .period{ font-size:13px; font-weight:600; margin-top:4px; }
+  .emp{ display:grid; grid-template-columns:repeat(2,1fr); gap:4px 26px; margin:16px 0 4px; }
+  .emp div{ display:flex; justify-content:space-between; gap:12px; border-bottom:1px dotted #ddd; padding:4px 0; }
+  .emp span:first-child{ color:#888; }
+  .emp span:last-child{ font-weight:600; text-align:right; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:16px; }
+  h4{ margin:0 0 6px; font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#999; }
+  table{ width:100%; border-collapse:collapse; }
+  td, th{ padding:6px 6px; border-bottom:1px solid #eee; text-align:left; vertical-align:top; }
+  th{ font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#999; border-bottom:2px solid #e4e0d6; }
+  .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  tr.sub td{ font-weight:700; border-top:2px solid #2b2b2b; border-bottom:none; }
+  .net{ margin-top:16px; display:flex; justify-content:space-between; align-items:center; background:#e3f9f2; color:#07795a; padding:11px 14px; border-radius:8px; font-size:16px; font-weight:700; }
+  .box{ margin-top:12px; border:1px solid #e4e0d6; border-radius:8px; padding:9px 12px; font-size:11.5px; color:#555; line-height:1.6; }
+  .sign{ display:grid; grid-template-columns:repeat(3,1fr); gap:28px; margin-top:44px; }
+  .sign div{ border-top:1px solid #999; padding-top:5px; font-size:11px; color:#777; text-align:center; }
+  .reg td, .reg th{ font-size:11px; padding:5px 5px; }
+  .reg tr.tot td{ font-weight:700; border-top:2px solid #2b2b2b; }
+  .small{ font-size:10.5px; color:#888; }
+  @media print{ body{ padding:0; } .noprint{ display:none !important; } .sheet{ margin-bottom:0; } @page{ size:${landscape ? 'A4 landscape' : 'A4'}; margin:12mm; } }
+  .noprint{ text-align:center; margin-bottom:20px; }
+  .noprint button{ font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:9px 20px; border-radius:7px; border:none; background:#2b2b2b; color:#fff; cursor:pointer; margin:0 4px; }
+</style></head><body>
+<div class="noprint">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <button onclick="window.close()" style="background:#f1f1ee; color:#2b2b2b;">Close</button>
+</div>
+${bodyHTML.replace(/%%LETTERHEAD%%/g, `
+    <div>
+      ${logo ? `<img class="logo" src="${esc(logo)}" alt="">` : ''}
+      <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
+      <div class="co-meta">${esc([co.reg, co.address, co.phone, co.email].filter(Boolean).join('\n'))}</div>
+    </div>`)}
+</body></html>`;
+}
+function openPrintWindow(html){
+  const w = window.open('', '_blank');
+  if(!w){ alert('Your browser blocked the print window. Allow pop-ups for this page and try again.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+function salarySheetHTML(p){
+  const c = payCalc(p);
+  const s = allStaffProfiles.find(x => x.id === p.profileId) || {};
+  const [py, pm] = String(p.period || ymKey(payMonthDate)).split('-').map(Number);
+  const period = monthLabel(new Date(py, pm-1, 1));
+  const earn = [
+    ['Basic salary', c.basic],
+    c.noPayDeduction ? [`Less no-pay (${p.noPayDays} day${p.noPayDays===1?'':'s'})`, -c.noPayDeduction] : null,
+    ['Allowance', p.allowance], ['Travelling allowance', p.travellingAllowance],
+    ['Performance incentive', p.performanceIncentive], ['Performance allowance', p.performanceAllowance],
+    ['Bonus', p.bonus], ['Overtime / extra wages', p.overtime],
+  ].filter(x => x && (x[1] || x[0] === 'Basic salary'));
+  const ded = [
+    p.epfApplies ? ['EPF — employee 8%', c.epfEmployee] : null,
+    ['Salary advance', p.salaryAdvance], ['APIT / tax', p.apit],
+    [p.otherDeductionsNote ? 'Other — ' + p.otherDeductionsNote : 'Other deductions', p.otherDeductions],
+  ].filter(x => x && x[1]);
+  const row = ([l,v]) => `<tr><td>${esc(l)}</td><td class="num">${v < 0 ? '(' + fmt2(-v) + ')' : fmt2(v)}</td></tr>`;
+  const info = [
+    ['Employee', p.name], ['Employee no.', s.employeeNo], ['Designation', p.designation], ['Works at', s.worksAt ? worksAtLabel(s.worksAt) : ''],
+    ['NIC no.', s.nic], ['EPF no.', p.epfApplies ? s.epfNo : 'Not applicable'], ['Bank', s.bankName], ['Account no.', s.bankAccount],
+    ['Date joined', s.joinDate ? fmtLongDate(parseISO(s.joinDate)) : ''], ['Salary paid by', paidByLabel(p.paidBy)],
+  ].filter(x => x[1]);
+  return `<div class="sheet">
+    <div class="head">%%LETTERHEAD%%
+      <div class="right"><h1 class="title">SALARY SHEET</h1><div class="period">${esc(period)}</div></div>
+    </div>
+    <div class="emp">${info.map(([k,v])=>`<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join('')}</div>
+    <div class="cols">
+      <div><h4>Earnings</h4><table><tbody>${earn.map(row).join('')}
+        <tr class="sub"><td>Gross pay</td><td class="num">${fmt2(c.gross)}</td></tr></tbody></table></div>
+      <div><h4>Deductions</h4><table><tbody>${ded.length ? ded.map(row).join('') : '<tr><td class="small">No deductions</td><td></td></tr>'}
+        <tr class="sub"><td>Total deductions</td><td class="num">${fmt2(c.deductions)}</td></tr></tbody></table></div>
+    </div>
+    <div class="net"><span>Net pay</span><span>LKR ${fmt2(c.net)}</span></div>
+    ${p.epfApplies ? `<div class="box">Paid by the employer on top of your salary: EPF 12% — LKR ${fmt2(c.epfEmployer)} · ETF 3% — LKR ${fmt2(c.etf)} (on EPF earnings of LKR ${fmt2(c.epfBase)}).</div>` : ''}
+    ${(p.paidOn || p.paidVia || p.note) ? `<div class="box">${p.paidOn ? `Paid on ${fmtLongDate(parseISO(p.paidOn))}` : 'Not yet paid'}${p.paidVia ? ' · ' + esc(p.paidVia) : ''}${p.note ? '<br>' + esc(p.note) : ''}</div>` : ''}
+    <div class="sign"><div>Prepared by</div><div>Approved by</div><div>Received by — ${esc(p.name)}</div></div>
+  </div>`;
+}
+function printSalarySheets(list){
+  openPrintWindow(printDocShell(list.length === 1 ? `Salary sheet — ${list[0].name} — ${monthLabel(payMonthDate)}` : `Salary sheets — ${monthLabel(payMonthDate)}`,
+    list.map(salarySheetHTML).join('')));
+  logActivity('print', 'payroll_entries', `Printed ${list.length} salary sheet(s) for ${monthLabel(payMonthDate)}`);
+}
+function printPayRegister(){
+  const rows = payRowsForMonth();
+  if(!rows.length){ alert('There is no payroll for this month yet.'); return; }
+  const t = { basic:0, add:0, gross:0, epfEe:0, other:0, net:0, epfEr:0, etf:0 };
+  const body = rows.map(p=>{
+    const c = payCalc(p), add = c.gross - c.basicEarned, other = c.deductions - c.epfEmployee;
+    t.basic += c.basicEarned; t.add += add; t.gross += c.gross; t.epfEe += c.epfEmployee; t.other += other; t.net += c.net; t.epfEr += c.epfEmployer; t.etf += c.etf;
+    const s = allStaffProfiles.find(x => x.id === p.profileId) || {};
+    return `<tr><td>${esc(p.name)}<div class="small">${esc(p.designation || '')}</div></td><td>${esc(s.epfNo || '')}</td><td>${esc(paidByLabel(p.paidBy))}</td>
+      <td class="num">${fmt2(c.basicEarned)}</td><td class="num">${fmt2(add)}</td><td class="num">${fmt2(c.gross)}</td><td class="num">${fmt2(c.epfEmployee)}</td>
+      <td class="num">${fmt2(other)}</td><td class="num"><b>${fmt2(c.net)}</b></td><td class="num">${fmt2(c.epfEmployer)}</td><td class="num">${fmt2(c.etf)}</td>
+      <td>${esc(s.bankAccount ? (s.bankName ? s.bankName + ' ' : '') + s.bankAccount : '')}</td></tr>`;
+  }).join('');
+  const html = `<div class="sheet">
+    <div class="head">%%LETTERHEAD%%
+      <div class="right"><h1 class="title">PAYROLL SUMMARY</h1><div class="period">${esc(monthLabel(payMonthDate))}</div></div>
+    </div>
+    <table class="reg" style="margin-top:16px;">
+      <thead><tr><th>Employee</th><th>EPF no.</th><th>Paid by</th><th class="num">Basic</th><th class="num">Additions</th><th class="num">Gross</th><th class="num">EPF 8%</th><th class="num">Other ded.</th><th class="num">Net pay</th><th class="num">EPF 12%</th><th class="num">ETF 3%</th><th>Bank account</th></tr></thead>
+      <tbody>${body}
+        <tr class="tot"><td colspan="3">Total — ${rows.length} employee${rows.length===1?'':'s'}</td><td class="num">${fmt2(t.basic)}</td><td class="num">${fmt2(t.add)}</td><td class="num">${fmt2(t.gross)}</td><td class="num">${fmt2(t.epfEe)}</td><td class="num">${fmt2(t.other)}</td><td class="num">${fmt2(t.net)}</td><td class="num">${fmt2(t.epfEr)}</td><td class="num">${fmt2(t.etf)}</td><td></td></tr>
+      </tbody></table>
+    <div class="box">EPF to remit for the month: LKR ${fmt2(t.epfEe + t.epfEr)} (8% employee + 12% employer). ETF to remit: LKR ${fmt2(t.etf)}.</div>
+    <div class="sign"><div>Prepared by</div><div>Checked by</div><div>Approved by</div></div>
+  </div>`;
+  openPrintWindow(printDocShell(`Payroll summary — ${monthLabel(payMonthDate)}`, html, true));
+  logActivity('print', 'payroll_entries', `Printed payroll summary for ${monthLabel(payMonthDate)}`);
 }
 
 </script>
