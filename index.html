@@ -1597,6 +1597,7 @@
       <option value="">No — paid fresh from the card above</option>
     </select>
     <div class="field-hint">If this bill is being covered out of cash someone's already holding as an advance, pick them here — it verifies where the money's coming from and comes off their balance instead of counting against the card a second time.</div>
+    <div class="field-hint" id="expAdvanceWarn" style="display:none; color:#a06800; font-weight:600;"></div>
     <div class="modal-checkbox-row" id="expStockRow">
       <input type="checkbox" id="expIsStock">
       <label for="expIsStock" id="expIsStockLabel">This is a stock item — also add to Inventory</label>
@@ -1652,6 +1653,10 @@
       <div id="advBillsList"></div>
       <button type="button" class="rpt-quick" id="advAddBill">+ Record a bill paid from this advance</button>
       <div id="advLegacyBills"></div>
+      <div id="advMoveWrap" style="margin-top:8px;">
+        <button type="button" class="rpt-quick" id="advMoveToggle">Bill already entered as paid from the card? Move it into this advance</button>
+        <div id="advMoveList" style="display:none; margin-top:6px;"></div>
+      </div>
       <div class="frm-row">
         <div><label>Unused cash he handed back (LKR)</label>
         <input type="number" id="advReturned" min="0" step="1" placeholder="0"></div>
@@ -4079,6 +4084,13 @@ function updateExpenseAdvanceHint(){
   const hint = document.getElementById('expAdvanceBalanceHint');
   if(!sel || !hint) return;
   const name = sel.value;
+  const warn = document.getElementById('expAdvanceWarn');
+  if(warn){
+    const holders = [...new Set(allCashTxns.filter(t => t.type === 'advance' && !t.advanceId && !t.settled).map(t => t.employeeName).filter(Boolean))];
+    const card = (document.getElementById('expCard') || {}).value;
+    warn.style.display = (!name && holders.length && card !== 'sharon') ? '' : 'none';
+    warn.innerHTML = `⚠ ${holders.map(esc).join(', ')} ${holders.length === 1 ? 'is' : 'are'} holding advance cash. If this bill was paid from that cash, pick the name above — otherwise the card is charged twice (once for the advance, once for this bill).`;
+  }
   if(!name){ hint.textContent = ''; return; }
   const wallets = computeAdvanceWallets();
   const balance = wallets[name] ? wallets[name].balance : 0;
@@ -4110,6 +4122,7 @@ function initPettyCash(){
     document.getElementById('expStockFields').style.display = e.target.checked ? '' : 'none';
   });
   document.getElementById('expFundedByAdvance').addEventListener('change', updateExpenseAdvanceHint);
+  document.getElementById('expCard').addEventListener('change', updateExpenseAdvanceHint);
   document.getElementById('advSettled').addEventListener('change', (e)=>{
     document.getElementById('advSettledNoteWrap').style.display = e.target.checked ? '' : 'none';
   });
@@ -4463,15 +4476,9 @@ function applyDirectExpenseUI(){
   // A direct expense can be goods too — ticking the stock box adds them straight to
   // that villa's inventory, the same as a direct purchase from "Record expense".
 
-  // A direct expense is paid by the card itself, so it can't also be funded from
-  // someone's advance — the label, the picker and its hint are all hidden and cleared.
-  const advSel = g('expFundedByAdvance');
-  const advLabel = g('expAdvanceBalanceHint').parentElement;   // the <label> wrapping the hint
-  const advHint = advSel.nextElementSibling;                   // the explanatory field-hint
-  advSel.style.display = on ? 'none' : '';
-  advLabel.style.display = on ? 'none' : '';
-  if(advHint && advHint.classList.contains('field-hint')) advHint.style.display = on ? 'none' : '';
-  if(on) advSel.value = '';
+  // A direct purchase can be paid out of cash someone is holding as an advance, just
+  // like any other bill — so the advance picker stays available here too. (Hiding it
+  // used to charge the card a second time for bills paid from an advance.)
 
   // Direct expenses always belong to a villa, never the office or the store.
   Array.from(g('expFor').options).forEach(opt=>{
@@ -4824,6 +4831,8 @@ function renderAdvSettlePanel(){
     });
   });
   document.getElementById('advAddBill').style.display = locked ? 'none' : '';
+  document.getElementById('advMoveWrap').style.display = locked ? 'none' : '';
+  document.getElementById('advMoveList').style.display = 'none';
   const loose = locked ? [] : advUnlinkedBills(adv);
   document.getElementById('advLegacyBills').innerHTML = loose.length
     ? `<div class="field-hint" style="margin-top:8px;">${loose.length} earlier bill${loose.length===1?'':'s'} paid from ${esc(adv.employeeName)}'s advances (LKR ${Math.round(loose.reduce((s,b)=>s+b.amount,0)).toLocaleString()}) aren't linked to a particular advance.
@@ -4865,6 +4874,44 @@ function advRenderRecon(){
 }
 ['advReturned','advPaidOut'].forEach(id => document.getElementById(id).addEventListener('input', (e)=>{ e.target.dataset.touched = '1'; advRenderRecon(); }));
 document.getElementById('advAmount').addEventListener('input', advRenderRecon);
+// Bills that were entered as "paid fresh from the card" around the time of this advance.
+// Moving one here stops the card being charged for it a second time.
+function advMoveCandidates(adv){
+  const from = adv.date;
+  const until = toISO(new Date(parseISO(adv.date).getTime() + 90 * 86400000));
+  return allCashTxns.filter(t => t.type === 'expense' && !t.employeeName && !t.advanceId && !isSharonCost(t)
+      && t.card === adv.card && t.date >= from && t.date <= until)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+}
+document.getElementById('advMoveToggle').addEventListener('click', ()=>{
+  const adv = advPanelRecord; if(!adv) return;
+  const list = document.getElementById('advMoveList');
+  if(list.style.display !== 'none'){ list.style.display = 'none'; return; }
+  const c = advMoveCandidates(adv);
+  list.style.display = '';
+  list.innerHTML = c.length
+    ? `<div class="field-hint" style="margin-bottom:4px;">Tick the bills ${esc(adv.employeeName)} paid with this advance's cash. They stay charged to the same villa; only the card stops paying for them twice.</div>`
+      + c.map(t => `<label class="acct-toggle" style="display:flex; margin:3px 0;"><input type="checkbox" value="${t.id}">
+          <span style="flex:1;">${fmtDay(t.date)} · <b>${esc(t.purpose || 'Expense')}</b> · ${esc(FOR_LABELS[t.for] || t.for || '')}${Math.abs(t.amount - advFigures(adv).left) < 1 ? ' <span class="adv-chip wait">matches the amount still open</span>' : ''}</span>
+          <b>${Math.round(t.amount).toLocaleString()}</b></label>`).join('')
+      + '<button type="button" class="rpt-quick" id="advMoveDo">Move ticked bills into this advance</button>'
+    : `<div class="co-empty-hint">No bills on the ${esc(CARD_LABELS[adv.card] || adv.card)} from ${fmtDay(adv.date)} onwards that aren't already linked to someone.</div>`;
+  const btn = document.getElementById('advMoveDo');
+  if(btn) btn.addEventListener('click', async ()=>{
+    const ids = [...list.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
+    if(!ids.length){ alert('Tick at least one bill.'); return; }
+    const picked = allCashTxns.filter(t => ids.includes(String(t.id)));
+    const sum = picked.reduce((s2,t)=> s2 + t.amount, 0);
+    if(!confirm(`Move ${picked.length} bill${picked.length===1?'':'s'} (LKR ${sum.toLocaleString()}) into ${adv.employeeName}'s advance?\n\nThe ${CARD_LABELS[adv.card]} balance goes back up by LKR ${sum.toLocaleString()}, because this money already left the card with the advance.`)) return;
+    for(const t of picked){
+      await sb.from('petty_cash_transactions').update({ employee_name: adv.employeeName, advance_id: String(adv.id) }).eq('id', t.id);
+    }
+    logActivity('update', 'petty_cash_transactions', `Moved ${picked.length} bill(s) (LKR ${sum.toLocaleString()}) into ${adv.employeeName}'s advance — removed double charge on ${CARD_LABELS[adv.card]}`);
+    await fetchCash();
+    advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
+    renderAdvSettlePanel();
+  });
+});
 document.getElementById('advAddBill').addEventListener('click', ()=>{
   const adv = advPanelRecord;
   if(!adv) return;
