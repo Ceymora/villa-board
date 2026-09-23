@@ -723,6 +723,8 @@
   .adv-undo-btn:hover{ filter:brightness(0.92); }
   .adv-quick{ border:1px dashed var(--board-line); border-radius:9px; padding:8px 11px 11px; margin-top:8px; background:#fff; }
   .adv-quick label{ margin-top:8px; }
+  .adv-holding{ background:var(--amber-bg); border:1px solid var(--amber); border-radius:9px; padding:8px 12px; margin:4px 0 8px; font-size:12.5px; }
+  .adv-holding b{ font-size:17px; font-variant-numeric:tabular-nums; display:block; }
   .chart-grid{ display:flex; flex-wrap:wrap; gap:12px; }
   .chart-card{ flex:1; min-width:280px; border:1px solid var(--board-line); border-radius:10px; padding:10px 12px; background:#fff; break-inside:avoid; }
   .chart-title{ font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
@@ -1624,6 +1626,10 @@
     <label>Goes into the accounts as</label>
     <select id="expAccount"></select>
     <div class="field-hint" id="expAccountHint"></div>
+    <div id="expWhoseWrap" style="display:none;">
+      <label>Whose mobile is it</label>
+      <select id="expWhose"></select>
+    </div>
     <label>Funded from a staff advance? <span id="expAdvanceBalanceHint" style="font-weight:400; color:var(--muted);"></span> (optional)</label>
     <select id="expFundedByAdvance">
       <option value="">No — paid fresh from the card above</option>
@@ -1681,6 +1687,7 @@
     <div class="field-hint" id="advFileHint"></div>
     <div id="advSettlePanel" class="pay-block" style="display:none">
       <div class="direct-block-title">Settling this advance</div>
+      <div id="advHolding" class="adv-holding"></div>
       <div class="field-hint">Enter the invoices he brought back, and the cash he returned if he returned any. Whatever is left stays on his account.</div>
       <div id="advBillsList"></div>
       <div class="adv-quick">
@@ -1961,6 +1968,10 @@
     <div id="ceAccountWrap">
       <label>Company account</label>
       <select id="ceAccount"></select>
+      <div id="ceWhoseWrap" style="display:none;">
+        <label>Whose mobile is it</label>
+        <select id="ceWhose"></select>
+      </div>
     </div>
     <div id="ceViaWrap">
       <label>Paid from</label>
@@ -4922,6 +4933,10 @@ function renderAdvSettlePanel(){
     renderAdvSettlePanel();
   });
   const f = advFigures(adv);
+  const wallet = computeAdvanceWallets()[adv.employeeName] || { balance:0 };
+  const holding = document.getElementById('advHolding');
+  holding.innerHTML = `${esc(adv.employeeName)} is holding <b>LKR ${Math.round(f.left).toLocaleString()}</b> from this advance of LKR ${adv.amount.toLocaleString()} given on ${fmtDay(adv.date)}.
+    ${Math.abs(wallet.balance - f.left) >= 1 ? `Across all his advances he is holding LKR ${Math.round(wallet.balance).toLocaleString()}.` : ''}`;
   const ri = document.getElementById('advReturned'), pi = document.getElementById('advPaidOut');
   if(!ri.dataset.touched) ri.value = f.returned || '';
   if(!pi.dataset.touched) pi.value = f.paidOut || '';
@@ -7541,6 +7556,7 @@ const CO_GROUPS = [
     ['performance_incentive','Performance Incentive'], ['allowance','Allowance'],
     ['performance_allowance','Performance Allowance'], ['bonus','Bonus'],
     ['travelling_allowance','Travelling Allowance'], ['wages','Wages'],
+    ['staff_mobile','Staff Mobile Bills'],
   ]},
   { key:'utilities', label:'Utilities & Fixed Commitments', items:[
     ['electricity','Electricity Bill'], ['water','Water'], ['telephone','Telephone'],
@@ -7552,6 +7568,7 @@ const CO_GROUPS = [
     ['printing','Printing & Stationery'], ['repair','Repair and Maintenance'],
     ['travel_transport','Travelling & Transport'], ['office_maintenance','Office Maintenance'],
     ['cleaning','Cleaning'], ['advertising','Advertising and Promotion'],
+    ['office_equipment','Office Equipment & Items'],
   ]},
   { key:'selling', label:'Selling & Distribution', items:[
     ['card_commission','Card Commission'],
@@ -8470,7 +8487,9 @@ function acctOptionsHTML(selected, opts){
 const ACCT_KEYWORDS = [
   [/audit/i,'annual_audit'], [/secretar/i,'annual_secretary'], [/trade\s*licen/i,'annual_trade_license'],
   [/electric|\bceb\b|leco/i,'electricity'], [/water|nwsdb/i,'water'],
+  [/mobile bill|staff phone|staff mobile|phone bill|sim bill/i,'staff_mobile'],
   [/phone|telephone|dialog|mobitel|\bslt\b|hutch|airtel|internet|wi-?fi|broadband|reload/i,'telephone'],
+  [/office (chair|table|desk|cupboard|almirah|fan|equipment|furniture|item)|laptop|printer|computer|air ?condition|\bac unit\b/i,'office_equipment'],
   [/accountan/i,'accountancy'], [/lawyer|legal|notary|consult/i,'professional_fees'],
   [/bank charge|service charge|sms alert|bank fee|card fee/i,'bank_charges'],
   [/commission/i,'card_commission'], [/penalt|surcharge|late fee|fine\b/i,'penalty'],
@@ -8506,6 +8525,34 @@ function expAccountAutoValue(){
   const txt = document.getElementById('expPurpose').value + ' ' + document.getElementById('expNote').value;
   return suggestAccount(txt) || '';
 }
+// Names the company might be paying a mobile bill for: staff profiles first, then
+// anyone who has held petty cash. Picking one writes it into the description, so the
+// report shows whose bill it was.
+function staffNameOptions(){
+  const names = new Set();
+  (typeof allStaffProfiles !== 'undefined' ? allStaffProfiles : []).filter(s => s.active).forEach(s => names.add(s.fullName));
+  allCashTxns.filter(t => t.employeeName).forEach(t => names.add(t.employeeName));
+  (typeof STAFF !== 'undefined' ? STAFF : []).forEach(s => names.add(s.name));
+  return [...names].sort();
+}
+function applyWhosePicker(selId, wrapId, targetId, accountValue){
+  const wrap = document.getElementById(wrapId), sel = document.getElementById(selId);
+  const show = accountValue === 'staff_mobile';
+  wrap.style.display = show ? '' : 'none';
+  if(!show) return;
+  const names = staffNameOptions();
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">— Pick the employee —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if(names.includes(keep)) sel.value = keep;
+  if(!sel.dataset.wired){
+    sel.dataset.wired = '1';
+    sel.addEventListener('change', ()=>{
+      const t = document.getElementById(targetId);
+      if(!sel.value) return;
+      if(!t.value.trim() || /^Mobile bill/i.test(t.value.trim())) t.value = `Mobile bill — ${sel.value}`;
+    });
+  }
+}
 function updateExpenseAccountHint(auto){
   const code = document.getElementById('expAccount').value;
   const forWhom = document.getElementById('expFor').value;
@@ -8518,6 +8565,7 @@ function updateExpenseAccountHint(auto){
   if(auto && code && forWhom === 'office') msg = 'Suggested from what you typed. ' + msg;
   hint.textContent = msg;
   document.getElementById('expAccount').classList.toggle('open', !code);
+  applyWhosePicker('expWhose', 'expWhoseWrap', 'expPurpose', code);
 }
 function expAccountAuto(){
   if(expAccountTouched) return;
@@ -8980,6 +9028,7 @@ function openCeModal(kind, record){
   g('ceViaWrap').querySelector('label').textContent = kind === 'income' ? 'Received into' : 'Paid from';
   g('ceAccount').innerHTML = acctOptionsHTML(record ? record.accountCode : '', { companyOnly:true, placeholder:'— Pick the company account —' });
   g('ceAccount').className = 'acct-select'; g('ceAccount').style.maxWidth = 'none';
+  applyWhosePicker('ceWhose', 'ceWhoseWrap', 'ceDesc', record ? record.accountCode : '');
 
   const names = knownAccountNames();
   g('ceViaList').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
@@ -9000,11 +9049,15 @@ function openCeModal(kind, record){
   // Typing the bill's description suggests its account, until one is picked by hand.
   g('ceAccount').dataset.touched = record ? '1' : '';
 }
-document.getElementById('ceAccount').addEventListener('change', e=> e.target.dataset.touched = '1');
+document.getElementById('ceAccount').addEventListener('change', e=>{
+  e.target.dataset.touched = '1';
+  applyWhosePicker('ceWhose', 'ceWhoseWrap', 'ceDesc', e.target.value);
+});
 document.getElementById('ceDesc').addEventListener('input', ()=>{
   const sel = document.getElementById('ceAccount');
   if(ceKind !== 'expense' || sel.dataset.touched) return;
   sel.value = suggestAccount(document.getElementById('ceDesc').value) || '';
+  applyWhosePicker('ceWhose', 'ceWhoseWrap', 'ceDesc', sel.value);
 });
 document.getElementById('ceCancel').addEventListener('click', ()=> document.getElementById('ceModalOverlay').classList.remove('open'));
 document.getElementById('ceModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'ceModalOverlay') e.currentTarget.classList.remove('open'); });
