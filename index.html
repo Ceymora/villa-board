@@ -951,6 +951,7 @@
           <select id="settledFilter" class="acct-select" style="max-width:200px;"></select>
         </div>
         <div class="field-hint" style="margin:2px 0 8px;">Every advance that's been closed — who settled it, the bills it paid for and the cash that came back. To reopen one, request an undo; Makky approves it.</div>
+        <div id="settledAdvancesTotals" class="acct-summary"></div>
         <div id="settledAdvancesList" class="manage-list" style="max-height:380px;"></div>
       </div>
 
@@ -1668,6 +1669,16 @@
         <input type="number" id="advPaidOut" min="0" step="1" placeholder="0"></div>
       </div>
       <div class="quote-box" id="advRecon"></div>
+      <div id="advShortWrap" style="display:none;">
+        <div class="modal-checkbox-row">
+          <input type="checkbox" id="advAcceptShort">
+          <label for="advAcceptShort" id="advAcceptShortLabel">Settle anyway — the balance stays on his account to recover later</label>
+        </div>
+      </div>
+      <div id="advUndoEntriesWrap" style="display:none; margin-top:8px;">
+        <button type="button" class="adv-undo-btn" id="advUndoEntries">↩ Undo the cash entries on this advance</button>
+        <div class="field-hint">Clears the “cash handed back” and “extra paid” figures so they can be entered again. Bills already recorded stay where they are.</div>
+      </div>
     </div>
     <div id="advSettledStatus"></div>
     <div class="modal-checkbox-row" id="advSettledRow">
@@ -4056,7 +4067,7 @@ function renderAdvanceWallets(){
       <div class="cash-card-label">${defaultInfo ? defaultInfo.label : name}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
-      ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} from ${openCount ? 'a settled' : 'settled'} advance${openCount ? '' : '(s)'} never billed — click to see</div>` : ''}
+      ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} still to recover from settled advance${Math.abs(gap) && openCount ? 's' : 's'} — click to see</div>` : ''}
     `;
     if(Math.abs(gap) >= 1){
       card.style.cursor = 'pointer';
@@ -4884,8 +4895,23 @@ function advRenderRecon(){
     <div class="quote-line muted"><span>Bills recorded</span><span>− ${Math.round(f.billed).toLocaleString()}</span></div>
     <div class="quote-line muted"><span>Cash handed back</span><span>− ${Math.round(f.returned).toLocaleString()}</span></div>
     <div class="quote-line total ${f.left === 0 ? 'due' : ''}" style="${f.left !== 0 ? 'color:var(--red);' : ''}">
-      <span>${f.left === 0 ? 'Balances — ready to settle ✓' : f.left > 0 ? 'Still to account for' : 'Bills are more than the cash given'}</span>
+      <span>${f.left === 0 ? 'Balances — ready to settle ✓' : f.left > 0 ? 'Balance still to recover from him' : 'Bills are more than the cash given'}</span>
       <span>${Math.abs(f.left).toLocaleString()}</span></div>`;
+  // Short by some amount? It can still be settled, as long as it's ticked knowingly —
+  // the balance stays on the person until they bring it or a bill turns up.
+  const shortWrap = document.getElementById('advShortWrap');
+  const adv = advPanelRecord;
+  const showShort = f.left > 0 && !(adv && adv.settled);
+  shortWrap.style.display = showShort ? '' : 'none';
+  if(showShort){
+    document.getElementById('advAcceptShortLabel').textContent =
+      `Settle anyway — LKR ${Math.round(f.left).toLocaleString()} stays on ${adv ? adv.employeeName + "'s" : 'his'} balance to recover later`;
+  } else {
+    document.getElementById('advAcceptShort').checked = false;
+  }
+  const undoWrap = document.getElementById('advUndoEntriesWrap');
+  const hasEntries = !!(adv && (advReturnRow(adv) || advTopUpRow(adv)));
+  undoWrap.style.display = (hasEntries && adv && !advLocked(adv)) ? '' : 'none';
 }
 ['advReturned','advPaidOut'].forEach(id => document.getElementById(id).addEventListener('input', (e)=>{ e.target.dataset.touched = '1'; advRenderRecon(); }));
 document.getElementById('advAmount').addEventListener('input', advRenderRecon);
@@ -4927,6 +4953,21 @@ document.getElementById('advMoveToggle').addEventListener('click', ()=>{
     renderAdvSettlePanel();
   });
 });
+document.getElementById('advUndoEntries').addEventListener('click', async ()=>{
+  const adv = advPanelRecord;
+  if(!adv || advLocked(adv)) return;
+  const ret = advReturnRow(adv), top = advTopUpRow(adv);
+  const parts = [ret ? `cash handed back LKR ${ret.amount.toLocaleString()}` : '', top ? `extra paid LKR ${top.amount.toLocaleString()}` : ''].filter(Boolean).join(' and ');
+  if(!confirm(`Remove ${parts} from ${adv.employeeName}'s advance?\n\nHis balance goes back to LKR ${(adv.amount - advBillsFor(adv).reduce((s2,b)=>s2+b.amount,0)).toLocaleString()} and the card is put back as it was. Bills already recorded are not touched.`)) return;
+  if(ret) await sb.from('petty_cash_transactions').delete().eq('id', ret.id);
+  if(top) await sb.from('petty_cash_transactions').delete().eq('id', top.id);
+  const log = [...(adv.settleLog || []), advStamp(`Undid the cash entries (${parts})`)];
+  await sb.from('petty_cash_transactions').update({ settle_log: log }).eq('id', adv.id);
+  logActivity('update', 'petty_cash_transactions', `Undid cash entries on ${adv.employeeName}'s advance (${parts})`);
+  await fetchCash();
+  const fresh = allCashTxns.find(t => t.id === adv.id);
+  if(fresh) openAdvanceModal(fresh);
+});
 document.getElementById('advAddBill').addEventListener('click', ()=>{
   const adv = advPanelRecord;
   if(!adv) return;
@@ -4947,7 +4988,7 @@ function renderAdvStatus(){
     if(Math.abs(f.left) >= 1){
       cls = 'bad';
       head += f.left > 0
-        ? ` <b>LKR ${f.left.toLocaleString()} was never recorded as a bill or returned cash</b>, so it still shows on ${esc(adv.employeeName)}'s balance. Reopen it (undo), record the missing bills or cash, then settle again.`
+        ? ` <b>LKR ${f.left.toLocaleString()} is still to recover from ${esc(adv.employeeName)}</b> — it stays on his balance until he brings the cash or the missing bill is recorded. Undo the settlement to put that right.`
         : ` <b>Bills are LKR ${Math.abs(f.left).toLocaleString()} more than the cash given.</b> Reopen it and enter the extra paid to him.`;
     } else {
       head += ' Bills and returned cash match the advance exactly.';
@@ -5041,17 +5082,29 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   const unsettling = !!(original && !settled && original.settled);
   const f = original ? advFormFigures() : { returned:0, paidOut:0, billed:0, left:0 };
 
-  if(newlySettling && Math.abs(f.left) >= 1){
-    g('advSettled').checked = false;
-    return fail(f.left > 0
-      ? `Can't settle yet — LKR ${f.left.toLocaleString()} isn't covered. Record the remaining bills, or enter the cash he handed back.`
-      : `Can't settle yet — the bills are LKR ${Math.abs(f.left).toLocaleString()} more than the advance. Enter that under “Extra paid to him”.`);
+  if(newlySettling){
+    // An invoice must be on file — either attached here, or on one of the bills.
+    const hasInvoice = (advSettledFileHandler.getFiles().length > 0)
+      || ((original.settledInvoiceUrls || []).length > 0)
+      || advBillsFor(original).some(bd => getInvoiceLinks(bd).length > 0);
+    if(!hasInvoice){
+      g('advSettled').checked = false;
+      return fail('Attach the invoice or receipt for this settlement before settling — use “Settlement bills / receipts” below, or attach it to one of the bills.');
+    }
+    if(f.left < -0.5){
+      g('advSettled').checked = false;
+      return fail(`The bills are LKR ${Math.abs(f.left).toLocaleString()} more than the advance. Enter that under “Extra paid to him”.`);
+    }
+    if(f.left >= 1 && !g('advAcceptShort').checked){
+      g('advSettled').checked = false;
+      return fail(`LKR ${Math.round(f.left).toLocaleString()} isn't covered yet. Record the remaining bills or the cash he handed back — or tick the box to settle with that amount left on his balance to recover.`);
+    }
   }
   if(unsettling && !confirm(`Undo the settlement of ${employeeName}'s advance?`)){ g('advSettled').checked = true; return; }
 
   const settledDate = settled ? ((original && original.settled && original.settledDate) ? original.settledDate : todayISO()) : null;
   const log = [...((original && original.settleLog) || [])];
-  if(newlySettling) log.push(advStamp(`Settled — bills LKR ${Math.round(f.billed).toLocaleString()}, returned LKR ${Math.round(f.returned).toLocaleString()}${f.paidOut ? ', extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}`));
+  if(newlySettling) log.push(advStamp(`Settled — bills LKR ${Math.round(f.billed).toLocaleString()}, returned LKR ${Math.round(f.returned).toLocaleString()}${f.paidOut ? ', extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}${f.left >= 1 ? `, LKR ${Math.round(f.left).toLocaleString()} left to recover` : ''}`));
   if(unsettling) log.push(advStamp('Settlement undone'));
 
   const payload = {
@@ -5175,6 +5228,15 @@ function renderSettledAdvances(){
   if(!sel.dataset.wired){ sel.dataset.wired = '1'; sel.addEventListener('change', renderSettledAdvances); }
 
   const rows = settled.filter(t => !sel.value || (sel.value === '__problem' ? Math.abs(advFigures(t).left) >= 1 : t.employeeName === sel.value));
+  const tot = rows.reduce((a,t)=>{ const f = advFigures(t); a.given += t.amount; a.billed += f.billed; a.returned += f.returned; a.left += f.left > 0 ? f.left : 0; return a; },
+    { given:0, billed:0, returned:0, left:0 });
+  const sum = document.getElementById('settledAdvancesTotals');
+  if(sum) sum.innerHTML = rows.length ? `
+    <div><div class="k">Advances settled</div><div class="v">${rows.length}</div></div>
+    <div><div class="k">Total given</div><div class="v">${lkr(tot.given)}</div></div>
+    <div><div class="k">Bills submitted</div><div class="v">${lkr(tot.billed)}</div></div>
+    <div><div class="k">Cash returned</div><div class="v">${lkr(tot.returned)}</div></div>
+    <div><div class="k">Still to recover</div><div class="v ${tot.left >= 1 ? 'warn' : 'good'}">${tot.left >= 1 ? lkr(tot.left) : 'nothing ✓'}</div></div>` : '';
   if(!rows.length){ wrap.innerHTML = `<div class="manage-empty">${settled.length ? 'Nothing matches this filter.' : 'No settled advances yet.'}</div>`; return; }
   wrap.innerHTML = '';
   for(const t of rows){
@@ -5184,14 +5246,14 @@ function renderSettledAdvances(){
     row.className = 'manage-row';
     row.style.flexWrap = 'wrap';
     const chips = [
-      bad ? `<span class="adv-chip bad">${f.left > 0 ? 'LKR ' + Math.round(f.left).toLocaleString() + ' not accounted for' : 'bills exceed advance'}</span>` : '<span class="adv-chip ok">balanced ✓</span>',
+      bad ? `<span class="adv-chip bad">${f.left > 0 ? 'LKR ' + Math.round(f.left).toLocaleString() + ' still to recover' : 'bills exceed advance'}</span>` : '<span class="adv-chip ok">balanced ✓</span>',
       t.undoRequestedBy ? `<span class="adv-chip wait">undo requested by ${esc(t.undoRequestedBy)} — waiting for Makky</span>` : '',
     ].join(' ');
     row.innerHTML = `
       <span class="manage-type-dot" style="background:${bad ? 'var(--red)' : 'var(--green)'};"></span>
       <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— LKR ${t.amount.toLocaleString()} given ${fmtDay(t.date)}</span></span>
       <span class="manage-dates">settled ${t.settledDate ? fmtDay(t.settledDate) : '—'}${t.settledBy ? ' by ' + esc(t.settledBy) : ''}
-        · ${advBillsFor(t).length} bill${advBillsFor(t).length===1?'':'s'} LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}${f.paidOut ? ' · extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}${(t.settledInvoiceUrls||[]).length ? ' · 📎 ' + t.settledInvoiceUrls.length : ''}
+        · ${advBillsFor(t).length} bill${advBillsFor(t).length===1?'':'s'} LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}${f.paidOut ? ' · extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}${advSettleInvoiceHTML(t)}
         ${chips}</span>`;
     const view = document.createElement('button');
     view.className = 'manage-invoice'; view.textContent = 'View details';
@@ -5211,6 +5273,13 @@ function renderSettledAdvances(){
   }
 }
 
+// Receipts for a settlement: the ones attached when settling, plus the ones on its bills.
+function advSettleInvoiceHTML(adv){
+  const urls = [...(adv.settledInvoiceUrls || [])];
+  advBillsFor(adv).forEach(b => urls.push(...getInvoiceLinks(b)));
+  if(!urls.length) return ' · <b style="color:var(--red);">no invoice attached</b>';
+  return ' · ' + urls.map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${urls.length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+}
 function renderUndoRequests(){
   const sec = document.getElementById('undoRequestsSection');
   const wrap = document.getElementById('undoRequestsList');
