@@ -1041,6 +1041,7 @@
             <button id="cashThisMonth">This month</button>
             <button id="cashAllTime">All time</button>
             <select id="cashMonthPick" class="acct-select" style="max-width:170px; margin-left:6px;"></select>
+            <button id="cashExportBtn" title="Download these transactions as a spreadsheet file">⬇ Export CSV</button>
           </div>
         </div>
         <div class="field-hint" style="margin:6px 0 0;">The card balances at the top are always running all-time balances. The figures below are just for the month shown.</div>
@@ -1130,10 +1131,12 @@
         <label><input type="checkbox" data-sec="pettycash" checked> Petty cash</label>
         <label><input type="checkbox" data-sec="opex" checked> Operating expenses</label>
         <label><input type="checkbox" data-sec="inventory" checked> Store supplies</label>
+        <label><input type="checkbox" data-sec="owner" checked> Owner settlement</label>
         <span class="sep"></span>
         <button class="rpt-quick" data-preset="summary">Summary only</button>
         <button class="rpt-quick" data-preset="all">Everything</button>
         <span class="sep"></span>
+        <button class="add-booking-btn" id="vrOwnerPayBtn">+ Record owner payment</button>
         <button class="add-booking-btn" id="vrPrintBtn">🖨️ Print / PDF</button>
         <button class="allowed-action-btn no-print" id="myPurchaseBtn" style="display:none;">+ Record my purchase</button>
       </div>
@@ -1184,6 +1187,7 @@
         <div class="villatabs" style="margin-bottom:0;">
           <button class="villatab-btn" id="coTabSort" data-coview="sort">📂 Sort expenses</button>
           <button class="villatab-btn" id="coTabBills" data-coview="bills">📥 Bills, income &amp; bank</button>
+          <button class="villatab-btn" id="coTabOwed" data-coview="owed">💰 Money owed</button>
           <button class="villatab-btn active" id="coTabEntry" data-coview="entry" style="background:var(--ink);color:#fff;">✏️ Review &amp; save month</button>
           <button class="villatab-btn" id="coTabReport" data-coview="report">📄 Generate report</button>
         </div>
@@ -1244,6 +1248,12 @@
             <button class="rpt-quick no-print" id="ceCopyBalances">Copy last month's accounts</button>
           </div>
         </div>
+      </div>
+
+      <!-- ---- MONEY OWED VIEW ---- -->
+      <div id="coOwedView" style="display:none">
+        <div class="cal-hint">Everything outstanding in both directions: guests who still owe, bills waiting to be paid, and cash staff are holding. Each villa owner's balance is on that villa's own report.</div>
+        <div id="coOwedBody"></div>
       </div>
 
       <!-- ---- ENTRY VIEW ---- -->
@@ -1318,6 +1328,7 @@
           <button class="rpt-quick" data-preset="statutory">Statutory set</button>
           <button class="rpt-quick" data-preset="all">Everything</button>
           <span class="sep"></span>
+          <button class="add-booking-btn" id="coExportBtn">⬇ Export CSV</button>
           <button class="add-booking-btn" id="coPrintBtn">🖨️ Print / PDF</button>
         </div>
         <div id="coReportBody"></div>
@@ -1350,6 +1361,7 @@
           <button class="add-booking-btn" id="payPrepare" style="background:var(--frame); color:#fff; border-color:var(--frame);">Prepare from staff profiles</button>
           <button class="add-booking-btn" id="payPrintAll">🖨️ Print all salary sheets</button>
           <button class="add-booking-btn" id="payPrintRegister">🖨️ Print payroll summary</button>
+          <button class="add-booking-btn" id="payExportBtn">⬇ Export CSV</button>
           <span class="field-hint" id="payMsg"></span>
         </div>
         <div id="paySummary" class="acct-summary"></div>
@@ -2025,6 +2037,32 @@
   </div>
 </div>
 
+<!-- Owner payment -->
+<div class="modal-overlay" id="opModalOverlay">
+  <div class="modal">
+    <h3 id="opTitle">Pay the owner</h3>
+    <input type="hidden" id="opVilla"><input type="hidden" id="opPeriod">
+    <div class="frm-row">
+      <div><label>Date paid</label><input type="date" id="opDate"></div>
+      <div><label>Amount (LKR)</label><input type="number" id="opAmount" min="0" step="0.01"></div>
+    </div>
+    <label>Paid by</label>
+    <input type="text" id="opMethod" list="ceViaList" placeholder="e.g. Bank transfer">
+    <label>Note (optional)</label>
+    <input type="text" id="opNote" placeholder="e.g. September settlement">
+    <div style="margin-top:12px;">
+      <div class="direct-block-title">Already recorded for this month</div>
+      <div id="opExisting"></div>
+    </div>
+    <div class="modal-error" id="opError"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="opCancel">Cancel</button>
+      <button class="btn btn-save" id="opSave">Save payment</button>
+    </div>
+  </div>
+</div>
+
 <!-- Guest group builder -->
 <div class="modal-overlay" id="gmModalOverlay">
   <div class="modal modal-wide">
@@ -2076,6 +2114,17 @@
       <div id="ceWhoseWrap" style="display:none;">
         <label>Whose mobile is it</label>
         <select id="ceWhose"></select>
+      </div>
+    </div>
+    <div id="cePaidWrap">
+      <div class="modal-checkbox-row">
+        <input type="checkbox" id="cePaid" checked>
+        <label for="cePaid">Already paid</label>
+      </div>
+      <div id="ceDueWrap" style="display:none;">
+        <label>Due by</label>
+        <input type="date" id="ceDue">
+        <div class="field-hint">It counts as money you still owe until it's marked paid.</div>
       </div>
     </div>
     <div id="ceViaWrap">
@@ -4354,6 +4403,7 @@ function initPettyCash(){
   document.getElementById('cashNextMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()+1); renderCash(); });
   document.getElementById('cashThisMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderCash(); });
   document.getElementById('cashAllTime').addEventListener('click', ()=>{ cashShowAll=!cashShowAll; renderCash(); });
+  document.getElementById('cashExportBtn').addEventListener('click', exportPettyCashCSV);
   document.querySelector('.cash-card.ceymora').addEventListener('click', ()=> openCardBalanceDetail('ceymora'));
   document.querySelector('.cash-card.kalava').addEventListener('click', ()=> openCardBalanceDetail('kalava_card'));
   document.getElementById('cashMonthPick').addEventListener('change', (e)=>{
@@ -6645,6 +6695,8 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       ${supplies.html}
     </div>
 
+    ${ownerSettlementHTML(loc, monthDate, netProfit)}
+
     <div class="rpt-foot">
       Prepared by Ceymora · ${esc(villaInfo.name)} · ${monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.
       Foreign-currency bookings are converted to LKR at the published rate for each booking's check-in date.
@@ -7975,6 +8027,7 @@ function initCompany(){
     b.addEventListener('click', ()=> setCoView(b.dataset.coview));
   });
   document.getElementById('coRebuild').addEventListener('click', ()=> coRebuildFromRecords(true));
+  document.getElementById('coExportBtn').addEventListener('click', exportCompanyCSV);
   document.getElementById('coPrintBtn').addEventListener('click', ()=> window.print());
   document.getElementById('coSaveBtn').addEventListener('click', saveCompanyMonth);
   document.getElementById('coPullCommission').addEventListener('click', coPullCommission);
@@ -8002,6 +8055,7 @@ async function setCoView(v){
   }
   coView = v;
   document.getElementById('coSortView').style.display = v==='sort' ? '' : 'none';
+  document.getElementById('coOwedView').style.display = v==='owed' ? '' : 'none';
   document.getElementById('coBillsView').style.display = v==='bills' ? '' : 'none';
   document.getElementById('coEntryView').style.display = v==='entry' ? '' : 'none';
   document.getElementById('coReportView').style.display = v==='report' ? '' : 'none';
@@ -8014,6 +8068,7 @@ async function setCoView(v){
   if(v==='report') renderCompanyReport();
   if(v==='sort') renderCoSort();
   if(v==='bills') renderCoBills();
+  if(v==='owed') renderCoOwed();
 }
 
 function renderCompany(){
@@ -8911,7 +8966,7 @@ let allPayroll = [];
 let acctDataPromise = null;
 let acctChannelsOn = false;
 
-function rowToCe(r){ return { id:r.id, kind:r.kind, date:r.date, accountCode:r.account_code || null, description:r.description || '', amount:Number(r.amount)||0, paidVia:r.paid_via || '', invoiceUrls:r.invoice_urls || [] }; }
+function rowToCe(r){ return { id:r.id, kind:r.kind, date:r.date, accountCode:r.account_code || null, description:r.description || '', amount:Number(r.amount)||0, paidVia:r.paid_via || '', invoiceUrls:r.invoice_urls || [], paid: r.paid !== false, dueDate: r.due_date || '' }; }
 function rowToSp(r){ return {
   id:r.id, fullName:r.full_name || '', employeeNo:r.employee_no || '', designation:r.designation || '',
   worksAt:r.works_at || 'office', paidBy:r.paid_by || 'company', nic:r.nic || '', epfNo:r.epf_no || '',
@@ -8957,7 +9012,7 @@ function acctTableMissing(name){
 function ensureAcctData(){
   if(acctDataPromise) return acctDataPromise;
   acctDataPromise = (async ()=>{
-    const jobs = [fetchCoEntries(), fetchStaffProfiles(), fetchPayroll()];
+    const jobs = [fetchCoEntries(), fetchStaffProfiles(), fetchPayroll(), fetchOwnerPayments()];
     if(cashInited && !allCashTxns.length && sb) jobs.push(fetchCash());
     await Promise.all(jobs);
     if(sb && !acctChannelsOn){
@@ -8967,6 +9022,9 @@ function ensureAcctData(){
         .subscribe();
       sb.channel('staff_profiles_changes')
         .on('postgres_changes', { event:'*', schema:'public', table:'staff_profiles' }, async ()=>{ await fetchStaffProfiles(); onAcctDataChanged(); })
+        .subscribe();
+      sb.channel('owner_payments_changes')
+        .on('postgres_changes', { event:'*', schema:'public', table:'owner_payments' }, async ()=>{ await fetchOwnerPayments(); onAcctDataChanged(); })
         .subscribe();
       sb.channel('payroll_entries_changes')
         .on('postgres_changes', { event:'*', schema:'public', table:'payroll_entries' }, async ()=>{ await fetchPayroll(); onAcctDataChanged(); })
@@ -8982,6 +9040,7 @@ function onAcctDataChanged(){
     renderCoFlow();
     if(coView === 'sort') renderCoSort();
     if(coView === 'bills') renderCoBills();
+    if(coView === 'owed') renderCoOwed();
     if(coView === 'report') renderCompanyReport();
     if(coView === 'entry'){
       if(!coDirty) renderCompanyEntry();
@@ -9297,7 +9356,7 @@ function renderCoBills(){
       const row = document.createElement('div');
       row.className = 'ce-row';
       const sub = kind === 'expense'
-        ? [acctLabel(e.accountCode), e.paidVia].filter(Boolean).join(' · ')
+        ? [acctLabel(e.accountCode), e.paidVia, e.paid ? '' : (e.dueDate ? 'DUE by ' + fmtDay(e.dueDate) : 'NOT PAID YET')].filter(Boolean).join(' · ')
         : kind === 'income' ? [e.paidVia ? 'into ' + e.paidVia : ''].filter(Boolean).join('')
         : 'as at ' + fmtDay(e.date);
       const files = (e.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${e.invoiceUrls.length>1?' '+(i+1):''}</a>`).join(' ');
@@ -9355,6 +9414,10 @@ function openCeModal(kind, record){
   g('ceDesc').value = record ? record.description : '';
   g('ceVia').value = record ? record.paidVia : '';
   ceFileHandler.reset();
+  g('cePaidWrap').style.display = kind === 'expense' ? '' : 'none';
+  g('cePaid').checked = record ? record.paid : true;
+  g('ceDue').value = record ? record.dueDate : '';
+  g('ceDueWrap').style.display = g('cePaid').checked ? 'none' : '';
   g('ceFileHint').textContent = record && record.invoiceUrls.length ? `${record.invoiceUrls.length} file(s) already attached.` : '';
   g('ceError').style.display = 'none';
   g('ceDelete').style.display = record ? '' : 'none';
@@ -9362,6 +9425,9 @@ function openCeModal(kind, record){
   // Typing the bill's description suggests its account, until one is picked by hand.
   g('ceAccount').dataset.touched = record ? '1' : '';
 }
+document.getElementById('cePaid').addEventListener('change', (e)=>{
+  document.getElementById('ceDueWrap').style.display = e.target.checked ? 'none' : '';
+});
 document.getElementById('ceAccount').addEventListener('change', e=>{
   e.target.dataset.touched = '1';
   applyWhosePicker('ceWhose', 'ceWhoseWrap', 'ceDesc', e.target.value);
@@ -9390,6 +9456,10 @@ document.getElementById('ceSave').addEventListener('click', async ()=>{
     const newUrls = [];
     for(const f of ceFileHandler.getFiles()){ g('ceFileHint').textContent = `Uploading ${f.name}…`; newUrls.push(await uploadReceiptFile(f)); }
     const payload = { kind:ceKind, date, amount, description, account_code:accountCode, paid_via:paidVia };
+    if(ceKind === 'expense'){
+      payload.paid = document.getElementById('cePaid').checked;
+      payload.due_date = payload.paid ? null : (document.getElementById('ceDue').value || null);
+    }
     if(editingCe){
       if(newUrls.length) payload.invoice_urls = [...(editingCe.invoiceUrls||[]), ...newUrls];
       const { error } = await sb.from('company_entries').update(payload).eq('id', editingCe.id);
@@ -9517,6 +9587,7 @@ function initPayroll(){
     printSalarySheets(rows);
   });
   g('payPrintRegister').addEventListener('click', printPayRegister);
+  g('payExportBtn').addEventListener('click', exportPayrollCSV);
   renderPayroll();
 }
 
@@ -10241,6 +10312,243 @@ function openGroupBuilder(b){
 document.getElementById('gmClose').addEventListener('click', ()=> document.getElementById('gmModalOverlay').classList.remove('open'));
 document.getElementById('gmModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'gmModalOverlay') e.currentTarget.classList.remove('open'); });
 
+
+
+/* ============================================================================
+   MONEY OWED — both directions — OWNER SETTLEMENTS, AND EXPORTS
+   ============================================================================ */
+let allOwnerPayments = [];
+function rowToOwnerPay(r){ return { id:r.id, villa:r.villa, period:r.period, date:r.date, amount:Number(r.amount)||0,
+  method:r.method || '', note:r.note || '', invoiceUrls:r.invoice_urls || [], createdBy:r.created_by || '' }; }
+async function fetchOwnerPayments(){
+  if(!sb) return;
+  const { data, error } = await sb.from('owner_payments').select('*');
+  if(error){ console.error('owner_payments', error); acctTableMissing('owner_payments'); return; }
+  allOwnerPayments = data.map(rowToOwnerPay);
+}
+function ownerPaymentsFor(villa, period){
+  return allOwnerPayments.filter(p => p.villa === villa && (!period || p.period === period))
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+}
+
+/* ---- what guests still owe us ---- */
+function guestBalances(){
+  const out = [];
+  for(const b of allBookings){
+    if(b.type !== 'direct') continue;
+    const total = bookingTotalNative(b);
+    const paid = Number(b.amountPaid) || 0;
+    const due = Math.round((total - paid) * 100) / 100;
+    if(due <= 0.5) continue;
+    out.push({ booking:b, total, paid, due, currency: b.currency || 'USD' });
+  }
+  return out.sort((a,b)=> (a.booking.checkIn || '').localeCompare(b.booking.checkIn || ''));
+}
+function bookingTotalNative(b){
+  const nights = Math.max(0, Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000));
+  return (Number(b.rateUsd) || 0) * nights;
+}
+/* ---- what we still owe ---- */
+function unpaidBills(){
+  return allCoEntries.filter(e => e.kind === 'expense' && !e.paid)
+    .sort((a,b)=> (a.dueDate || a.date || '').localeCompare(b.dueDate || b.date || ''));
+}
+function sharonOwed(){
+  return allCashTxns.filter(t => t.type === 'expense' && t.card === 'sharon').reduce((s,t)=> s + t.amount, 0);
+}
+
+function renderCoOwed(){
+  const wrap = document.getElementById('coOwedBody');
+  if(!wrap) return;
+  const guests = guestBalances();
+  const bills = unpaidBills();
+  const staff = Object.entries(computeAdvanceWallets())
+    .filter(([,w]) => Math.abs(w.balance) >= 1)
+    .map(([name,w]) => ({ name, balance:w.balance }));
+  const sharon = sharonOwed();
+  const guestTotalLkr = guests.reduce((s,g)=> s + (g.currency === 'LKR' ? g.due : 0), 0);
+  const billsTotal = bills.reduce((s,b)=> s + b.amount, 0);
+  const staffTotal = staff.reduce((s,x)=> s + x.balance, 0);
+  const today = todayISO();
+
+  wrap.innerHTML = `
+    <div class="acct-summary">
+      <div><div class="k">Guests still to pay</div><div class="v ${guests.length ? 'warn' : 'good'}">${guests.length || 'none ✓'}</div></div>
+      <div><div class="k">Bills we owe</div><div class="v ${bills.length ? 'warn' : 'good'}">${bills.length ? lkr(billsTotal) : 'none ✓'}</div></div>
+      <div><div class="k">Cash held by staff</div><div class="v ${staffTotal >= 1 ? 'warn' : 'good'}">${staffTotal >= 1 ? lkr(staffTotal) : 'none ✓'}</div></div>
+      <div><div class="k">Sharon's own money spent</div><div class="v">${lkr(sharon)}</div></div>
+    </div>
+
+    <div class="rpt-section-title" style="font-size:14px; margin-top:6px;">Guests who still owe — direct bookings</div>
+    ${guests.length ? `<table class="inv-table pay-table">
+      <thead><tr><th>Guest</th><th>Villa</th><th>Check-in</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Still due</th><th></th></tr></thead>
+      <tbody>${guests.map(g=>`<tr>
+        <td><b>${esc(g.booking.guest || 'Guest')}</b>${g.booking.phone ? `<div class="ce-sub">${esc(g.booking.phone)}</div>` : ''}</td>
+        <td>${esc((CAL_VILLAS.find(v=>v.id===g.booking.villa)||{}).name || g.booking.villa)}</td>
+        <td>${fmtDay(g.booking.checkIn)}${g.booking.checkIn < today ? '<div class="ce-sub" style="color:var(--red);">already arrived</div>' : ''}</td>
+        <td class="r">${money(g.currency, g.total)}</td>
+        <td class="r">${money(g.currency, g.paid)}</td>
+        <td class="r"><b style="color:var(--red);">${money(g.currency, g.due)}</b></td>
+        <td><button class="manage-edit" data-owed-booking="${g.booking.id}">Open</button></td>
+      </tr>`).join('')}</tbody></table>` : '<div class="rpt-empty">Every direct booking is paid in full.</div>'}
+
+    <div class="rpt-section-title" style="font-size:14px; margin-top:14px;">Bills we still have to pay</div>
+    ${bills.length ? `<table class="inv-table pay-table">
+      <thead><tr><th>Bill</th><th>Account</th><th>Due by</th><th class="r">Amount</th><th></th></tr></thead>
+      <tbody>${bills.map(b=>`<tr>
+        <td><b>${esc(b.description)}</b><div class="ce-sub">entered ${fmtDay(b.date)}</div></td>
+        <td>${esc(acctLabel(b.accountCode))}</td>
+        <td>${b.dueDate ? fmtDay(b.dueDate) : '—'}${b.dueDate && b.dueDate < today ? '<div class="ce-sub" style="color:var(--red);">overdue</div>' : ''}</td>
+        <td class="r"><b>${Math.round(b.amount).toLocaleString()}</b></td>
+        <td><button class="manage-edit" data-owed-bill="${b.id}">Mark paid</button></td>
+      </tr>`).join('')}
+        <tr class="tot"><td colspan="3">Total owed</td><td class="r">${Math.round(billsTotal).toLocaleString()}</td><td></td></tr>
+      </tbody></table>` : '<div class="rpt-empty">No unpaid bills recorded. Enter a bill as “not paid yet” when it arrives and it will appear here.</div>'}
+
+    <div class="rpt-section-title" style="font-size:14px; margin-top:14px;">Cash held by staff</div>
+    ${staff.length ? `<table class="inv-table pay-table">
+      <thead><tr><th>Person</th><th class="r">Holding</th></tr></thead>
+      <tbody>${staff.map(x=>`<tr><td>${esc(x.name)}</td><td class="r"><b>${Math.round(x.balance).toLocaleString()}</b></td></tr>`).join('')}</tbody></table>`
+      : '<div class="rpt-empty">Nobody is holding unaccounted advance cash.</div>'}
+    <div class="field-hint" style="margin-top:8px;">Sharon has paid LKR ${Math.round(sharon).toLocaleString()} from his own pocket for the villas, all time. What each villa owner is owed is on that villa's own report, under “Owner settlement”.</div>`;
+
+  wrap.querySelectorAll('[data-owed-booking]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const bk = allBookings.find(x => String(x.id) === b.dataset.owedBooking);
+      if(bk) openModal(bk);
+    });
+  });
+  wrap.querySelectorAll('[data-owed-bill]').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      const bill = allCoEntries.find(x => String(x.id) === b.dataset.owedBill);
+      if(!bill || !confirm(`Mark "${bill.description}" as paid?`)) return;
+      const { error } = await sb.from('company_entries').update({ paid:true, due_date:null }).eq('id', bill.id);
+      if(error){ alert('Could not update.'); return; }
+      logActivity('update', 'company_entries', `Marked bill paid: ${bill.description} — LKR ${bill.amount.toLocaleString()}`);
+      await fetchCoEntries(); onAcctDataChanged();
+    });
+  });
+}
+
+/* ---- owner settlement, inside each villa's report ---- */
+function ownerSettlementHTML(villaId, monthDate, netProfit){
+  const period = ymKey(monthDate);
+  const pays = ownerPaymentsFor(villaId, period);
+  const paid = pays.reduce((s,p)=> s + p.amount, 0);
+  const balance = Math.round((netProfit - paid) * 100) / 100;
+  return `<div class="rpt-section" data-rpt-section="owner">
+    <div class="rpt-section-title">5. Owner Settlement
+      <span class="rpt-section-count">${pays.length} payment${pays.length===1?'':'s'} · ${lkr(paid)} paid</span></div>
+    <table class="rpt-table">
+      <tbody>
+        <tr class="line"><td class="lbl">Net profit for the period (owner's)</td><td class="amt">${Math.round(netProfit).toLocaleString()}</td></tr>
+        ${pays.map(p=>`<tr class="line"><td class="lbl">Paid ${fmtDay(p.date)}${p.method ? ' · ' + esc(p.method) : ''}${p.note ? ' · ' + esc(p.note) : ''}</td><td class="amt">(${Math.round(p.amount).toLocaleString()})</td></tr>`).join('')}
+        <tr class="grand"><td>${balance > 0 ? 'Still to settle with the owner' : balance < 0 ? 'Overpaid to the owner' : 'Settled in full ✓'}</td>
+          <td class="amt">${Math.abs(Math.round(balance)).toLocaleString()}</td></tr>
+      </tbody>
+    </table>
+    <div class="rpt-note">Payments are recorded with “+ Record owner payment” above the report. A month with no payment yet shows the whole profit as still to settle.</div>
+  </div>`;
+}
+
+function openOwnerPayModal(villaId, monthDate){
+  if(!isAdmin()){ alert('Only an admin can record owner payments.'); return; }
+  const g = id => document.getElementById(id);
+  const period = ymKey(monthDate);
+  g('opVilla').value = villaId;
+  g('opPeriod').value = period;
+  g('opTitle').textContent = `Pay the owner — ${(CAL_VILLAS.find(v=>v.id===villaId)||{}).name || villaId}, ${monthLabel(monthDate)}`;
+  g('opDate').value = todayISO();
+  g('opAmount').value = '';
+  g('opMethod').value = 'Bank transfer';
+  g('opNote').value = '';
+  g('opError').style.display = 'none';
+  const pays = ownerPaymentsFor(villaId, period);
+  g('opExisting').innerHTML = pays.length
+    ? pays.map(p=>`<div class="ce-row"><div class="ce-main"><b>${Math.round(p.amount).toLocaleString()}</b>
+        <div class="ce-sub">${fmtDay(p.date)}${p.method ? ' · ' + esc(p.method) : ''}${p.note ? ' · ' + esc(p.note) : ''}</div></div>
+        <button type="button" class="manage-del" data-op-del="${p.id}">Delete</button></div>`).join('')
+    : '<div class="co-empty-hint">No payments recorded for this month yet.</div>';
+  g('opExisting').querySelectorAll('[data-op-del]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!checkDeletePassword()) return;
+      const { error } = await sb.from('owner_payments').delete().eq('id', btn.dataset.opDel);
+      if(error){ alert('Could not delete.'); return; }
+      await fetchOwnerPayments();
+      openOwnerPayModal(villaId, monthDate);
+      if(typeof renderVillaReport === 'function') renderVillaReport();
+    });
+  });
+  g('opModalOverlay').classList.add('open');
+}
+document.getElementById('vrOwnerPayBtn').addEventListener('click', ()=> openOwnerPayModal(vrSelectedVilla, vrMonthDate));
+document.getElementById('opCancel').addEventListener('click', ()=> document.getElementById('opModalOverlay').classList.remove('open'));
+document.getElementById('opModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'opModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('opSave').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const err = g('opError');
+  const amount = parseFloat(g('opAmount').value);
+  if(!(amount > 0)){ err.textContent = 'Enter the amount paid.'; err.style.display = 'block'; return; }
+  const payload = { villa:g('opVilla').value, period:g('opPeriod').value, date:g('opDate').value || todayISO(),
+    amount, method:g('opMethod').value.trim() || null, note:g('opNote').value.trim() || null,
+    created_by: currentUser ? currentUser.username : null };
+  const { error } = await sb.from('owner_payments').insert(payload);
+  if(error){ console.error(error); err.textContent = 'Save failed — has the latest SQL been run?'; err.style.display = 'block'; return; }
+  logActivity('create', 'owner_payments', `Paid the ${payload.villa} owner LKR ${amount.toLocaleString()} for ${payload.period}`);
+  g('opModalOverlay').classList.remove('open');
+  await fetchOwnerPayments();
+  if(typeof renderVillaReport === 'function') renderVillaReport();
+  if(companyInited) onAcctDataChanged();
+});
+
+/* ---- CSV exports, so the accountant doesn't retype anything ---- */
+function toCSV(rows){
+  return rows.map(r => r.map(c=>{
+    const v = c === null || c === undefined ? '' : String(c);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(',')).join('\r\n');
+}
+function downloadCSV(filename, rows){
+  const blob = new Blob(['\ufeff' + toCSV(rows)], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+function exportPettyCashCSV(){
+  const { start, end } = monthRangeLocal(cashMonthDate);
+  const rows = allCashTxns
+    .filter(t => cashShowAll || (t.date >= start && t.date < end))
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  const out = [['Date','Type','Details','For','Account','Card','Paid from advance of','Amount LKR','Money on card LKR','Note']];
+  rows.forEach(t => out.push([
+    t.date, t.type, t.purpose || (t.type === 'advance' ? 'Advance — ' + (t.employeeName||'') : 'Money received'),
+    FOR_LABELS[t.for] || t.for || '', acctLabel(acctOf(t)) || '', CARD_LABELS[t.card] || t.card || '',
+    t.employeeName || '', t.amount, cardEffect(t), t.note || '',
+  ]));
+  downloadCSV(`petty-cash-${cashShowAll ? 'all-time' : ymKey(cashMonthDate)}.csv`, out);
+}
+function exportPayrollCSV(){
+  const rows = payRowsForMonth();
+  if(!rows.length){ alert('No payroll for this month yet.'); return; }
+  const out = [['Employee','Designation','Paid by','Basic','No-pay days','Allowance','Travelling','Incentive','Perf. allowance','Bonus','Overtime','Gross','EPF 8%','Advance','APIT','Other ded.','Net pay','EPF 12%','ETF 3%','Cost to company','Paid on']];
+  rows.forEach(p=>{
+    const c = payCalc(p);
+    out.push([p.name, p.designation, paidByLabel(p.paidBy), c.basic, p.noPayDays, p.allowance, p.travellingAllowance,
+      p.performanceIncentive, p.performanceAllowance, p.bonus, p.overtime, c.gross, c.epfEmployee, p.salaryAdvance,
+      p.apit, p.otherDeductions, c.net, c.epfEmployer, c.etf, c.employerCost, p.paidOn || '']);
+  });
+  downloadCSV(`payroll-${ymKey(payMonthDate)}.csv`, out);
+}
+function exportCompanyCSV(){
+  const p = coPeriodISO(coMonthDate);
+  const rows = allCoRows.filter(r => r.period === p);
+  if(!rows.length){ alert('This month has not been saved yet.'); return; }
+  const out = [['Month','Section','Line','Amount LKR']];
+  rows.forEach(r => out.push([monthLabel(coMonthDate), r.section, CO_CAT_INDEX[r.category] ? CO_CAT_INDEX[r.category].label : r.category, r.amount]));
+  downloadCSV(`company-accounts-${ymKey(coMonthDate)}.csv`, out);
+}
 
 </script>
 </body>
