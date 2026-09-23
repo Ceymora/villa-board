@@ -492,6 +492,9 @@
 
   /* Print support for report sections */
   .print-header{ display:none; }
+  .print-header .ph-logo{ max-height:60px; max-width:170px; object-fit:contain; display:block; margin-bottom:6px; }
+  .print-header .ph-name{ font-family:'Kalam',cursive; font-size:21px; font-weight:700; color:#2b2b2b; }
+  .print-header .ph-meta{ font-size:11px; color:#666; line-height:1.5; margin-top:2px; }
   @media print{
     body{ background:#fff; padding:0; }
     .frame{ background:none; box-shadow:none; padding:0; border-radius:0; }
@@ -499,7 +502,11 @@
     .board::before{ display:none; }
     #loginScreen, .maintabs, .no-print, .add-booking-btn, .manage-del, .manage-edit,
     #resetWeek, .weeknav button, .toolbar-actions, .setup-banner{ display:none !important; }
-    .print-header{ display:block; margin-bottom:14px; }
+    .print-header{ display:block; margin-bottom:14px; border-bottom:2px solid #000; padding-bottom:8px; }
+    /* Make sure photos and the logo actually come out on paper. */
+    body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    img{ display:block !important; max-width:100%; }
+    .rpt-head img, .print-header img{ display:block !important; }
     .manage-list{ max-height:none !important; overflow:visible !important; }
     .modal-overlay{ display:none !important; }
 
@@ -741,6 +748,14 @@
     border-radius:7px; padding:7px 10px; margin:6px 0; word-break:break-word;
   }
   .group-box .shot{ width:120px; height:78px; border-radius:8px; object-fit:cover; border:1px solid var(--board-line); }
+  .grp-row{ display:flex; gap:11px; align-items:center; padding:9px 0; border-bottom:1px dashed var(--board-line); flex-wrap:wrap; }
+  .grp-row:last-child{ border-bottom:none; }
+  .grp-row .shot{ width:92px; height:62px; border-radius:8px; object-fit:cover; border:1px solid var(--board-line); background:var(--board); flex-shrink:0; }
+  .grp-row .grp-main{ flex:1; min-width:190px; }
+  .grp-row .grp-name{ font-weight:700; font-size:13.5px; }
+  .grp-row .grp-sub{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .grp-row .grp-acts{ display:flex; gap:5px; flex-wrap:wrap; }
+  .grp-row .grp-acts a{ text-decoration:none; }
   .rpt-head .rpt-logo{ max-height:54px; max-width:150px; object-fit:contain; display:block; margin-bottom:6px; }
   .rpt-head .rpt-villa-shot{ width:120px; height:78px; object-fit:cover; border-radius:8px; margin-left:12px; }
   .chart-grid{ display:flex; flex-wrap:wrap; gap:12px; }
@@ -769,6 +784,8 @@
 </style>
 </head>
 <body>
+
+<div class="print-header" id="printHeader"></div>
 
 <div id="loginScreen">
   <div class="login-card">
@@ -878,6 +895,15 @@
       <div class="footer-note">
         <span id="bookingStatusMsg" class="status-msg">Loading calendar…</span>
         <span id="monthSummary" class="status-msg" style="font-weight:600;"></span>
+      </div>
+
+      <div class="manage-section" id="groupsSection">
+        <div class="manage-header">
+          <span class="manage-title">Guest groups</span>
+          <label class="acct-toggle"><input type="checkbox" id="groupsAllVillas"> All villas</label>
+        </div>
+        <div class="field-hint" style="margin:2px 0 8px;">Each upcoming stay with its group name, the villa photo and the guest's number — everything needed to open the WhatsApp group in one place.</div>
+        <div id="groupsList"></div>
       </div>
 
       <div class="manage-section">
@@ -2289,6 +2315,7 @@ async function fetchSettings(){
     if(error) throw error;
     if(data && data.value) APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, data.value);
     settingsLoaded = true;
+    renderPrintHeader();   // the letterhead can only be drawn once the settings arrive
   }catch(e){
     console.error('Could not load app_settings — using built-in defaults. Run the setup SQL to enable saving.', e);
   }
@@ -2673,6 +2700,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'activitylog' && !logInited){ initActivityLog(); }
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
     if(tab === 'reports' && !reportsInited){ initReports(); }
+    if(tab === 'bookings' && typeof renderGuestGroups === 'function') renderGuestGroups();
     if(tab === 'company' && !companyInited){ initCompany(); }
     if(tab === 'payroll' && !payrollInited){ initPayroll(); }
     if(tab === 'users' && !usersInited){ initUsers(); }
@@ -3076,6 +3104,7 @@ function moneyFull(amount, cur){
 }
 
 function renderCalendar(){
+  renderGuestGroups();   // the group list follows the villa tab and the live bookings
   const monthLabel = document.getElementById('monthLabel');
   monthLabel.textContent = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
 
@@ -7412,6 +7441,7 @@ function renderVillaPhotos(){
         APP_SETTINGS.villaImages = Object.assign({}, APP_SETTINGS.villaImages || {}, { [id]: url });
         await saveSettings();
         renderVillaPhotos();
+        if(typeof renderGuestGroups === 'function') renderGuestGroups();
         logActivity('update', 'app_settings', `Uploaded the photo for ${FOR_LABELS[id] || id}`);
       }catch(err){ hint.textContent = 'Upload failed — ' + (err.message || 'try again.'); console.error(err); }
       e.target.value = '';
@@ -7427,7 +7457,21 @@ function renderVillaPhotos(){
     });
   });
 }
+// Printed letterhead — shown only on paper, on whichever tab is being printed.
+function renderPrintHeader(){
+  const el = document.getElementById('printHeader');
+  if(!el) return;
+  const co = APP_SETTINGS.company || {};
+  const logo = APP_SETTINGS.logoUrl || '';
+  const meta = [co.address, co.phone, co.email, co.website].filter(Boolean).join(' · ');
+  el.innerHTML = `
+    ${logo ? `<img class="ph-logo" src="${esc(logo)}" alt="">` : ''}
+    <div class="ph-name">${esc(co.name || 'Ceymora Management')}</div>
+    ${meta ? `<div class="ph-meta">${esc(meta)}</div>` : ''}
+    <div class="ph-meta">Printed ${esc(fmtLongDate(new Date()))}</div>`;
+}
 function renderLogoPreview(){
+  renderPrintHeader();
   const box = document.getElementById('setLogoPreview');
   const url = APP_SETTINGS.logoUrl;
   box.innerHTML = url ? `<img src="${esc(url)}" alt="Ceymora logo">` : 'No logo uploaded yet';
@@ -7456,6 +7500,7 @@ function fillSettingsForm(){
   g('setReminderStaffTemplate').value = APP_SETTINGS.reminderStaffTemplate || SETTINGS_DEFAULTS.reminderStaffTemplate;
   renderLogoPreview();
   renderVillaPhotos();
+  renderPrintHeader();
 }
 
 function readSettingsForm(){
@@ -9937,6 +9982,75 @@ function coPayrollDashboardHTML(){
     </div>
     <div class="rpt-note">EPF is remitted by the 30th of the following month and ETF by the 30th as well; the figures above are the totals to remit for this month.</div>
   </div>`;
+}
+
+
+/* ============================================================================
+   GUEST GROUPS — everything needed to open a stay's WhatsApp group in one place:
+   the group name, the villa photo and the guest's number.
+   ============================================================================ */
+function waNumber(phone){
+  const digits = String(phone || '').replace(/[^\d]/g, '');
+  if(!digits) return '';
+  // A local 07x number is dialled +94 7x from WhatsApp.
+  if(digits.length === 9 && digits[0] === '7') return '94' + digits;
+  if(digits.length === 10 && digits.startsWith('0')) return '94' + digits.slice(1);
+  return digits;
+}
+async function copyText(text, hintEl, okMsg){
+  try{
+    await navigator.clipboard.writeText(text);
+    if(hintEl) hintEl.textContent = okMsg || 'Copied.';
+  }catch(e){
+    window.prompt('Copy this:', text);
+  }
+}
+document.getElementById('groupsAllVillas').addEventListener('change', renderGuestGroups);
+function renderGuestGroups(){
+  const wrap = document.getElementById('groupsList');
+  if(!wrap) return;
+  const allVillas = document.getElementById('groupsAllVillas').checked;
+  const today = todayISO();
+  const rows = [...allBookings, ...provisionalBookings]
+    .filter(b => (allVillas || b.villa === currentVillaCal) && b.checkOut >= today)
+    .sort((a,b)=> a.checkIn.localeCompare(b.checkIn))
+    .slice(0, 40);
+  if(!rows.length){
+    wrap.innerHTML = `<div class="manage-empty">No upcoming stays${allVillas ? '' : ' for this villa'}.</div>`;
+    return;
+  }
+  wrap.innerHTML = '';
+  rows.forEach(b=>{
+    const name = bookingGroupName(b.villa, b.checkIn, b.checkOut);
+    const shot = villaImage(b.villa);
+    const wa = waNumber(b.phone);
+    const provisional = b.status === 'provisional';
+    const row = document.createElement('div');
+    row.className = 'grp-row';
+    row.innerHTML = `
+      ${shot ? `<img class="shot" src="${esc(shot)}" alt="">` : '<div class="shot"></div>'}
+      <div class="grp-main">
+        <div class="grp-name">${esc(name)}</div>
+        <div class="grp-sub">${esc(b.guest || 'Guest')}${b.guests ? ' · ' + esc(b.guests) + ' guests' : ''}
+          · ${esc(b.type === 'airbnb' ? 'Airbnb' : 'Direct')}${provisional ? ' · <b>hold, not paid</b>' : ''}
+          ${b.phone ? '· ' + esc(b.phone) : '· <b>no phone number</b>'}</div>
+        <div class="grp-sub" data-grp-hint></div>
+      </div>
+      <div class="grp-acts">
+        <button type="button" class="rpt-quick" data-copy-name>Copy name</button>
+        ${b.phone ? `<button type="button" class="rpt-quick" data-copy-phone>Copy number</button>` : ''}
+        ${wa ? `<a class="rpt-quick" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">💬 Message guest</a>` : ''}
+        ${shot ? `<a class="rpt-quick" href="${esc(shot)}" target="_blank" rel="noopener">Open photo</a>` : ''}
+        <button type="button" class="rpt-quick" data-open-booking>Open booking</button>
+      </div>`;
+    const hint = row.querySelector('[data-grp-hint]');
+    row.querySelector('[data-copy-name]').addEventListener('click', ()=> copyText(name, hint, 'Group name copied — paste it into WhatsApp.'));
+    const cp = row.querySelector('[data-copy-phone]');
+    if(cp) cp.addEventListener('click', ()=> copyText(b.phone, hint, 'Number copied.'));
+    row.querySelector('[data-open-booking]').addEventListener('click', ()=> openModal(b));
+    if(!shot){ hint.textContent = 'No photo for this villa yet — add one under Invoices & Setup → Villa photos.'; }
+    wrap.appendChild(row);
+  });
 }
 
 </script>
