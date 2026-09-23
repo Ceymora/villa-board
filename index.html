@@ -721,6 +721,8 @@
   .adv-chip.wait{ background:var(--amber-bg); color:#a06800; }
   .adv-undo-btn{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; background:var(--red); color:#fff; border:none; border-radius:7px; padding:6px 11px; cursor:pointer; flex-shrink:0; }
   .adv-undo-btn:hover{ filter:brightness(0.92); }
+  .adv-quick{ border:1px dashed var(--board-line); border-radius:9px; padding:8px 11px 11px; margin-top:8px; background:#fff; }
+  .adv-quick label{ margin-top:8px; }
   .adv-undo-btn:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
   @media print{ .adv-undo-btn{ display:none !important; } }
   @media (max-width:720px){
@@ -1184,7 +1186,7 @@
         <div class="co-groups">
           <div class="co-group">
             <div class="co-group-title"><span>Management Income</span><span class="co-group-total" id="coTotalMgmt">0</span></div>
-            <div class="field-hint" style="margin-bottom:6px;">Linked from Bookings automatically on a month you haven't saved yet — one line per villa. Use "Refresh from Bookings" if a booking changes afterwards.</div>
+            <div class="field-hint" style="margin-bottom:6px;">Linked from Bookings automatically on a month you haven't saved yet — one line per villa: 15% of stays checking in that month, plus 15% of any money kept from a late cancellation. Use "Refresh from Bookings" if a booking changes afterwards.</div>
             <div id="coMgmtRows"></div>
             <button class="rpt-quick no-print" data-add="management_income">+ Add income line</button>
           </div>
@@ -1654,16 +1656,36 @@
     <div class="field-hint" id="advFileHint"></div>
     <div id="advSettlePanel" class="pay-block" style="display:none">
       <div class="direct-block-title">Settling this advance</div>
-      <div class="field-hint">Record every bill paid out of this advance — each one is charged to the villa or office it was for. Cash that wasn't spent goes back onto the card.</div>
+      <div class="field-hint">Enter the invoices he brought back, and the cash he returned if he returned any. Whatever is left stays on his account.</div>
       <div id="advBillsList"></div>
-      <button type="button" class="rpt-quick" id="advAddBill">+ Record a bill paid from this advance</button>
+      <div class="adv-quick">
+        <div class="frm-row">
+          <div><label>Invoice amount (LKR)</label><input type="number" id="advBillAmount" min="0" step="1" placeholder="e.g. 1540"></div>
+          <div><label>What the invoice is for</label><input type="text" id="advBillPurpose" placeholder="e.g. Mosquito nets"></div>
+          <div><label>For which villa / place</label><select id="advBillFor"></select></div>
+        </div>
+        <div id="advBillAccountWrap" style="display:none;">
+          <label>Company account</label>
+          <select id="advBillAccount" class="acct-select" style="max-width:none;"></select>
+        </div>
+        <div class="modal-checkbox-row">
+          <input type="checkbox" id="advBillDirect">
+          <label for="advBillDirect">Bought straight for that villa (direct purchase)</label>
+        </div>
+        <label>Attach the invoice</label>
+        <input type="file" id="advBillFile" accept="image/*,.pdf">
+        <div id="advBillFileList"></div>
+        <div class="modal-error" id="advBillError"></div>
+        <button type="button" class="rpt-quick" id="advBillAdd">+ Add this invoice</button>
+        <button type="button" class="rpt-quick" id="advAddBill">More options (stock item, account, other card)…</button>
+      </div>
       <div id="advLegacyBills"></div>
       <div id="advMoveWrap" style="margin-top:8px;">
         <button type="button" class="rpt-quick" id="advMoveToggle">Bill already entered as paid from the card? Move it into this advance</button>
         <div id="advMoveList" style="display:none; margin-top:6px;"></div>
       </div>
       <div class="frm-row">
-        <div><label>Unused cash he handed back (LKR)</label>
+        <div><label>Cash he returned (leave blank if he keeps it)</label>
         <input type="number" id="advReturned" min="0" step="1" placeholder="0"></div>
         <div><label>Extra paid to him to cover bills (LKR)</label>
         <input type="number" id="advPaidOut" min="0" step="1" placeholder="0"></div>
@@ -3195,6 +3217,8 @@ async function fetchFxJson(dateOrLatest, fromCurrency){
   return null;
 }
 async function getFxRate(dateISO, fromCurrency){
+  // A price already in LKR needs no conversion — and shouldn't depend on the rate service.
+  if(!fromCurrency || fromCurrency === 'LKR') return 1;
   const cacheKey = fromCurrency + ':' + dateISO;
   if(fxRateCache[cacheKey] !== undefined) return fxRateCache[cacheKey];
 
@@ -4828,6 +4852,7 @@ function openAdvanceModal(record){
 
     advPanelRecord = record || null;
     g('advReturned').dataset.touched = ''; g('advPaidOut').dataset.touched = '';
+    if(record) advQuickReset();
     renderAdvSettlePanel();
     renderAdvStatus();
     g('advanceModalOverlay').classList.add('open');
@@ -4856,7 +4881,7 @@ function renderAdvSettlePanel(){
       openExpenseModal(bill, undefined, { returnToAdvance: adv.id });
     });
   });
-  document.getElementById('advAddBill').style.display = locked ? 'none' : '';
+  document.querySelector('#advSettlePanel .adv-quick').style.display = locked ? 'none' : '';
   document.getElementById('advMoveWrap').style.display = locked ? 'none' : '';
   document.getElementById('advMoveList').style.display = 'none';
   const loose = locked ? [] : advUnlinkedBills(adv);
@@ -4892,10 +4917,10 @@ function advRenderRecon(){
   document.getElementById('advRecon').innerHTML = `
     <div class="quote-line"><span>Advance given</span><span>${f.amount.toLocaleString()}</span></div>
     ${f.paidOut ? `<div class="quote-line"><span>Extra paid to cover bills</span><span>+ ${Math.round(f.paidOut).toLocaleString()}</span></div>` : ''}
-    <div class="quote-line muted"><span>Bills recorded</span><span>− ${Math.round(f.billed).toLocaleString()}</span></div>
-    <div class="quote-line muted"><span>Cash handed back</span><span>− ${Math.round(f.returned).toLocaleString()}</span></div>
+    <div class="quote-line muted"><span>Invoices submitted</span><span>− ${Math.round(f.billed).toLocaleString()}</span></div>
+    <div class="quote-line muted"><span>Cash returned</span><span>− ${Math.round(f.returned).toLocaleString()}</span></div>
     <div class="quote-line total ${f.left === 0 ? 'due' : ''}" style="${f.left !== 0 ? 'color:var(--red);' : ''}">
-      <span>${f.left === 0 ? 'Balances — ready to settle ✓' : f.left > 0 ? 'Balance still to recover from him' : 'Bills are more than the cash given'}</span>
+      <span>${f.left === 0 ? 'Nothing left — ready to settle ✓' : f.left > 0 ? 'Balance still with him' : 'Invoices are more than the cash given'}</span>
       <span>${Math.abs(f.left).toLocaleString()}</span></div>`;
   // Short by some amount? It can still be settled, as long as it's ticked knowingly —
   // the balance stays on the person until they bring it or a bill turns up.
@@ -4905,7 +4930,7 @@ function advRenderRecon(){
   shortWrap.style.display = showShort ? '' : 'none';
   if(showShort){
     document.getElementById('advAcceptShortLabel').textContent =
-      `Settle anyway — LKR ${Math.round(f.left).toLocaleString()} stays on ${adv ? adv.employeeName + "'s" : 'his'} balance to recover later`;
+      `He keeps the balance of LKR ${Math.round(f.left).toLocaleString()} — settle with it staying on his account`;
   } else {
     document.getElementById('advAcceptShort').checked = false;
   }
@@ -4952,6 +4977,66 @@ document.getElementById('advMoveToggle').addEventListener('click', ()=>{
     advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
     renderAdvSettlePanel();
   });
+});
+const advBillFileHandler = createMultiFileHandler('advBillFile', 'advBillFileList');
+function advQuickReset(){
+  const g = id => document.getElementById(id);
+  g('advBillAmount').value = ''; g('advBillPurpose').value = '';
+  g('advBillDirect').checked = false;
+  g('advBillError').style.display = 'none';
+  advBillFileHandler.reset();
+  const forSel = g('advBillFor');
+  forSel.innerHTML = Object.keys(FOR_LABELS).map(k => `<option value="${k}">${esc(FOR_LABELS[k])}</option>`).join('');
+  const adv = advPanelRecord;
+  forSel.value = (adv && adv.card === 'kalava_card') ? 'kalava' : 'kalava';
+  g('advBillAccount').innerHTML = acctOptionsHTML('', { companyOnly:true, placeholder:'— Pick the company account —' });
+  advQuickForChanged();
+}
+// Only office bills need a company account picked; villa and Store ones are obvious.
+function advQuickForChanged(){
+  const forWhom = document.getElementById('advBillFor').value;
+  document.getElementById('advBillAccountWrap').style.display = forWhom === 'office' ? '' : 'none';
+  if(forWhom === 'office'){
+    const sel = document.getElementById('advBillAccount');
+    if(!sel.value) sel.value = suggestAccount(document.getElementById('advBillPurpose').value) || '';
+  }
+}
+document.getElementById('advBillFor').addEventListener('change', advQuickForChanged);
+document.getElementById('advBillPurpose').addEventListener('input', ()=>{
+  const sel = document.getElementById('advBillAccount');
+  if(document.getElementById('advBillFor').value === 'office' && !sel.dataset.touched) sel.value = suggestAccount(document.getElementById('advBillPurpose').value) || '';
+});
+document.getElementById('advBillAccount').addEventListener('change', e => e.target.dataset.touched = '1');
+document.getElementById('advBillAdd').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const adv = advPanelRecord;
+  const err = g('advBillError');
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  if(!adv || !sb) return;
+  const amount = parseFloat(g('advBillAmount').value);
+  const purpose = g('advBillPurpose').value.trim();
+  const forWhom = g('advBillFor').value;
+  const account = forWhom === 'office' ? (g('advBillAccount').value || null) : (forWhom === 'store' ? 'store' : 'villa');
+  if(!amount || amount <= 0) return fail('Enter the invoice amount.');
+  if(!purpose) return fail('Say what the invoice is for.');
+  if(forWhom === 'office' && !account) return fail('Pick the company account for this office bill.');
+  const btn = g('advBillAdd'); btn.disabled = true;
+  try{
+    const urls = [];
+    for(const fl of advBillFileHandler.getFiles()) urls.push(await uploadReceiptFile(fl));
+    const { error } = await sb.from('petty_cash_transactions').insert({
+      type:'expense', date: todayISO(), card: adv.card, for: forWhom, purpose, amount,
+      note:'', linked_inventory:false, invoice_urls: urls, employee_name: adv.employeeName,
+      direct_expense: g('advBillDirect').checked, account_code: account, advance_id: String(adv.id),
+    });
+    if(error) throw error;
+    logActivity('create', 'petty_cash_transactions', `Invoice from ${adv.employeeName}'s advance: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom] || forWhom})`);
+    await fetchCash();
+    advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
+    advQuickReset();
+    renderAdvSettlePanel();
+  }catch(e){ console.error(e); fail('Could not save — ' + (e.message || 'check the connection.')); }
+  finally{ btn.disabled = false; }
 });
 document.getElementById('advUndoEntries').addEventListener('click', async ()=>{
   const adv = advPanelRecord;
@@ -5097,7 +5182,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
     }
     if(f.left >= 1 && !g('advAcceptShort').checked){
       g('advSettled').checked = false;
-      return fail(`LKR ${Math.round(f.left).toLocaleString()} isn't covered yet. Record the remaining bills or the cash he handed back — or tick the box to settle with that amount left on his balance to recover.`);
+      return fail(`LKR ${Math.round(f.left).toLocaleString()} is unaccounted for. Add the missing invoice, or the cash he returned — or tick the box below if he keeps that balance.`);
     }
   }
   if(unsettling && !confirm(`Undo the settlement of ${employeeName}'s advance?`)){ g('advSettled').checked = true; return; }
@@ -6050,8 +6135,42 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     occupiedNights += Math.round((parseISO(segEnd) - parseISO(segStart)) / 86400000);
   }
 
-  const commission = grossLkr * 0.15;
-  const villaShare = grossLkr * 0.85;
+  // Money kept when a guest cancels late is earned revenue: Ceymora takes its 15%
+  // and the rest belongs to the villa, exactly like a stay. Counted in the month the
+  // booking was cancelled. A booking refunded in full keeps nothing, so it adds zero.
+  const cancels = cancelledBookings
+    .filter(b => b.villa === loc && b.retainedAmount > 0 && (b.cancelledOn || b.checkIn) >= monthStartISO && (b.cancelledOn || b.checkIn) < monthEndISO)
+    .sort((a,b)=> (a.cancelledOn||'').localeCompare(b.cancelledOn||''));
+  let keptLkr = 0, keptNative = 0, keptNoFx = 0, cancelRowsHtml = '';
+  for(const b of cancels){
+    const cur = b.currency || villaCurrency;
+    const rate = await getFxRate(b.cancelledOn || b.checkIn, cur);
+    let lineLkr = null;
+    keptNative += b.retainedAmount;
+    if(rate){ lineLkr = b.retainedAmount * rate; keptLkr += lineLkr; } else { keptNoFx++; }
+    cancelRowsHtml += `<tr>
+      <td class="dim">${b.cancelledOn ? fmtDay(b.cancelledOn) : '—'}</td>
+      <td><b>${esc(b.guest || 'Guest')}</b><div class="dim">stay was ${fmtDay(b.checkIn)} – ${fmtDay(b.checkOut)}</div></td>
+      <td class="dim">${esc(b.cancelReason || '')}${b.cancelNote ? `<div class="dim">${esc(b.cancelNote)}</div>` : ''}</td>
+      <td class="r dim">${moneyFull(b.refundedAmount || 0, cur)}</td>
+      <td class="r">${moneyFull(b.retainedAmount, cur)}</td>
+      <td class="r ${lineLkr!==null?'rpt-money-in':'dim'}">${lineLkr!==null ? Math.round(lineLkr).toLocaleString() : '—'}</td>
+    </tr>`;
+  }
+  const cancelHtml = cancels.length === 0
+    ? '<div class="rpt-empty">No cancellation money kept in this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr><th>Cancelled on</th><th>Guest</th><th>Reason</th><th class="r">Refunded (${esc(villaCurrency)})</th><th class="r">Kept (${esc(villaCurrency)})</th><th class="r">Kept (LKR)</th></tr></thead>
+        <tbody>${cancelRowsHtml}
+          <tr class="subtotal"><td colspan="4">Total kept — ${cancels.length} cancellation${cancels.length===1?'':'s'}</td>
+            <td class="r">${moneyFull(keptNative, villaCurrency)}</td><td class="r">${Math.round(keptLkr).toLocaleString()}</td></tr>
+        </tbody></table>
+      ${keptNoFx ? `<div class="rpt-note">${keptNoFx} cancellation${keptNoFx===1?'':'s'} could not be converted to LKR (no exchange rate for that date).</div>` : ''}
+      <div class="rpt-note">Money kept from a late cancellation is shared the same way as a stay: 15% to Ceymora, 85% to the villa. A guest refunded in full leaves nothing to share.</div>`;
+
+  const totalRevenueLkr = grossLkr + keptLkr;
+  const commission = totalRevenueLkr * 0.15;
+  const villaShare = totalRevenueLkr * 0.85;
 
   /* ---------------- 2. PETTY CASH ---------------- */
   const expenses = allCashTxns
@@ -6096,7 +6215,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   const totalExpenses = pettyCashTotal + opExTotal + supplies.total;
   const netProfit = villaShare - totalExpenses;
   const adr = bookedNights > 0 ? grossLkr / bookedNights : 0;
-  const margin = grossLkr > 0 ? Math.round(netProfit / grossLkr * 100) : null;
+  const margin = totalRevenueLkr > 0 ? Math.round(netProfit / totalRevenueLkr * 100) : null;
 
   const plCatRows = Object.keys(opExByCat).map(cat =>
     `<tr class="line"><td class="lbl">${esc(OPEX_LABELS[cat] || cat)}</td>${negCell(opExByCat[cat])}</tr>`
@@ -6110,7 +6229,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       <div class="rpt-kpis">
         <div class="rpt-kpi">
           <div class="rpt-kpi-label">Gross revenue</div>
-          <div class="rpt-kpi-value">${Math.round(grossLkr).toLocaleString()}</div>
+          <div class="rpt-kpi-value">${Math.round(totalRevenueLkr).toLocaleString()}</div>
           <div class="rpt-kpi-note">${bookings.length} booking${bookings.length===1?'':'s'}</div>
         </div>
         <div class="rpt-kpi">
@@ -6142,7 +6261,8 @@ async function buildVillaProfitReportHTML(loc, monthDate){
             <tr class="group"><td>Revenue</td><td class="amt">LKR</td></tr>
             <tr class="line"><td class="lbl">Booking revenue — Airbnb (${airbnbCount})</td><td class="amt">${Math.round(airbnbLkr).toLocaleString()}</td></tr>
             <tr class="line"><td class="lbl">Booking revenue — Direct (${directCount})</td><td class="amt">${Math.round(directLkr).toLocaleString()}</td></tr>
-            <tr class="sub"><td>Gross booking revenue</td><td class="amt">${Math.round(grossLkr).toLocaleString()}</td></tr>
+            ${keptLkr ? `<tr class="line"><td class="lbl">Kept from cancellations (${cancels.length})</td><td class="amt">${Math.round(keptLkr).toLocaleString()}</td></tr>` : ''}
+            <tr class="sub"><td>Gross revenue</td><td class="amt">${Math.round(totalRevenueLkr).toLocaleString()}</td></tr>
             <tr class="line"><td class="lbl">Less: Ceymora management fee (15%)</td>${negCell(commission)}</tr>
             <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${Math.round(villaShare).toLocaleString()}</td></tr>
 
@@ -6162,6 +6282,13 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     <div class="rpt-section" data-rpt-section="bookings">
       <div class="rpt-section-title">1. Bookings &amp; Revenue <span class="rpt-section-count">${bookings.length} booking${bookings.length===1?'':'s'} · ${bookedNights} paid night${bookedNights===1?'':'s'} · ${lkr(grossLkr)}</span></div>
       ${bookingsHtml}
+    </div>
+
+    <div class="rpt-section" data-rpt-section="cancellations">
+      <div class="rpt-section-title">1b. Cancellations — money kept
+          <span class="rpt-section-count">${cancels.length} cancellation${cancels.length===1?'':'s'} · ${lkr(keptLkr)} kept</span>
+        </div>
+      ${cancelHtml}
     </div>
 
     <div class="rpt-section" data-rpt-section="pettycash">
@@ -7663,6 +7790,17 @@ async function computeCommissionByVilla(monthDate){
     const rate = await getFxRate(b.checkIn, cur);
     if(!rate) continue;
     perVilla[b.villa] = (perVilla[b.villa] || 0) + nights * b.rateUsd * rate * 0.15;
+  }
+  // Money kept from a late cancellation is earned too — Ceymora's 15% of it is
+  // management income in the month the booking was cancelled.
+  for(const b of cancelledBookings){
+    if(!b.retainedAmount) continue;
+    const when = b.cancelledOn || b.checkIn;
+    if(when < monthStart || when >= monthEnd) continue;
+    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
+    const rate = await getFxRate(when, cur);
+    if(!rate) continue;
+    perVilla[b.villa] = (perVilla[b.villa] || 0) + b.retainedAmount * rate * 0.15;
   }
   return perVilla;
 }
