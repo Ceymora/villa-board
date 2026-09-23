@@ -7558,7 +7558,7 @@ const CO_GROUPS = [
     ['travelling_allowance','Travelling Allowance'], ['wages','Wages'],
   ]},
   { key:'utilities', label:'Utilities & Fixed Commitments', items:[
-    ['electricity','Electricity Bill'], ['water','Water'], ['telephone','Telephone'],
+    ['electricity','Electricity Bill'], ['water','Water'], ['telephone','Telephone (SLT / landline & internet)'],
   ]},
   { key:'professional', label:'Professional Fees', items:[
     ['accountancy','Monthly Accountancy Fee'], ['professional_fees','Professional Fees'],
@@ -7567,7 +7567,7 @@ const CO_GROUPS = [
     ['printing','Printing & Stationery'], ['repair','Repair and Maintenance'],
     ['travel_transport','Travelling & Transport'], ['office_maintenance','Office Maintenance'],
     ['cleaning','Cleaning'], ['advertising','Advertising and Promotion'],
-    ['staff_mobile','Staff Telephone & Mobile Bills'],
+    ['staff_mobile','Telephone (Mobile — staff phones)'],
     ['office_equipment','Office Equipment & Items'],
   ]},
   { key:'selling', label:'Selling & Distribution', items:[
@@ -8487,8 +8487,8 @@ function acctOptionsHTML(selected, opts){
 const ACCT_KEYWORDS = [
   [/audit/i,'annual_audit'], [/secretar/i,'annual_secretary'], [/trade\s*licen/i,'annual_trade_license'],
   [/electric|\bceb\b|leco/i,'electricity'], [/water|nwsdb/i,'water'],
-  [/mobile bill|staff phone|staff mobile|phone bill|sim bill/i,'staff_mobile'],
-  [/phone|telephone|dialog|mobitel|\bslt\b|hutch|airtel|internet|wi-?fi|broadband|reload/i,'telephone'],
+  [/mobile|dialog|mobitel|hutch|airtel|reload|\bsim\b|staff phone/i,'staff_mobile'],
+  [/\bslt\b|landline|telephone|phone bill|internet|wi-?fi|broadband|fibre|fiber/i,'telephone'],
   [/office (chair|table|desk|cupboard|almirah|fan|equipment|furniture|item)|laptop|printer|computer|air ?condition|\bac unit\b/i,'office_equipment'],
   [/accountan/i,'accountancy'], [/lawyer|legal|notary|consult/i,'professional_fees'],
   [/bank charge|service charge|sms alert|bank fee|card fee/i,'bank_charges'],
