@@ -966,11 +966,11 @@
     <div id="pettyCashPanel" style="display:none">
       <div class="cash-summary">
         <div class="cash-card ceymora">
-          <div class="cash-card-label">Ceymora Card</div>
+          <div class="cash-card-label">Ceymora Card <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="ceymoraBalance">LKR 0</div>
         </div>
         <div class="cash-card kalava">
-          <div class="cash-card-label">Kalava Villa Card</div>
+          <div class="cash-card-label">Kalava Villa Card <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
         <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
@@ -4354,6 +4354,8 @@ function initPettyCash(){
   document.getElementById('cashNextMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()+1); renderCash(); });
   document.getElementById('cashThisMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderCash(); });
   document.getElementById('cashAllTime').addEventListener('click', ()=>{ cashShowAll=!cashShowAll; renderCash(); });
+  document.querySelector('.cash-card.ceymora').addEventListener('click', ()=> openCardBalanceDetail('ceymora'));
+  document.querySelector('.cash-card.kalava').addEventListener('click', ()=> openCardBalanceDetail('kalava_card'));
   document.getElementById('cashMonthPick').addEventListener('change', (e)=>{
     if(!e.target.value) return;
     const [y,m] = e.target.value.split('-').map(Number);
@@ -6111,6 +6113,40 @@ function renderDirectCardSubs(){
       + (villas.length ? villas.map(v => `${esc(FOR_LABELS[v] || v)} LKR ${Math.round(byVilla[v]).toLocaleString()}`).join(' · ') : 'None yet')
       + ' · all-time';
   });
+}
+// Every line that makes up a card's balance, so a figure can always be explained.
+function openCardBalanceDetail(card){
+  const label = CARD_LABELS[card] || card;
+  const rows = allCashTxns.filter(t => t.card === card).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  const sum = f => rows.filter(f).reduce((s2,t)=> s2 + t.amount, 0);
+  const topUps    = sum(t => t.type === 'income' && !t.advanceId);
+  const returned  = sum(t => t.type === 'income' && t.advanceId);
+  const advances  = sum(t => t.type === 'advance');
+  const cardBills = sum(t => t.type === 'expense' && !t.employeeName);
+  const advBills  = sum(t => t.type === 'expense' && t.employeeName);
+  const balance   = rows.reduce((s2,t)=> s2 + cardEffect(t), 0);
+  const line = (label2, v, sign, note)=> `<div class="quote-line ${sign === '−' ? 'muted' : ''}">
+      <span>${esc(label2)}${note ? `<div class="txn-sub">${esc(note)}</div>` : ''}</span>
+      <span>${sign} ${Math.round(v).toLocaleString()}</span></div>`;
+
+  document.getElementById('villaDetailTitle').textContent = `${label} — how this balance is made up`;
+  document.getElementById('villaDetailBody').innerHTML = `
+    <div class="quote-box">
+      ${line('Money received onto the card', topUps, '+')}
+      ${returned ? line('Unused advance cash handed back', returned, '+') : ''}
+      ${line('Advances given to staff', advances, '−', 'cash left the card with the person')}
+      ${line('Bills paid straight from the card', cardBills, '−')}
+      <div class="quote-line total ${balance >= 0 ? 'due' : ''}" style="${balance < 0 ? 'color:var(--red);' : ''}">
+        <span>Balance on the card now</span><span>LKR ${Math.round(balance).toLocaleString()}</span></div>
+    </div>
+    ${advBills ? `<div class="field-hint" style="margin-top:8px;">LKR ${Math.round(advBills).toLocaleString()} of bills were paid out of staff advances. They are costs of the villas/office, but they don't come off the card again — that money already left when the advance was handed over.</div>` : ''}
+    ${balance < 0 ? `<div class="adv-status warn" style="margin-top:10px;">
+        <b>This card is showing a minus figure.</b> That means more has been recorded going out than coming in. The usual reason is that top-ups (or the balance the card started with) were never entered.
+        Add them with <b>“+ Money received”</b>, dated when the money actually went onto the card.
+        ${topUps === 0 ? '<br><br>Nothing at all has been recorded as money received on this card.' : ''}
+      </div>` : ''}
+    <div class="field-hint" style="margin-top:8px;">${rows.length} transaction${rows.length===1?'':'s'} on this card, all time.</div>`;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
 }
 function openDirectPurchasesDetail(card){
   const cardLabel = CARD_LABELS[card] || card;
