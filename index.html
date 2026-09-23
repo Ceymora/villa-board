@@ -4923,35 +4923,42 @@ function renderAdvSettlePanel(){
   if(!pi.dataset.touched) pi.value = f.paidOut || '';
   advRenderRecon();
 }
-function advFormFigures(){
+// includeDraft: counts the invoice amount currently being typed, so the balance on
+// screen answers "what is left with him?" straight away. Saving never uses the draft —
+// only invoices actually added count towards settling.
+function advFormFigures(includeDraft){
   const adv = advPanelRecord;
   const amount = parseFloat(document.getElementById('advAmount').value) || 0;
   const billed = adv ? advBillsFor(adv).reduce((s,b)=> s + b.amount, 0) : 0;
+  const draft = includeDraft ? (parseFloat(document.getElementById('advBillAmount').value) || 0) : 0;
   const returned = parseFloat(document.getElementById('advReturned').value) || 0;
   const paidOut = parseFloat(document.getElementById('advPaidOut').value) || 0;
-  const left = Math.round((amount + paidOut - billed - returned) * 100) / 100;
-  return { amount, billed, returned, paidOut, left };
+  const left = Math.round((amount + paidOut - billed - draft - returned) * 100) / 100;
+  return { amount, billed, draft, returned, paidOut, left };
 }
 function advRenderRecon(){
   if(!advPanelRecord) return;
-  const f = advFormFigures();
+  const f = advFormFigures(true);
   document.getElementById('advRecon').innerHTML = `
     <div class="quote-line"><span>Advance given</span><span>${f.amount.toLocaleString()}</span></div>
     ${f.paidOut ? `<div class="quote-line"><span>Extra paid to cover bills</span><span>+ ${Math.round(f.paidOut).toLocaleString()}</span></div>` : ''}
     <div class="quote-line muted"><span>Invoices submitted</span><span>− ${Math.round(f.billed).toLocaleString()}</span></div>
+    ${f.draft ? `<div class="quote-line muted"><span>Invoice being entered now</span><span>− ${Math.round(f.draft).toLocaleString()}</span></div>` : ''}
     <div class="quote-line muted"><span>Cash returned</span><span>− ${Math.round(f.returned).toLocaleString()}</span></div>
     <div class="quote-line total ${f.left === 0 ? 'due' : ''}" style="${f.left !== 0 ? 'color:var(--red);' : ''}">
-      <span>${f.left === 0 ? 'Nothing left — ready to settle ✓' : f.left > 0 ? 'Balance still with him' : 'Invoices are more than the cash given'}</span>
-      <span>${Math.abs(f.left).toLocaleString()}</span></div>`;
+      <span>${f.left === 0 ? 'Nothing left — ready to settle ✓' : f.left > 0 ? `Balance still with ${esc((advPanelRecord && advPanelRecord.employeeName) || 'him')}` : 'Invoices are more than the cash given'}</span>
+      <span>${Math.abs(f.left).toLocaleString()}</span></div>
+    ${f.draft ? '<div class="field-hint" style="margin-top:4px;">Press “+ Add this invoice” to record it — until then it isn\'t saved.</div>' : ''}`;
   // Short by some amount? It can still be settled, as long as it's ticked knowingly —
   // the balance stays on the person until they bring it or a bill turns up.
   const shortWrap = document.getElementById('advShortWrap');
   const adv = advPanelRecord;
-  const showShort = f.left > 0 && !(adv && adv.settled);
+  const saved = advFormFigures(false);
+  const showShort = saved.left > 0 && !(adv && adv.settled);
   shortWrap.style.display = showShort ? '' : 'none';
   if(showShort){
     document.getElementById('advAcceptShortLabel').textContent =
-      `He keeps the balance of LKR ${Math.round(f.left).toLocaleString()} — settle with it staying on his account`;
+      `He keeps the balance of LKR ${Math.round(saved.left).toLocaleString()} — settle with it staying on his account`;
   } else {
     document.getElementById('advAcceptShort').checked = false;
   }
@@ -5023,6 +5030,7 @@ function advQuickForChanged(){
   }
 }
 document.getElementById('advBillFor').addEventListener('change', advQuickForChanged);
+document.getElementById('advBillAmount').addEventListener('input', advRenderRecon);
 document.getElementById('advBillPurpose').addEventListener('input', ()=>{
   const sel = document.getElementById('advBillAccount');
   if(document.getElementById('advBillFor').value === 'office' && !sel.dataset.touched) sel.value = suggestAccount(document.getElementById('advBillPurpose').value) || '';
@@ -5186,7 +5194,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   if(advLocked(original)) return fail('This advance is settled. Request an undo to change it.');
   const newlySettling = !!(original && settled && !original.settled);
   const unsettling = !!(original && !settled && original.settled);
-  const f = original ? advFormFigures() : { returned:0, paidOut:0, billed:0, left:0 };
+  const f = original ? advFormFigures(false) : { returned:0, paidOut:0, billed:0, left:0 };
 
   if(newlySettling){
     // An invoice must be on file — either attached here, or on one of the bills.
