@@ -2040,6 +2040,8 @@
       </div>
       <div class="gm-step"><b>3.</b> Open WhatsApp, press <b>New group</b>, and add these numbers
         <div id="gmNumbers"></div>
+        <a class="adv-undo-btn" id="gmOpenWa" href="https://wa.me/" target="_blank" rel="noopener"
+           style="background:#25D366; text-decoration:none; display:inline-block; margin-right:6px;">💬 Open WhatsApp</a>
         <button type="button" class="rpt-quick" id="gmCopyNumbers">Copy all numbers</button>
         <div class="field-hint" id="gmHint"></div>
       </div>
@@ -2722,9 +2724,15 @@ function applyRolePermissions(){
 /* ============================= TAB SWITCHING ============================= */
 document.querySelectorAll('.maintab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    const tab = btn.dataset.tab;
+    // Month figures live in the form until they're saved — don't drop them on a tab change.
+    if(typeof coDirty !== 'undefined' && coDirty && tab !== 'company'
+       && document.getElementById('companyPanel').style.display !== 'none'){
+      if(!confirm('You have unsaved company figures for this month. Leave without saving?')) return;
+      coDirty = false;
+    }
     document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    const tab = btn.dataset.tab;
     document.getElementById('housekeepingPanel').style.display = tab==='housekeeping' ? '' : 'none';
     document.getElementById('bookingsPanel').style.display = tab==='bookings' ? '' : 'none';
     document.getElementById('pettyCashPanel').style.display = tab==='pettycash' ? '' : 'none';
@@ -5050,8 +5058,19 @@ function openAdvanceModal(record){
     g('advanceModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
 }
-document.getElementById('advCancel').addEventListener('click', ()=> document.getElementById('advanceModalOverlay').classList.remove('open'));
-document.getElementById('advanceModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='advanceModalOverlay') e.currentTarget.classList.remove('open'); });
+function advDraftPending(){
+  const a = document.getElementById('advBillAmount');
+  return !!(a && parseFloat(a.value) > 0);
+}
+document.getElementById('advCancel').addEventListener('click', ()=>{
+  if(advDraftPending() && !confirm('The invoice you typed hasn\'t been added yet. Close anyway and lose it?')) return;
+  document.getElementById('advanceModalOverlay').classList.remove('open');
+});
+document.getElementById('advanceModalOverlay').addEventListener('click', (e)=>{
+  if(e.target.id !== 'advanceModalOverlay') return;
+  if(advDraftPending() && !confirm('The invoice you typed hasn\'t been added yet. Close anyway and lose it?')) return;
+  e.currentTarget.classList.remove('open');
+});
 
 function renderAdvSettlePanel(){
   const adv = advPanelRecord;
@@ -5123,7 +5142,7 @@ function advRenderRecon(){
     <div class="quote-line total ${f.left === 0 ? 'due' : ''}" style="${f.left !== 0 ? 'color:var(--red);' : ''}">
       <span>${f.left === 0 ? 'Nothing left — ready to settle ✓' : f.left > 0 ? `Balance still with ${esc((advPanelRecord && advPanelRecord.employeeName) || 'him')}` : 'Invoices are more than the cash given'}</span>
       <span>${Math.abs(f.left).toLocaleString()}</span></div>
-    ${f.draft ? '<div class="field-hint" style="margin-top:4px;">Press “+ Add this invoice” to record it — until then it isn\'t saved.</div>' : ''}`;
+    ${f.draft ? '<div class="field-hint" style="margin-top:4px; color:var(--red); font-weight:600;">Not saved yet — press “+ Add this invoice” to record it.</div>' : ''}`;
   // Short by some amount? It can still be settled, as long as it's ticked knowingly —
   // the balance stays on the person until they bring it or a bill turns up.
   const shortWrap = document.getElementById('advShortWrap');
@@ -5229,12 +5248,16 @@ document.getElementById('advBillPurpose').addEventListener('input', ()=>{
   if(document.getElementById('advBillFor').value === 'office' && !sel.dataset.touched) sel.value = suggestAccount(document.getElementById('advBillPurpose').value) || '';
 });
 document.getElementById('advBillAccount').addEventListener('change', e => e.target.dataset.touched = '1');
-document.getElementById('advBillAdd').addEventListener('click', async ()=>{
+// Returns true when the typed invoice was saved (or there was nothing typed), false when
+// something is missing. Save calls this too, so an invoice that was typed but never added
+// can't be lost when the form closes.
+async function advAddDraftInvoice(){
   const g = id => document.getElementById(id);
   const adv = advPanelRecord;
   const err = g('advBillError');
-  const fail = m => { err.textContent = m; err.style.display = 'block'; };
-  if(!adv || !sb) return;
+  const fail = m => { err.textContent = m; err.style.display = 'block'; return false; };
+  if(!adv || !sb) return true;
+  if(!(parseFloat(g('advBillAmount').value) > 0) && !g('advBillPurpose').value.trim() && !advBillFileHandler.getFiles().length) return true;
   const amount = parseFloat(g('advBillAmount').value);
   const purpose = g('advBillPurpose').value.trim();
   const forWhom = g('advBillFor').value;
@@ -5243,6 +5266,7 @@ document.getElementById('advBillAdd').addEventListener('click', async ()=>{
   if(!purpose) return fail('Say what the invoice is for.');
   if(forWhom === 'office' && !account) return fail('Pick the company account for this office bill.');
   const btn = g('advBillAdd'); btn.disabled = true;
+  let ok = false;
   try{
     const urls = [];
     for(const fl of advBillFileHandler.getFiles()) urls.push(await uploadReceiptFile(fl));
@@ -5257,9 +5281,16 @@ document.getElementById('advBillAdd').addEventListener('click', async ()=>{
     advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
     advQuickReset();
     renderAdvSettlePanel();
-  }catch(e){ console.error(e); fail('Could not save — ' + (e.message || 'check the connection.')); }
+    ok = true;
+  }catch(e){
+    console.error(e);
+    fail('Could not save this invoice — ' + (e.message || 'check the connection.')
+      + (/advance_id|column/i.test(e.message || '') ? ' Run supabase-accounts-and-payroll.sql in Supabase first.' : ''));
+  }
   finally{ btn.disabled = false; }
-});
+  return ok;
+}
+document.getElementById('advBillAdd').addEventListener('click', advAddDraftInvoice);
 document.getElementById('advUndoEntries').addEventListener('click', async ()=>{
   const adv = advPanelRecord;
   if(!adv || advLocked(adv)) return;
@@ -5385,6 +5416,10 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
 
   const original = editingCashId ? allCashTxns.find(t=>t.id===editingCashId) : null;
   if(advLocked(original)) return fail('This advance is settled. Request an undo to change it.');
+  // An invoice typed into the form but never added would otherwise be thrown away.
+  if(original && !(await advAddDraftInvoice())){
+    return fail('Finish the invoice you started above (amount and what it was for), press “+ Add this invoice”, then save. Clear the amount if you didn\'t mean to add one.');
+  }
   const newlySettling = !!(original && settled && !original.settled);
   const unsettling = !!(original && !settled && original.settled);
   const f = original ? advFormFigures(false) : { returned:0, paidOut:0, billed:0, left:0 };
