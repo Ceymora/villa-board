@@ -725,6 +725,24 @@
   .adv-quick label{ margin-top:8px; }
   .adv-holding{ background:var(--amber-bg); border:1px solid var(--amber); border-radius:9px; padding:8px 12px; margin:4px 0 8px; font-size:12.5px; }
   .adv-holding b{ font-size:17px; font-variant-numeric:tabular-nums; display:block; }
+  .villa-photo-grid{ display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; }
+  .villa-photo{ width:190px; }
+  .villa-photo .shot{
+    width:190px; height:120px; border:1px solid var(--board-line); border-radius:9px; background:var(--board);
+    display:flex; align-items:center; justify-content:center; font-size:11.5px; color:var(--muted); overflow:hidden;
+  }
+  .villa-photo .shot img{ width:100%; height:100%; object-fit:cover; }
+  .villa-photo h5{ margin:0 0 5px; font-size:12.5px; }
+  .group-box{
+    margin-top:12px; border:1px solid var(--board-line); border-radius:10px; padding:10px 12px; background:var(--board);
+  }
+  .group-box .name{
+    font-weight:700; font-size:14px; background:#fff; border:1px solid var(--board-line);
+    border-radius:7px; padding:7px 10px; margin:6px 0; word-break:break-word;
+  }
+  .group-box .shot{ width:120px; height:78px; border-radius:8px; object-fit:cover; border:1px solid var(--board-line); }
+  .rpt-head .rpt-logo{ max-height:54px; max-width:150px; object-fit:contain; display:block; margin-bottom:6px; }
+  .rpt-head .rpt-villa-shot{ width:120px; height:78px; object-fit:cover; border-radius:8px; margin-left:12px; }
   .chart-grid{ display:flex; flex-wrap:wrap; gap:12px; }
   .chart-card{ flex:1; min-width:280px; border:1px solid var(--board-line); border-radius:10px; padding:10px 12px; background:#fff; break-inside:avoid; }
   .chart-title{ font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
@@ -1321,6 +1339,12 @@
       </div>
 
       <div class="set-card">
+        <h4>Villa photos</h4>
+        <div class="field-hint">One photo per villa. Used as the picture for a booking's guest group, and shown at the top of that villa's report.</div>
+        <div id="setVillaPhotos" class="villa-photo-grid"></div>
+      </div>
+
+      <div class="set-card">
         <h4>Ceymora Management — company details</h4>
         <div class="field-hint">These appear at the top of every invoice you print. Saved once and reused for all villas.</div>
         <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
@@ -1557,7 +1581,19 @@
         <div class="field-hint" style="margin-top:5px;">Issued automatically when the booking is first saved. They never change.</div>
       </div>
     </div>
-    <div class="field-hint">Leave blank if you don't want this booking counted in the earnings report.</div>
+    <div class="field-hint">Leave blank if you don't want this booking counted in the earnings report.</div>    <div class="group-box" id="bookingGroupBox" style="display:none;">
+      <div class="direct-block-title">Guest group</div>
+      <div class="field-hint">Open WhatsApp, create a new group, paste this name and set the villa photo as the group picture.</div>
+      <div class="name" id="bookingGroupName"></div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <img class="shot" id="bookingGroupShot" alt="" style="display:none;">
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="rpt-quick" id="bookingGroupCopy">Copy group name</button>
+          <a class="rpt-quick" id="bookingGroupSave" href="#" target="_blank" rel="noopener" style="display:none; text-decoration:none;">Open photo to save</a>
+        </div>
+      </div>
+      <div class="field-hint" id="bookingGroupHint"></div>
+    </div>
     </div><!-- /.modal-scroll -->
     <div class="modal-error" id="modalError">Check-out must be after check-in.</div>
     <div class="modal-actions">
@@ -2209,6 +2245,7 @@ const SETTINGS_DEFAULTS = {
     terms: 'Check-in from 2:00 pm · Check-out by 11:00 am. The refundable damage deposit is returned within 7 days of check-out, less any damages.',
   },
   logoUrl: '',
+  villaImages: {},
   invoicePrefix: 'CM',
   villaCodes: { kalava: 'KAL', noelia: 'NOE', brisa: 'BRI' },
   damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
@@ -3427,12 +3464,39 @@ const btnDelete = document.getElementById('btnDelete');
 let editingBookingVilla = null;   // the villa a booking being edited belongs to
 let editingBookingRef = null;     // the full booking object, so the Invoice button can print it
 
+// "Kalava Villa | Sep 25 - Sep 29" — the name to give the guest's WhatsApp group,
+// with that villa's photo to use as the group picture.
+function bookingGroupName(villaId, ciISO, coISO){
+  const villa = (CAL_VILLAS.find(v => v.id === villaId) || {}).name || FOR_LABELS[villaId] || villaId || '';
+  const short = iso => { try{ return parseISO(iso).toLocaleDateString('en-US', { month:'short', day:'numeric' }); }catch(e){ return iso; } };
+  if(!ciISO || !coISO) return villa;
+  return `${villa} | ${short(ciISO)} - ${short(coISO)}`;
+}
+function renderBookingGroupBox(){
+  const box = document.getElementById('bookingGroupBox');
+  if(!box) return;
+  const villaId = document.getElementById('fVilla').value || editingBookingVilla;
+  const ci = document.getElementById('fCheckIn').value, co = document.getElementById('fCheckOut').value;
+  if(!ci || !co){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  const name = bookingGroupName(villaId, ci, co);
+  document.getElementById('bookingGroupName').textContent = name;
+  const shot = villaImage(villaId);
+  const img = document.getElementById('bookingGroupShot'), link = document.getElementById('bookingGroupSave');
+  img.style.display = shot ? '' : 'none';
+  if(shot) img.src = shot;
+  link.style.display = shot ? '' : 'none';
+  link.href = shot || '#';
+  document.getElementById('bookingGroupHint').textContent = shot
+    ? '' : 'No photo for this villa yet — upload one under Invoices & Setup → Villa photos.';
+}
 function openModal(booking, presetCheckInISO, presetCheckOutISO){
   editingBookingId = booking ? booking.id : null;
   editingBookingVilla = booking ? booking.villa : currentVillaCal;
   editingBookingRef = booking || null;
   modalError.style.display = 'none';
   document.getElementById('modalTitle').textContent = booking ? 'Edit booking' : 'Add booking';
+  setTimeout(renderBookingGroupBox, 0);
   const currency = (CAL_VILLAS.find(v=>v.id===editingBookingVilla) || {}).currency || 'USD';
   document.getElementById('fRateCurrencyLabel').textContent = currency;
   document.querySelectorAll('.dCurLabel').forEach(el => el.textContent = currency);
@@ -5049,6 +5113,24 @@ function advQuickForChanged(){
   }
 }
 document.getElementById('advBillFor').addEventListener('change', advQuickForChanged);
+['fVilla','fCheckIn','fCheckOut'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('change', renderBookingGroupBox);
+});
+document.getElementById('bookingGroupCopy').addEventListener('click', async ()=>{
+  const name = document.getElementById('bookingGroupName').textContent;
+  const hint = document.getElementById('bookingGroupHint');
+  try{
+    await navigator.clipboard.writeText(name);
+    hint.textContent = 'Group name copied — paste it into WhatsApp.';
+  }catch(e){
+    // Clipboard is blocked in some browsers; select the text so it can be copied by hand.
+    const el = document.getElementById('bookingGroupName');
+    const range = document.createRange(); range.selectNodeContents(el);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    hint.textContent = 'Name selected — press Ctrl/Cmd + C to copy.';
+  }
+});
 document.getElementById('advBillAmount').addEventListener('input', advRenderRecon);
 document.getElementById('advBillPurpose').addEventListener('input', ()=>{
   const sel = document.getElementById('advBillAccount');
@@ -5829,7 +5911,7 @@ function buildVillaReportHTML(loc, monthDate){
 
   return `
   <div class="rpt-doc">
-    ${reportHeaderHTML(locName, 'Monthly Cost Report', monthDate, 'All figures in <b>LKR</b>')}
+    ${reportHeaderHTML(locName, 'Monthly Cost Report', monthDate, 'All figures in <b>LKR</b>', loc)}
 
     <div data-rpt-section="summary">
       <div class="rpt-kpis">
@@ -6125,14 +6207,20 @@ function applyReportSections(pickerId, bodyId){
 }
 
 // Standard letterhead at the top of every report.
-function reportHeaderHTML(title, subtitle, monthDate, extraMeta){
+function reportHeaderHTML(title, subtitle, monthDate, extraMeta, villaId){
   const periodStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const periodEnd = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 0);
+  const logo = APP_SETTINGS.logoUrl || '';
+  const shot = villaId ? villaImage(villaId) : '';
   return `
     <div class="rpt-head">
-      <div>
-        <div class="rpt-title">${esc(title)}</div>
-        <div class="rpt-sub">${esc(subtitle)}</div>
+      <div style="display:flex; align-items:flex-start;">
+        <div>
+          ${logo ? `<img class="rpt-logo" src="${esc(logo)}" alt="">` : ''}
+          <div class="rpt-title">${esc(title)}</div>
+          <div class="rpt-sub">${esc(subtitle)}</div>
+        </div>
+        ${shot ? `<img class="rpt-villa-shot" src="${esc(shot)}" alt="">` : ''}
       </div>
       <div class="rpt-meta">
         <div>Period: <b>${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}</b></div>
@@ -6308,7 +6396,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
 
   return `
   <div class="rpt-doc">
-    ${reportHeaderHTML(villaInfo.name, 'Monthly Financial Report', monthDate, 'All figures in <b>LKR</b>')}
+    ${reportHeaderHTML(villaInfo.name, 'Monthly Financial Report', monthDate, 'All figures in <b>LKR</b>', loc)}
 
     <div data-rpt-section="summary">
       <div class="rpt-kpis">
@@ -7296,6 +7384,49 @@ function initSettings(){
   });
 }
 
+// One photo per villa, kept in app settings beside the logo.
+function villaImage(villaId){ return (APP_SETTINGS.villaImages || {})[villaId] || ''; }
+function renderVillaPhotos(){
+  const wrap = document.getElementById('setVillaPhotos');
+  if(!wrap) return;
+  const villas = (typeof CAL_VILLAS !== 'undefined' && CAL_VILLAS.length) ? CAL_VILLAS : VILLA_IDS.map(id => ({ id, name: FOR_LABELS[id] || id }));
+  wrap.innerHTML = villas.map(v=>{
+    const url = villaImage(v.id);
+    return `<div class="villa-photo">
+      <h5>${esc(v.name)}</h5>
+      <div class="shot">${url ? `<img src="${esc(url)}" alt="${esc(v.name)}">` : 'No photo yet'}</div>
+      <input type="file" accept="image/*" data-villa-photo="${esc(v.id)}" style="margin-top:6px; font-size:11.5px; max-width:190px;">
+      ${url ? `<button class="manage-invoice" data-villa-photo-remove="${esc(v.id)}" style="margin-top:4px;">Remove</button>` : ''}
+      <div class="field-hint" data-villa-photo-hint="${esc(v.id)}"></div>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('[data-villa-photo]').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      const id = inp.dataset.villaPhoto;
+      const hint = wrap.querySelector(`[data-villa-photo-hint="${id}"]`);
+      hint.textContent = 'Uploading…';
+      try{
+        const url = await uploadReceiptFile(file);
+        APP_SETTINGS.villaImages = Object.assign({}, APP_SETTINGS.villaImages || {}, { [id]: url });
+        await saveSettings();
+        renderVillaPhotos();
+        logActivity('update', 'app_settings', `Uploaded the photo for ${FOR_LABELS[id] || id}`);
+      }catch(err){ hint.textContent = 'Upload failed — ' + (err.message || 'try again.'); console.error(err); }
+      e.target.value = '';
+    });
+  });
+  wrap.querySelectorAll('[data-villa-photo-remove]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.villaPhotoRemove;
+      if(!confirm('Remove this villa photo?')) return;
+      const old = villaImage(id);
+      APP_SETTINGS.villaImages = Object.assign({}, APP_SETTINGS.villaImages || {}, { [id]: '' });
+      try{ await saveSettings(); if(old) await deleteReceiptFiles([old]); renderVillaPhotos(); }catch(err){ console.error(err); }
+    });
+  });
+}
 function renderLogoPreview(){
   const box = document.getElementById('setLogoPreview');
   const url = APP_SETTINGS.logoUrl;
@@ -7324,6 +7455,7 @@ function fillSettingsForm(){
   g('setReminderTemplate').value = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
   g('setReminderStaffTemplate').value = APP_SETTINGS.reminderStaffTemplate || SETTINGS_DEFAULTS.reminderStaffTemplate;
   renderLogoPreview();
+  renderVillaPhotos();
 }
 
 function readSettingsForm(){
@@ -8056,7 +8188,7 @@ function renderCompanyReport(){
 
   body.innerHTML = `
   <div class="rpt-doc">
-    ${reportHeaderHTML('Ceymora (Pvt) Ltd', 'Management Accounts', coMonthDate, 'All figures in <b>LKR</b>')}
+    ${reportHeaderHTML((APP_SETTINGS.company || {}).name || 'Ceymora Management', 'Management Accounts', coMonthDate, 'All figures in <b>LKR</b>')}
     <div data-rpt-section="dashboard">${coDashboardHTML(cur, prev, curLabel, prevLabel)}</div>
     ${coUnsortedWarningHTML()}
     <div data-rpt-section="charts">${coChartsHTML(cur)}</div>
