@@ -756,6 +756,16 @@
   .grp-row .grp-sub{ font-size:11.5px; color:var(--muted); margin-top:2px; }
   .grp-row .grp-acts{ display:flex; gap:5px; flex-wrap:wrap; }
   .grp-row .grp-acts a{ text-decoration:none; }
+  .gm-step{ border:1px solid var(--board-line); border-radius:10px; padding:10px 12px; margin-top:10px; font-size:12.5px; }
+  .gm-step .name{
+    font-weight:700; font-size:14.5px; background:var(--board); border:1px solid var(--board-line);
+    border-radius:7px; padding:8px 10px; margin:6px 0; word-break:break-word;
+  }
+  .gm-step img{ width:150px; height:98px; object-fit:cover; border-radius:8px; border:1px solid var(--board-line); }
+  .gm-num{ display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px dashed var(--board-line); }
+  .gm-num:last-child{ border-bottom:none; }
+  .gm-num .who{ flex:1; }
+  .gm-num .no{ font-variant-numeric:tabular-nums; font-weight:600; }
   .rpt-head .rpt-logo{ max-height:54px; max-width:150px; object-fit:contain; display:block; margin-bottom:6px; }
   .rpt-head .rpt-villa-shot{ width:120px; height:78px; object-fit:cover; border-radius:8px; margin-left:12px; }
   .chart-grid{ display:flex; flex-wrap:wrap; gap:12px; }
@@ -900,10 +910,11 @@
       <div class="manage-section" id="groupsSection">
         <div class="manage-header">
           <span class="manage-title">Guest groups</span>
-          <label class="acct-toggle"><input type="checkbox" id="groupsAllVillas"> All villas</label>
+          <div class="villatabs" id="groupsVillaTabs" style="margin:0;"></div>
         </div>
         <div class="field-hint" style="margin:2px 0 8px;">Each upcoming stay with its group name, the villa photo and the guest's number — everything needed to open the WhatsApp group in one place.</div>
         <div id="groupsList"></div>
+        <button class="rpt-quick no-print" id="groupsMore" style="display:none;">Show more stays</button>
       </div>
 
       <div class="manage-section">
@@ -1029,6 +1040,7 @@
             <button id="cashNextMonth">Next ▶</button>
             <button id="cashThisMonth">This month</button>
             <button id="cashAllTime">All time</button>
+            <select id="cashMonthPick" class="acct-select" style="max-width:170px; margin-left:6px;"></select>
           </div>
         </div>
         <div class="field-hint" style="margin:6px 0 0;">The card balances at the top are always running all-time balances. The figures below are just for the month shown.</div>
@@ -1368,6 +1380,9 @@
         <h4>Villa photos</h4>
         <div class="field-hint">One photo per villa. Used as the picture for a booking's guest group, and shown at the top of that villa's report.</div>
         <div id="setVillaPhotos" class="villa-photo-grid"></div>
+        <label style="margin-top:14px;">Numbers to add to every guest group</label>
+        <input type="text" id="setGroupNumbers" placeholder="+94 77 155 6138, +94 74 410 5189">
+        <div class="field-hint">Your own team's numbers, separated by commas. They show on every group so nobody is forgotten.</div>
       </div>
 
       <div class="set-card">
@@ -2010,6 +2025,32 @@
   </div>
 </div>
 
+<!-- Guest group builder -->
+<div class="modal-overlay" id="gmModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Create the guest group</h3>
+    <div class="modal-scroll">
+      <div class="field-hint">WhatsApp doesn't let another app make a group for you, so the last taps are yours — but everything you need is here.</div>
+      <div class="gm-step"><b>1.</b> Copy the group name
+        <div class="name" id="gmName"></div>
+        <button type="button" class="rpt-quick" id="gmCopyName">Copy name</button>
+      </div>
+      <div class="gm-step"><b>2.</b> Save the villa photo for the group picture
+        <div id="gmPhotoWrap" style="margin-top:6px;"></div>
+      </div>
+      <div class="gm-step"><b>3.</b> Open WhatsApp, press <b>New group</b>, and add these numbers
+        <div id="gmNumbers"></div>
+        <button type="button" class="rpt-quick" id="gmCopyNumbers">Copy all numbers</button>
+        <div class="field-hint" id="gmHint"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="gmClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Company entry modal (bills paid outside petty cash / other income / bank balances) -->
 <div class="modal-overlay" id="ceModalOverlay">
   <div class="modal modal-wide">
@@ -2272,6 +2313,7 @@ const SETTINGS_DEFAULTS = {
   },
   logoUrl: '',
   villaImages: {},
+  groupNumbers: '+94771556138, +94744105189, +94741566138',
   invoicePrefix: 'CM',
   villaCodes: { kalava: 'KAL', noelia: 'NOE', brisa: 'BRI' },
   damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
@@ -4304,6 +4346,13 @@ function initPettyCash(){
   document.getElementById('cashNextMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()+1); renderCash(); });
   document.getElementById('cashThisMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderCash(); });
   document.getElementById('cashAllTime').addEventListener('click', ()=>{ cashShowAll=!cashShowAll; renderCash(); });
+  document.getElementById('cashMonthPick').addEventListener('change', (e)=>{
+    if(!e.target.value) return;
+    const [y,m] = e.target.value.split('-').map(Number);
+    cashShowAll = false;
+    cashMonthDate = new Date(y, m-1, 1);
+    renderCash();
+  });
 
   renderCash();
 }
@@ -4386,6 +4435,20 @@ function renderCashMonth(){
   document.getElementById('cashMonthLabel').textContent = cashShowAll
     ? 'All time'
     : cashMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  // Jump straight to any of the last 18 months — everyone who can see Petty Cash can
+  // look back at what was entered, not only at the current month.
+  const pick = document.getElementById('cashMonthPick');
+  if(pick){
+    const now = new Date();
+    let opts = '';
+    for(let i = 0; i < 18; i++){
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const v = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      opts += `<option value="${v}">${d.toLocaleDateString('en-GB', { month:'long', year:'numeric' })}</option>`;
+    }
+    pick.innerHTML = '<option value="">Jump to month…</option>' + opts;
+    pick.value = cashShowAll ? '' : `${cashMonthDate.getFullYear()}-${String(cashMonthDate.getMonth()+1).padStart(2,'0')}`;
+  }
   const allBtn = document.getElementById('cashAllTime');
   if(allBtn){ allBtn.style.fontWeight = cashShowAll ? '700' : ''; allBtn.textContent = cashShowAll ? '✓ All time' : 'All time'; }
 
@@ -7498,6 +7561,7 @@ function fillSettingsForm(){
   g('setReminderStaffNumbers').value = APP_SETTINGS.reminderStaffNumbers || '';
   g('setReminderTemplate').value = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
   g('setReminderStaffTemplate').value = APP_SETTINGS.reminderStaffTemplate || SETTINGS_DEFAULTS.reminderStaffTemplate;
+  g('setGroupNumbers').value = APP_SETTINGS.groupNumbers || '';
   renderLogoPreview();
   renderVillaPhotos();
   renderPrintHeader();
@@ -7522,6 +7586,7 @@ function readSettingsForm(){
   const remDays = parseInt(g('setReminderDays'), 10);
   APP_SETTINGS.reminderDays = (isFinite(remDays) && remDays > 0) ? remDays : 30;
   APP_SETTINGS.reminderStaffNumbers = document.getElementById('setReminderStaffNumbers').value.trim();
+  APP_SETTINGS.groupNumbers = document.getElementById('setGroupNumbers').value.trim();
   APP_SETTINGS.reminderTemplate = document.getElementById('setReminderTemplate').value.trim()
     || SETTINGS_DEFAULTS.reminderTemplate;
   APP_SETTINGS.reminderStaffTemplate = document.getElementById('setReminderStaffTemplate').value.trim()
@@ -10005,18 +10070,43 @@ async function copyText(text, hintEl, okMsg){
     window.prompt('Copy this:', text);
   }
 }
-document.getElementById('groupsAllVillas').addEventListener('change', renderGuestGroups);
+let groupsVilla = 'all', groupsLimit = 3;
+function renderGroupsVillaTabs(){
+  const wrap = document.getElementById('groupsVillaTabs');
+  if(!wrap) return;
+  const villas = [{ id:'all', name:'All villas' }, ...CAL_VILLAS.map(v=>({ id:v.id, name:v.name }))];
+  wrap.innerHTML = '';
+  villas.forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'villatab-btn' + (groupsVilla === v.id ? ' active' : '');
+    b.textContent = v.name;
+    b.style.background = groupsVilla === v.id ? 'var(--ink)' : '#fff';
+    b.style.color = groupsVilla === v.id ? '#fff' : 'var(--muted)';
+    b.addEventListener('click', ()=>{ groupsVilla = v.id; groupsLimit = 3; renderGuestGroups(); });
+    wrap.appendChild(b);
+  });
+}
 function renderGuestGroups(){
   const wrap = document.getElementById('groupsList');
   if(!wrap) return;
-  const allVillas = document.getElementById('groupsAllVillas').checked;
+  renderGroupsVillaTabs();
   const today = todayISO();
-  const rows = [...allBookings, ...provisionalBookings]
-    .filter(b => (allVillas || b.villa === currentVillaCal) && b.checkOut >= today)
-    .sort((a,b)=> a.checkIn.localeCompare(b.checkIn))
-    .slice(0, 40);
+  // The stays that matter now: the ones running or starting next, nearest first.
+  const all = [...allBookings, ...provisionalBookings]
+    .filter(b => (groupsVilla === 'all' || b.villa === groupsVilla) && b.checkOut >= today)
+    .sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
+  const rows = all.slice(0, groupsLimit);
+  const more = document.getElementById('groupsMore');
+  if(more){
+    more.style.display = all.length > rows.length ? '' : 'none';
+    more.textContent = `Show more stays (${all.length - rows.length} more)`;
+    if(!more.dataset.wired){
+      more.dataset.wired = '1';
+      more.addEventListener('click', ()=>{ groupsLimit += 5; renderGuestGroups(); });
+    }
+  }
   if(!rows.length){
-    wrap.innerHTML = `<div class="manage-empty">No upcoming stays${allVillas ? '' : ' for this villa'}.</div>`;
+    wrap.innerHTML = `<div class="manage-empty">No upcoming stays${groupsVilla === 'all' ? '' : ' for this villa'}.</div>`;
     return;
   }
   wrap.innerHTML = '';
@@ -10037,21 +10127,49 @@ function renderGuestGroups(){
         <div class="grp-sub" data-grp-hint></div>
       </div>
       <div class="grp-acts">
-        <button type="button" class="rpt-quick" data-copy-name>Copy name</button>
-        ${b.phone ? `<button type="button" class="rpt-quick" data-copy-phone>Copy number</button>` : ''}
+        <button type="button" class="adv-undo-btn" style="background:var(--green);" data-make-group>👥 Create group</button>
         ${wa ? `<a class="rpt-quick" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">💬 Message guest</a>` : ''}
-        ${shot ? `<a class="rpt-quick" href="${esc(shot)}" target="_blank" rel="noopener">Open photo</a>` : ''}
         <button type="button" class="rpt-quick" data-open-booking>Open booking</button>
       </div>`;
-    const hint = row.querySelector('[data-grp-hint]');
-    row.querySelector('[data-copy-name]').addEventListener('click', ()=> copyText(name, hint, 'Group name copied — paste it into WhatsApp.'));
-    const cp = row.querySelector('[data-copy-phone]');
-    if(cp) cp.addEventListener('click', ()=> copyText(b.phone, hint, 'Number copied.'));
+    row.querySelector('[data-make-group]').addEventListener('click', ()=> openGroupBuilder(b));
     row.querySelector('[data-open-booking]').addEventListener('click', ()=> openModal(b));
-    if(!shot){ hint.textContent = 'No photo for this villa yet — add one under Invoices & Setup → Villa photos.'; }
+    if(!shot) row.querySelector('[data-grp-hint]').textContent = 'No photo for this villa yet — add one under Invoices & Setup → Villa photos.';
     wrap.appendChild(row);
   });
 }
+
+/* ---- the group builder: name, photo and every number to add ---- */
+function groupNumberList(){
+  return String(APP_SETTINGS.groupNumbers || '')
+    .split(/[,\n;]/).map(x => x.trim()).filter(Boolean);
+}
+function openGroupBuilder(b){
+  const g = id => document.getElementById(id);
+  const name = bookingGroupName(b.villa, b.checkIn, b.checkOut);
+  g('gmName').textContent = name;
+  const shot = villaImage(b.villa);
+  g('gmPhotoWrap').innerHTML = shot
+    ? `<img src="${esc(shot)}" alt=""><div style="margin-top:6px;"><a class="rpt-quick" href="${esc(shot)}" target="_blank" rel="noopener" style="text-decoration:none;">Open photo to save</a></div>`
+    : '<div class="field-hint">No photo for this villa yet — add one under Invoices &amp; Setup → Villa photos.</div>';
+  const nums = [
+    ...(b.phone ? [{ who: (b.guest || 'Guest') + ' (guest)', no: b.phone }] : []),
+    ...groupNumberList().map(n => ({ who:'Ceymora team', no:n })),
+  ];
+  g('gmNumbers').innerHTML = nums.length
+    ? nums.map(n=>{
+        const wa = waNumber(n.no);
+        return `<div class="gm-num"><span class="who">${esc(n.who)}</span><span class="no">${esc(n.no)}</span>
+          ${wa ? `<a class="rpt-quick" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener" style="text-decoration:none;">Open chat</a>` : ''}</div>`;
+      }).join('')
+    : '<div class="field-hint">No numbers yet — add your team numbers under Invoices &amp; Setup → Villa photos, and the guest number on the booking.</div>';
+  g('gmHint').textContent = b.phone ? '' : 'This booking has no guest phone number — add it on the booking first.';
+  g('gmCopyName').onclick = ()=> copyText(name, g('gmHint'), 'Group name copied.');
+  g('gmCopyNumbers').onclick = ()=> copyText(nums.map(n => n.no).join(', '), g('gmHint'), 'All numbers copied.');
+  g('gmModalOverlay').classList.add('open');
+}
+document.getElementById('gmClose').addEventListener('click', ()=> document.getElementById('gmModalOverlay').classList.remove('open'));
+document.getElementById('gmModalOverlay').addEventListener('click', e=>{ if(e.target.id === 'gmModalOverlay') e.currentTarget.classList.remove('open'); });
+
 
 </script>
 </body>
