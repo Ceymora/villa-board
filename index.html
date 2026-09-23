@@ -1147,6 +1147,10 @@
           so they stay out of the company's own profit &amp; loss. Office and company costs need a company account — pick one from the list and it saves straight away.
         </div>
         <div class="co-actions">
+          <select id="coSortPeriod" class="acct-select" style="max-width:190px;">
+            <option value="month">This month only</option>
+            <option value="all">Every month</option>
+          </select>
           <label class="acct-toggle"><input type="checkbox" id="coSortOnlyOpen"> Only show expenses that still need an account</label>
           <button class="add-booking-btn" id="coSortAuto">✨ Suggest accounts for unsorted expenses</button>
           <span class="field-hint" id="coSortMsg"></span>
@@ -5417,7 +5421,13 @@ function renderUnsortedNotice(){
   const b = document.getElementById('goSortNow');
   if(b) b.addEventListener('click', ()=>{
     document.querySelector('.maintab-btn[data-tab="company"]').click();
-    setTimeout(()=> setCoView('sort'), 300);
+    setTimeout(()=>{
+      const per = document.getElementById('coSortPeriod'), only = document.getElementById('coSortOnlyOpen');
+      if(per) per.value = 'all';
+      if(only) only.checked = true;
+      setCoView('sort');
+      renderCoSort();
+    }, 300);
   });
 }
 function renderUndoRequests(){
@@ -8801,12 +8811,13 @@ function renderCoFlow(){
     <div class="src"><b>${k(L.petty.villa + L.petty.store)}</b>Charged to villas &amp; Store (kept out)</div>
     <div class="dest"><b>LKR ${k(L.companyTotal)}</b>company expenses in the records for ${esc(monthLabel(coMonthDate))}</div>`;
   const go = el.querySelector('[data-go-sort]');
-  if(go) go.addEventListener('click', ()=> setCoView('sort'));
+  if(go) go.addEventListener('click', ()=>{ document.getElementById('coSortOnlyOpen').checked = true; setCoView('sort'); renderCoSort(); });
 }
 
 /* ---------------------------- Sort expenses view ---------------------------- */
 function initCoSortAndBills(){
   document.getElementById('coSortOnlyOpen').addEventListener('change', renderCoSort);
+  document.getElementById('coSortPeriod').addEventListener('change', renderCoSort);
   document.getElementById('coSortAuto').addEventListener('click', coSortAuto);
   document.querySelectorAll('#companyPanel [data-ce-add]').forEach(b=>{
     b.addEventListener('click', ()=> openCeModal(b.dataset.ceAdd, null));
@@ -8816,23 +8827,39 @@ function initCoSortAndBills(){
 
 function renderCoSort(){
   const wrap = document.getElementById('coSortList');
+  const allMonths = document.getElementById('coSortPeriod').value === 'all';
   const { start, end } = monthRangeLocal(coMonthDate);
-  const monthTx = allCashTxns.filter(t => t.type === 'expense' && t.date >= start && t.date < end)
+  const monthTx = allCashTxns
+    .filter(t => t.type === 'expense' && (allMonths || (t.date >= start && t.date < end)))
     .sort((a,b)=> a.date.localeCompare(b.date));
   const onlyOpen = document.getElementById('coSortOnlyOpen').checked;
-  const L = coLinkedFigures(coMonthDate);
+  // Totals follow whatever is on screen, so the cards and the list always agree.
+  const tally = { company:0, villaStore:0, open:0, openCount:0 };
+  monthTx.forEach(t=>{
+    const code = acctOf(t);
+    if(!code){ tally.open += t.amount; tally.openCount++; }
+    else if(code === 'villa' || code === 'store') tally.villaStore += t.amount;
+    else tally.company += t.amount;
+  });
+  const openAllTime = unsortedExpenses();
 
   document.getElementById('coSortSummary').innerHTML = `
-    <div><div class="k">Expenses this month</div><div class="v">${monthTx.length}</div></div>
-    <div><div class="k">Company accounts</div><div class="v">${lkr(L.petty.company)}</div></div>
-    <div><div class="k">Charged to villas &amp; Store</div><div class="v">${lkr(L.petty.villa + L.petty.store)}</div></div>
-    <div><div class="k">Still need an account</div><div class="v ${L.petty.openCount ? 'warn' : 'good'}">${L.petty.openCount ? L.petty.openCount + ' · ' + lkr(L.petty.open) : 'All sorted ✓'}</div></div>`;
+    <div><div class="k">Expenses ${allMonths ? 'all months' : 'this month'}</div><div class="v">${monthTx.length}</div></div>
+    <div><div class="k">Company accounts</div><div class="v">${lkr(tally.company)}</div></div>
+    <div><div class="k">Charged to villas &amp; Store</div><div class="v">${lkr(tally.villaStore)}</div></div>
+    <div><div class="k">Still need an account</div><div class="v ${tally.openCount ? 'warn' : 'good'}">${tally.openCount ? tally.openCount + ' · ' + lkr(tally.open) : 'All sorted ✓'}</div></div>`;
+  // If everything here is sorted but older months aren't, say so instead of leaving
+  // the page looking empty while the banner still shows a count.
+  const msg = document.getElementById('coSortMsg');
+  if(!allMonths && !tally.openCount && openAllTime.length){
+    msg.innerHTML = `${openAllTime.length} unsorted expense${openAllTime.length===1?'':'s'} (LKR ${Math.round(openAllTime.reduce((s2,t)=>s2+t.amount,0)).toLocaleString()}) ${openAllTime.length===1?'is':'are'} in other months — switch to “Every month” to see ${openAllTime.length===1?'it':'them'}.`;
+  } else if(msg.dataset.keep !== '1'){ msg.textContent = ''; }
 
   const rows = onlyOpen ? monthTx.filter(t => !acctOf(t)) : monthTx;
   if(!rows.length){
     wrap.innerHTML = `<div class="manage-empty">${monthTx.length
-      ? 'Every expense this month has an account.'
-      : 'No petty cash expenses recorded in ' + esc(monthLabel(coMonthDate)) + '.'}</div>`;
+      ? (allMonths ? 'Every expense has an account.' : 'Every expense this month has an account.')
+      : 'No petty cash expenses recorded in ' + esc(allMonths ? 'any month' : monthLabel(coMonthDate)) + '.'}</div>`;
     return;
   }
   const editable = canEdit();
@@ -8840,7 +8867,7 @@ function renderCoSort(){
     <thead><tr><th>Date</th><th>Expense</th><th class="hide-sm">For</th><th class="hide-sm">Card</th><th class="r">LKR</th><th>Goes to</th></tr></thead>
     <tbody>${rows.map(t=>`
       <tr>
-        <td>${fmtDay(t.date)}</td>
+        <td>${fmtDay(t.date)}${allMonths ? `<div class="ce-sub">${esc(parseISO(t.date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }))}</div>` : ''}</td>
         <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="ce-sub">${esc(t.note)}</div>` : ''}</td>
         <td class="hide-sm">${esc(FOR_LABELS[t.for] || t.for || '')}</td>
         <td class="hide-sm">${esc(CARD_LABELS[t.card] || t.card || '')}</td>
@@ -8873,9 +8900,10 @@ function renderCoSort(){
 
 async function coSortAuto(){
   if(!canEdit()){ alert('Only an admin can sort expenses.'); return; }
+  const allMonths = document.getElementById('coSortPeriod').value === 'all';
   const { start, end } = monthRangeLocal(coMonthDate);
-  const open = allCashTxns.filter(t => t.type === 'expense' && t.date >= start && t.date < end && !acctOf(t));
-  if(!open.length){ document.getElementById('coSortMsg').textContent = 'Nothing to sort this month.'; return; }
+  const open = allCashTxns.filter(t => t.type === 'expense' && !acctOf(t) && (allMonths || (t.date >= start && t.date < end)));
+  if(!open.length){ document.getElementById('coSortMsg').textContent = allMonths ? 'Nothing left to sort.' : 'Nothing to sort this month.'; return; }
   const plan = open.map(t => ({ t, code: suggestAccount((t.purpose||'') + ' ' + (t.note||'')) })).filter(x => x.code);
   if(!plan.length){ document.getElementById('coSortMsg').textContent = `No suggestions for the ${open.length} unsorted expense${open.length===1?'':'s'} — pick their accounts by hand.`; return; }
   const preview = plan.slice(0, 12).map(x => `• ${x.t.purpose} → ${acctLabel(x.code)}`).join('\n') + (plan.length > 12 ? `\n…and ${plan.length-12} more` : '');
