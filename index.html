@@ -329,6 +329,11 @@
     padding:10px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;
   }
   .login-error{ color:var(--red); font-size:12.5px; margin-top:10px; display:none; }
+  .login-ok{ display:none; color:var(--green); font-size:12.5px; margin-top:8px; }
+  .login-link{
+    background:none; border:none; padding:0; color:var(--blue); font-size:12px; text-decoration:underline;
+    cursor:pointer; font-family:'Inter',sans-serif; text-align:left;
+  }
   #appRoot{ display:none; }
 
   /* Viewer role: hide every action that mutates data */
@@ -801,14 +806,17 @@
   <div class="login-card">
     <h1>🏡 Villa Management Board</h1>
     <div class="sub" style="font-size:12.5px;color:var(--muted);">Sign in to continue</div>
-    <label>Name</label>
-    <select id="loginUsername">
-      <option value="">Select your name…</option>
-    </select>
+    <label>Email</label>
+    <input type="email" id="loginEmail" autocomplete="username" placeholder="you@example.com">
     <label>Password</label>
-    <input type="password" id="loginPassword" placeholder="Enter your password">
-    <div class="login-error" id="loginError">Incorrect password.</div>
+    <input type="password" id="loginPassword" autocomplete="current-password" placeholder="Enter your password">
+    <div class="login-error" id="loginError">Incorrect email or password.</div>
+    <div class="login-ok" id="loginOk"></div>
     <button id="loginBtn">Sign in</button>
+    <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
+      <button class="login-link" id="loginSetPw">First time here? Set my password</button>
+      <button class="login-link" id="loginForgot">Forgotten password — email me a reset link</button>
+    </div>
   </div>
 </div>
 
@@ -2010,10 +2018,11 @@
 <div class="modal-overlay" id="userModalOverlay">
   <div class="modal">
     <h3 id="userModalTitle">Add user</h3>
-    <label>Name (used to log in)</label>
+    <label>Email (this is their login)</label>
+    <input type="email" id="userEmail" placeholder="e.g. kumar@example.com">
+    <label>Name shown in the app</label>
     <input type="text" id="userName" placeholder="e.g. Kumar">
-    <label>Password</label>
-    <input type="text" id="userPassword" placeholder="e.g. kumar123">
+    <div class="field-hint">They set their own password on the login page with “First time here? Set my password”. Passwords are held by Supabase — nobody here can read them.</div>
     <label>Role</label>
     <select id="userRole">
       <option value="admin">Admin — full access, can edit/delete everything</option>
@@ -2303,6 +2312,8 @@ if (CONFIGURED) {
 // Password required to delete anything in Petty Cash or Inventory.
 // Change this to whatever you like.
 // =====================================================================
+// A second pair of eyes before a delete. It is NOT the security boundary —
+// the database only accepts a delete from an admin login, whatever is typed here.
 const DELETE_PASSWORD = "villa123";
 function checkDeletePassword(){
   const pw = prompt('Enter the password to confirm this delete:');
@@ -2566,27 +2577,15 @@ function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, q
 //   'viewer_villa_fixed'       — only sees ONE villa's Petty Cash/Inventory (set via villaScope),
 //                                no Housekeeping/Bookings access at all
 // =====================================================================
-// Fallback used only if the app_users table can't be reached yet (e.g. before
-// you've run the setup SQL for it) — keeps the board usable either way.
-const FALLBACK_USERS = {
-  'Makky':   { password: 'makky123',   role: 'admin' },
-  'Zahny':   { password: 'zahny123',   role: 'cash_inventory' },
-  'Anuja':   { password: 'anuja123',   role: 'cash_inventory_bookings' },
-  'Raashid': { password: 'raashid123', role: 'viewer' },
-  'Nafhan':  { password: 'nafhan123',  role: 'viewer' },
-  'Sharon':  { password: 'sharon123',  role: 'viewer_villa_select' },
-  'Dino':    { password: 'dino123',    role: 'viewer_villa_fixed', villaScope: 'noelia' },
-  'Anna':    { password: 'anna123',    role: 'viewer_villa_fixed', villaScope: 'brisa' },
-};
-let USERS = { ...FALLBACK_USERS };
-let usersLoadedFromDB = false;
-
-let currentUser = null; // { username, role }
+// No passwords live in this file. Who may sign in is decided by Supabase Auth,
+// and what they may do by their row in the "profiles" table, which the database
+// checks again on every single read and write.
+let currentUser = null; // { username, email, role, villaScope }
 
 function canEdit(){
   return currentUser && (currentUser.role === 'admin' || currentUser.role === 'cash_inventory' || currentUser.role === 'cash_inventory_bookings');
 }
-const APP_VERSION = 'v2026.09.22-e';
+const APP_VERSION = 'v2026.09.23-secure';
 function isAdmin(){
   return !!currentUser && String(currentUser.role || '').trim().toLowerCase() === 'admin';
 }
@@ -2600,54 +2599,111 @@ async function logActivity(action, tableName, description){
   }catch(e){ console.error('activity log failed', e); }
 }
 
-async function loadUsersFromDB(){
-  if(!sb) return;
-  try{
-    const { data, error } = await sb.from('app_users').select('*');
-    if(error || !data || data.length === 0) return; // stay on fallback (table not set up yet, or empty)
-    const dbUsers = {};
-    data.forEach(u => {
-      dbUsers[u.username] = { password: u.password, role: u.role, villaScope: u.villa_scope || undefined };
-    });
-    USERS = dbUsers;
-    usersLoadedFromDB = true;
-    populateLoginDropdown();
-  }catch(e){ console.error('Could not load users from database, using built-in defaults', e); }
-}
-
-// Populate the name dropdown
-function populateLoginDropdown(){
-  const sel = document.getElementById('loginUsername');
-  const currentVal = sel.value;
-  sel.innerHTML = '<option value="">Select your name…</option>';
-  Object.keys(USERS).sort().forEach(name=>{
-    const opt = document.createElement('option');
-    opt.value = name; opt.textContent = name;
-    sel.appendChild(opt);
-  });
-  if(USERS[currentVal]) sel.value = currentVal;
-}
-populateLoginDropdown();
-if(sb) loadUsersFromDB();
 if(sb) fetchSettings();
+if(sb) restoreSession();
 
 document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('loginSetPw').addEventListener('click', doSetPassword);
+document.getElementById('loginForgot').addEventListener('click', doForgotPassword);
 document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('loginEmail').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
 
-function doLogin(){
-  const username = document.getElementById('loginUsername').value;
-  const password = document.getElementById('loginPassword').value;
-  const errEl = document.getElementById('loginError');
-  const user = USERS[username];
-  if(!username || !user || user.password !== password){
-    errEl.textContent = 'Incorrect name or password.';
-    errEl.style.display = 'block';
-    return;
-  }
-  currentUser = { username, role: user.role, villaScope: user.villaScope || null };
+/* ============================================================================
+   SIGNING IN
+   Supabase holds the passwords (hashed, never in this page). Who someone is
+   allowed to be is decided by their row in "profiles" — no profile, no access,
+   even with a valid login. The database enforces the same rules again on every
+   read and write, so nothing here is the only thing standing in the way.
+   ============================================================================ */
+const loginMsg = (kind, text)=>{
+  const err = document.getElementById('loginError'), ok = document.getElementById('loginOk');
+  err.style.display = kind === 'error' ? 'block' : 'none';
+  ok.style.display = kind === 'ok' ? 'block' : 'none';
+  (kind === 'error' ? err : ok).textContent = text;
+};
+
+async function loadMyProfile(){
+  const { data: { user } } = await sb.auth.getUser();
+  if(!user) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+  if(error){ console.error('profile lookup failed', error); return null; }
+  if(!data || data.active === false) return { blocked:true, email:user.email };
+  return {
+    username: data.full_name || data.email,
+    email: data.email,
+    role: data.role,
+    villaScope: data.villa_scope || null,
+  };
+}
+
+async function enterApp(profile){
+  currentUser = profile;
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   startApp();
+}
+
+function showNoAccess(email){
+  loginMsg('error', `${email} is signed in, but no access has been set up for this address yet. Ask Makky to add it under Users.`);
+  sb.auth.signOut();
+}
+
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  if(!email || !password) return loginMsg('error', 'Enter your email and password.');
+  if(!sb) return loginMsg('error', 'Not connected to the database yet — try again in a moment.');
+  const btn = document.getElementById('loginBtn'); btn.disabled = true;
+  try{
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){
+      loginMsg('error', /Invalid login/i.test(error.message)
+        ? 'Incorrect email or password. If you have never set a password, use the link below.'
+        : error.message);
+      return;
+    }
+    const profile = await loadMyProfile();
+    if(!profile || profile.blocked) return showNoAccess(email);
+    await enterApp(profile);
+  } finally { btn.disabled = false; }
+}
+
+// First-time password: the profile must already exist, so an uninvited sign-up
+// gains nothing even if it succeeds.
+async function doSetPassword(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  if(!email) return loginMsg('error', 'Type your email first.');
+  if(!password || password.length < 8) return loginMsg('error', 'Type the password you want to use — at least 8 characters.');
+  const { error } = await sb.auth.signUp({ email, password });
+  if(error){
+    loginMsg('error', /already/i.test(error.message)
+      ? 'This email already has a password. Sign in with it, or use the reset link.'
+      : error.message);
+    return;
+  }
+  loginMsg('ok', 'Password set. If Supabase asks you to confirm by email, do that first, then sign in.');
+}
+
+async function doForgotPassword(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  if(!email) return loginMsg('error', 'Type your email first.');
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  if(error) return loginMsg('error', error.message);
+  loginMsg('ok', 'If that address has a login, a reset link is on its way.');
+}
+
+// Coming back to an open session — no need to sign in again.
+async function restoreSession(){
+  if(!sb) return;
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+    const profile = await loadMyProfile();
+    if(!profile) return;
+    if(profile.blocked) return showNoAccess(profile.email);
+    await enterApp(profile);
+  }catch(e){ console.error('session restore failed', e); }
 }
 
 function startApp(){
@@ -2760,8 +2816,10 @@ function applyRolePermissions(){
   const logoutBtn = document.createElement('button');
   logoutBtn.textContent = 'Log out';
   logoutBtn.style.cssText = 'font-family:Inter,sans-serif; font-size:11.5px; font-weight:600; color:var(--muted); background:#fff; border:1px solid var(--board-line); padding:4px 10px; border-radius:20px; cursor:pointer;';
-  logoutBtn.addEventListener('click', ()=>{
-    if(confirm('Log out?')) location.reload();
+  logoutBtn.addEventListener('click', async ()=>{
+    if(!confirm('Log out?')) return;
+    try{ if(sb) await sb.auth.signOut(); }catch(e){ console.error(e); }
+    location.reload();
   });
 
   badgeWrap.appendChild(badge);
@@ -5070,7 +5128,7 @@ function openAdvanceModal(record){
   try{
     const g = id => document.getElementById(id);
     const dl = g('staffNameList');
-    const names = new Set([...STAFF.map(s=>s.name), ...Object.keys(USERS)]);
+    const names = new Set([...STAFF.map(s=>s.name), ...allAppUsers.map(u => u.full_name || u.email)]);
     dl.innerHTML = [...names].map(n=>`<option value="${esc(n)}">`).join('');
 
     g('advDate').value = record ? record.date : todayISO();
@@ -7123,7 +7181,7 @@ function initUsers(){
   document.getElementById('usersStatusMsg').textContent = 'Loading…';
   fetchAppUsers();
   sb.channel('app_users_changes')
-    .on('postgres_changes', { event:'*', schema:'public', table:'app_users' }, fetchAppUsers)
+    .on('postgres_changes', { event:'*', schema:'public', table:'profiles' }, fetchAppUsers)
     .subscribe();
 
   document.getElementById('addUserBtn').addEventListener('click', ()=> openUserModal(null));
@@ -7132,33 +7190,29 @@ function initUsers(){
 
 let allAppUsers = [];
 async function fetchAppUsers(){
-  const { data, error } = await sb.from('app_users').select('*').order('username');
+  const { data, error } = await sb.from('profiles').select('*').order('email');
   if(error){
-    document.getElementById('usersStatusMsg').textContent = 'Could not load — has the app_users table been created? (see supabase-add-users-and-sharon-purchases.sql)';
+    document.getElementById('usersStatusMsg').textContent = 'Could not load — has supabase-security.sql been run?';
     console.error(error);
     return;
   }
   allAppUsers = data;
   document.getElementById('usersStatusMsg').textContent = 'Synced (live)';
   renderUsers();
-  // Keep the live in-memory login list up to date too, in case someone
-  // is added while others are still on the login screen.
-  const dbUsers = {};
-  data.forEach(u => { dbUsers[u.username] = { password: u.password, role: u.role, villaScope: u.villa_scope || undefined }; });
-  if(Object.keys(dbUsers).length > 0){ USERS = dbUsers; usersLoadedFromDB = true; }
 }
 
 function renderUsers(){
   const body = document.getElementById('usersBody');
   body.innerHTML = '';
   if(allAppUsers.length === 0){
-    body.innerHTML = '<tr><td colspan="4" class="inv-empty">No users yet — click "+ Add user".</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="inv-empty">Nobody has access yet — click "+ Add user".</td></tr>';
     return;
   }
   for(const u of allAppUsers){
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td style="font-weight:600;">${u.username}</td>
+      <td style="font-weight:600;">${esc(u.full_name || u.email)}
+        <div class="ce-sub">${esc(u.email)}${u.user_id ? '' : ' · <b>password not set yet</b>'}${u.active === false ? ' · <b>access switched off</b>' : ''}</div></td>
       <td>${ROLE_LABELS[u.role] || u.role}</td>
       <td>${u.villa_scope ? (VILLAS.find(v=>v.id===u.villa_scope)||{}).name || u.villa_scope : '—'}</td>
     `;
@@ -7174,17 +7228,18 @@ function renderUsers(){
   }
 }
 
-let editingUsername = null;
+let editingUsername = null;   // the email of the profile being edited
 function updateUserVillaScopeVisibility(){
   const isFixed = document.getElementById('userRole').value === 'viewer_villa_fixed';
   document.getElementById('userVillaScopeWrap').style.display = isFixed ? '' : 'none';
 }
 function openUserModal(user){
-  editingUsername = user ? user.username : null;
-  document.getElementById('userModalTitle').textContent = user ? 'Edit user' : 'Add user';
-  document.getElementById('userName').value = user ? user.username : '';
-  document.getElementById('userName').disabled = !!user; // username is the primary key — don't let it change once created
-  document.getElementById('userPassword').value = user ? user.password : '';
+  editingUsername = user ? user.email : null;
+  document.getElementById('userModalTitle').textContent = user ? 'Edit access' : 'Give someone access';
+  document.getElementById('userEmail').value = user ? user.email : '';
+  document.getElementById('userEmail').disabled = !!user;   // the email is the login — never changed in place
+  document.getElementById('userName').value = user ? (user.full_name || '') : '';
+  document.getElementById('userName').disabled = false;
   document.getElementById('userRole').value = user ? user.role : 'viewer';
   const villaSel = document.getElementById('userVillaScope');
   villaSel.innerHTML = VILLAS.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
@@ -7200,20 +7255,21 @@ document.getElementById('userSave').addEventListener('click', async ()=>{
   const errEl = document.getElementById('userError');
   if(!isAdmin()){ errEl.textContent='Only an admin can manage users.'; errEl.style.display='block'; return; }
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
-  const username = document.getElementById('userName').value.trim();
-  const password = document.getElementById('userPassword').value.trim();
+  const email = document.getElementById('userEmail').value.trim().toLowerCase();
+  const fullName = document.getElementById('userName').value.trim();
   const role = document.getElementById('userRole').value;
   const villaScope = role === 'viewer_villa_fixed' ? document.getElementById('userVillaScope').value : null;
-  if(!username || !password){ errEl.textContent='Enter a name and password.'; errEl.style.display='block'; return; }
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ errEl.textContent='Enter a valid email address — it is their login.'; errEl.style.display='block'; return; }
   try{
     if(editingUsername){
-      const { error } = await sb.from('app_users').update({ password, role, villa_scope: villaScope }).eq('username', editingUsername);
+      const { error } = await sb.from('profiles').update({ full_name: fullName || null, role, villa_scope: villaScope }).eq('email', editingUsername);
       if(error) throw error;
-      logActivity('update', 'app_users', `Edited user: ${editingUsername}`);
+      logActivity('update', 'profiles', `Changed access for ${editingUsername} → ${ROLE_LABELS[role]||role}`);
     } else {
-      const { error } = await sb.from('app_users').insert({ username, password, role, villa_scope: villaScope });
+      const { error } = await sb.from('profiles').insert({ email, full_name: fullName || null, role, villa_scope: villaScope });
       if(error) throw error;
-      logActivity('create', 'app_users', `Added user: ${username} (${ROLE_LABELS[role]||role})`);
+      logActivity('create', 'profiles', `Gave ${email} access as ${ROLE_LABELS[role]||role}`);
+      alert(`${email} can now sign in.\n\nTell them to open the app, type that email, type the password they want, and press “First time here? Set my password”.`);
     }
     document.getElementById('userModalOverlay').classList.remove('open');
   }catch(e){
@@ -7225,11 +7281,11 @@ document.getElementById('userDeleteBtn').addEventListener('click', async ()=>{
   if(!editingUsername) return;
   if(!isAdmin()){ alert('Only an admin can delete users.'); return; }
   if(!checkDeletePassword()) return;
-  if(editingUsername === currentUser.username){ alert("You can't delete the account you're currently logged in as."); return; }
-  if(!confirm(`Remove ${editingUsername}'s login? They won't be able to sign in anymore.`)) return;
+  if(editingUsername === (currentUser.email || '')){ alert("You can't remove your own access while you're signed in."); return; }
+  if(!confirm(`Remove access for ${editingUsername}? They keep their password but the app will show them nothing.`)) return;
   try{
-    await sb.from('app_users').delete().eq('username', editingUsername);
-    logActivity('delete', 'app_users', `Removed user: ${editingUsername}`);
+    await sb.from('profiles').delete().eq('email', editingUsername);
+    logActivity('delete', 'profiles', `Removed access: ${editingUsername}`);
     document.getElementById('userModalOverlay').classList.remove('open');
   }catch(e){ console.error(e); }
 });
