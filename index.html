@@ -1043,14 +1043,27 @@
         <div class="manage-header">
           <span class="manage-title">Transactions</span>
           <div class="weeknav">
+            <div class="villatabs" id="cashPeriodTabs" style="margin:0 6px 0 0;">
+              <button class="villatab-btn" data-cashperiod="week">Weekly</button>
+              <button class="villatab-btn active" data-cashperiod="month">Monthly</button>
+              <button class="villatab-btn" data-cashperiod="all">All time</button>
+            </div>
             <button id="cashPrevMonth">◀ Prev</button>
             <span id="cashMonthLabel">Month of ...</span>
             <button id="cashNextMonth">Next ▶</button>
             <button id="cashThisMonth">This month</button>
-            <button id="cashAllTime">All time</button>
             <select id="cashMonthPick" class="acct-select" style="max-width:170px; margin-left:6px;"></select>
             <button id="cashExportBtn" title="Download these transactions as a spreadsheet file">⬇ Export CSV</button>
           </div>
+        </div>
+        <div class="manage-header" style="border-top:none; padding-top:0;">
+          <div class="villatabs" id="cashKindTabs" style="margin:0;">
+            <button class="villatab-btn active" data-cashkind="all">Everything</button>
+            <button class="villatab-btn" data-cashkind="income">💰 Money received</button>
+            <button class="villatab-btn" data-cashkind="expense">Expenses</button>
+            <button class="villatab-btn" data-cashkind="advance">Advances</button>
+          </div>
+          <span class="field-hint" id="cashKindTotal"></span>
         </div>
         <div class="field-hint" style="margin:6px 0 0;">The card balances at the top are always running all-time balances. The figures below are just for the month shown.</div>
         <div id="cashMonthSummary" class="cash-summary" style="margin-top:10px;"></div>
@@ -4457,10 +4470,22 @@ function initPettyCash(){
   document.getElementById('directPurchasesCeymoraCard').addEventListener('click', ()=> openDirectPurchasesDetail('ceymora'));
 
   // Month navigation for the transaction list + monthly spend figures
-  document.getElementById('cashPrevMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()-1); renderCash(); });
-  document.getElementById('cashNextMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate.setMonth(cashMonthDate.getMonth()+1); renderCash(); });
-  document.getElementById('cashThisMonth').addEventListener('click', ()=>{ cashShowAll=false; cashMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderCash(); });
-  document.getElementById('cashAllTime').addEventListener('click', ()=>{ cashShowAll=!cashShowAll; renderCash(); });
+  const stepCash = dir => {
+    if(cashPeriod === 'all') return;
+    if(cashPeriod === 'week') cashMonthDate.setDate(cashMonthDate.getDate() + dir * 7);
+    else cashMonthDate.setMonth(cashMonthDate.getMonth() + dir);
+    renderCash();
+  };
+  document.getElementById('cashPrevMonth').addEventListener('click', ()=> stepCash(-1));
+  document.getElementById('cashNextMonth').addEventListener('click', ()=> stepCash(1));
+  document.getElementById('cashThisMonth').addEventListener('click', ()=>{
+    cashMonthDate = cashPeriod === 'week' ? cashWeekStart(new Date()) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    renderCash();
+  });
+  document.querySelectorAll('#cashPeriodTabs [data-cashperiod]').forEach(b=>
+    b.addEventListener('click', ()=> setCashPeriod(b.dataset.cashperiod)));
+  document.querySelectorAll('#cashKindTabs [data-cashkind]').forEach(b=>
+    b.addEventListener('click', ()=>{ cashKind = b.dataset.cashkind; renderCash(); }));
   document.getElementById('cashExportBtn').addEventListener('click', exportPettyCashCSV);
   document.querySelector('.cash-card.ceymora').addEventListener('click', ()=> openCardBalanceDetail('ceymora'));
   document.querySelector('.cash-card.kalava').addEventListener('click', ()=> openCardBalanceDetail('kalava_card'));
@@ -4542,17 +4567,61 @@ function findLegacyLinkedInventory(record){
 
 let cashMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let cashShowAll = false;
+// 'month' | 'week' | 'all' — which stretch of time the Transactions list covers,
+// and which kind of line is listed, so money received can be checked on its own.
+let cashPeriod = 'month';
+let cashKind = 'all';
+function cashWeekStart(d){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = (x.getDay() + 6) % 7;        // Monday = 0
+  x.setDate(x.getDate() - day);
+  return x;
+}
+// The window currently on screen, as plain date strings.
+function cashRange(){
+  if(cashPeriod === 'all') return { from:'0000-01-01', to:'9999-12-31', label:'All time' };
+  if(cashPeriod === 'week'){
+    const start = cashWeekStart(cashMonthDate);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    const last = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+    const fmt = d => d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+    return { from: toISO(start), to: toISO(end), label: `Week of ${fmt(start)} – ${fmt(last)}` };
+  }
+  const start = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth(), 1);
+  const end = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth() + 1, 1);
+  return { from: toISO(start), to: toISO(end), label: cashMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' }) };
+}
+function setCashPeriod(p){
+  cashPeriod = p;
+  cashShowAll = (p === 'all');
+  if(p === 'week') cashMonthDate = cashWeekStart(new Date());
+  if(p === 'month') cashMonthDate = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth(), 1);
+  renderCash();
+}
 
 // Everything spent / received inside the month being viewed. The card balances above
 // stay all-time (they're running balances) — this is purely "what happened in July".
 function renderCashMonth(){
-  const monthStart = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth(), 1);
-  const monthEndExclusive = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth()+1, 1);
-  const fromISO = toISO(monthStart), toISOEnd = toISO(monthEndExclusive);
-
-  document.getElementById('cashMonthLabel').textContent = cashShowAll
-    ? 'All time'
-    : cashMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  const range = cashRange();
+  const fromISO = range.from, toISOEnd = range.to;
+  document.getElementById('cashMonthLabel').textContent = range.label;
+  document.getElementById('cashThisMonth').textContent = cashPeriod === 'week' ? 'This week' : 'This month';
+  ['cashPrevMonth','cashNextMonth','cashThisMonth'].forEach(id=>{
+    document.getElementById(id).style.display = cashPeriod === 'all' ? 'none' : '';
+  });
+  document.getElementById('cashMonthPick').style.display = cashPeriod === 'month' ? '' : 'none';
+  document.querySelectorAll('#cashPeriodTabs [data-cashperiod]').forEach(b=>{
+    const on = b.dataset.cashperiod === cashPeriod;
+    b.classList.toggle('active', on);
+    b.style.background = on ? 'var(--ink)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--muted)';
+  });
+  document.querySelectorAll('#cashKindTabs [data-cashkind]').forEach(b=>{
+    const on = b.dataset.cashkind === cashKind;
+    b.classList.toggle('active', on);
+    b.style.background = on ? 'var(--ink)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--muted)';
+  });
   // Jump straight to any of the last 18 months — everyone who can see Petty Cash can
   // look back at what was entered, not only at the current month.
   const pick = document.getElementById('cashMonthPick');
@@ -4570,7 +4639,7 @@ function renderCashMonth(){
   const allBtn = document.getElementById('cashAllTime');
   if(allBtn){ allBtn.style.fontWeight = cashShowAll ? '700' : ''; allBtn.textContent = cashShowAll ? '✓ All time' : 'All time'; }
 
-  const txns = cashShowAll
+  const txns = cashPeriod === 'all'
     ? [...allCashTxns]
     : allCashTxns.filter(t => t.date >= fromISO && t.date < toISOEnd);
 
@@ -4627,7 +4696,16 @@ function renderCashMonth(){
         </div>
       </div>`;
 
-  return txns;
+  // Only the kind of line being looked at goes into the list below.
+  const shown = cashKind === 'all' ? txns
+    : cashKind === 'income'  ? txns.filter(t => t.type === 'income')
+    : cashKind === 'expense' ? txns.filter(t => t.type === 'expense')
+    : txns.filter(t => t.type === 'advance');
+  const shownTotal = shown.reduce((a,t)=> a + t.amount, 0);
+  document.getElementById('cashKindTotal').innerHTML = cashKind === 'all'
+    ? `${shown.length} transaction${shown.length===1?'':'s'} · ${esc(range.label)}`
+    : `<b>${shown.length} ${cashKind === 'income' ? 'receipt' : cashKind === 'expense' ? 'expense' : 'advance'}${shown.length===1?'':'s'} · LKR ${Math.round(shownTotal).toLocaleString()}</b> · ${esc(range.label)}`;
+  return shown;
 }
 
 function renderCash(){
@@ -4652,7 +4730,8 @@ function renderCash(){
   const list = document.getElementById('cashList');
   list.innerHTML = '';
   if(monthTxns.length === 0){
-    list.innerHTML = `<div class="manage-empty">${cashShowAll ? 'No transactions yet.' : 'No transactions recorded in ' + cashMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'}) + '.'}</div>`;
+    const kindWord = cashKind === 'income' ? 'money received' : cashKind === 'expense' ? 'expenses' : cashKind === 'advance' ? 'advances' : 'transactions';
+    list.innerHTML = `<div class="manage-empty">No ${kindWord} ${cashPeriod === 'all' ? 'recorded yet' : 'in ' + esc(cashRange().label.toLowerCase())}.</div>`;
     renderAdvances();
     return;
   }
@@ -4755,10 +4834,18 @@ function renderCash(){
     tr.appendChild(actionTd);
     tbody.appendChild(tr);
   }
-  const netTotal = sorted.reduce((s,t)=> s + cardEffect(t), 0);
+  // Looking at one kind of line: add those lines up. Looking at everything: show
+  // what the cards actually moved by, which is the figure to check against the cards.
+  const filtered = cashKind !== 'all';
+  const netTotal = filtered
+    ? sorted.reduce((s,t)=> s + t.amount, 0)
+    : sorted.reduce((s,t)=> s + cardEffect(t), 0);
+  const footLabel = filtered
+    ? (cashKind === 'income' ? 'Total money received' : cashKind === 'expense' ? 'Total spent' : 'Total advances given')
+    : 'Net change on the cards';
   const tfoot = document.createElement('tfoot');
   tfoot.innerHTML = `<tr style="font-weight:800; border-top:2px solid var(--board-line); background:#f6f4ec;">
-      <td colspan="4" style="padding:9px 10px;">Net change on the cards — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
+      <td colspan="4" style="padding:9px 10px;">${esc(footLabel)} — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
       <td class="num" style="padding:9px 10px; color:${netTotal>=0?'var(--green)':'var(--red)'};">${netTotal>=0?'+':'−'} ${Math.abs(Math.round(netTotal)).toLocaleString()}</td>
       <td style="padding:9px 10px;"></td>
     </tr>`;
@@ -10573,9 +10660,10 @@ function downloadCSV(filename, rows){
   setTimeout(()=> URL.revokeObjectURL(url), 1000);
 }
 function exportPettyCashCSV(){
-  const { start, end } = monthRangeLocal(cashMonthDate);
+  const range = cashRange();
   const rows = allCashTxns
-    .filter(t => cashShowAll || (t.date >= start && t.date < end))
+    .filter(t => cashPeriod === 'all' || (t.date >= range.from && t.date < range.to))
+    .filter(t => cashKind === 'all' || t.type === cashKind)
     .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const out = [['Date','Type','Details','For','Account','Card','Paid from advance of','Amount LKR','Money on card LKR','Note']];
   rows.forEach(t => out.push([
@@ -10583,7 +10671,7 @@ function exportPettyCashCSV(){
     FOR_LABELS[t.for] || t.for || '', acctLabel(acctOf(t)) || '', CARD_LABELS[t.card] || t.card || '',
     t.employeeName || '', t.amount, cardEffect(t), t.note || '',
   ]));
-  downloadCSV(`petty-cash-${cashShowAll ? 'all-time' : ymKey(cashMonthDate)}.csv`, out);
+  downloadCSV(`petty-cash-${cashKind === 'all' ? '' : cashKind + '-'}${cashPeriod === 'all' ? 'all-time' : cashPeriod === 'week' ? 'week-' + range.from : ymKey(cashMonthDate)}.csv`, out);
 }
 function exportPayrollCSV(){
   const rows = payRowsForMonth();
