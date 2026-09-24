@@ -992,7 +992,7 @@
           <div class="cash-card-sub" id="directCeymoraSub"></div>
         </div>
       </div>
-      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the real money left on each card: top-ups and returned cash in, advances and card-paid bills out. "Direct" = bought straight for a villa (bypassing Store) — already inside the card balances, shown separately so you can see how much went to villas directly.</div>
+      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the petty cash float on each card: top-ups and returned cash in, advances and day-to-day bills out. "Direct" = bought straight for a villa (bypassing Store) — charged to that villa and settled separately, so it is shown here but NOT taken off the card float.</div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div class="manage-title">Staff advance balances</div>
@@ -4310,14 +4310,20 @@ const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card',
 
 // How a row moves real money on one of the two petty cash cards. This is the only rule
 // used for card balances, so the balance on screen can be matched to the card statement.
-//   money received / cash returned  +  |  advance handed out  −  |  expense paid from a card  −
+//   money received / cash returned  +  |  advance handed out  −  |  day-to-day bill  −
 //   a bill paid out of an advance moves nothing (the cash already left with the advance)
+//   a direct villa purchase moves nothing — it is charged to the villa and settled
+//     separately, not out of the petty cash float on the card
 //   a purchase Sharon paid for himself moves nothing (not petty cash money)
 function cardEffect(t){
   if(t.card !== 'ceymora' && t.card !== 'kalava_card') return 0;
   if(t.type === 'income') return t.amount;
   if(t.type === 'advance') return -t.amount;
-  if(t.type === 'expense') return t.employeeName ? 0 : -t.amount;
+  if(t.type === 'expense'){
+    if(t.employeeName) return 0;                 // already left the card with the advance
+    if(directCardOf(t)) return 0;                // direct villa purchase — settled outside the float
+    return -t.amount;
+  }
   return 0;
 }
 // Which petty cash card a direct villa purchase was paid from — including one paid out
@@ -6317,7 +6323,8 @@ function openCardBalanceDetail(card){
   const topUps    = sum(t => t.type === 'income' && !t.advanceId);
   const returned  = sum(t => t.type === 'income' && t.advanceId);
   const advances  = sum(t => t.type === 'advance');
-  const cardBills = sum(t => t.type === 'expense' && !t.employeeName);
+  const cardBills = sum(t => t.type === 'expense' && !t.employeeName && !directCardOf(t));
+  const directBills = sum(t => !!directCardOf(t));
   const advBills  = sum(t => t.type === 'expense' && t.employeeName);
   const balance   = rows.reduce((s2,t)=> s2 + cardEffect(t), 0);
   const line = (label2, v, sign, note)=> `<div class="quote-line ${sign === '−' ? 'muted' : ''}">
@@ -6330,10 +6337,12 @@ function openCardBalanceDetail(card){
       ${line('Money received onto the card', topUps, '+')}
       ${returned ? line('Unused advance cash handed back', returned, '+') : ''}
       ${line('Advances given to staff', advances, '−', 'cash left the card with the person')}
-      ${line('Bills paid straight from the card', cardBills, '−')}
+      ${line('Day-to-day bills paid from the card', cardBills, '−')}
+      ${directBills ? line('Direct villa purchases (charged to the villa, settled separately — not taken off this card)', directBills, ' ') : ''}
       <div class="quote-line total ${balance >= 0 ? 'due' : ''}" style="${balance < 0 ? 'color:var(--red);' : ''}">
         <span>Balance on the card now</span><span>LKR ${Math.round(balance).toLocaleString()}</span></div>
     </div>
+    ${directBills ? `<div class="field-hint" style="margin-top:8px;">LKR ${Math.round(directBills).toLocaleString()} of direct villa purchases are recorded against this card. They were paid directly, not out of its petty cash, so they are not deducted here — they appear under “Direct Villa Purchases” and on each villa's report.</div>` : ''}
     ${advBills ? `<div class="field-hint" style="margin-top:8px;">LKR ${Math.round(advBills).toLocaleString()} of bills were paid out of staff advances. They are costs of the villas/office, but they don't come off the card again — that money already left when the advance was handed over.</div>` : ''}
     ${balance < 0 ? `<div class="adv-status warn" style="margin-top:10px;">
         <b>This card is showing a minus figure.</b> That means more has been recorded going out than coming in. The usual reason is that top-ups (or the balance the card started with) were never entered.
