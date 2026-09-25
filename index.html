@@ -1012,6 +1012,12 @@
       </div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="manage-title">Bank transfers — by villa</div>
+        <div class="field-hint" style="margin:2px 0 8px;">Paid straight from the bank rather than from a petty cash card. Charged to the villa, all-time, and listed separately on that villa's report.</div>
+        <div id="bankTransferSummary" class="cash-summary"></div>
+      </div>
+
+      <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div class="manage-title">Sharon's direct expenses — by villa</div>
         <div class="field-hint" style="margin:2px 0 8px;">Everything Sharon bought for each villa, all-time. When he pays from his own pocket (not a petty cash card) it's charged to the villa but doesn't reduce any card balance.</div>
         <div id="sharonExpensesSummary" class="cash-summary"></div>
@@ -1718,6 +1724,7 @@
     <select id="expCard">
       <option value="ceymora">Ceymora Card</option>
       <option value="kalava_card">Kalava Villa Card</option>
+      <option value="bank">Bank transfer (not petty cash)</option>
       <option value="sharon">Sharon paid personally (not petty cash)</option>
     </select>
     <div class="field-hint" id="expCardHint">Ceymora Card can be used for any villa or the office.</div>
@@ -2006,6 +2013,7 @@
       <option value="sharon">Sharon paid personally (not petty cash)</option>
       <option value="ceymora">Ceymora Card</option>
       <option value="kalava_card">Kalava Villa Card</option>
+      <option value="bank">Bank transfer (not petty cash)</option>
     </select>
     <div class="field-hint" id="mpCardHint"></div>
     <label>What was it for</label>
@@ -4306,7 +4314,11 @@ async function restoreBooking(b){
 }
 
 /* ============================= PETTY CASH ============================= */
-const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', sharon: 'Paid by Sharon personally' };
+const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', bank: 'Bank transfer', sharon: 'Paid by Sharon personally' };
+
+// Paid straight from the bank, not out of either card's petty cash. Charged to the
+// villa or office it was for, and kept in its own "Bank transfers" total.
+function isBankTransfer(t){ return t.type === 'expense' && t.card === 'bank'; }
 
 // How a row moves real money on one of the two petty cash cards. This is the only rule
 // used for card balances, so the balance on screen can be matched to the card statement.
@@ -4330,7 +4342,7 @@ function cardEffect(t){
 // of a staff advance (the bill keeps the advance's card). Sharon's own-pocket buys are
 // reported under "Bought by Sharon" instead.
 function directCardOf(t){
-  if(!isDirectCost(t) || isSharonCost(t)) return null;
+  if(!isDirectCost(t) || isSharonCost(t) || isBankTransfer(t)) return null;
   return (t.card === 'ceymora' || t.card === 'kalava_card') ? t.card : null;
 }
 function isSharonCost(t){ return t.type === 'expense' && (t.purchasedBy === 'Sharon' || t.card === 'sharon'); }
@@ -4525,6 +4537,9 @@ function updateExpenseCardLock(){
     forSelect.value = 'kalava';
     forSelect.disabled = true;
     hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa expenses.';
+  } else if(card === 'bank'){
+    forSelect.disabled = false;
+    hint.textContent = 'Paid by bank transfer — charged to the villa/office below, but nothing comes out of either card.';
   } else if(card === 'sharon'){
     forSelect.disabled = false;
     hint.textContent = 'Sharon paid with his own money — charged to the villa/office below, but nothing comes out of petty cash.';
@@ -4659,6 +4674,7 @@ function renderCashMonth(){
     byFor[t.for] = (byFor[t.for] || 0) + t.amount;
     const key = t.employeeName ? 'advance'
       : t.card === 'sharon' ? 'sharon'
+      : t.card === 'bank' ? 'bank'
       : directCardOf(t) === 'ceymora' ? 'direct_ceymora'
       : directCardOf(t) === 'kalava_card' ? 'direct_kalava'
       : t.card;
@@ -4729,6 +4745,7 @@ function renderCash(){
   document.getElementById('directPurchasesKalava').textContent = 'LKR ' + directKalava.toLocaleString();
   document.getElementById('directPurchasesCeymora').textContent = 'LKR ' + directCeymora.toLocaleString();
   renderAdvanceWallets();
+  renderBankTransferSummary();
   renderSharonExpensesSummary();
 
   const monthTxns = renderCashMonth();
@@ -6154,14 +6171,21 @@ function computeAvgUnitCost(){
      staff  — Zahny / staff day-to-day buying, including bills paid out of an advance
      direct — goods bought straight for this villa (bypassing Store)
      sharon — bought by Sharon (from a card or from his own pocket)                  */
+/* How every villa's spending is broken down, in the order it is reported:
+     1. Petty cash expenses      — Zahny and staff, out of a card's float
+     2. Direct purchases         — bought straight for the villa, by card
+     3. Bank transfers           — paid from the bank, not from a card
+     4. Sharon's expenditure     — anything Sharon bought for the villa          */
 const PETTY_GROUPS = [
-  { key:'staff',          label:'Petty cash — Zahny & staff day-to-day',        pl:'Petty cash — day-to-day (Zahny & staff)', always:true },
-  { key:'direct_ceymora', label:'Petty cash — direct purchases, Ceymora Card',   pl:'Petty cash — direct purchases (Ceymora Card)' },
-  { key:'direct_kalava',  label:'Petty cash — direct purchases, Kalava Villa Card', pl:'Petty cash — direct purchases (Kalava Villa Card)' },
-  { key:'sharon',         label:'Bought by Sharon',                             pl:'Bought by Sharon', always:true },
+  { key:'staff',          label:'1. Petty cash expenses — Zahny & staff',            pl:'Petty cash expenses', always:true },
+  { key:'direct_ceymora', label:'2. Direct purchases for the villa — Ceymora Card',  pl:'Direct purchases for the villa (Ceymora Card)' },
+  { key:'direct_kalava',  label:'2. Direct purchases for the villa — Kalava Card',   pl:'Direct purchases for the villa (Kalava Villa Card)' },
+  { key:'bank',           label:'3. Bank transfers',                                 pl:'Bank transfers', always:true },
+  { key:'sharon',         label:'4. Sharon\'s expenditure for the villa',            pl:'Sharon\'s expenditure for the villa', always:true },
 ];
 function pettyGroupOf(e){
   if(isSharonCost(e)) return 'sharon';
+  if(isBankTransfer(e)) return 'bank';
   const dc = directCardOf(e);
   if(dc === 'ceymora') return 'direct_ceymora';
   if(dc === 'kalava_card') return 'direct_kalava';
@@ -6907,6 +6931,53 @@ function buildSuppliesSection(loc, monthStartISO, monthEndISO){
     ${anyUnknown ? '<div class="rpt-note">Lines showing “—” have no price entered and no purchase cost on record, so they are not included in the total.</div>' : ''}`;
   return { total, count:received.length, html };
 }
+function renderBankTransferSummary(){
+  const wrap = document.getElementById('bankTransferSummary');
+  if(!wrap) return;
+  const byPlace = {};
+  for(const t of allCashTxns.filter(isBankTransfer)) byPlace[t.for] = (byPlace[t.for] || 0) + t.amount;
+  const villaColors = { kalava:'#0c8599', noelia:'#7048e8', brisa:'#e64980', office:'#495057', store:'#a06800' };
+  // The three villas always show, so a zero is visible too; Office and Store only
+  // appear once something has actually been transferred for them.
+  const places = [...VR_VILLAS.map(v => ({ id:v.id, name:v.name })),
+    ...['office','store'].filter(k => byPlace[k]).map(k => ({ id:k, name:FOR_LABELS[k] || k }))];
+  wrap.innerHTML = places.map(v => `
+    <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id] || '#495057'}, ${(villaColors[v.id] || '#495057')}cc); cursor:pointer;" data-bank-place="${esc(v.id)}">
+      <div class="cash-card-label">Bank transfer → ${esc(v.name)}</div>
+      <div class="cash-card-balance">LKR ${Math.round(byPlace[v.id] || 0).toLocaleString()}</div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-bank-place]').forEach(el=>{
+    el.addEventListener('click', ()=> openBankTransferDetail(el.dataset.bankPlace));
+  });
+}
+
+function openBankTransferDetail(placeId){
+  const rows = allCashTxns.filter(t => isBankTransfer(t) && t.for === placeId)
+    .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  document.getElementById('villaDetailTitle').textContent = `Bank transfers — ${FOR_LABELS[placeId] || placeId}`;
+  let html = '';
+  if(rows.length === 0){
+    html = '<div class="manage-empty">No bank transfers recorded for this one yet.</div>';
+  } else {
+    let total = 0;
+    html = '<div class="manage-list" style="margin-top:6px;">';
+    for(const t of rows){
+      total += t.amount;
+      const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+      html += `<div class="txn-row">
+        <span class="txn-badge expense">bank</span>
+        <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Expense')}${links?' '+links:''}</div>
+          <div class="txn-sub">${esc(t.date)}${t.note?' · '+esc(t.note):''}</div></span>
+        <span class="txn-amount expense">LKR ${Math.round(t.amount).toLocaleString()}</span>
+      </div>`;
+    }
+    html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${Math.round(total).toLocaleString()}</div>`;
+  }
+  document.getElementById('villaDetailBody').innerHTML = html;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+}
+
 function renderSharonExpensesSummary(){
   const wrap = document.getElementById('sharonExpensesSummary');
   if(!wrap) return;
@@ -7009,6 +7080,9 @@ function updateMpCardHint(){
   if(card === 'kalava_card'){
     villaSel.value = 'kalava'; villaSel.disabled = true;
     hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa.';
+  } else if(card === 'bank'){
+    villaSel.disabled = false;
+    hint.textContent = 'Paid by bank transfer — charged to the villa, but nothing comes out of either card.';
   } else if(card === 'sharon'){
     villaSel.disabled = false;
     hint.textContent = 'Paid with Sharon\'s own money — charged to the villa, but nothing comes out of petty cash.';
