@@ -837,6 +837,7 @@
       <button class="maintab-btn" data-tab="bookings">📅 Bookings Calendar</button>
       <button class="maintab-btn" data-tab="pettycash">💰 Petty Cash</button>
       <button class="maintab-btn" data-tab="inventory">📦 Inventory</button>
+      <button class="maintab-btn" data-tab="expenses" id="expensesTabBtn">💸 Villa Expenses</button>
       <button class="maintab-btn" data-tab="activitylog" id="activityLogTabBtn" style="display:none">📋 Activity Log</button>
       <button class="maintab-btn" data-tab="villareport" id="villaReportTabBtn" style="display:none">🏘️ Villa Report</button>
       <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
@@ -844,6 +845,34 @@
       <button class="maintab-btn" data-tab="payroll" id="payrollTabBtn" style="display:none">🧑‍💼 Staff &amp; Payroll</button>
       <button class="maintab-btn" data-tab="users" id="usersTabBtn" style="display:none">👤 Users</button>
       <button class="maintab-btn" data-tab="settings" id="settingsTabBtn" style="display:none">🧾 Invoices &amp; Setup</button>
+    </div>
+
+    <!-- ===================== VILLA EXPENSES PANEL =====================
+         Every rupee spent on a villa, in one place: pick the villa, pick the month
+         (or all time), pick which kind of spending, and read it in full detail. -->
+    <div id="expensesPanel" style="display:none">
+      <div class="toolbar">
+        <div id="exVillaTabs" class="villatabs" style="margin:0;"></div>
+        <div class="weeknav">
+          <button id="exPrevMonth">◀ Prev</button>
+          <span id="exMonthLabel">Month of ...</span>
+          <button id="exNextMonth">Next ▶</button>
+          <button id="exThisMonth">This month</button>
+          <button id="exAllTime">All time</button>
+        </div>
+      </div>
+
+      <div class="rpt-picker no-print">
+        <span class="rpt-picker-label">Show:</span>
+        <div id="exKindTabs" class="villatabs" style="margin:0; display:inline-flex;"></div>
+        <span class="sep"></span>
+        <button class="add-booking-btn" id="exExportBtn">⬇️ Export CSV</button>
+        <button class="add-booking-btn" id="exPrintBtn">🖨️ Print / PDF</button>
+      </div>
+
+      <div id="exSummary" class="cash-summary"></div>
+      <div class="field-hint" style="margin:8px 0 2px;">Every expense charged to the place chosen above, whoever paid and however they paid. Advances aren't listed — an advance is money handed over, not yet spent; it appears here as the invoices come back.</div>
+      <div id="exBody" class="rpt-doc" style="margin-top:8px;"></div>
     </div>
 
     <!-- ===================== HOUSEKEEPING PANEL ===================== -->
@@ -2809,6 +2838,7 @@ function applyRolePermissions(){
     document.body.classList.add('viewer-mode');
     tabs.pettycash.style.display = 'none';
     tabs.inventory.style.display = 'none';
+    document.getElementById('expensesTabBtn').style.display = 'none';
     document.getElementById('pettyCashPanel').style.display = 'none';
     document.getElementById('inventoryPanel').style.display = 'none';
     document.getElementById('villaReportTabBtn').style.display = '';
@@ -2821,6 +2851,7 @@ function applyRolePermissions(){
     tabs.bookings.style.display = '';
     tabs.pettycash.style.display = 'none';
     tabs.inventory.style.display = 'none';
+    document.getElementById('expensesTabBtn').style.display = 'none';
     document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
     document.getElementById('villaReportTabBtn').classList.add('active');
     document.getElementById('villaReportTabBtn').style.display = '';
@@ -2883,6 +2914,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('bookingsPanel').style.display = tab==='bookings' ? '' : 'none';
     document.getElementById('pettyCashPanel').style.display = tab==='pettycash' ? '' : 'none';
     document.getElementById('inventoryPanel').style.display = tab==='inventory' ? '' : 'none';
+    document.getElementById('expensesPanel').style.display = tab==='expenses' ? '' : 'none';
     document.getElementById('activityLogPanel').style.display = tab==='activitylog' ? '' : 'none';
     document.getElementById('villaReportPanel').style.display = tab==='villareport' ? '' : 'none';
     document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
@@ -2893,6 +2925,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
     if(tab === 'pettycash' && !cashInited){ initPettyCash(); }
     if(tab === 'inventory' && !invInited){ initInventory(); if(!cashInited){ initPettyCash(); } }
+    if(tab === 'expenses'){ if(!cashInited){ initPettyCash(); } initVillaExpenses(); }
     if(tab === 'activitylog' && !logInited){ initActivityLog(); }
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
     if(tab === 'reports' && !reportsInited){ initReports(); }
@@ -2903,6 +2936,182 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'settings' && !settingsInited){ initSettings(); }
   });
 });
+
+/* ========================== VILLA EXPENSES TAB ==========================
+   The same four-way breakdown the villa report prints — petty cash, direct
+   purchases, bank transfers, Sharon's own money — but browsable: any villa or
+   the office and store, any month or all of them at once, and narrowed to one
+   kind of spending when that is what you are chasing.                        */
+let exInited = false;
+let exPlace = 'kalava';          // which villa / place, or 'all'
+let exKind = 'all';              // one of PETTY_GROUPS' keys, or 'all'
+let exAllTime = false;
+let exMonthDate = new Date();
+
+const EX_PLACES = () => ([
+  { id:'all',    name:'All places', color:'#495057' },
+  { id:'kalava', name:'Kalava Villa', color:'#0c8599' },
+  { id:'noelia', name:'Noelia Villa', color:'#7048e8' },
+  { id:'brisa',  name:'Brisa Villa',  color:'#e64980' },
+  { id:'office', name:'Office',       color:'#495057' },
+  { id:'store',  name:'Store',        color:'#a06800' },
+]);
+
+// The rows the current filters select. Advances are deliberately absent: an advance is
+// money handed to someone, not a cost — it becomes one when the invoice arrives, and
+// that invoice is an expense row in its own right. Counting both would double it.
+function exRows(){
+  const from = toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), 1));
+  const to   = toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1));
+  return allCashTxns
+    .filter(t => t.type === 'expense')
+    .filter(t => exPlace === 'all' || t.for === exPlace)
+    .filter(t => exAllTime || (t.date >= from && t.date < to))
+    .filter(t => exKind === 'all' || pettyGroupOf(t) === exKind)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+}
+
+function exPeriodLabel(){
+  return exAllTime ? 'All time'
+    : exMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+}
+
+function renderExPickers(){
+  const vt = document.getElementById('exVillaTabs');
+  vt.innerHTML = '';
+  EX_PLACES().forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'villatab-btn';
+    b.textContent = v.name;
+    b.dataset.exPlace = v.id;
+    const on = v.id === exPlace;
+    b.style.background = on ? v.color : '#fff';
+    b.style.color = on ? '#fff' : 'var(--muted)';
+    if(on) b.classList.add('active');
+    b.addEventListener('click', ()=>{ exPlace = v.id; renderVillaExpenses(); });
+    vt.appendChild(b);
+  });
+
+  const kt = document.getElementById('exKindTabs');
+  kt.innerHTML = '';
+  // Short names here: the full wording is on the summary card and the section heading.
+  const SHORT = { staff:'Petty cash', direct_ceymora:'Direct — Ceymora Card',
+    direct_kalava:'Direct — Kalava Card', bank:'Bank transfers', sharon:"Sharon's" };
+  [{ key:'all', label:'Everything' }, ...PETTY_GROUPS.map(g=>({ key:g.key, label:SHORT[g.key] || g.pl }))].forEach(k=>{
+    const b = document.createElement('button');
+    b.className = 'villatab-btn';
+    b.textContent = k.label;
+    b.dataset.exKind = k.key;
+    const on = k.key === exKind;
+    b.style.background = on ? 'var(--ink)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--muted)';
+    if(on) b.classList.add('active');
+    b.addEventListener('click', ()=>{ exKind = k.key; renderVillaExpenses(); });
+    kt.appendChild(b);
+  });
+
+  document.getElementById('exMonthLabel').textContent = exPeriodLabel();
+  ['exPrevMonth','exNextMonth','exThisMonth'].forEach(id=>{
+    document.getElementById(id).disabled = exAllTime;
+  });
+  const at = document.getElementById('exAllTime');
+  at.textContent = exAllTime ? '← Back to months' : 'All time';
+}
+
+// One card per section, so the split is readable before any row is.
+function renderExSummary(rows){
+  const wrap = document.getElementById('exSummary');
+  const totals = {}; PETTY_GROUPS.forEach(g => totals[g.key] = 0);
+  let grand = 0;
+  for(const r of rows){ totals[pettyGroupOf(r)] += r.amount; grand += r.amount; }
+  const colors = { staff:'#0c8599', direct_ceymora:'#3b5bdb', direct_kalava:'#a06800', bank:'#f08c00', sharon:'#e64980' };
+  const shown = PETTY_GROUPS.filter(g => exKind === 'all' || g.key === exKind);
+  wrap.innerHTML = `
+    <div class="cash-card" style="background:linear-gradient(135deg, #343a40, #14161a);">
+      <div class="cash-card-label">${esc(exKind === 'all' ? 'Total spending' : (PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || 'Total')}</div>
+      <div class="cash-card-balance">LKR ${Math.round(grand).toLocaleString()}</div>
+      <div class="cash-card-sub">${esc(EX_PLACES().find(v=>v.id===exPlace).name)} · ${esc(exPeriodLabel())} · ${rows.length} item${rows.length===1?'':'s'}</div>
+    </div>` + shown.map(g => `
+    <div class="cash-card" style="background:linear-gradient(135deg, ${colors[g.key]}, ${colors[g.key]}bb);">
+      <div class="cash-card-label">${esc(g.pl)}</div>
+      <div class="cash-card-balance">LKR ${Math.round(totals[g.key]).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+function renderVillaExpenses(){
+  if(!document.getElementById('exBody')) return;
+  renderExPickers();
+  const rows = exRows();
+  renderExSummary(rows);
+  const place = EX_PLACES().find(v=>v.id===exPlace).name;
+  let html = `<div class="rpt-head"><div class="rpt-title">Villa expenses — ${esc(place)}</div>
+    <div class="rpt-sub">${esc(exPeriodLabel())}${exKind === 'all' ? '' : ' · ' + esc((PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || '')}</div></div>`;
+
+  if(exPlace === 'all'){
+    // One block per place, so "everything" is still readable rather than one long list.
+    const places = EX_PLACES().filter(v => v.id !== 'all');
+    let any = false;
+    for(const v of places){
+      const mine = rows.filter(r => r.for === v.id);
+      if(!mine.length) continue;
+      any = true;
+      const blk = pettyGroupsBlock(mine);
+      html += `<div class="rpt-section-title" style="margin-top:16px;">${esc(v.name)}
+        <span class="rpt-section-count">${mine.length} item${mine.length===1?'':'s'} · ${lkr(blk.total)}</span></div>${blk.html}`;
+    }
+    if(!any) html += '<div class="rpt-empty">Nothing recorded for this period.</div>';
+    else {
+      const grand = rows.reduce((t,r)=>t+r.amount,0);
+      html += `<table class="rpt-table" style="margin-top:14px;"><tbody><tr class="subtotal">
+        <td><b>Everything, all places</b></td><td class="r"><b>${Math.round(grand).toLocaleString()}</b></td></tr></tbody></table>`;
+    }
+  } else {
+    html += pettyGroupsBlock(rows).html;
+  }
+  document.getElementById('exBody').innerHTML = html;
+}
+
+function exportVillaExpensesCSV(){
+  const rows = exRows();
+  if(!rows.length){ alert('Nothing to export for these filters.'); return; }
+  const groupName = k => (PETTY_GROUPS.find(g=>g.key===k)||{}).pl || k;
+  const out = [['Date','Place','Section','Description','Paid from','Paid by staff advance of','Account','Stock item','Note','Invoice','Amount LKR']];
+  for(const t of rows){
+    const pur = t.linkedInventory && t.linkedPurchaseId
+      ? allInvTxns.find(x => String(x.id) === String(t.linkedPurchaseId)) : null;
+    out.push([
+      t.date, FOR_LABELS[t.for] || t.for || '', groupName(pettyGroupOf(t)),
+      t.purpose || 'Expense', CARD_LABELS[t.card] || t.card || '', t.employeeName || '',
+      acctLabel(acctOf(t)) || '', pur ? `${pur.item} x ${pur.qty}` : (t.linkedInventory ? 'stock item' : ''),
+      t.note || '', getInvoiceLinks(t).join(' '), t.amount,
+    ]);
+  }
+  const total = rows.reduce((s2,t)=>s2+t.amount,0);
+  out.push([]); out.push(['', '', '', '', '', '', '', '', '', 'Total', total]);
+  const when = exAllTime ? 'all-time' : ymKey(exMonthDate);
+  downloadCSV(`villa-expenses-${exPlace}-${exKind === 'all' ? 'all' : exKind}-${when}.csv`, out);
+}
+
+function initVillaExpenses(){
+  if(!exInited){
+    exInited = true;
+    document.getElementById('exPrevMonth').addEventListener('click', ()=>{
+      exMonthDate = new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()-1, 1); renderVillaExpenses();
+    });
+    document.getElementById('exNextMonth').addEventListener('click', ()=>{
+      exMonthDate = new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1); renderVillaExpenses();
+    });
+    document.getElementById('exThisMonth').addEventListener('click', ()=>{
+      exMonthDate = new Date(); exAllTime = false; renderVillaExpenses();
+    });
+    document.getElementById('exAllTime').addEventListener('click', ()=>{
+      exAllTime = !exAllTime; renderVillaExpenses();
+    });
+    document.getElementById('exExportBtn').addEventListener('click', exportVillaExpensesCSV);
+    document.getElementById('exPrintBtn').addEventListener('click', ()=> window.print());
+  }
+  renderVillaExpenses();
+}
 
 /* ============================= HOUSEKEEPING ============================= */
 let VILLAS = []; // fetched from Supabase, falls back to a default set until loaded
@@ -4765,6 +4974,7 @@ function renderCash(){
   renderAdvanceWallets();
   renderBankTransferSummary();
   renderSharonExpensesSummary();
+  if(exInited) renderVillaExpenses();
 
   const monthTxns = renderCashMonth();
 
