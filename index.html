@@ -1792,17 +1792,11 @@
     <datalist id="staffNameList"></datalist>
     <label>How was the money given?</label>
     <select id="advGiveMode">
-      <option value="cash">Cash — handed over from a petty cash card</option>
-      <option value="bank">Bank transfer — sent straight from the bank</option>
+      <option value="ceymora">Cash — from the Ceymora Card</option>
+      <option value="kalava_card">Cash — from the Kalava Villa Card</option>
+      <option value="bank">Bank transfer — sent from the bank</option>
     </select>
     <div class="field-hint" id="advGiveModeHint"></div>
-    <div id="advCardWrap">
-      <label>From card</label>
-      <select id="advCard">
-        <option value="ceymora">Ceymora Card</option>
-        <option value="kalava_card">Kalava Villa Card</option>
-      </select>
-    </div>
     <label>Amount (LKR)</label>
     <input type="number" id="advAmount" min="0" step="1" placeholder="e.g. 10000">
     <label>Note (optional)</label>
@@ -2602,11 +2596,11 @@ const advFileHandler = createMultiFileHandler('advFile', 'advFileList');
 // advance's bills land in the villa's Bank transfers section by themselves.
 function advApplyGiveMode(){
   const g = id => document.getElementById(id);
-  const bank = g('advGiveMode').value === 'bank';
-  g('advCardWrap').style.display = bank ? 'none' : '';
+  const card = g('advGiveMode').value;
+  const bank = card === 'bank';
   g('advGiveModeHint').textContent = bank
     ? 'Sent from the bank — neither card is touched. It stays on his balance until he brings the invoices, and whatever he spends shows under Bank transfers for that villa.'
-    : 'Comes off the chosen card\'s petty cash float, the way it works today.';
+    : `Comes off the ${CARD_LABELS[card] || card}'s petty cash float, the way it works today.`;
 }
 const advSettledFileHandler = createMultiFileHandler('advSettledFile', 'advSettledFileList');
 function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note, amount:r.amount!==null&&r.amount!==undefined?Number(r.amount):null }; }
@@ -5282,8 +5276,7 @@ function openAdvanceModal(record){
 
     g('advDate').value = record ? record.date : todayISO();
     g('advEmployee').value = record ? (record.employeeName || '') : '';
-    g('advGiveMode').value = (record && record.card === 'bank') ? 'bank' : 'cash';
-    g('advCard').value = (record && record.card !== 'bank') ? record.card : 'ceymora';
+    g('advGiveMode').value = record ? record.card : 'ceymora';
     advApplyGiveMode();
     g('advAmount').value = record ? record.amount : '';
     g('advNote').value = record ? (record.note || '') : '';
@@ -5303,7 +5296,7 @@ function openAdvanceModal(record){
     // Settling needs bills first, so a brand-new advance can't be ticked settled.
     g('advSettledRow').style.display = record ? '' : 'none';
     const locked = advLocked(record);
-    ['advDate','advEmployee','advGiveMode','advCard','advAmount','advNote','advReturned','advPaidOut','advSettled','advSettledNote','advFile','advSettledFile']
+    ['advDate','advEmployee','advGiveMode','advAmount','advNote','advReturned','advPaidOut','advSettled','advSettledNote','advFile','advSettledFile']
       .forEach(id => { g(id).disabled = locked; });
     g('advSave').style.display = locked ? 'none' : '';
     g('advDeleteBtn').style.display = (record && !locked) ? '' : 'none';
@@ -5668,7 +5661,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   if(!sb) return fail('Not connected to Supabase yet.');
   const date = g('advDate').value;
   const employeeName = g('advEmployee').value.trim();
-  const card = g('advGiveMode').value === 'bank' ? 'bank' : g('advCard').value;
+  const card = g('advGiveMode').value;
   const amount = parseFloat(g('advAmount').value);
   const note = g('advNote').value.trim();
   let settled = g('advSettled').checked;
