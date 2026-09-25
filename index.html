@@ -363,6 +363,24 @@
   }
   .rpt-picker .sep{ width:1px; height:16px; background:var(--board-line); }
 
+  /* Permission tick boxes */
+  .perm-group{ margin-top:12px; }
+  .perm-group-title{
+    font-size:11px; text-transform:uppercase; letter-spacing:.4px;
+    color:var(--muted); font-weight:700; margin-bottom:5px;
+  }
+  .perm-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .perm-chip{
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    border:1px solid var(--board-line); border-radius:20px; padding:5px 11px;
+    font-size:12px; font-weight:600; color:var(--muted); background:#fff; user-select:none;
+  }
+  .perm-chip input{ margin:0; width:14px; height:14px; cursor:pointer; }
+  .perm-chip.on{ background:var(--frame); border-color:var(--frame); color:#fff; }
+  .perm-chip.master.on{ background:#c92a2a; border-color:#c92a2a; }
+  .perm-chip.locked{ opacity:.5; }
+  .pend-row{ border-left:3px solid var(--amber); }
+
   /* The report document itself */
   .rpt-doc{ background:#fff; border:1px solid var(--board-line); border-radius:10px; padding:22px 24px; }
   .rpt-head{
@@ -805,16 +823,26 @@
 <div id="loginScreen">
   <div class="login-card">
     <h1>🏡 Villa Management Board</h1>
-    <div class="sub" style="font-size:12.5px;color:var(--muted);">Sign in to continue</div>
+    <div class="sub" style="font-size:12.5px;color:var(--muted);" id="loginSub">Sign in to continue</div>
+    <div id="regNameWrap" style="display:none;">
+      <label>Your name</label>
+      <input type="text" id="regName" placeholder="e.g. Kumar">
+    </div>
     <label>Email</label>
     <input type="email" id="loginEmail" autocomplete="username" placeholder="you@example.com">
-    <label>Password</label>
+    <label id="loginPwLabel">Password</label>
     <input type="password" id="loginPassword" autocomplete="current-password" placeholder="Enter your password">
+    <div id="regConfirmWrap" style="display:none;">
+      <label>Type the password again</label>
+      <input type="password" id="regConfirm" autocomplete="new-password" placeholder="Same password again">
+    </div>
     <div class="login-error" id="loginError">Incorrect email or password.</div>
     <div class="login-ok" id="loginOk"></div>
     <button id="loginBtn">Sign in</button>
+    <button id="regBtn" style="display:none;">Send my request</button>
     <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
-      <button class="login-link" id="loginSetPw">First time here? Set my password</button>
+      <button class="login-link" id="loginRegister">New here? Register for access</button>
+      <button class="login-link" id="loginBackToSignIn" style="display:none;">← Back to sign in</button>
       <button class="login-link" id="loginForgot">Forgotten password — email me a reset link</button>
     </div>
   </div>
@@ -1160,10 +1188,18 @@
           <button class="add-booking-btn" id="addUserBtn">+ Add user</button>
         </div>
       </div>
-      <div class="field-hint" style="margin-bottom:10px;">New logins here take effect immediately — no file redeploy needed.</div>
+      <div class="field-hint" style="margin-bottom:10px;">Changes here take effect the moment that person reloads the page — no file redeploy needed.</div>
+
+      <div id="pendingSection" style="display:none; margin-bottom:18px;">
+        <div class="manage-title" style="color:var(--amber);">⏳ Waiting for your approval</div>
+        <div class="field-hint" style="margin:2px 0 8px;">These people registered themselves on the login page. They can see nothing at all until you approve them and tick what they may do.</div>
+        <div id="pendingList" class="manage-list"></div>
+      </div>
+
+      <div class="manage-title">People with access</div>
       <table class="inv-table">
         <thead>
-          <tr><th>Name</th><th>Role</th><th>Villa (if applicable)</th><th></th></tr>
+          <tr><th>Name</th><th>What they can do</th><th>Villas</th><th></th></tr>
         </thead>
         <tbody id="usersBody"></tbody>
       </table>
@@ -2069,26 +2105,29 @@
 
 <!-- Add/edit user modal (admin only) -->
 <div class="modal-overlay" id="userModalOverlay">
-  <div class="modal">
+  <div class="modal"><div class="modal-scroll">
     <h3 id="userModalTitle">Add user</h3>
     <label>Email (this is their login)</label>
     <input type="email" id="userEmail" placeholder="e.g. kumar@example.com">
     <label>Name shown in the app</label>
     <input type="text" id="userName" placeholder="e.g. Kumar">
-    <div class="field-hint">They set their own password on the login page with “First time here? Set my password”. Passwords are held by Supabase — nobody here can read them.</div>
-    <label>Role</label>
-    <select id="userRole">
-      <option value="admin">Admin — full access, can edit/delete everything</option>
-      <option value="cash_inventory">Petty Cash + Inventory only</option>
-      <option value="cash_inventory_bookings">Petty Cash + Inventory + Bookings</option>
-      <option value="viewer">View everything, no editing</option>
-      <option value="viewer_villa_select">View one villa at a time (picks which)</option>
-      <option value="viewer_villa_fixed">Locked to one specific villa</option>
-    </select>
-    <div id="userVillaScopeWrap" style="display:none;">
-      <label>Villa</label>
-      <select id="userVillaScope"></select>
+    <div class="field-hint">They choose their own password when they register on the login page. Passwords are held by Supabase — nobody here can read them.</div>
+
+    <label>Start from</label>
+    <div id="userPresets" class="rpt-picker" style="margin:4px 0 2px;"></div>
+    <div class="field-hint">A starting point only — tick and untick whatever you like underneath, now or any time later.</div>
+
+    <div id="userPermGrid" style="margin-top:10px;"></div>
+
+    <label style="margin-top:12px;">Which villas they can see</label>
+    <div id="userVillaScopes" class="perm-row"></div>
+    <div class="field-hint">Leave all three unticked for every villa.</div>
+
+    <div class="modal-checkbox-row" style="margin-top:12px;">
+      <input type="checkbox" id="userActive" checked>
+      <label for="userActive">Access switched on</label>
     </div>
+    <div class="field-hint" style="margin-top:-6px;">Untick to suspend someone without deleting them — their records stay exactly as they are.</div>
     <div class="modal-error" id="userError"></div>
     <div class="modal-actions">
       <button class="btn btn-delete" id="userDeleteBtn" style="display:none">Delete</button>
@@ -2096,7 +2135,7 @@
       <button class="btn btn-cancel" id="userCancel">Cancel</button>
       <button class="btn btn-save" id="userSave">Save</button>
     </div>
-  </div>
+  </div></div>
 </div>
 
 <!-- Owner payment -->
@@ -2648,15 +2687,79 @@ function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, q
 // No passwords live in this file. Who may sign in is decided by Supabase Auth,
 // and what they may do by their row in the "profiles" table, which the database
 // checks again on every single read and write.
-let currentUser = null; // { username, email, role, villaScope }
+let currentUser = null; // { username, email, role, perms:Set, villaScopes:[] }
 
-function canEdit(){
-  return currentUser && (currentUser.role === 'admin' || currentUser.role === 'cash_inventory' || currentUser.role === 'cash_inventory_bookings');
+/* ---------------------------------------------------------------------------
+   Access is a list of ticked boxes, not a job title. Each one is a single thing
+   someone may see or do, so giving a person one extra tab is one tick rather
+   than a promotion to a role that carries five other things with it.
+   A profile with nothing ticked falls back to whatever its old role allowed,
+   so nobody loses access the day this arrives.
+--------------------------------------------------------------------------- */
+const PERM_GROUPS = [
+  { title:'Tabs they can open', items:[
+    { key:'tab_housekeeping', label:'Housekeeping' },
+    { key:'tab_bookings',     label:'Bookings Calendar' },
+    { key:'tab_pettycash',    label:'Petty Cash' },
+    { key:'tab_inventory',    label:'Inventory' },
+    { key:'tab_expenses',     label:'Villa Expenses' },
+    { key:'tab_villareport',  label:'Villa Report' },
+    { key:'tab_reports',      label:'Reports' },
+    { key:'tab_company',      label:'Company Accounts' },
+    { key:'tab_payroll',      label:'Staff & Payroll' },
+    { key:'tab_activitylog',  label:'Activity Log' },
+    { key:'tab_settings',     label:'Invoices & Setup' },
+    { key:'tab_users',        label:'Users' },
+  ]},
+  { title:'What they can change', items:[
+    { key:'edit_cash',       label:'Record & edit petty cash, expenses, advances' },
+    { key:'edit_inventory',  label:'Record & edit inventory' },
+    { key:'edit_bookings',   label:'Add & edit bookings' },
+    { key:'edit_housekeeping', label:'Tick off housekeeping' },
+    { key:'edit_company',    label:'Enter company account figures' },
+    { key:'edit_payroll',    label:'Enter payroll & staff pay' },
+  ]},
+  { title:'Trusted actions', items:[
+    { key:'approve_undo',   label:'Approve an undo on a settled advance' },
+    { key:'delete_records', label:'Delete records' },
+    { key:'manage_users',   label:'Add people and change what they can do' },
+    { key:'admin',          label:'Full admin — everything above, always', master:true },
+  ]},
+];
+const ALL_PERMS = PERM_GROUPS.flatMap(g => g.items.map(i => i.key));
+const PERM_LABEL = Object.fromEntries(PERM_GROUPS.flatMap(g => g.items.map(i => [i.key, i.label])));
+
+// Starting points, so a common setup is one click and then any tweak you like.
+const PERM_PRESETS = {
+  admin: ['admin'],
+  cash_inventory: ['tab_pettycash','tab_inventory','tab_expenses','edit_cash','edit_inventory'],
+  cash_inventory_bookings: ['tab_pettycash','tab_inventory','tab_expenses','tab_bookings',
+                            'edit_cash','edit_inventory','edit_bookings'],
+  viewer: ['tab_housekeeping','tab_bookings','tab_pettycash','tab_inventory','tab_expenses',
+           'tab_villareport','tab_reports'],
+  viewer_villa_select: ['tab_villareport','tab_bookings'],
+  viewer_villa_fixed:  ['tab_villareport','tab_bookings'],
+};
+const PRESET_LABELS = {
+  admin: 'Full admin',
+  cash_inventory: 'Petty cash & inventory (Zahny)',
+  cash_inventory_bookings: 'Petty cash, inventory & bookings',
+  viewer: 'View everything, no editing',
+  viewer_villa_select: 'Villa report only',
+};
+
+function permsOf(row){
+  const ticked = Array.isArray(row.permissions) ? row.permissions.filter(Boolean) : [];
+  return new Set(ticked.length ? ticked : (PERM_PRESETS[row.role] || PERM_PRESETS.viewer));
 }
-const APP_VERSION = 'v2026.09.23-secure';
-function isAdmin(){
-  return !!currentUser && String(currentUser.role || '').trim().toLowerCase() === 'admin';
+function hasPerm(key){
+  if(!currentUser || !currentUser.perms) return false;
+  return currentUser.perms.has('admin') || currentUser.perms.has(key);
 }
+function canEdit(){ return hasPerm('edit_cash'); }
+const APP_VERSION = 'v2026.09.25-perms';
+function isAdmin(){ return hasPerm('admin'); }
+function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
 async function logActivity(action, tableName, description){
   if(!sb || !currentUser) return;
@@ -2671,10 +2774,34 @@ if(sb) fetchSettings();
 if(sb) restoreSession();
 
 document.getElementById('loginBtn').addEventListener('click', doLogin);
-document.getElementById('loginSetPw').addEventListener('click', doSetPassword);
+document.getElementById('regBtn').addEventListener('click', doRegister);
 document.getElementById('loginForgot').addEventListener('click', doForgotPassword);
-document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
-document.getElementById('loginEmail').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('loginRegister').addEventListener('click', ()=> setLoginMode('register'));
+document.getElementById('loginBackToSignIn').addEventListener('click', ()=> setLoginMode('signin'));
+const loginEnter = (e)=>{ if(e.key === 'Enter'){ loginMode === 'register' ? doRegister() : doLogin(); } };
+['loginPassword','loginEmail','regName','regConfirm'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', loginEnter);
+});
+
+// The login card doubles as the registration form — same fields, two more.
+let loginMode = 'signin';
+function setLoginMode(mode){
+  loginMode = mode;
+  const reg = mode === 'register';
+  const show = (id, on)=> document.getElementById(id).style.display = on ? '' : 'none';
+  show('regNameWrap', reg); show('regConfirmWrap', reg);
+  show('loginBtn', !reg); show('regBtn', reg);
+  show('loginRegister', !reg); show('loginBackToSignIn', reg);
+  show('loginForgot', !reg);
+  document.getElementById('loginSub').textContent = reg
+    ? 'Ask for access — Makky approves it before you can sign in'
+    : 'Sign in to continue';
+  document.getElementById('loginPwLabel').textContent = reg ? 'Choose a password' : 'Password';
+  document.getElementById('loginPassword').placeholder = reg ? 'At least 8 characters' : 'Enter your password';
+  document.getElementById('loginPassword').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('loginOk').style.display = 'none';
+}
 
 /* ============================================================================
    SIGNING IN
@@ -2695,12 +2822,17 @@ async function loadMyProfile(){
   if(!user) return null;
   const { data, error } = await sb.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
   if(error){ console.error('profile lookup failed', error); return null; }
-  if(!data || data.active === false) return { blocked:true, email:user.email };
+  if(!data) return { blocked:true, email:user.email };
+  if(data.status === 'pending') return { pending:true, email:user.email };
+  if(data.active === false) return { blocked:true, suspended:true, email:user.email };
+  const scopes = Array.isArray(data.villa_scopes) ? data.villa_scopes.filter(Boolean) : [];
   return {
     username: data.full_name || data.email,
     email: data.email,
     role: data.role,
-    villaScope: data.villa_scope || null,
+    perms: permsOf(data),
+    villaScopes: scopes,
+    villaScope: data.villa_scope || (scopes.length === 1 ? scopes[0] : null),
   };
 }
 
@@ -2711,8 +2843,15 @@ async function enterApp(profile){
   startApp();
 }
 
-function showNoAccess(email){
-  loginMsg('error', `${email} is signed in, but no access has been set up for this address yet. Ask Makky to add it under Users.`);
+function showNoAccess(email, suspended){
+  loginMsg('error', suspended
+    ? `Access for ${email} has been switched off. Ask Makky to switch it back on under Users.`
+    : `${email} is signed in, but no access has been set up for this address yet. Ask Makky to add it under Users.`);
+  sb.auth.signOut();
+}
+
+function showPending(email){
+  loginMsg('ok', `Thanks — your request for ${email} has been sent. Makky has to approve it before you can sign in. Try again once he tells you it's done.`);
   sb.auth.signOut();
 }
 
@@ -2731,26 +2870,59 @@ async function doLogin(){
       return;
     }
     const profile = await loadMyProfile();
-    if(!profile || profile.blocked) return showNoAccess(email);
+    if(profile && profile.pending) return showPending(email);
+    if(!profile || profile.blocked) return showNoAccess(email, profile && profile.suspended);
     await enterApp(profile);
   } finally { btn.disabled = false; }
 }
 
-// First-time password: the profile must already exist, so an uninvited sign-up
-// gains nothing even if it succeeds.
-async function doSetPassword(){
+/* Registering asks for access; it does not grant any. The account is filed as
+   pending, switched off, with nothing ticked — the database refuses it every
+   table until Makky approves it on the Users tab. No email is sent, so this
+   works whatever Supabase's mail allowance is doing. */
+async function doRegister(){
+  const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
-  if(!email) return loginMsg('error', 'Type your email first.');
-  if(!password || password.length < 8) return loginMsg('error', 'Type the password you want to use — at least 8 characters.');
-  const { error } = await sb.auth.signUp({ email, password });
-  if(error){
-    loginMsg('error', /already/i.test(error.message)
-      ? 'This email already has a password. Sign in with it, or use the reset link.'
-      : error.message);
-    return;
-  }
-  loginMsg('ok', 'Password set. If Supabase asks you to confirm by email, do that first, then sign in.');
+  const confirm2 = document.getElementById('regConfirm').value;
+  if(!sb) return loginMsg('error', 'Not connected to the database yet — try again in a moment.');
+  if(!name) return loginMsg('error', 'Type your name so Makky knows who is asking.');
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return loginMsg('error', 'Type a valid email address — it will be your login.');
+  if(!password || password.length < 8) return loginMsg('error', 'Choose a password of at least 8 characters.');
+  if(password !== confirm2) return loginMsg('error', "The two passwords don't match.");
+
+  const btn = document.getElementById('regBtn'); btn.disabled = true;
+  try{
+    const { error } = await sb.auth.signUp({ email, password, options:{ data:{ full_name: name } } });
+    if(error){
+      return loginMsg('error', /already|registered/i.test(error.message)
+        ? 'That email already has a login here. Sign in with it, or use the reset link if the password is forgotten.'
+        : error.message);
+    }
+    // The database files the request by itself. This is only a safety net for a
+    // project where that trigger has not been installed yet; it can only ever
+    // write a pending, switched-off row for the address just registered.
+    try{
+      const { data: { user } } = await sb.auth.getUser();
+      if(user){
+        const { data: mine } = await sb.from('profiles').select('email').eq('user_id', user.id).maybeSingle();
+        if(!mine){
+          await sb.from('profiles').insert({
+            email, user_id: user.id, full_name: name,
+            role:'pending', status:'pending', active:false, permissions:[], villa_scopes:[],
+          });
+        } else if(name){
+          await sb.from('profiles').update({ full_name: name }).eq('user_id', user.id);
+        }
+      }
+    }catch(e){ console.error('pending profile fallback', e); }
+
+    try{ await sb.auth.signOut(); }catch(e){}
+    setLoginMode('signin');
+    loginMsg('ok', `Thanks ${name} — your request has been sent. Makky will approve it, then you can sign in with this email and password.`);
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('regConfirm').value = '';
+  } finally { btn.disabled = false; }
 }
 
 async function doForgotPassword(){
@@ -2769,7 +2941,8 @@ async function restoreSession(){
     if(!session) return;
     const profile = await loadMyProfile();
     if(!profile) return;
-    if(profile.blocked) return showNoAccess(profile.email);
+    if(profile.pending) return showPending(profile.email);
+    if(profile.blocked) return showNoAccess(profile.email, profile.suspended);
     await enterApp(profile);
   }catch(e){ console.error('session restore failed', e); }
 }
@@ -2781,90 +2954,63 @@ function startApp(){
 }
 
 function applyRolePermissions(){
-  const role = currentUser.role;
-  const tabs = {
-    housekeeping: document.querySelector('.maintab-btn[data-tab="housekeeping"]'),
-    bookings: document.querySelector('.maintab-btn[data-tab="bookings"]'),
-    pettycash: document.querySelector('.maintab-btn[data-tab="pettycash"]'),
-    inventory: document.querySelector('.maintab-btn[data-tab="inventory"]'),
+  /* Tabs appear because a box is ticked for them, not because of a job title.
+     Every tab is listed here once; anything the person has not been given is
+     simply not in the tab bar. The database enforces the same list again on
+     every read and write, so hiding a tab is the courtesy, not the lock. */
+  const TAB_PERM = {
+    housekeeping:'tab_housekeeping', bookings:'tab_bookings', pettycash:'tab_pettycash',
+    inventory:'tab_inventory', expenses:'tab_expenses', villareport:'tab_villareport',
+    reports:'tab_reports', company:'tab_company', payroll:'tab_payroll',
+    activitylog:'tab_activitylog', users:'tab_users', settings:'tab_settings',
   };
-
-  if(role === 'cash_inventory'){
-    // Only Petty Cash + Inventory visible
-    tabs.housekeeping.style.display = 'none';
-    tabs.bookings.style.display = 'none';
-    // switch to Petty Cash by default
-    document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
-    tabs.pettycash.classList.add('active');
-    document.getElementById('housekeepingPanel').style.display = 'none';
-    document.getElementById('bookingsPanel').style.display = 'none';
-    document.getElementById('pettyCashPanel').style.display = '';
-    document.getElementById('inventoryPanel').style.display = 'none';
-    if(!cashInited){ initPettyCash(); }
+  const btnOf = t => document.querySelector('.maintab-btn[data-tab="' + t + '"]');
+  const allowed = [];
+  for(const tab in TAB_PERM){
+    const btn = btnOf(tab);
+    if(!btn) continue;
+    const on = hasPerm(TAB_PERM[tab]);
+    btn.style.display = on ? '' : 'none';
+    if(on) allowed.push(tab);
   }
 
-  if(role === 'cash_inventory_bookings'){
-    // Petty Cash + Inventory + Bookings visible; Housekeeping hidden
-    tabs.housekeeping.style.display = 'none';
-    document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
-    tabs.pettycash.classList.add('active');
-    document.getElementById('housekeepingPanel').style.display = 'none';
-    document.getElementById('bookingsPanel').style.display = 'none';
-    document.getElementById('pettyCashPanel').style.display = '';
-    document.getElementById('inventoryPanel').style.display = 'none';
-    if(!cashInited){ initPettyCash(); }
-  }
+  // Someone with no editing tick at all gets the read-only skin.
+  const canChangeSomething = ['edit_cash','edit_inventory','edit_bookings','edit_housekeeping',
+    'edit_company','edit_payroll','manage_users','admin'].some(hasPerm);
+  document.body.classList.toggle('viewer-mode', !canChangeSomething);
 
-  if(role === 'admin'){
-    document.getElementById('activityLogTabBtn').style.display = '';
-    document.getElementById('villaReportTabBtn').style.display = '';
-    document.getElementById('companyTabBtn').style.display = '';
-    document.getElementById('payrollTabBtn').style.display = '';
-    document.getElementById('usersTabBtn').style.display = '';
-    document.getElementById('settingsTabBtn').style.display = '';
-    if(!villaReportInited){ initVillaReport(); }
+  // Land on the first tab they actually have, whichever that is.
+  const PANELS = {
+    housekeeping:'housekeepingPanel', bookings:'bookingsPanel', pettycash:'pettyCashPanel',
+    inventory:'inventoryPanel', expenses:'expensesPanel', villareport:'villaReportPanel',
+    reports:'reportsPanel', company:'companyPanel', payroll:'payrollPanel',
+    activitylog:'activityLogPanel', users:'usersPanel', settings:'settingsPanel',
+  };
+  const landing = allowed[0];
+  document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
+  for(const tab in PANELS){
+    const el = document.getElementById(PANELS[tab]);
+    if(el) el.style.display = tab === landing ? '' : 'none';
   }
-
-  if(role === 'viewer'){
-    // Hide every add/action button; disable clickable edit surfaces.
-    // (Individual sections also check canEdit() before acting, this just
-    // removes the visual affordance so it's clear editing isn't available.)
-    document.body.classList.add('viewer-mode');
+  if(landing){
+    const b = btnOf(landing);
+    if(b) b.classList.add('active');
+    const INIT = {
+      bookings: ()=>{ if(!bookingsInited) initBookings(); },
+      pettycash: ()=>{ if(!cashInited) initPettyCash(); },
+      inventory: ()=>{ if(!invInited){ initInventory(); if(!cashInited) initPettyCash(); } },
+      expenses: ()=>{ if(!cashInited) initPettyCash(); initVillaExpenses(); },
+      activitylog: ()=>{ if(!logInited) initActivityLog(); },
+      villareport: ()=>{ if(!villaReportInited) initVillaReport(); },
+      reports: ()=>{ if(!reportsInited) initReports(); },
+      company: ()=>{ if(!companyInited) initCompany(); },
+      payroll: ()=>{ if(!payrollInited) initPayroll(); },
+      users: ()=>{ if(!usersInited) initUsers(); },
+      settings: ()=>{ if(!settingsInited) initSettings(); },
+    };
+    if(INIT[landing]) INIT[landing]();
   }
-
-  if(role === 'viewer_villa_select'){
-    // Full read-only Housekeeping/Bookings, but Petty Cash + Inventory replaced
-    // with a villa-picker report (one villa's data at a time).
-    document.body.classList.add('viewer-mode');
-    tabs.pettycash.style.display = 'none';
-    tabs.inventory.style.display = 'none';
-    document.getElementById('expensesTabBtn').style.display = 'none';
-    document.getElementById('pettyCashPanel').style.display = 'none';
-    document.getElementById('inventoryPanel').style.display = 'none';
-    document.getElementById('villaReportTabBtn').style.display = '';
-  }
-
-  if(role === 'viewer_villa_fixed'){
-    // Villa Report for their one assigned villa, plus Bookings Calendar — nothing else.
-    document.body.classList.add('viewer-mode');
-    tabs.housekeeping.style.display = 'none';
-    tabs.bookings.style.display = '';
-    tabs.pettycash.style.display = 'none';
-    tabs.inventory.style.display = 'none';
-    document.getElementById('expensesTabBtn').style.display = 'none';
-    document.querySelectorAll('.maintab-btn').forEach(b=>b.classList.remove('active'));
-    document.getElementById('villaReportTabBtn').classList.add('active');
-    document.getElementById('villaReportTabBtn').style.display = '';
-    document.getElementById('housekeepingPanel').style.display = 'none';
-    document.getElementById('bookingsPanel').style.display = 'none';
-    document.getElementById('pettyCashPanel').style.display = 'none';
-    document.getElementById('inventoryPanel').style.display = 'none';
-    document.getElementById('villaReportPanel').style.display = '';
-    if(!villaReportInited){ initVillaReport(); }
-  }
-
-  // Reports tab mirrors Inventory tab's visibility (it's the inventory summary, printable)
-  document.getElementById('reportsTabBtn').style.display = tabs.inventory.style.display === 'none' ? 'none' : '';
+  if(hasPerm('tab_villareport') && !villaReportInited) initVillaReport();
 
   // Add a small badge showing who's signed in, top-right of the board, with a logout button
   const badgeWrap = document.createElement('div');
@@ -2872,15 +3018,11 @@ function applyRolePermissions(){
 
   const badge = document.createElement('div');
   badge.style.cssText = 'font-size:11.5px; color:var(--muted); background:#fff; border:1px solid var(--board-line); padding:4px 10px; border-radius:20px;';
-  const roleLabels = {
-    admin: 'Admin',
-    cash_inventory: 'Cash & Inventory',
-    cash_inventory_bookings: 'Cash, Inventory & Bookings',
-    viewer: 'View only',
-    viewer_villa_select: 'All villas — view only',
-    viewer_villa_fixed: 'View only',
-  };
-  badge.textContent = `${currentUser.username} (${roleLabels[role] || role}) · ${APP_VERSION}`;
+  // What the badge calls them now follows the ticks, not a job title.
+  const whoLabel = hasPerm('admin') ? 'Admin'
+    : (canEdit() || hasPerm('edit_inventory') || hasPerm('edit_bookings')) ? 'Can record'
+    : 'View only';
+  badge.textContent = `${currentUser.username} (${whoLabel}) · ${APP_VERSION}`;
   badge.title = 'App version ' + APP_VERSION + ' — if this is missing, the browser is still using an old copy of the page.';
 
   const logoutBtn = document.createElement('button');
@@ -7728,7 +7870,6 @@ function initUsers(){
     .subscribe();
 
   document.getElementById('addUserBtn').addEventListener('click', ()=> openUserModal(null));
-  document.getElementById('userRole').addEventListener('change', updateUserVillaScopeVisibility);
 }
 
 let allAppUsers = [];
@@ -7744,20 +7885,43 @@ async function fetchAppUsers(){
   renderUsers();
 }
 
+// A one-line summary of someone's ticks, so the list reads without opening anyone.
+function permSummary(u){
+  const set = permsOf(u);
+  if(set.has('admin')) return '<b>Full admin</b> — everything';
+  const tabs = PERM_GROUPS[0].items.filter(i => set.has(i.key)).map(i => i.label);
+  const does = [...PERM_GROUPS[1].items, ...PERM_GROUPS[2].items]
+    .filter(i => set.has(i.key)).map(i => i.label);
+  if(!tabs.length && !does.length) return '<span class="dim">Nothing ticked yet</span>';
+  let out = tabs.length ? `<b>Sees:</b> ${esc(tabs.join(', '))}` : '<b>Sees:</b> nothing';
+  if(does.length) out += `<div class="ce-sub"><b>Can:</b> ${esc(does.join(' · '))}</div>`;
+  else out += '<div class="ce-sub">View only</div>';
+  return out;
+}
+function scopeSummary(u){
+  const sc = Array.isArray(u.villa_scopes) ? u.villa_scopes.filter(Boolean) : [];
+  if(!sc.length && u.villa_scope) sc.push(u.villa_scope);
+  if(!sc.length) return 'All villas';
+  const villaList = (VILLAS && VILLAS.length) ? VILLAS : VR_VILLAS;
+  return sc.map(id => (villaList.find(v=>v.id===id)||{}).name || id).join(', ');
+}
+
 function renderUsers(){
+  renderPendingUsers();
   const body = document.getElementById('usersBody');
   body.innerHTML = '';
-  if(allAppUsers.length === 0){
-    body.innerHTML = '<tr><td colspan="4" class="inv-empty">Nobody has access yet — click "+ Add user".</td></tr>';
+  const live = allAppUsers.filter(u => u.status !== 'pending');
+  if(live.length === 0){
+    body.innerHTML = '<tr><td colspan="4" class="inv-empty">Nobody has access yet — click "+ Add user", or wait for someone to register.</td></tr>';
     return;
   }
-  for(const u of allAppUsers){
+  for(const u of live){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="font-weight:600;">${esc(u.full_name || u.email)}
-        <div class="ce-sub">${esc(u.email)}${u.user_id ? '' : ' · <b>password not set yet</b>'}${u.active === false ? ' · <b>access switched off</b>' : ''}</div></td>
-      <td>${ROLE_LABELS[u.role] || u.role}</td>
-      <td>${u.villa_scope ? (VILLAS.find(v=>v.id===u.villa_scope)||{}).name || u.villa_scope : '—'}</td>
+        <div class="ce-sub">${esc(u.email)}${u.user_id ? '' : ' · <b>has not registered yet</b>'}${u.active === false ? ' · <b>access switched off</b>' : ''}</div></td>
+      <td style="font-size:11.5px;">${permSummary(u)}</td>
+      <td style="font-size:11.5px;">${esc(scopeSummary(u))}</td>
     `;
     const actionTd = document.createElement('td');
     const editBtn = document.createElement('button');
@@ -7771,53 +7935,161 @@ function renderUsers(){
   }
 }
 
-let editingUsername = null;   // the email of the profile being edited
-function updateUserVillaScopeVisibility(){
-  const isFixed = document.getElementById('userRole').value === 'viewer_villa_fixed';
-  document.getElementById('userVillaScopeWrap').style.display = isFixed ? '' : 'none';
+// Requests from the login page. Nothing here has any access at all yet.
+function renderPendingUsers(){
+  const wrap = document.getElementById('pendingSection');
+  const list = document.getElementById('pendingList');
+  if(!wrap || !list) return;
+  const pending = allAppUsers.filter(u => u.status === 'pending');
+  wrap.style.display = pending.length ? '' : 'none';
+  if(!pending.length){ list.innerHTML = ''; return; }
+  list.innerHTML = pending.map(u => `
+    <div class="ce-row pend-row">
+      <div class="ce-main"><b>${esc(u.full_name || u.email)}</b>
+        <div class="ce-sub">${esc(u.email)}${u.requested_at ? ' · asked ' + esc(fmtDay(String(u.requested_at).slice(0,10))) : ''}</div></div>
+      <button type="button" class="manage-edit" data-approve="${esc(u.email)}">Review &amp; approve</button>
+      <button type="button" class="manage-del" data-reject="${esc(u.email)}">Reject</button>
+    </div>`).join('');
+  list.querySelectorAll('[data-approve]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const u = allAppUsers.find(x => x.email === b.dataset.approve);
+      if(u) openUserModal(u, true);
+    });
+  });
+  list.querySelectorAll('[data-reject]').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      const email = b.dataset.reject;
+      if(!confirm(`Reject ${email}?\n\nThe request disappears from this list. They keep the password they chose, but the app will show them nothing.`)) return;
+      try{
+        const { error } = await sb.from('profiles').delete().eq('email', email);
+        if(error) throw error;
+        logActivity('delete', 'profiles', `Rejected access request from ${email}`);
+        fetchAppUsers();
+      }catch(e){ alert('Could not reject — ' + (e.message || 'check the connection.')); }
+    });
+  });
 }
-function openUserModal(user){
+
+let editingUsername = null;   // the email of the profile being edited
+let userPermState = new Set();
+let userScopeState = new Set();
+
+function renderPermChips(){
+  const grid = document.getElementById('userPermGrid');
+  const master = userPermState.has('admin');
+  grid.innerHTML = PERM_GROUPS.map(g => `
+    <div class="perm-group">
+      <div class="perm-group-title">${esc(g.title)}</div>
+      <div class="perm-row">${g.items.map(i => {
+        const on = master || userPermState.has(i.key);
+        const locked = master && i.key !== 'admin';
+        return `<label class="perm-chip${on ? ' on' : ''}${i.master ? ' master' : ''}${locked ? ' locked' : ''}">
+          <input type="checkbox" data-perm="${esc(i.key)}" ${on ? 'checked' : ''} ${locked ? 'disabled' : ''}>
+          ${esc(i.label)}</label>`;
+      }).join('')}</div>
+    </div>`).join('');
+  grid.querySelectorAll('[data-perm]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const k = cb.dataset.perm;
+      cb.checked ? userPermState.add(k) : userPermState.delete(k);
+      renderPermChips();   // ticking "Full admin" lights the rest up
+    });
+  });
+
+  const vw = document.getElementById('userVillaScopes');
+  const villaList = (VILLAS && VILLAS.length) ? VILLAS : VR_VILLAS;
+  vw.innerHTML = villaList.map(v => {
+    const on = userScopeState.has(v.id);
+    return `<label class="perm-chip${on ? ' on' : ''}">
+      <input type="checkbox" data-scope="${esc(v.id)}" ${on ? 'checked' : ''}> ${esc(v.name)}</label>`;
+  }).join('');
+  vw.querySelectorAll('[data-scope]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      cb.checked ? userScopeState.add(cb.dataset.scope) : userScopeState.delete(cb.dataset.scope);
+      renderPermChips();
+    });
+  });
+}
+
+function renderPresetButtons(){
+  const wrap = document.getElementById('userPresets');
+  wrap.innerHTML = '<span class="rpt-picker-label">Preset:</span>' +
+    Object.keys(PRESET_LABELS).map(k =>
+      `<button type="button" class="rpt-quick" data-preset-perm="${esc(k)}">${esc(PRESET_LABELS[k])}</button>`).join('')
+    + '<span class="sep"></span><button type="button" class="rpt-quick" data-preset-perm="__none">Clear all</button>';
+  wrap.querySelectorAll('[data-preset-perm]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const k = b.dataset.presetPerm;
+      userPermState = new Set(k === '__none' ? [] : (PERM_PRESETS[k] || []));
+      renderPermChips();
+    });
+  });
+}
+
+function openUserModal(user, approving){
   editingUsername = user ? user.email : null;
-  document.getElementById('userModalTitle').textContent = user ? 'Edit access' : 'Give someone access';
+  document.getElementById('userModalTitle').textContent = approving
+    ? `Approve ${user.full_name || user.email}`
+    : (user ? 'Edit access' : 'Give someone access');
   document.getElementById('userEmail').value = user ? user.email : '';
   document.getElementById('userEmail').disabled = !!user;   // the email is the login — never changed in place
   document.getElementById('userName').value = user ? (user.full_name || '') : '';
   document.getElementById('userName').disabled = false;
-  document.getElementById('userRole').value = user ? user.role : 'viewer';
-  const villaSel = document.getElementById('userVillaScope');
-  villaSel.innerHTML = VILLAS.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
-  if(user && user.villa_scope) villaSel.value = user.villa_scope;
-  updateUserVillaScopeVisibility();
+
+  // A brand-new person, and anyone being approved, starts from a sensible set
+  // rather than from nothing — then you tick whatever else you want.
+  const ticked = user && Array.isArray(user.permissions) ? user.permissions.filter(Boolean) : [];
+  userPermState = new Set(ticked.length ? ticked
+    : (user && !approving ? [...permsOf(user)] : PERM_PRESETS.cash_inventory));
+  const sc = user && Array.isArray(user.villa_scopes) ? user.villa_scopes.filter(Boolean) : [];
+  if(!sc.length && user && user.villa_scope) sc.push(user.villa_scope);
+  userScopeState = new Set(sc);
+
+  document.getElementById('userActive').checked = user ? (approving ? true : user.active !== false) : true;
+  renderPresetButtons();
+  renderPermChips();
   document.getElementById('userError').style.display = 'none';
   document.getElementById('userDeleteBtn').style.display = user ? '' : 'none';
   document.getElementById('userModalOverlay').classList.add('open');
 }
+
 document.getElementById('userCancel').addEventListener('click', ()=> document.getElementById('userModalOverlay').classList.remove('open'));
 document.getElementById('userModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='userModalOverlay') e.currentTarget.classList.remove('open'); });
 document.getElementById('userSave').addEventListener('click', async ()=>{
   const errEl = document.getElementById('userError');
-  if(!isAdmin()){ errEl.textContent='Only an admin can manage users.'; errEl.style.display='block'; return; }
-  if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
+  const fail = m => { errEl.textContent = m; errEl.style.display = 'block'; };
+  if(!canManageUsers()) return fail('Only an admin can manage users.');
+  if(!sb) return fail('Not connected to Supabase yet.');
   const email = document.getElementById('userEmail').value.trim().toLowerCase();
   const fullName = document.getElementById('userName').value.trim();
-  const role = document.getElementById('userRole').value;
-  const villaScope = role === 'viewer_villa_fixed' ? document.getElementById('userVillaScope').value : null;
-  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ errEl.textContent='Enter a valid email address — it is their login.'; errEl.style.display='block'; return; }
+  const perms = [...userPermState];
+  const scopes = [...userScopeState];
+  const active = document.getElementById('userActive').checked;
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email address — it is their login.');
+  if(!perms.length && active && !confirm('Nothing is ticked, so this person will sign in and see an empty app. Save anyway?')) return;
+
+  // role is kept in step with the ticks so anything still reading it behaves.
+  const role = perms.includes('admin') ? 'admin' : 'custom';
+  const payload = { full_name: fullName || null, role, permissions: perms,
+                    villa_scopes: scopes, status:'approved', active };
   try{
     if(editingUsername){
-      const { error } = await sb.from('profiles').update({ full_name: fullName || null, role, villa_scope: villaScope }).eq('email', editingUsername);
+      const { error } = await sb.from('profiles').update(payload).eq('email', editingUsername);
       if(error) throw error;
-      logActivity('update', 'profiles', `Changed access for ${editingUsername} → ${ROLE_LABELS[role]||role}`);
+      logActivity('update', 'profiles', `Changed access for ${editingUsername} — ${perms.length} permission(s)`);
     } else {
-      const { error } = await sb.from('profiles').insert({ email, full_name: fullName || null, role, villa_scope: villaScope });
+      const { error } = await sb.from('profiles').insert({ email, ...payload });
       if(error) throw error;
-      logActivity('create', 'profiles', `Gave ${email} access as ${ROLE_LABELS[role]||role}`);
-      alert(`${email} can now sign in.\n\nTell them to open the app, type that email, type the password they want, and press “First time here? Set my password”.`);
+      logActivity('create', 'profiles', `Gave ${email} access — ${perms.length} permission(s)`);
+      alert(`${email} is on the list.\n\nTell them to open the app, press "New here? Register for access", and use this same email with a password of their choosing. It will go straight through — you have already approved them.`);
     }
     document.getElementById('userModalOverlay').classList.remove('open');
+    fetchAppUsers();
   }catch(e){
-    errEl.textContent = e.message && e.message.includes('duplicate') ? 'That name is already taken.' : 'Save failed.';
-    errEl.style.display='block'; console.error(e);
+    console.error(e);
+    fail(/permissions|villa_scopes|status|column/i.test(e.message || '')
+      ? 'Save failed — run 6-supabase-registration-and-permissions.sql in Supabase first.'
+      : (e.message && /duplicate/i.test(e.message) ? 'That email is already on the list.' : 'Save failed.'));
   }
 });
 document.getElementById('userDeleteBtn').addEventListener('click', async ()=>{
