@@ -1003,10 +1003,11 @@
       <div class="toolbar">
         <div class="status-msg" id="cashStatusMsg">Loading…</div>
         <div class="toolbar-actions">
-          <button class="add-booking-btn" id="addIncomeBtn">+ Money received</button>
-          <button class="add-booking-btn" id="addExpenseBtn">+ Record expense</button>
+          <button class="add-booking-btn" id="addIncomeBtn">+ Petty Cash Money Received</button>
+          <button class="add-booking-btn" id="addExpenseBtn">+ Petty Cash Expenses Cash</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
-          <button class="add-booking-btn" id="addDirectExpenseBtn">+ Direct expense</button>
+          <button class="add-booking-btn" id="addDirectExpenseBtn">+ Payment From Card</button>
+          <button class="add-booking-btn" id="addBankTransferBtn">+ Bank transfer</button>
           <button class="add-booking-btn" id="addSharonExpenseBtn">+ Record Sharon's expense</button>
         </div>
       </div>
@@ -1689,7 +1690,7 @@
 <!-- Income modal (money received) -->
 <div class="modal-overlay" id="incomeModalOverlay">
   <div class="modal modal-wide">
-    <h3>Money received</h3>
+    <h3>Petty Cash Money Received</h3>
     <label>Date</label>
     <input type="date" id="incDate">
     <label>Received into</label>
@@ -1789,11 +1790,19 @@
     <label>Employee name</label>
     <input type="text" id="advEmployee" list="staffNameList" placeholder="e.g. Anuja">
     <datalist id="staffNameList"></datalist>
-    <label>From card</label>
-    <select id="advCard">
-      <option value="ceymora">Ceymora Card</option>
-      <option value="kalava_card">Kalava Villa Card</option>
+    <label>How was the money given?</label>
+    <select id="advGiveMode">
+      <option value="cash">Cash — handed over from a petty cash card</option>
+      <option value="bank">Bank transfer — sent straight from the bank</option>
     </select>
+    <div class="field-hint" id="advGiveModeHint"></div>
+    <div id="advCardWrap">
+      <label>From card</label>
+      <select id="advCard">
+        <option value="ceymora">Ceymora Card</option>
+        <option value="kalava_card">Kalava Villa Card</option>
+      </select>
+    </div>
     <label>Amount (LKR)</label>
     <input type="number" id="advAmount" min="0" step="1" placeholder="e.g. 10000">
     <label>Note (optional)</label>
@@ -2584,6 +2593,21 @@ const incFileHandler = createMultiFileHandler('incFile', 'incFileList');
 const expFileHandler = createMultiFileHandler('expFile', 'expFileList');
 const opExFileHandler = createMultiFileHandler('opExFile', 'opExFileList');
 const advFileHandler = createMultiFileHandler('advFile', 'advFileList');
+
+// An advance can leave as cash out of a card, or as a bank transfer. Either way it is
+// money the person is holding, not yet an expense — so the wallet maths is identical.
+// The difference is where it came from: cash comes off that card's float, a bank
+// transfer doesn't touch either card and is reported under Bank transfers instead.
+// Invoices brought back against the advance inherit its card, so a bank-transfer
+// advance's bills land in the villa's Bank transfers section by themselves.
+function advApplyGiveMode(){
+  const g = id => document.getElementById(id);
+  const bank = g('advGiveMode').value === 'bank';
+  g('advCardWrap').style.display = bank ? 'none' : '';
+  g('advGiveModeHint').textContent = bank
+    ? 'Sent from the bank — neither card is touched. It stays on his balance until he brings the invoices, and whatever he spends shows under Bank transfers for that villa.'
+    : 'Comes off the chosen card\'s petty cash float, the way it works today.';
+}
 const advSettledFileHandler = createMultiFileHandler('advSettledFile', 'advSettledFileList');
 function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note, amount:r.amount!==null&&r.amount!==undefined?Number(r.amount):null }; }
 
@@ -4370,16 +4394,20 @@ const ADVANCE_WALLET_DEFAULTS = [
 // card). Both live on the same petty_cash_transactions table, tied together by employee_name.
 function computeAdvanceWallets(){
   const wallets = {};
+  const blank = () => ({ given:0, spent:0, returned:0, givenBank:0, givenCash:0, spentBank:0, spentCash:0 });
   for(const t of allCashTxns){
+    const bank = t.card === 'bank';
     if(t.type === 'advance' && t.employeeName){
-      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0, returned:0 };
-      wallets[t.employeeName].given += t.amount;
+      const w = wallets[t.employeeName] || (wallets[t.employeeName] = blank());
+      w.given += t.amount;
+      if(bank) w.givenBank += t.amount; else w.givenCash += t.amount;
     } else if(t.type === 'expense' && t.employeeName){
-      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0, returned:0 };
-      wallets[t.employeeName].spent += t.amount;
+      const w = wallets[t.employeeName] || (wallets[t.employeeName] = blank());
+      w.spent += t.amount;
+      if(bank) w.spentBank += t.amount; else w.spentCash += t.amount;
     } else if(t.type === 'income' && t.advanceId && t.employeeName){
-      if(!wallets[t.employeeName]) wallets[t.employeeName] = { given:0, spent:0, returned:0 };
-      wallets[t.employeeName].returned = (wallets[t.employeeName].returned || 0) + t.amount;
+      const w = wallets[t.employeeName] || (wallets[t.employeeName] = blank());
+      w.returned += t.amount;
     }
   }
   for(const name in wallets){ wallets[name].balance = wallets[name].given - wallets[name].spent - (wallets[name].returned || 0); }
@@ -4408,17 +4436,11 @@ function renderAdvanceWallets(){
       <div class="cash-card-label">${defaultInfo ? defaultInfo.label : name}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
+      <div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap for his statement</span></div>
       ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} still to recover from settled advance${Math.abs(gap) && openCount ? 's' : 's'} — click to see</div>` : ''}
     `;
-    if(Math.abs(gap) >= 1){
-      card.style.cursor = 'pointer';
-      card.addEventListener('click', ()=>{
-        const sel = document.getElementById('settledFilter');
-        renderSettledAdvances();
-        sel.value = name; renderSettledAdvances();
-        document.getElementById('settledAdvancesSection').scrollIntoView({ behavior:'smooth', block:'start' });
-      });
-    }
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', ()=> openStaffAdvanceStatement(name));
     wrap.appendChild(card);
   }
 }
@@ -4471,6 +4493,8 @@ function initPettyCash(){
   document.getElementById('addIncomeBtn').addEventListener('click', ()=> openIncomeModal());
   document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
   document.getElementById('addAdvanceBtn').addEventListener('click', ()=> openAdvanceModal());
+  document.getElementById('advGiveMode').addEventListener('change', advApplyGiveMode);
+  document.getElementById('addBankTransferBtn').addEventListener('click', ()=> openExpenseModal(null, false, { card:'bank', bank:true }));
   document.getElementById('addDirectExpenseBtn').addEventListener('click', ()=> openExpenseModal(null, true));
   document.getElementById('addSharonExpenseBtn').addEventListener('click', ()=> openMyPurchaseModal('Sharon'));
 
@@ -4962,11 +4986,25 @@ function applyDirectExpenseUI(){
   if(on){
     hint.innerHTML = '<b>Kalava Villa Card</b> → Direct Kalava Villa Purchases. &nbsp;<b>Ceymora Card</b> → Direct Ceymora Card Expenses. Either way the cost still counts toward that villa\'s petty cash.';
   }
-  document.querySelector('#expenseModalOverlay h3').textContent =
-    (editingCashId ? 'Edit ' : 'Record ') + (on ? 'direct expense' : 'expense');
+  document.querySelector('#expenseModalOverlay h3').textContent = expBankMode
+    ? (editingCashId ? 'Edit bank transfer' : 'Record a bank transfer')
+    : (editingCashId ? 'Edit — ' : '') + (on ? 'Payment From Card' : 'Petty Cash Expenses Cash');
+
+  // In bank transfer mode the payment method is the whole point of the button, so it is
+  // fixed rather than left as one option among four.
+  const cardSel = g('expCard');
+  Array.from(cardSel.options).forEach(opt => {
+    const hide = expBankMode && opt.value !== 'bank';
+    opt.hidden = hide; opt.disabled = hide;
+  });
+  if(expBankMode) cardSel.value = 'bank';
 }
 
 let expLinkAdvanceId = null, expReturnToAdvance = null;
+// The "+ Bank transfer" button opens this same form with the payment method pinned to
+// Bank transfer, so a transfer is recorded with its villa, its account code and its
+// invoice exactly like any other bill — it just never touches a card.
+let expBankMode = false;
 function billLockedBySettledAdvance(t){
   if(!t || !t.advanceId || isAdmin()) return false;
   const parent = allCashTxns.find(a => String(a.id) === String(t.advanceId));
@@ -4982,6 +5020,7 @@ function openExpenseModal(record, forceDirect, opts){
   expLinkAdvanceId = opts.advanceId != null ? String(opts.advanceId) : (record && record.advanceId) || null;
   expReturnToAdvance = opts.returnToAdvance != null ? opts.returnToAdvance : null;
   expDirectMode = (forceDirect !== undefined) ? !!forceDirect : (record ? !!record.directExpense : false);
+  expBankMode = opts.bank ? true : (record ? record.card === 'bank' : false);
   try{
     document.getElementById('expDate').value = record ? record.date : todayISO();
     document.getElementById('expCard').value = record ? record.card : 'ceymora';
@@ -5243,7 +5282,9 @@ function openAdvanceModal(record){
 
     g('advDate').value = record ? record.date : todayISO();
     g('advEmployee').value = record ? (record.employeeName || '') : '';
-    g('advCard').value = record ? record.card : 'ceymora';
+    g('advGiveMode').value = (record && record.card === 'bank') ? 'bank' : 'cash';
+    g('advCard').value = (record && record.card !== 'bank') ? record.card : 'ceymora';
+    advApplyGiveMode();
     g('advAmount').value = record ? record.amount : '';
     g('advNote').value = record ? (record.note || '') : '';
     g('advSettled').checked = record ? !!record.settled : false;
@@ -5262,7 +5303,7 @@ function openAdvanceModal(record){
     // Settling needs bills first, so a brand-new advance can't be ticked settled.
     g('advSettledRow').style.display = record ? '' : 'none';
     const locked = advLocked(record);
-    ['advDate','advEmployee','advCard','advAmount','advNote','advReturned','advPaidOut','advSettled','advSettledNote','advFile','advSettledFile']
+    ['advDate','advEmployee','advGiveMode','advCard','advAmount','advNote','advReturned','advPaidOut','advSettled','advSettledNote','advFile','advSettledFile']
       .forEach(id => { g(id).disabled = locked; });
     g('advSave').style.display = locked ? 'none' : '';
     g('advDeleteBtn').style.display = (record && !locked) ? '' : 'none';
@@ -5627,7 +5668,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   if(!sb) return fail('Not connected to Supabase yet.');
   const date = g('advDate').value;
   const employeeName = g('advEmployee').value.trim();
-  const card = g('advCard').value;
+  const card = g('advGiveMode').value === 'bank' ? 'bank' : g('advCard').value;
   const amount = parseFloat(g('advAmount').value);
   const note = g('advNote').value.trim();
   let settled = g('advSettled').checked;
@@ -6931,6 +6972,20 @@ function buildSuppliesSection(loc, monthStartISO, monthEndISO){
     ${anyUnknown ? '<div class="rpt-note">Lines showing “—” have no price entered and no purchase cost on record, so they are not included in the total.</div>' : ''}`;
   return { total, count:received.length, html };
 }
+// Money transferred out of the bank as a staff advance, less the invoices brought back
+// and any cash returned. It belongs to no villa until those invoices arrive, so it is
+// shown on its own rather than folded into a villa's figure.
+function bankAdvanceHeld(){
+  let held = 0;
+  for(const t of allCashTxns){
+    if(t.card !== 'bank') continue;
+    if(t.type === 'advance' && t.employeeName) held += t.amount;
+    else if(t.type === 'expense' && t.employeeName) held -= t.amount;
+    else if(t.type === 'income' && t.advanceId) held -= t.amount;
+  }
+  return held;
+}
+
 function renderBankTransferSummary(){
   const wrap = document.getElementById('bankTransferSummary');
   if(!wrap) return;
@@ -6947,8 +7002,48 @@ function renderBankTransferSummary(){
       <div class="cash-card-balance">LKR ${Math.round(byPlace[v.id] || 0).toLocaleString()}</div>
     </div>
   `).join('');
+  const held = bankAdvanceHeld();
+  if(Math.round(held) !== 0){
+    wrap.insertAdjacentHTML('beforeend', `
+      <div class="cash-card" style="background:linear-gradient(135deg, #f08c00, #b35c00); cursor:pointer;" data-bank-held="1">
+        <div class="cash-card-label">Bank transfer → to staff</div>
+        <div class="cash-card-balance">LKR ${Math.round(held).toLocaleString()}</div>
+        <div class="cash-card-sub">Sent to staff by bank, invoices not yet brought back · tap to see who</div>
+      </div>`);
+    wrap.querySelector('[data-bank-held]').addEventListener('click', openBankToStaffDetail);
+  }
   wrap.querySelectorAll('[data-bank-place]').forEach(el=>{
     el.addEventListener('click', ()=> openBankTransferDetail(el.dataset.bankPlace));
+  });
+}
+
+// Who is holding the money that went out of the bank as an advance, so a figure that
+// belongs to no villa yet still has a name against it.
+function openBankToStaffDetail(){
+  const wallets = computeAdvanceWallets();
+  const rows = Object.keys(wallets)
+    .map(n => ({ name:n, w:wallets[n] }))
+    .filter(r => (r.w.givenBank || 0) > 0)
+    .sort((a,b) => (b.w.givenBank||0) - (a.w.givenBank||0));
+  const money = n => 'LKR ' + Math.round(n).toLocaleString();
+  let html = '<div class="field-hint" style="margin-bottom:8px;">Money transferred from the bank straight to a member of staff. It is charged to a villa only when he brings the invoice back and says which villa it was for.</div>';
+  if(!rows.length){
+    html += '<div class="manage-empty">No advances have been sent by bank transfer.</div>';
+  } else {
+    html += '<div class="manage-list">' + rows.map(r => `
+      <div class="txn-row" data-staff-stmt="${esc(r.name)}" style="cursor:pointer;">
+        <span class="txn-badge advance">bank</span>
+        <span class="txn-main"><div class="txn-title">${esc(r.name)}</div>
+          <div class="txn-sub">Sent by bank ${money(r.w.givenBank)} · billed so far ${money(r.w.spent)} · still holding ${money(r.w.balance)}</div></span>
+        <span class="txn-amount">${money(r.w.givenBank)}</span>
+      </div>`).join('') + '</div>';
+    html += `<div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Sent by bank in total: ${money(rows.reduce((t,r)=>t+r.w.givenBank,0))}</div>`;
+  }
+  document.getElementById('villaDetailTitle').textContent = 'Bank transfers to staff';
+  document.getElementById('villaDetailBody').innerHTML = html;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  document.querySelectorAll('#villaDetailBody [data-staff-stmt]').forEach(el=>{
+    el.addEventListener('click', ()=> openStaffAdvanceStatement(el.dataset.staffStmt));
   });
 }
 
@@ -6974,6 +7069,81 @@ function openBankTransferDetail(placeId){
     }
     html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${Math.round(total).toLocaleString()}</div>`;
   }
+  document.getElementById('villaDetailBody').innerHTML = html;
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+}
+
+// One person's whole advance position on a single page: every rupee that reached him
+// (by bank transfer or as cash off a card), every invoice he brought back and which
+// villa it was charged to, and any cash he handed in. The three have to agree with the
+// balance still showing against his name — which is the check Sharon asked for.
+function openStaffAdvanceStatement(name){
+  const w = computeAdvanceWallets()[name] || { given:0, spent:0, returned:0, givenBank:0, givenCash:0 };
+  const mine = allCashTxns.filter(t => t.employeeName === name);
+  const byDate = (a,b) => (a.date||'').localeCompare(b.date||'');
+  const advances = mine.filter(t => t.type === 'advance').sort(byDate);
+  const bills    = mine.filter(t => t.type === 'expense').sort(byDate);
+  const backs    = mine.filter(t => t.type === 'income' && t.advanceId).sort(byDate);
+
+  const money = n => 'LKR ' + Math.round(n).toLocaleString();
+  const src = t => t.card === 'bank' ? 'Bank transfer' : (CARD_LABELS[t.card] || t.card);
+  const clip = (t) => getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+
+  const section = (title, note, rows, sub) => `
+    <div class="direct-block-title" style="margin-top:14px;">${title}</div>
+    ${note ? `<div class="field-hint" style="margin:2px 0 6px;">${note}</div>` : ''}
+    ${rows.length ? `<div class="manage-list">${rows.join('')}</div>
+      <div style="text-align:right; font-weight:700; margin-top:6px; font-size:13px;">${sub}</div>`
+    : '<div class="manage-empty">Nothing yet.</div>'}`;
+
+  let html = section(
+    'Money given to ' + esc(name), 'Everything handed over or transferred to him, whatever the source.',
+    advances.map(t => `<div class="txn-row">
+        <span class="txn-badge advance">${t.card === 'bank' ? 'bank' : 'cash'}</span>
+        <span class="txn-main"><div class="txn-title">${esc(src(t))}${clip(t) ? ' ' + clip(t) : ''}</div>
+          <div class="txn-sub">${esc(t.date)}${t.note ? ' · ' + esc(t.note) : ''}</div></span>
+        <span class="txn-amount">${money(t.amount)}</span></div>`),
+    `Total given ${money(w.given)} &nbsp;·&nbsp; by bank transfer ${money(w.givenBank||0)} &nbsp;·&nbsp; cash ${money(w.givenCash||0)}`);
+
+  html += section(
+    'Invoices he brought back', 'Each one is charged to the villa or place shown — that is where the cost lands in the reports.',
+    bills.map(t => `<div class="txn-row">
+        <span class="txn-badge expense">${esc(FOR_LABELS[t.for] || t.for || '')}</span>
+        <span class="txn-main"><div class="txn-title">${esc(t.purpose || 'Invoice')}${clip(t) ? ' ' + clip(t) : ''}</div>
+          <div class="txn-sub">${esc(t.date)} · ${esc(src(t))}${t.note ? ' · ' + esc(t.note) : ''}</div></span>
+        <span class="txn-amount expense">${money(t.amount)}</span></div>`),
+    `Total billed ${money(w.spent)}`);
+
+  if(backs.length) html += section('Cash he handed back', '',
+    backs.map(t => `<div class="txn-row">
+        <span class="txn-badge income">returned</span>
+        <span class="txn-main"><div class="txn-title">Cash returned</div>
+          <div class="txn-sub">${esc(t.date)}${t.note ? ' · ' + esc(t.note) : ''}</div></span>
+        <span class="txn-amount income">${money(t.amount)}</span></div>`),
+    `Total returned ${money(w.returned || 0)}`);
+
+  const bal = w.balance != null ? w.balance : (w.given - w.spent - (w.returned||0));
+  html += `
+    <div class="pay-block" style="margin-top:16px;">
+      <div class="direct-block-title">Does it add up?</div>
+      <table class="inv-table" style="margin-top:6px;">
+        <tbody>
+          <tr><td>Given by bank transfer</td><td class="num">${money(w.givenBank||0)}</td></tr>
+          <tr><td>Given as cash from a card</td><td class="num">${money(w.givenCash||0)}</td></tr>
+          <tr><td><b>Total given</b></td><td class="num"><b>${money(w.given)}</b></td></tr>
+          <tr><td>Less invoices submitted</td><td class="num" style="color:var(--red)">− ${money(w.spent)}</td></tr>
+          <tr><td>Less cash handed back</td><td class="num" style="color:var(--red)">− ${money(w.returned || 0)}</td></tr>
+          <tr><td><b>Should still be holding</b></td><td class="num"><b>${money(bal)}</b></td></tr>
+        </tbody>
+      </table>
+      <div class="field-hint" style="margin-top:8px;">${bal === 0
+        ? 'Fully accounted for — nothing outstanding.'
+        : bal > 0
+          ? `${esc(name)} is still holding ${money(bal)}. It stays here until he brings the invoices or hands the cash back.`
+          : `Overspent by ${money(-bal)} — he has put in more of his own money than he was given.`}</div>
+    </div>`;
+
+  document.getElementById('villaDetailTitle').textContent = `Advance statement — ${name}`;
   document.getElementById('villaDetailBody').innerHTML = html;
   document.getElementById('villaDetailModalOverlay').classList.add('open');
 }
