@@ -2817,7 +2817,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.26-paging';
+const APP_VERSION = 'v2026.09.26-places';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3162,9 +3162,25 @@ const EX_PLACES = () => ([
 // The rows the current filters select. Advances are deliberately absent: an advance is
 // money handed to someone, not a cost — it becomes one when the invoice arrives, and
 // that invoice is an expense row in its own right. Counting both would double it.
+function exRange(){
+  return {
+    from: toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), 1)),
+    to:   toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1)),
+  };
+}
+
+// Every expense in the chosen period, before the place and kind filters. This is what
+// the "where did they go" line counts, so an empty villa can be explained rather than
+// just being empty.
+function exRowsInPeriod(){
+  const { from, to } = exRange();
+  return allCashTxns
+    .filter(t => t.type === 'expense')
+    .filter(t => exAllTime || (t.date >= from && t.date < to));
+}
+
 function exRows(){
-  const from = toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), 1));
-  const to   = toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1));
+  const { from, to } = exRange();
   return allCashTxns
     .filter(t => t.type === 'expense')
     .filter(t => exPlace === 'all' || t.for === exPlace)
@@ -3245,14 +3261,36 @@ function renderVillaExpenses(){
   renderExPickers();
   const rows = exRows();
   renderExSummary(rows);
-  const allExpenses = allCashTxns.filter(t => t.type === 'expense');
-  const firstDate = allExpenses.reduce((m,t)=> (!m || (t.date||'') < m) ? t.date : m, null);
-  const lastDate  = allExpenses.reduce((m,t)=> (!m || (t.date||'') > m) ? t.date : m, null);
+  /* When a villa comes up empty the useful question is not "is it empty" but "then
+     where are that month's expenses". This counts the whole period by place, including
+     anything recorded without a place at all, which is otherwise invisible here. */
   const loadedNote = document.getElementById('exLoadedNote');
   if(loadedNote){
-    loadedNote.textContent = allExpenses.length
-      ? `${allExpenses.length} expense${allExpenses.length===1?'':'s'} loaded in total, from ${fmtDay(firstDate)} to ${fmtDay(lastDate)}. A month that looks empty has nothing recorded for it.`
-      : 'No expenses recorded at all yet.';
+    const allExpenses = allCashTxns.filter(t => t.type === 'expense');
+    const periodRows = exRowsInPeriod();
+    const byPlace = {};
+    for(const t of periodRows){
+      const k = t.for || '__none';
+      byPlace[k] = (byPlace[k] || 0) + 1;
+    }
+    const known = EX_PLACES().filter(v => v.id !== 'all');
+    const parts = known.filter(v => byPlace[v.id]).map(v => `${esc(v.name)} ${byPlace[v.id]}`);
+    const strays = Object.keys(byPlace).filter(k => k === '__none' || !known.some(v=>v.id===k));
+    const strayCount = strays.reduce((n,k)=> n + byPlace[k], 0);
+    if(strayCount) parts.push(`<b style="color:var(--amber)">not assigned to a place ${strayCount}</b>`);
+
+    if(!allExpenses.length){
+      loadedNote.innerHTML = 'No expenses recorded at all yet.';
+    } else {
+      const firstDate = allExpenses.reduce((m,t)=> (!m || (t.date||'') < m) ? t.date : m, null);
+      const lastDate  = allExpenses.reduce((m,t)=> (!m || (t.date||'') > m) ? t.date : m, null);
+      loadedNote.innerHTML =
+        `${allExpenses.length} expense${allExpenses.length===1?'':'s'} loaded in total, from ${fmtDay(firstDate)} to ${fmtDay(lastDate)}. `
+        + (periodRows.length
+            ? `<b>${esc(exPeriodLabel())}</b> has ${periodRows.length}: ${parts.join(' · ')}.`
+            : `Nothing at all was recorded in <b>${esc(exPeriodLabel())}</b>.`)
+        + (strayCount ? ` Those ${strayCount} were saved without a villa or office against them, so they belong to no report — open them from Petty Cash and set "For".` : '');
+    }
   }
   const place = EX_PLACES().find(v=>v.id===exPlace).name;
   let html = `<div class="rpt-head"><div class="rpt-title">Villa expenses — ${esc(place)}</div>
@@ -3270,11 +3308,22 @@ function renderVillaExpenses(){
       html += `<div class="rpt-section-title" style="margin-top:16px;">${esc(v.name)}
         <span class="rpt-section-count">${mine.length} item${mine.length===1?'':'s'} · ${lkr(blk.total)}</span></div>${blk.html}`;
     }
+    // Anything saved without a place, or with one that no longer exists, would otherwise
+    // be dropped silently here — which is how an expense goes missing from every report.
+    const orphans = rows.filter(r => !places.some(v => v.id === r.for));
+    if(orphans.length){
+      any = true;
+      const blk = pettyGroupsBlock(orphans);
+      html += `<div class="rpt-section-title" style="margin-top:16px; color:var(--amber);">Not assigned to a place
+        <span class="rpt-section-count">${orphans.length} item${orphans.length===1?'':'s'} · ${lkr(blk.total)}</span></div>
+        <div class="rpt-note">These were saved without a villa or office against them, so they appear on no villa's report. Open each one from Petty Cash and set "For".</div>${blk.html}`;
+    }
     if(!any) html += '<div class="rpt-empty">Nothing recorded for this period.</div>';
     else {
       const grand = rows.reduce((t,r)=>t+r.amount,0);
       html += `<table class="rpt-table" style="margin-top:14px;"><tbody><tr class="subtotal">
-        <td><b>Everything, all places</b></td><td class="r"><b>${Math.round(grand).toLocaleString()}</b></td></tr></tbody></table>`;
+        <td><b>Everything, all places${orphans.length ? ' (including unassigned)' : ''}</b></td>
+        <td class="r"><b>${Math.round(grand).toLocaleString()}</b></td></tr></tbody></table>`;
     }
   } else {
     html += pettyGroupsBlock(rows).html;
