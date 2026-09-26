@@ -2815,7 +2815,9 @@ function hasPerm(key){
   return currentUser.perms.has('admin') || currentUser.perms.has(key);
 }
 function canEdit(){ return hasPerm('edit_cash'); }
-const APP_VERSION = 'v2026.09.25-perms';
+// Bump this on every delivered file. It is printed on the login badge, and it is the
+// only way to tell at a glance whether the browser is running the newest copy.
+const APP_VERSION = 'v2026.09.26-paging';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
