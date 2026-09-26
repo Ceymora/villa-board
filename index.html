@@ -1151,9 +1151,7 @@
         <thead>
           <tr>
             <th>Item</th>
-            <th style="text-align:center">Kalava</th>
-            <th style="text-align:center">Noelia</th>
-            <th style="text-align:center">Brisa</th>
+            <th class="inv-villa-cols" style="display:none"></th>
             <th style="text-align:center">Office</th>
             <th style="text-align:center">Store</th>
             <th></th>
@@ -1254,9 +1252,6 @@
         <div class="manage-title">Financial Report</div>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
           <select id="repLocationSelect">
-            <option value="kalava">Kalava Villa</option>
-            <option value="noelia">Noelia Villa</option>
-            <option value="brisa">Brisa Villa</option>
             <option value="office">Office</option>
             <option value="store">Store</option>
           </select>
@@ -1544,9 +1539,7 @@
         <div style="margin-top:14px;">
           <div class="set-grid" style="max-width:520px;">
             <div><label>Deposit on confirmation (%)</label><input type="number" id="setDepositPct" min="1" max="100" step="1" placeholder="25"></div>
-            <div data-villa-code="kalava"><label>Villa invoice code — Kalava</label><input type="text" id="setCodeKalava" maxlength="6" placeholder="KAL"></div>
-            <div data-villa-code="noelia"><label>Villa invoice code — Noelia</label><input type="text" id="setCodeNoelia" maxlength="6" placeholder="NOE"></div>
-            <div data-villa-code="brisa"><label>Villa invoice code — Brisa</label><input type="text" id="setCodeBrisa" maxlength="6" placeholder="BRI"></div>
+            <div id="setVillaCodes" style="display:contents;"></div>
           </div>
         </div>
       </div>
@@ -1805,9 +1798,6 @@
     <div class="field-hint" id="expCardHint">Ceymora Card can be used for any villa or the office.</div>
     <label>For</label>
     <select id="expFor">
-      <option value="kalava">Kalava Villa</option>
-      <option value="noelia">Noelia Villa</option>
-      <option value="brisa">Brisa Villa</option>
       <option value="office">Office</option>
       <option value="store">Store</option>
     </select>
@@ -1989,9 +1979,6 @@
     <input type="number" id="distQty" min="0" step="1">
     <label>Send to</label>
     <select id="distVilla">
-      <option value="kalava">Kalava Villa</option>
-      <option value="noelia">Noelia Villa</option>
-      <option value="brisa">Brisa Villa</option>
       <option value="office">Office</option>
     </select>
     <label>Price to charge <span id="distSuggestedCost" style="font-weight:400;color:var(--muted);"></span> (LKR, optional)</label>
@@ -2014,8 +2001,37 @@
     <h3>Add villa</h3>
     <label>Villa name</label>
     <input type="text" id="villaName" placeholder="e.g. Sunset Villa">
-    <label>Color (used for tags on the board)</label>
-    <input type="text" id="villaColor" value="#0c8599">
+    <div class="frm-row">
+      <div>
+        <label>Colour</label>
+        <input type="color" id="villaColor" value="#0c8599" style="height:38px; padding:2px;">
+      </div>
+      <div>
+        <label>Bookings priced in</label>
+        <select id="villaCurrency">
+          <option value="USD">USD — US dollars</option>
+          <option value="EUR">EUR — euros</option>
+          <option value="GBP">GBP — pounds</option>
+          <option value="LKR">LKR — rupees</option>
+          <option value="AUD">AUD — Australian dollars</option>
+          <option value="CAD">CAD — Canadian dollars</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-hint">Nightly rates for this villa are entered in this currency and converted to LKR on every report.</div>
+    <div class="frm-row">
+      <div>
+        <label>Invoice code</label>
+        <input type="text" id="villaCodeInput" maxlength="6" placeholder="e.g. SUN">
+        <div class="field-hint">Used in its invoice numbers. Must differ from the other villas.</div>
+      </div>
+      <div>
+        <label>Refundable damage deposit (<span id="villaDepCur">USD</span>)</label>
+        <input type="number" id="villaDeposit" min="0" step="1" placeholder="e.g. 250">
+      </div>
+    </div>
+    <label>Order in the list (optional)</label>
+    <input type="number" id="villaSort" min="0" step="1" placeholder="e.g. 40 — lower comes first">
     <div class="modal-error" id="villaError"></div>
     <div class="modal-actions">
       <button class="btn btn-delete" id="villaDeleteBtn" style="display:none">Delete</button>
@@ -2498,6 +2514,110 @@ function getInvoiceLinks(t){
   return links;
 }
 
+/* =====================================================================
+   THE VILLAS — one list, built from the database
+
+   Every villa list in the app is derived from this one, rebuilt whenever the
+   villas table loads. The arrays are filled in place rather than reassigned, so
+   anything already holding a reference keeps seeing the current set.
+
+   Adding a villa is therefore a row in the `villas` table and nothing else: the
+   calendar tab, its report, the photo slot, the expense "For" list, the stock
+   columns and the rest all follow from here.
+
+   The three below are only the fallback for a database that has not answered
+   yet — or has no villas in it at all.
+   ===================================================================== */
+const DEFAULT_VILLAS = [
+  { id:'kalava', name:'Kalava Villa', color:'#0c8599', currency:'USD', code:'KAL', deposit:250 },
+  { id:'noelia', name:'Noelia Villa', color:'#7048e8', currency:'USD', code:'NOE', deposit:250 },
+  { id:'brisa',  name:'Brisa Villa',  color:'#e64980', currency:'EUR', code:'BRI', deposit:400 },
+];
+let VILLAS = [];   // straight from the villas table
+
+const CAL_VILLAS = [];   // {id,name,color,currency} — calendar, bookings, invoices
+const VR_VILLAS  = [];   // {id,name,color}          — villa report, summary cards
+const VILLA_IDS  = [];   // ids only
+const INV_VILLAS = [];   // ids, for inventory
+const INV_LOCATIONS = [];        // 'office' + every villa
+const FOR_LABELS = { office:'Office', store:'Store' };
+const INV_LOCATION_LABELS = { office:'Office', store:'Store' };
+
+// A villa row as the rest of the app wants it, whatever the database gave us.
+function normaliseVilla(v){
+  const d = DEFAULT_VILLAS.find(x => x.id === v.id) || {};
+  return {
+    id: v.id,
+    name: v.name || d.name || v.id,
+    color: v.color || d.color || '#495057',
+    currency: (v.currency || d.currency || 'USD').toUpperCase(),
+    sortOrder: (v.sort_order !== undefined && v.sort_order !== null) ? Number(v.sort_order) : 100,
+  };
+}
+
+function villasNow(){ return (VILLAS && VILLAS.length) ? VILLAS : DEFAULT_VILLAS.map(normaliseVilla); }
+
+function rebuildVillaLists(){
+  const rows = villasNow();
+  [CAL_VILLAS, VR_VILLAS, VILLA_IDS, INV_VILLAS, INV_LOCATIONS].forEach(a => { a.length = 0; });
+  Object.keys(FOR_LABELS).forEach(k => { if(k !== 'office' && k !== 'store') delete FOR_LABELS[k]; });
+  Object.keys(INV_LOCATION_LABELS).forEach(k => { if(k !== 'office' && k !== 'store') delete INV_LOCATION_LABELS[k]; });
+
+  INV_LOCATIONS.push('office');
+  for(const v of rows){
+    CAL_VILLAS.push({ id:v.id, name:v.name, color:v.color, currency:v.currency });
+    VR_VILLAS.push({ id:v.id, name:v.name, color:v.color });
+    VILLA_IDS.push(v.id);
+    INV_VILLAS.push(v.id);
+    INV_LOCATIONS.push(v.id);
+    FOR_LABELS[v.id] = v.name;
+    INV_LOCATION_LABELS[v.id] = v.name;
+  }
+}
+rebuildVillaLists();
+
+function onVillasChanged(){
+  try{
+    if(typeof renderVillaPhotos === 'function' && document.getElementById('setVillaPhotos')) renderVillaPhotos();
+    if(typeof renderVillaPicker === 'function' && document.getElementById('villaReportPicker')) renderVillaPicker();
+    if(typeof renderVillaExpenses === 'function' && typeof exInited !== 'undefined' && exInited) renderVillaExpenses();
+    if(typeof renderCalVillaTabs === 'function') renderCalVillaTabs();
+    if(typeof renderSettingsVillaScope === 'function') renderSettingsVillaScope();
+    if(typeof renderInventory === 'function' && typeof invInited !== 'undefined' && invInited) renderInventory();
+    if(typeof renderVillaCodeRows === 'function' && document.getElementById('setVillaCodes')) renderVillaCodeRows();
+    if(typeof renderDepositRows === 'function' && document.getElementById('setDeposits')) renderDepositRows();
+    if(typeof renderVillaReport === 'function' && typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
+  }catch(e){ console.error('villa list refresh', e); }
+}
+
+function villaById(id){ return villasNow().find(v => v.id === id) || null; }
+function villaColor(id){ const v = villaById(id); return v ? v.color : '#495057'; }
+function villaName(id){ return FOR_LABELS[id] || (villaById(id) || {}).name || id; }
+function firstVillaId(){ return VILLA_IDS[0] || 'kalava'; }
+
+// Fills any <select> with the villas, optionally with Office and Store on the end.
+function fillVillaSelect(sel, opts){
+  if(!sel) return;
+  opts = opts || {};
+  const keep = sel.value;
+  let html = VR_VILLAS.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  if(opts.office) html += '<option value="office">Office</option>';
+  if(opts.store)  html += '<option value="store">Store</option>';
+  sel.innerHTML = html;
+  if(keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+
+// Every villa-driven <select> in the page, refreshed together after a villa is
+// added, renamed or removed.
+function refreshVillaSelects(){
+  fillVillaSelect(document.getElementById('expFor'),   { office:true, store:true });
+  fillVillaSelect(document.getElementById('distVilla'),{ office:true });
+  fillVillaSelect(document.getElementById('repLocationSelect'), { office:true, store:true });
+  fillVillaSelect(document.getElementById('mpVilla'));
+  fillVillaSelect(document.getElementById('dpVilla'));
+  fillVillaSelect(document.getElementById('advBillFor'), { office:true, store:true });
+}
+
 // =====================================================================
 // APP SETTINGS — one row in `app_settings` (key = 'main') holding the
 // company letterhead, the logo, the per-villa refundable damage deposits
@@ -2574,12 +2694,30 @@ async function saveSettings(){
   if(error) throw error;
 }
 
-function villaCode(villaId){
-  return (APP_SETTINGS.villaCodes && APP_SETTINGS.villaCodes[villaId]) || villaId.slice(0,3).toUpperCase();
+/* Two villas sharing the first three letters would otherwise share an invoice serial,
+   which is very hard to unpick later. This keeps suggesting a longer code until it is
+   unique among the villas currently known. */
+function defaultVillaCode(villaId){
+  const letters = String(villaId).replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const taken = new Set(VILLA_IDS.filter(id => id !== villaId)
+    .map(id => (APP_SETTINGS.villaCodes || {})[id]).filter(Boolean));
+  for(let n = 3; n <= Math.max(6, letters.length); n++){
+    const candidate = letters.slice(0, n) || 'VIL';
+    if(!taken.has(candidate)) return candidate;
+  }
+  return (letters.slice(0, 4) || 'VIL') + '1';
 }
+
+function villaCode(villaId){
+  return (APP_SETTINGS.villaCodes && APP_SETTINGS.villaCodes[villaId]) || defaultVillaCode(villaId);
+}
+// A villa the settings have never seen gets the same starting deposit as the others
+// rather than silently being worth nothing.
 function damageDepositFor(villaId){
   const d = APP_SETTINGS.damageDeposits || {};
-  return d[villaId] !== undefined && d[villaId] !== null ? Number(d[villaId]) : 0;
+  if(d[villaId] !== undefined && d[villaId] !== null) return Number(d[villaId]);
+  const known = VILLA_IDS.map(id => d[id]).filter(n => n !== undefined && n !== null && Number(n) > 0);
+  return known.length ? Number(known[0]) : 0;
 }
 
 // ---------------------------------------------------------------------
@@ -2817,7 +2955,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.26-places';
+const APP_VERSION = 'v2026.09.26-villas';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3145,18 +3283,16 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
    the office and store, any month or all of them at once, and narrowed to one
    kind of spending when that is what you are chasing.                        */
 let exInited = false;
-let exPlace = 'kalava';          // which villa / place, or 'all'
+let exPlace = 'all';             // which villa / place, or 'all'
 let exKind = 'all';              // one of PETTY_GROUPS' keys, or 'all'
 let exAllTime = false;
 let exMonthDate = new Date();
 
 const EX_PLACES = () => ([
-  { id:'all',    name:'All places', color:'#495057' },
-  { id:'kalava', name:'Kalava Villa', color:'#0c8599' },
-  { id:'noelia', name:'Noelia Villa', color:'#7048e8' },
-  { id:'brisa',  name:'Brisa Villa',  color:'#e64980' },
-  { id:'office', name:'Office',       color:'#495057' },
-  { id:'store',  name:'Store',        color:'#a06800' },
+  { id:'all', name:'All places', color:'#495057' },
+  ...VR_VILLAS.map(v => ({ id:v.id, name:v.name, color:v.color })),
+  { id:'office', name:'Office', color:'#495057' },
+  { id:'store',  name:'Store',  color:'#a06800' },
 ]);
 
 // The rows the current filters select. Advances are deliberately absent: an advance is
@@ -3195,6 +3331,7 @@ function exPeriodLabel(){
 }
 
 function renderExPickers(){
+  if(!EX_PLACES().some(v => v.id === exPlace)) exPlace = 'all';
   const vt = document.getElementById('exVillaTabs');
   vt.innerHTML = '';
   EX_PLACES().forEach(v=>{
@@ -3374,22 +3511,37 @@ function initVillaExpenses(){
 }
 
 /* ============================= HOUSEKEEPING ============================= */
-let VILLAS = []; // fetched from Supabase, falls back to a default set until loaded
 let STAFF = [];
 async function fetchVillasAndStaff(){
   if(!sb) return;
   const [{ data: villaRows, error: vErr }, { data: staffRows, error: sErr }] = await Promise.all([
-    sb.from('villas').select('*').order('name'),
+    sb.from('villas').select('*'),
     sb.from('staff').select('*').order('villa_id'),
   ]);
-  if(!vErr && villaRows) VILLAS = villaRows.map(v => ({ id:v.id, name:v.name, color:v.color }));
+  if(!vErr && villaRows){
+    VILLAS = villaRows.map(normaliseVilla).sort((a,b)=> (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
+    rebuildVillaLists();
+    refreshVillaSelects();
+    onVillasChanged();
+  }
   if(!sErr && staffRows) STAFF = staffRows.map(s => ({ id:s.id, name:s.name, villa:s.villa_id, role:s.role, pool:s.pool }));
   renderHK();
 }
 
 let editingVillaId = null;
+function villaDepCurSync(){
+  const el = document.getElementById('villaDepCur');
+  if(el) el.textContent = document.getElementById('villaCurrency').value;
+}
 function openVillaModal(villa){
   editingVillaId = villa ? villa.id : null;
+  const g = id => document.getElementById(id);
+  const full = villa ? (villaById(villa.id) || villa) : null;
+  g('villaCurrency').value = (full && full.currency) || 'USD';
+  g('villaCodeInput').value = villa ? villaCode(villa.id) : '';
+  g('villaDeposit').value = villa ? damageDepositFor(villa.id) : '';
+  g('villaSort').value = (full && full.sortOrder !== undefined && full.sortOrder !== 100) ? full.sortOrder : '';
+  villaDepCurSync();
   document.getElementById('villaModalOverlay').querySelector('h3').textContent = villa ? 'Edit villa' : 'Add villa';
   document.getElementById('villaName').value = villa ? villa.name : '';
   document.getElementById('villaColor').value = villa ? villa.color : '#0c8599';
@@ -3398,33 +3550,58 @@ function openVillaModal(villa){
   document.getElementById('villaModalOverlay').classList.add('open');
 }
 document.getElementById('addVillaBtn').addEventListener('click', ()=> openVillaModal(null));
+document.getElementById('villaCurrency').addEventListener('change', villaDepCurSync);
 document.getElementById('villaCancel').addEventListener('click', ()=> document.getElementById('villaModalOverlay').classList.remove('open'));
 document.getElementById('villaModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='villaModalOverlay') e.currentTarget.classList.remove('open'); });
 document.getElementById('villaSave').addEventListener('click', async ()=>{
   const errEl = document.getElementById('villaError');
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
-  const name = document.getElementById('villaName').value.trim();
-  const color = document.getElementById('villaColor').value.trim() || '#0c8599';
-  if(!name){ errEl.textContent='Enter a villa name.'; errEl.style.display='block'; return; }
+  const g = id => document.getElementById(id);
+  const fail = m => { errEl.textContent = m; errEl.style.display='block'; };
+  const name = g('villaName').value.trim();
+  const color = g('villaColor').value.trim() || '#0c8599';
+  const currency = g('villaCurrency').value;
+  const sortRaw = parseInt(g('villaSort').value, 10);
+  const sortOrder = isFinite(sortRaw) ? sortRaw : 100;
+  if(!name) return fail('Enter a villa name.');
+
+  const id = editingVillaId || (name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('villa_'+Date.now()));
+  const code = (g('villaCodeInput').value.trim() || defaultVillaCode(id)).toUpperCase();
+  // Two villas on the same invoice code would share a serial run, which is very hard
+  // to unpick once invoices are out.
+  const clash = VILLA_IDS.find(other => other !== id && villaCode(other) === code);
+  if(clash) return fail(`That invoice code is already ${villaName(clash)}'s. Pick a different one.`);
+  const depRaw = parseFloat(g('villaDeposit').value);
+  const deposit = isFinite(depRaw) && depRaw >= 0 ? depRaw : null;
+
   try{
     if(editingVillaId){
-      const { error } = await sb.from('villas').update({ name, color }).eq('id', editingVillaId);
+      const { error } = await sb.from('villas').update({ name, color, currency, sort_order: sortOrder }).eq('id', editingVillaId);
       if(error) throw error;
-      logActivity('update', 'villas', `Renamed/updated villa: ${name}`);
+      logActivity('update', 'villas', `Updated villa: ${name}`);
     } else {
-      const id = name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || ('villa_'+Date.now());
-      const { error } = await sb.from('villas').insert({ id, name, color });
+      const { error } = await sb.from('villas').insert({ id, name, color, currency, sort_order: sortOrder });
       if(error) throw error;
-      logActivity('create', 'villas', `Added villa: ${name}`);
+      logActivity('create', 'villas', `Added villa: ${name} (${currency})`);
     }
+    // The code and the deposit live with the rest of the invoice setup.
+    APP_SETTINGS.villaCodes = Object.assign({}, APP_SETTINGS.villaCodes, { [id]: code });
+    if(deposit !== null) APP_SETTINGS.damageDeposits = Object.assign({}, APP_SETTINGS.damageDeposits, { [id]: deposit });
+    await saveSettings();
+    await fetchVillasAndStaff();
     document.getElementById('villaModalOverlay').classList.remove('open');
-  }catch(e){ errEl.textContent = e.message && e.message.includes('duplicate') ? 'A villa with a similar name already exists.' : 'Save failed.'; errEl.style.display='block'; console.error(e); }
+  }catch(e){
+    console.error(e);
+    fail(/duplicate/i.test(e.message || '') ? 'A villa with a similar name already exists.'
+       : /currency|sort_order|column/i.test(e.message || '') ? 'Save failed — run 7-supabase-villas.sql in Supabase first.'
+       : 'Save failed.');
+  }
 });
 document.getElementById('villaDeleteBtn').addEventListener('click', async ()=>{
   if(!editingVillaId) return;
   if(!isAdmin()){ alert('Only an admin can delete villas.'); return; }
   if(!checkDeletePassword()) return;
-  if(!confirm('Delete this villa? Staff assigned to it will need to be reassigned.')) return;
+  if(!confirm(`Delete ${villaName(editingVillaId)}?\n\nIts bookings, expenses and stock stay in the database but will no longer appear on any villa tab or report. Staff assigned to it need reassigning. This cannot be undone here.`)) return;
   try{
     await sb.from('villas').delete().eq('id', editingVillaId);
     logActivity('delete', 'villas', `Deleted villa: ${editingVillaId}`);
@@ -3613,17 +3790,12 @@ document.getElementById('resetWeek').addEventListener('click', async ()=>{
 });
 
 /* ============================= BOOKINGS CALENDAR ============================= */
-const CAL_VILLAS = [
-  { id:'kalava', name:'Kalava Villa', color:'#0c8599', currency:'USD' },
-  { id:'noelia', name:'Noelia Villa', color:'#7048e8', currency:'USD' },
-  { id:'brisa', name:'Brisa Villa', color:'#e64980', currency:'EUR' },
-];
 let bookingsInited = false;
 let allBookings = [];        // confirmed only — everything downstream (calendar, earnings, reports) reads this
 let allBookingsRaw = [];     // every booking in any state — used for invoice numbering and the invoice list
 let provisionalBookings = []; // dates held, awaiting payment
 let cancelledBookings = [];
-let currentVillaCal = 'kalava';
+let currentVillaCal = '';   // set to the first villa once the list is known
 let currentMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let editingBookingId = null;
 const bookingStatusMsg = document.getElementById('bookingStatusMsg');
@@ -3640,18 +3812,22 @@ function visibleCalVillas(){
   return CAL_VILLAS;
 }
 
-function initBookings(){
-  bookingsInited = true;
+// The calendar's villa tabs, rebuilt whenever the villa list changes so a villa added
+// today gets its tab without a reload.
+function renderCalVillaTabs(){
   const tabWrap = document.getElementById('villaTabs');
+  if(!tabWrap) return;
   const villaList = visibleCalVillas();
+  if(!villaList.length) return;
   if(!villaList.some(v => v.id === currentVillaCal)) currentVillaCal = villaList[0].id;
+  tabWrap.innerHTML = '';
   villaList.forEach(v=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn' + (v.id===currentVillaCal ? ' active':'');
     b.dataset.villa = v.id;
     b.textContent = v.name;
     b.style.setProperty('--vc', v.color);
-    if(v.id===currentVillaCal){ b.style.background=v.color; }
+    if(v.id===currentVillaCal){ b.style.background=v.color; b.style.color='#fff'; }
     b.addEventListener('click', ()=>{
       currentVillaCal = v.id;
       document.querySelectorAll('.villatab-btn').forEach(x=>{ x.classList.remove('active'); x.style.background='#fff'; x.style.color='var(--muted)'; });
@@ -3661,9 +3837,11 @@ function initBookings(){
     });
     tabWrap.appendChild(b);
   });
-  // style first active tab
-  const firstBtn = tabWrap.querySelector('.villatab-btn');
-  if(firstBtn){ firstBtn.style.background = villaList[0].color; firstBtn.style.color='#fff'; }
+}
+
+function initBookings(){
+  bookingsInited = true;
+  renderCalVillaTabs();
 
   if(!sb){ bookingStatusMsg.textContent = 'Not connected to Supabase yet'; renderCalendar(); return; }
   bookingStatusMsg.textContent = 'Loading…';
@@ -4842,7 +5020,6 @@ function isSharonCost(t){ return t.type === 'expense' && (t.purchasedBy === 'Sha
 function isDirectCost(t){
   return t.type === 'expense' && t.for !== 'store' && (t.directExpense || !!t.linkedInventory);
 }
-const FOR_LABELS = { kalava: 'Kalava Villa', noelia: 'Noelia Villa', brisa: 'Brisa Villa', office: 'Office', store: 'Store' };
 // Always shown as a balance box even at LKR 0, so it's obvious at a glance who's currently
 // holding cash. Anyone else who receives an advance shows up automatically alongside these.
 const ADVANCE_WALLET_DEFAULTS = [
@@ -5469,7 +5646,7 @@ function applyDirectExpenseUI(){
     opt.hidden = on && villaOnly;
     opt.disabled = on && villaOnly;
   });
-  if(on && (g('expFor').value === 'office' || g('expFor').value === 'store')) g('expFor').value = 'kalava';
+  if(on && (g('expFor').value === 'office' || g('expFor').value === 'store')) g('expFor').value = firstVillaId();
 
   const hint = g('expCardHint');
   if(on){
@@ -5513,7 +5690,7 @@ function openExpenseModal(record, forceDirect, opts){
   try{
     document.getElementById('expDate').value = record ? record.date : todayISO();
     document.getElementById('expCard').value = record ? record.card : 'ceymora';
-    document.getElementById('expFor').value = record ? record.for : 'kalava';
+    document.getElementById('expFor').value = record ? record.for : firstVillaId();
     document.getElementById('expFor').disabled = false;
     document.getElementById('expPurpose').value = record ? record.purpose : '';
     document.getElementById('expAmount').value = record ? record.amount : '';
@@ -5959,7 +6136,7 @@ function advQuickReset(){
   const forSel = g('advBillFor');
   forSel.innerHTML = Object.keys(FOR_LABELS).map(k => `<option value="${k}">${esc(FOR_LABELS[k])}</option>`).join('');
   const adv = advPanelRecord;
-  forSel.value = (adv && adv.card === 'kalava_card') ? 'kalava' : 'kalava';
+  forSel.value = (adv && adv.card === 'kalava_card') ? 'kalava' : firstVillaId();
   g('advBillAccount').innerHTML = acctOptionsHTML('', { companyOnly:true, placeholder:'— Pick the company account —' });
   advQuickForChanged();
 }
@@ -6435,9 +6612,6 @@ function renderUndoRequests(){
 }
 
 /* ============================= INVENTORY ============================= */
-const INV_VILLAS = ['kalava','noelia','brisa'];
-const INV_LOCATIONS = ['office','kalava','noelia','brisa'];
-const INV_LOCATION_LABELS = { office:'Office', kalava:'Kalava Villa', noelia:'Noelia Villa', brisa:'Brisa Villa', store:'Store' };
 
 let invInited = false;
 let allInvTxns = [];
@@ -6482,15 +6656,23 @@ async function fetchInv(){
   if(typeof reportsInited !== 'undefined' && reportsInited) renderReports();
 }
 
+function blankStockRow(){
+  const row = { store:0, office:0 };
+  for(const id of VILLA_IDS) row[id] = 0;
+  return row;
+}
+
 function computeStock(){
-  const items = {}; // itemName -> { store, office, kalava, noelia, brisa }
+  const items = {}; // itemName -> { store, office, and one per villa }
   for(const t of allInvTxns){
     const name = t.item;
-    if(!items[name]) items[name] = { store:0, office:0, kalava:0, noelia:0, brisa:0 };
+    if(!items[name]) items[name] = blankStockRow();
     if(t.type === 'purchase'){
       items[name].store += t.qty;
     } else if(t.type === 'distribute'){
       items[name].store -= t.qty;
+      // A villa that has since been removed would otherwise turn the row into NaN.
+      if(items[name][t.toVilla] === undefined) items[name][t.toVilla] = 0;
       items[name][t.toVilla] += t.qty;
     }
   }
@@ -6501,18 +6683,32 @@ function renderInventory(){
   const stock = computeStock();
   const invBody = document.getElementById('invBody');
   invBody.innerHTML = '';
+
+  // One column per villa, rebuilt each time so a new villa simply appears.
+  const headRow = invBody.closest('table').querySelector('thead tr');
+  headRow.querySelectorAll('.inv-villa-cols').forEach(th => th.remove());
+  const itemTh = headRow.querySelector('th');
+  let after = itemTh;
+  for(const v of VR_VILLAS){
+    const th = document.createElement('th');
+    th.className = 'inv-villa-cols';
+    th.style.textAlign = 'center';
+    th.textContent = v.name.replace(/ Villa$/, '');
+    after.insertAdjacentElement('afterend', th);
+    after = th;
+  }
+  const colCount = headRow.querySelectorAll('th').length;
+
   const itemNames = Object.keys(stock).sort((a,b)=> a.localeCompare(b));
   if(itemNames.length === 0){
-    invBody.innerHTML = '<tr><td colspan="7" class="inv-empty">No items purchased yet.</td></tr>';
+    invBody.innerHTML = `<tr><td colspan="${colCount}" class="inv-empty">No items purchased yet.</td></tr>`;
   } else {
     for(const name of itemNames){
       const s = stock[name];
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${name}</td>
-        <td class="num ${s.kalava===0?'zero':''}">${s.kalava}</td>
-        <td class="num ${s.noelia===0?'zero':''}">${s.noelia}</td>
-        <td class="num ${s.brisa===0?'zero':''}">${s.brisa}</td>
+        ${VILLA_IDS.map(id => `<td class="num ${(s[id]||0)===0?'zero':''}">${s[id]||0}</td>`).join('')}
         <td class="num ${s.office===0?'zero':''}">${s.office}</td>
         <td class="num ${s.store===0?'zero':''}">${s.store}</td>
       `;
@@ -6666,7 +6862,7 @@ function renderReports(){
 
   // Below the profit card: one villa/office/store's report at a time, picked from the
   // dropdown, instead of every location crammed into one table.
-  const loc = document.getElementById('repLocationSelect').value || 'kalava';
+  const loc = document.getElementById('repLocationSelect').value || firstVillaId();
   const body = document.getElementById('repReportBody');
   body.innerHTML = buildVillaReportHTML(loc, repMonthDate);
   wireReportSections('repSections', 'repReportBody');
@@ -6955,12 +7151,7 @@ document.getElementById('villaDetailModalOverlay').addEventListener('click', (e)
 /* ============================= VILLA REPORT (restricted viewers) ============================= */
 let villaReportInited = false;
 let vrMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-let vrSelectedVilla = 'kalava';
-const VR_VILLAS = [
-  { id:'kalava', name:'Kalava Villa', color:'#0c8599' },
-  { id:'noelia', name:'Noelia Villa', color:'#7048e8' },
-  { id:'brisa',  name:'Brisa Villa',  color:'#e64980' },
-];
+let vrSelectedVilla = '';   // set to the first villa once the list is known
 const OPEX_LABELS = { salary:'Salary', water:'Water Bill', electricity:'Electricity Bill', slt:'SLT Bill', other:'Other expense' };
 let allOpEx = [];
 let opExInited = false;
@@ -7017,6 +7208,9 @@ function initVillaReport(){
 function renderVillaPicker(){
   const wrap = document.getElementById('villaReportPicker');
   wrap.innerHTML = '';
+  const onlyVilla = lockedVilla();
+  if(onlyVilla){ vrSelectedVilla = onlyVilla; return; }   // locked to one villa: no picker
+  if(!VR_VILLAS.some(v => v.id === vrSelectedVilla)) vrSelectedVilla = firstVillaId();
   VR_VILLAS.forEach(v=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn';
@@ -7683,7 +7877,8 @@ function renderBankTransferSummary(){
   if(!wrap) return;
   const byPlace = {};
   for(const t of allCashTxns.filter(isBankTransfer)) byPlace[t.for] = (byPlace[t.for] || 0) + t.amount;
-  const villaColors = { kalava:'#0c8599', noelia:'#7048e8', brisa:'#e64980', office:'#495057', store:'#a06800' };
+  const villaColors = Object.assign({ office:'#495057', store:'#a06800' },
+    Object.fromEntries(VR_VILLAS.map(v => [v.id, v.color])));
   // The three villas always show, so a zero is visible too; Office and Store only
   // appear once something has actually been transferred for them.
   const places = [...VR_VILLAS.map(v => ({ id:v.id, name:v.name })),
@@ -7844,15 +8039,16 @@ function renderSharonExpensesSummary(){
   const wrap = document.getElementById('sharonExpensesSummary');
   if(!wrap) return;
   const mine = allCashTxns.filter(t => t.type==='expense' && t.purchasedBy === 'Sharon');
-  const byVilla = { kalava:0, noelia:0, brisa:0 }, ownByVilla = { kalava:0, noelia:0, brisa:0 };
+  const byVilla = {}, ownByVilla = {};
+  for(const id of VILLA_IDS){ byVilla[id] = 0; ownByVilla[id] = 0; }
   for(const t of allCashTxns.filter(isSharonCost)){
     if(byVilla[t.for] === undefined) continue;
     byVilla[t.for] += t.amount;
     if(t.card === 'sharon') ownByVilla[t.for] += t.amount;
   }
-  const villaColors = { kalava:'#0c8599', noelia:'#7048e8', brisa:'#e64980' };
+  const villaColors = Object.fromEntries(VR_VILLAS.map(v => [v.id, v.color]));
   wrap.innerHTML = VR_VILLAS.map(v => `
-    <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id]}, ${villaColors[v.id]}cc); cursor:pointer;" data-sharon-villa="${v.id}">
+    <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id] || '#495057'}, ${(villaColors[v.id] || '#495057')}cc); cursor:pointer;" data-sharon-villa="${v.id}">
       <div class="cash-card-label">Sharon → ${v.name}</div>
       <div class="cash-card-balance">LKR ${byVilla[v.id].toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">${ownByVilla[v.id] ? 'LKR ' + ownByVilla[v.id].toLocaleString() + ' paid from his own pocket' : 'all from petty cash cards'}</div>
@@ -7922,8 +8118,8 @@ function openMyPurchaseModal(onBehalfOf){
   document.querySelector('#myPurchaseModalOverlay h3').textContent = mpOnBehalfOf ? `Record ${mpOnBehalfOf}'s expense` : 'Record a purchase';
   document.getElementById('mpDate').value = todayISO();
   const villaSel = document.getElementById('mpVilla');
-  villaSel.innerHTML = VILLAS.filter(v=>['kalava','noelia','brisa'].includes(v.id)).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
-  villaSel.value = vrSelectedVilla || 'kalava';
+  fillVillaSelect(villaSel);
+  villaSel.value = vrSelectedVilla || firstVillaId();
   const mpWho = mpOnBehalfOf || (currentUser && currentUser.username) || '';
   document.getElementById('mpCard').value = mpWho === 'Sharon' ? 'sharon' : 'ceymora';
   document.getElementById('mpPurpose').value = '';
@@ -8104,7 +8300,7 @@ function openDistributeModal(record){
     document.getElementById('distDate').value = record ? record.date : todayISO();
     document.getElementById('distItemName').value = record ? record.item : '';
     document.getElementById('distQty').value = record ? record.qty : '';
-    document.getElementById('distVilla').value = record ? record.toVilla : 'kalava';
+    document.getElementById('distVilla').value = record ? record.toVilla : firstVillaId();
     document.getElementById('distPrice').value = record && record.amount!==null && record.amount!==undefined ? record.amount : '';
     document.getElementById('distNote').value = record ? (record.note || '') : '';
     document.getElementById('distError').style.display = 'none';
@@ -8895,9 +9091,7 @@ function fillSettingsForm(){
   g('setCoTerms').value   = co.terms || '';
   g('setCoPrefix').value  = APP_SETTINGS.invoicePrefix || 'CM';
   g('setDepositPct').value = depositPct();
-  g('setCodeKalava').value = villaCode('kalava');
-  g('setCodeNoelia').value = villaCode('noelia');
-  g('setCodeBrisa').value  = villaCode('brisa');
+  renderVillaCodeRows();
   g('setReminderDays').value = reminderDays();
   g('setReminderStaffNumbers').value = APP_SETTINGS.reminderStaffNumbers || '';
   g('setReminderTemplate').value = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
@@ -8919,11 +9113,14 @@ function readSettingsForm(){
   APP_SETTINGS.invoicePrefix = (g('setCoPrefix') || 'CM').toUpperCase();
   const pct = parseFloat(g('setDepositPct'));
   APP_SETTINGS.depositPercent = (isFinite(pct) && pct > 0 && pct <= 100) ? pct : 25;
-  APP_SETTINGS.villaCodes = {
-    kalava: (g('setCodeKalava') || 'KAL').toUpperCase(),
-    noelia: (g('setCodeNoelia') || 'NOE').toUpperCase(),
-    brisa:  (g('setCodeBrisa')  || 'BRI').toUpperCase(),
-  };
+  // Merged, never replaced: replacing it used to wipe the code of any villa whose
+  // input happened not to be on screen.
+  const codes = {};
+  CAL_VILLAS.forEach(v=>{
+    const el = document.getElementById('code_' + v.id);
+    if(el && el.value.trim()) codes[v.id] = el.value.trim().toUpperCase();
+  });
+  APP_SETTINGS.villaCodes = Object.assign({}, APP_SETTINGS.villaCodes, codes);
   const remDays = parseInt(g('setReminderDays'), 10);
   APP_SETTINGS.reminderDays = (isFinite(remDays) && remDays > 0) ? remDays : 30;
   APP_SETTINGS.reminderStaffNumbers = document.getElementById('setReminderStaffNumbers').value.trim();
@@ -8939,6 +9136,21 @@ function readSettingsForm(){
     if(el){ const n = parseFloat(el.value); deps[v.id] = isFinite(n) && n >= 0 ? n : 0; }
   });
   APP_SETTINGS.damageDeposits = Object.assign({}, APP_SETTINGS.damageDeposits, deps);
+}
+
+// One invoice-code box per villa, drawn the same way the deposits are.
+function renderVillaCodeRows(){
+  const wrap = document.getElementById('setVillaCodes');
+  if(!wrap) return;
+  wrap.innerHTML = CAL_VILLAS.map(v => `
+    <div data-villa-code="${esc(v.id)}">
+      <label>Villa invoice code — ${esc(v.name.replace(/ Villa$/, ''))}</label>
+      <input type="text" id="code_${esc(v.id)}" maxlength="6" placeholder="${esc(defaultVillaCode(v.id))}" value="${esc(villaCode(v.id))}">
+    </div>`).join('');
+  // Scoping for both the code rows and the deposit rows lives in renderDepositRows.
+  document.querySelectorAll('#setVillaCodes [data-villa-code]').forEach(el=>{
+    el.style.display = (settingsVillaScope === 'all' || settingsVillaScope === el.dataset.villaCode) ? '' : 'none';
+  });
 }
 
 function renderDepositRows(){
@@ -8958,7 +9170,7 @@ function renderDepositRows(){
     `;
     wrap.appendChild(row);
   });
-  document.querySelectorAll('[data-villa-code]').forEach(el=>{
+  document.querySelectorAll('#setVillaCodes [data-villa-code]').forEach(el=>{
     el.style.display = (settingsVillaScope === 'all' || settingsVillaScope === el.dataset.villaCode) ? '' : 'none';
   });
 }
@@ -10030,7 +10242,6 @@ function fmt2(v){ return Number(v||0).toLocaleString('en-US', { minimumFractionD
 function monthLabel(d){ return d.toLocaleDateString('en-GB', { month:'long', year:'numeric' }); }
 
 /* ---------------------------- accounts ---------------------------- */
-const VILLA_IDS = ['kalava','noelia','brisa'];
 function isCompanyAcct(code){ return !!(code && CO_CAT_INDEX[code]); }
 // Where an expense goes. An explicit choice wins; otherwise villa and Store
 // purchases are obvious, and anything for the Office still needs sorting.
