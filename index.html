@@ -58,12 +58,20 @@
   .setup-banner b{color:#b25b00;}
 
   /* Top-level tabs */
-  .maintabs{ display:flex; gap:8px; margin-bottom:16px; border-bottom:2px solid var(--board-line); padding-bottom:0; }
+  /* The tab row has to hold every tab the person is allowed to open, and that number
+     grows. Without wrapping, a flex row simply pushes the last tabs past the edge of
+     the board where nothing can reach them — which is how "Invoices & Setup" went
+     missing once there were twelve of them. */
+  .maintabs{
+    display:flex; flex-wrap:wrap; gap:2px 8px; row-gap:0;
+    margin-bottom:16px; border-bottom:2px solid var(--board-line); padding-bottom:0;
+  }
   .maintab-btn{
     font-family:'Kalam',cursive; font-size:16px; font-weight:700;
-    background:none; border:none; padding:8px 16px; cursor:pointer;
+    background:none; border:none; padding:8px 13px; cursor:pointer; white-space:nowrap;
     color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-2px;
   }
+  @media (max-width: 1100px){ .maintab-btn{ font-size:15px; padding:8px 10px; } }
   .maintab-btn.active{ color:var(--ink); border-bottom-color:var(--frame); }
 
   .toolbar{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
@@ -2955,7 +2963,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.26-villas';
+const APP_VERSION = 'v2026.09.26-tabs';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
