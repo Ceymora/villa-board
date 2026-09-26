@@ -1221,6 +1221,7 @@
         <span class="rpt-picker-label">Include:</span>
         <label><input type="checkbox" data-sec="summary" checked> Summary</label>
         <label><input type="checkbox" data-sec="bookings" checked> Bookings</label>
+        <label><input type="checkbox" data-sec="directpay" checked> Direct payments</label>
         <label><input type="checkbox" data-sec="pettycash" checked> Petty cash</label>
         <label><input type="checkbox" data-sec="opex" checked> Operating expenses</label>
         <label><input type="checkbox" data-sec="inventory" checked> Store supplies</label>
@@ -1230,8 +1231,15 @@
         <button class="rpt-quick" data-preset="all">Everything</button>
         <span class="sep"></span>
         <button class="add-booking-btn" id="vrOwnerPayBtn">+ Record owner payment</button>
+        <button class="add-booking-btn" id="vrDirectPayBtn">+ Direct payment received</button>
         <button class="add-booking-btn" id="vrPrintBtn">🖨️ Print / PDF</button>
         <button class="allowed-action-btn no-print" id="myPurchaseBtn" style="display:none;">+ Record my purchase</button>
+      </div>
+
+      <div class="rpt-picker no-print" id="vrOptions">
+        <span class="rpt-picker-label">On this report:</span>
+        <label><input type="checkbox" id="vrShowCommission" checked> Show the Ceymora 15% management fee</label>
+        <label><input type="checkbox" id="vrShowOfficeBills"> Show office bills paid from the same petty cash</label>
       </div>
 
       <div id="myPurchasesSummary" style="display:none;"></div>
@@ -2138,6 +2146,47 @@
   </div></div>
 </div>
 
+<!-- Direct payment received from a guest -->
+<div class="modal-overlay" id="dpModalOverlay">
+  <div class="modal">
+    <h3 id="dpTitle">Direct payment received</h3>
+    <div class="field-hint" style="margin-bottom:8px;">Money a guest paid you directly rather than through Airbnb — cash on arrival, a bank transfer, whatever it was.</div>
+    <div class="frm-row">
+      <div><label>Date received</label><input type="date" id="dpDate"></div>
+      <div><label>Amount (LKR)</label><input type="number" id="dpAmount" min="0" step="1" placeholder="e.g. 45000"></div>
+    </div>
+    <label>For which villa</label>
+    <select id="dpVilla"></select>
+    <label>Who paid / what for</label>
+    <input type="text" id="dpFrom" placeholder="e.g. Mr Silva — balance for 12–15 Sept">
+    <label>Received into</label>
+    <select id="dpCard">
+      <option value="bank">Bank account</option>
+      <option value="ceymora">Ceymora Card</option>
+      <option value="kalava_card">Kalava Villa Card</option>
+    </select>
+    <div class="field-hint" id="dpCardHint"></div>
+    <div class="modal-checkbox-row" style="margin-top:10px;">
+      <input type="checkbox" id="dpExtra">
+      <label for="dpExtra">This is extra income — it is <b>not</b> a booking already on the report</label>
+    </div>
+    <div class="field-hint" style="margin-top:-6px;">Leave this unticked when the guest is paying for a stay that is already listed under Bookings — the money is recorded, but the revenue is not counted twice. Tick it for anything earned on top, so it is added to revenue.</div>
+    <label>Note (optional)</label>
+    <input type="text" id="dpNote">
+    <label>Attach the receipt / slip (optional)</label>
+    <input type="file" id="dpFile" accept="image/*,.pdf">
+    <div id="dpFileList"></div>
+    <div class="field-hint" id="dpFileHint"></div>
+    <div class="modal-error" id="dpError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="dpDeleteBtn" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="dpCancel">Cancel</button>
+      <button class="btn btn-save" id="dpSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Owner payment -->
 <div class="modal-overlay" id="opModalOverlay">
   <div class="modal">
@@ -2747,6 +2796,14 @@ const PRESET_LABELS = {
   viewer: 'View everything, no editing',
   viewer_villa_select: 'Villa report only',
 };
+
+// The single villa someone is locked to, or null for everybody who sees them all.
+function lockedVilla(){
+  if(!currentUser) return null;
+  const sc = currentUser.villaScopes || [];
+  if(sc.length === 1) return sc[0];
+  return currentUser.villaScope || null;   // profiles saved before the ticks arrived
+}
 
 function permsOf(row){
   const ticked = Array.isArray(row.permissions) ? row.permissions.filter(Boolean) : [];
@@ -3514,8 +3571,9 @@ const bookingStatusMsg = document.getElementById('bookingStatusMsg');
 // villa: the tab list is filtered here, and fetchBookings() below drops every other
 // villa's rows before they reach the calendar, earnings table or any report.
 function visibleCalVillas(){
-  if(currentUser && currentUser.role === 'viewer_villa_fixed' && currentUser.villaScope){
-    const only = CAL_VILLAS.filter(v => v.id === currentUser.villaScope);
+  const only1 = lockedVilla();
+  if(only1){
+    const only = CAL_VILLAS.filter(v => v.id === only1);
     if(only.length) return only;
   }
   return CAL_VILLAS;
@@ -3567,9 +3625,8 @@ async function fetchBookings(){
   let rows = data.map(rowToBooking);
 
   // Villa-scoped viewers never hold another villa's data in memory at all.
-  if(currentUser && currentUser.role === 'viewer_villa_fixed' && currentUser.villaScope){
-    rows = rows.filter(b => b.villa === currentUser.villaScope);
-  }
+  const onlyVilla = lockedVilla();
+  if(onlyVilla) rows = rows.filter(b => b.villa === onlyVilla);
 
   allBookingsRaw   = rows;
   // A cancelled booking keeps its row (so the money is still reportable) but is
@@ -5150,6 +5207,10 @@ function renderCash(){
     let details;
     if(t.type === 'income' && t.advanceId){
       details = `Unused cash returned — ${esc(t.employeeName || '')}` + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
+    } else if(isDirectPayment(t)){
+      details = `Direct payment — ${esc(t.purpose || 'guest')} <span style="color:var(--muted); font-size:11.5px;">(${esc(FOR_LABELS[t.for] || t.for || '')})</span>`
+        + (isExtraIncome(t) ? ' <span style="color:var(--green); font-size:11px; font-weight:600;">(extra income)</span>' : '')
+        + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     } else if(t.type === 'income'){
       details = 'Money received' + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
     } else if(t.type === 'advance' && t.advanceId){
@@ -6842,8 +6903,9 @@ function initVillaReport(){
       .subscribe();
   }
 
-  if(currentUser.role === 'viewer_villa_fixed'){
-    vrSelectedVilla = currentUser.villaScope;
+  const onlyVilla = lockedVilla();
+  if(onlyVilla){
+    vrSelectedVilla = onlyVilla;
     document.getElementById('villaReportPicker').innerHTML = '';
   } else {
     renderVillaPicker();
@@ -6851,10 +6913,17 @@ function initVillaReport(){
 
   document.getElementById('vrPrevMonth').addEventListener('click', ()=>{ vrMonthDate.setMonth(vrMonthDate.getMonth()-1); renderVillaReport(); });
   document.getElementById('vrNextMonth').addEventListener('click', ()=>{ vrMonthDate.setMonth(vrMonthDate.getMonth()+1); renderVillaReport(); });
+  document.getElementById('vrDirectPayBtn').addEventListener('click', ()=> openDirectPayModal(null, vrSelectedVilla));
+  document.getElementById('vrShowCommission').addEventListener('change', (e)=>{
+    vrShowCommission = e.target.checked; renderVillaReport();
+  });
+  document.getElementById('vrShowOfficeBills').addEventListener('change', (e)=>{
+    vrShowOfficeBills = e.target.checked; renderVillaReport();
+  });
   document.getElementById('vrThisMonth').addEventListener('click', ()=>{ vrMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderVillaReport(); });
   document.getElementById('vrPrintBtn').addEventListener('click', ()=> window.print());
 
-  if(currentUser.role === 'viewer_villa_select'){
+  if(canEdit() || isAdmin()){
     document.getElementById('myPurchaseBtn').style.display = '';
     document.getElementById('myPurchasesSummary').style.display = '';
     document.getElementById('myPurchaseBtn').addEventListener('click', ()=> openMyPurchaseModal());
@@ -6878,6 +6947,105 @@ function renderVillaPicker(){
 }
 
 let villaReportToken = 0;
+/* ------------------------- DIRECT PAYMENTS FROM GUESTS -------------------------
+   Stored as an income row against the villa. Received onto a card, it lifts that
+   card's float like any other money in; received into the bank, it touches no card.
+   The account code is what marks it as a guest payment rather than a float top-up.  */
+const dpFileHandler = createMultiFileHandler('dpFile', 'dpFileList');
+let editingDirectPayId = null;
+
+function dpApplyCardHint(){
+  const card = document.getElementById('dpCard').value;
+  document.getElementById('dpCardHint').textContent = card === 'bank'
+    ? 'Into the bank — no petty cash card changes.'
+    : `Added to the ${CARD_LABELS[card] || card}'s float, because the cash is now on that card.`;
+}
+
+function openDirectPayModal(record, villaId){
+  const g = id => document.getElementById(id);
+  editingDirectPayId = record ? record.id : null;
+  g('dpTitle').textContent = record ? 'Edit direct payment' : 'Direct payment received';
+  const villaSel = g('dpVilla');
+  const villaList = (VILLAS && VILLAS.length) ? VILLAS : VR_VILLAS;
+  villaSel.innerHTML = villaList.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  villaSel.value = record ? record.for : (villaId || vrSelectedVilla || villaList[0].id);
+  g('dpDate').value = record ? record.date : todayISO();
+  g('dpAmount').value = record ? record.amount : '';
+  g('dpFrom').value = record ? (record.purpose || '') : '';
+  g('dpCard').value = record ? record.card : 'bank';
+  g('dpExtra').checked = record ? isExtraIncome(record) : false;
+  g('dpNote').value = record ? (record.note || '') : '';
+  dpFileHandler.reset();
+  const existing = record ? getInvoiceLinks(record) : [];
+  g('dpFileHint').innerHTML = existing.length
+    ? `${existing.length} file(s) already attached: ` + existing.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ') : '';
+  g('dpError').style.display = 'none';
+  g('dpDeleteBtn').style.display = (record && isAdmin()) ? '' : 'none';
+  dpApplyCardHint();
+  g('dpModalOverlay').classList.add('open');
+}
+
+document.getElementById('dpCard').addEventListener('change', dpApplyCardHint);
+document.getElementById('dpCancel').addEventListener('click', ()=> document.getElementById('dpModalOverlay').classList.remove('open'));
+document.getElementById('dpModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='dpModalOverlay') e.currentTarget.classList.remove('open'); });
+
+document.getElementById('dpSave').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  const errEl = g('dpError');
+  const fail = m => { errEl.textContent = m; errEl.style.display = 'block'; };
+  if(!sb) return fail('Not connected to Supabase yet.');
+  if(!canEdit() && !isAdmin()) return fail('You do not have permission to record payments.');
+  const date = g('dpDate').value;
+  const amount = parseFloat(g('dpAmount').value);
+  const villa = g('dpVilla').value;
+  const from = g('dpFrom').value.trim();
+  if(!date || !amount || amount <= 0) return fail('Enter the date and a valid amount.');
+  if(!from) return fail('Say who paid, or what the payment was for.');
+  const btn = g('dpSave'); btn.disabled = true;
+  try{
+    const urls = [];
+    for(const fl of dpFileHandler.getFiles()) urls.push(await uploadReceiptFile(fl));
+    const payload = {
+      type:'income', date, card: g('dpCard').value, for: villa, purpose: from,
+      amount, note: g('dpNote').value.trim() || null,
+      account_code: g('dpExtra').checked ? DP_ACCT_EXTRA : DP_ACCT,
+    };
+    if(editingDirectPayId){
+      const existing = allCashTxns.find(t => String(t.id) === String(editingDirectPayId));
+      payload.invoice_urls = [...((existing && existing.invoiceUrls) || []), ...urls];
+      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingDirectPayId);
+      if(error) throw error;
+      logActivity('update', 'petty_cash_transactions', `Edited direct payment — ${from} — LKR ${amount.toLocaleString()}`);
+    } else {
+      payload.invoice_urls = urls;
+      const { error } = await sb.from('petty_cash_transactions').insert(payload);
+      if(error) throw error;
+      logActivity('create', 'petty_cash_transactions', `Direct payment received — ${from} — LKR ${amount.toLocaleString()} (${FOR_LABELS[villa] || villa})`);
+    }
+    g('dpModalOverlay').classList.remove('open');
+    await fetchCash();
+    renderVillaReport();
+  }catch(e){
+    console.error(e);
+    fail('Could not save — ' + (e.message || 'check the connection.'));
+  } finally { btn.disabled = false; }
+});
+
+document.getElementById('dpDeleteBtn').addEventListener('click', async ()=>{
+  if(!editingDirectPayId || !isAdmin()) return;
+  if(!checkDeletePassword()) return;
+  if(!confirm('Delete this direct payment?')) return;
+  try{
+    const existing = allCashTxns.find(t => String(t.id) === String(editingDirectPayId));
+    if(existing) await deleteReceiptFiles(existing.invoiceUrls);
+    await sb.from('petty_cash_transactions').delete().eq('id', editingDirectPayId);
+    logActivity('delete', 'petty_cash_transactions', 'Deleted a direct payment');
+    document.getElementById('dpModalOverlay').classList.remove('open');
+    await fetchCash();
+    renderVillaReport();
+  }catch(e){ alert('Could not delete — ' + (e.message || 'check the connection.')); }
+});
+
 async function renderVillaReport(){
   if(!villaReportInited) return;
   const myToken = ++villaReportToken;
@@ -6888,7 +7056,7 @@ async function renderVillaReport(){
   if(myToken !== villaReportToken) return; // a newer render started
 
   document.getElementById('villaReportBody').innerHTML = html;
-  if(currentUser.role === 'viewer_villa_select'){ renderMyPurchasesSummary(); }
+  if(canEdit() || isAdmin()) renderMyPurchasesSummary();
 
   // Wire up the "+ category" buttons — admin only
   const btnWrap = document.getElementById('opExButtons');
@@ -6923,6 +7091,15 @@ async function renderVillaReport(){
       }
     });
   });
+  // Edit buttons on the direct payment rows
+  document.querySelectorAll('#villaReportBody [data-dp-id]').forEach(btn=>{
+    if(!canEdit() && !isAdmin()){ btn.style.display = 'none'; return; }
+    btn.addEventListener('click', ()=>{
+      const rec = allCashTxns.find(t => String(t.id) === btn.dataset.dpId);
+      if(rec) openDirectPayModal(rec);
+    });
+  });
+
   // Print button
   wireReportSections('vrSections', 'villaReportBody');
   applyReportSections('vrSections', 'villaReportBody');
@@ -7007,6 +7184,21 @@ function reportHeaderHTML(title, subtitle, monthDate, extraMeta, villaId){
       </div>
     </div>`;
 }
+
+/* Two things the villa report can be asked to leave out or bring in. Both are read
+   at render time, so ticking either redraws the report as it stands. */
+let vrShowCommission = true;   // the Ceymora 15% line; off shows the full total instead
+let vrShowOfficeBills = false; // office bills paid from the same card, shown for context
+
+// Money a guest handed over directly. Kept as an income row against the villa, marked
+// so it can be told apart from a petty cash float top-up. Two markers: one for money
+// against a stay already on the report (recorded, not counted again), one for money
+// earned on top of it (counted as revenue).
+const DP_ACCT = 'guest_direct', DP_ACCT_EXTRA = 'guest_direct_extra';
+function isDirectPayment(t){
+  return t.type === 'income' && (t.accountCode === DP_ACCT || t.accountCode === DP_ACCT_EXTRA);
+}
+function isExtraIncome(t){ return t.accountCode === DP_ACCT_EXTRA; }
 
 async function buildVillaProfitReportHTML(loc, monthDate){
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -7118,9 +7310,38 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       ${keptNoFx ? `<div class="rpt-note">${keptNoFx} cancellation${keptNoFx===1?'':'s'} could not be converted to LKR (no exchange rate for that date).</div>` : ''}
       <div class="rpt-note">Money kept from a late cancellation is shared the same way as a stay: 15% to Ceymora, 85% to the villa. A guest refunded in full leaves nothing to share.</div>`;
 
-  const totalRevenueLkr = grossLkr + keptLkr;
-  const commission = totalRevenueLkr * 0.15;
-  const villaShare = totalRevenueLkr * 0.85;
+  /* ---------------- 1c. DIRECT PAYMENTS RECEIVED ---------------- */
+  const directPays = allCashTxns
+    .filter(t => isDirectPayment(t) && t.for === loc && t.date >= monthStartISO && t.date < monthEndISO)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  let directPayTotal = 0, directExtraTotal = 0, dpRowsHtml = '';
+  for(const t of directPays){
+    directPayTotal += t.amount;
+    if(isExtraIncome(t)) directExtraTotal += t.amount;
+    const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+    dpRowsHtml += `<tr>
+      <td class="dim">${fmtDay(t.date)}</td>
+      <td><b>${esc(t.purpose || 'Direct payment')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}</td>
+      <td class="dim">${esc(CARD_LABELS[t.card] || t.card || '')}${links ? ' '+links : ''}</td>
+      <td class="dim">${isExtraIncome(t) ? 'Extra income' : 'Against a booking above'}</td>
+      <td class="r rpt-money-in">${Math.round(t.amount).toLocaleString()}</td>
+      <td class="r no-print"><button class="manage-edit no-print" data-dp-id="${esc(String(t.id))}">Edit</button></td>
+    </tr>`;
+  }
+  const directPayHtml = directPays.length === 0
+    ? '<div class="rpt-empty">No direct payments recorded for this villa in this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr><th>Date</th><th>Who paid / what for</th><th>Received into</th><th>Counts as</th><th class="r">Amount (LKR)</th><th class="no-print"></th></tr></thead>
+        <tbody>${dpRowsHtml}
+          <tr class="subtotal"><td colspan="4">Total received directly — ${directPays.length} payment${directPays.length===1?'':'s'}</td>
+            <td class="r">${Math.round(directPayTotal).toLocaleString()}</td><td class="no-print"></td></tr>
+        </tbody></table>
+      ${directExtraTotal < directPayTotal ? '<div class="rpt-note">Payments marked "Against a booking above" are money you have collected for a stay already counted under Bookings — they are shown so you can see what has actually come in, and are not added to revenue a second time.</div>' : ''}`;
+
+  // Only money earned on top of the bookings adds to revenue; the rest is collection.
+  const totalRevenueLkr = grossLkr + keptLkr + directExtraTotal;
+  const commission = vrShowCommission ? totalRevenueLkr * 0.15 : 0;
+  const villaShare = totalRevenueLkr - commission;
 
   /* ---------------- 2. PETTY CASH ---------------- */
   const expenses = allCashTxns
@@ -7157,6 +7378,37 @@ async function buildVillaProfitReportHTML(loc, monthDate){
           <tr class="subtotal"><td colspan="3">Total — ${opEx.length} item${opEx.length===1?'':'s'}</td><td class="r">${Math.round(opExTotal).toLocaleString()}</td><td class="no-print"></td></tr>
         </tbody>
       </table>`;
+
+  /* ---------------- 2b. OFFICE BILLS PAID FROM THE SAME PETTY CASH ----------------
+     A phone bill Zahny pays is an office cost, so it is charged to a company account
+     and belongs on the company accounts, not on any villa. It did leave the same petty
+     cash card though, so this section can be switched on to see it — clearly apart, and
+     never added to this villa's figures. */
+  const officeBills = vrShowOfficeBills ? allCashTxns
+    .filter(t => t.type === 'expense' && t.date >= monthStartISO && t.date < monthEndISO)
+    .filter(t => isCompanyAcct(acctOf(t)))
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||'')) : [];
+  let officeBillTotal = 0, officeRowsHtml = '';
+  for(const t of officeBills){
+    officeBillTotal += t.amount;
+    const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+    officeRowsHtml += `<tr>
+      <td class="dim">${fmtDay(t.date)}</td>
+      <td><b>${esc(t.purpose || 'Bill')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}${links ? ' '+links : ''}</td>
+      <td class="dim">${esc(acctLabel(acctOf(t)) || '')}</td>
+      <td class="dim">${esc(t.employeeName ? t.employeeName + "'s advance" : (CARD_LABELS[t.card] || t.card || ''))}</td>
+      <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
+    </tr>`;
+  }
+  const officeBillsHtml = officeBills.length === 0
+    ? '<div class="rpt-empty">No office bills were paid from petty cash in this period.</div>'
+    : `<table class="rpt-table">
+        <thead><tr><th>Date</th><th>What it was</th><th>Company account</th><th>Paid from</th><th class="r">Amount (LKR)</th></tr></thead>
+        <tbody>${officeRowsHtml}
+          <tr class="subtotal"><td colspan="4">Total — ${officeBills.length} bill${officeBills.length===1?'':'s'}</td>
+            <td class="r">${Math.round(officeBillTotal).toLocaleString()}</td></tr>
+        </tbody></table>
+      <div class="rpt-note">These are office costs, not ${esc(villaInfo.name)}'s. They are here only so you can see everything that left the petty cash card this month, and they are <b>not</b> included in the totals or the profit above.</div>`;
 
   /* ---------------- 4. STORE SUPPLIES RECEIVED ---------------- */
   const supplies = buildSuppliesSection(loc, monthStartISO, monthEndISO);
@@ -7195,7 +7447,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
         <div class="rpt-kpi">
           <div class="rpt-kpi-label">Total expenses</div>
           <div class="rpt-kpi-value">${Math.round(totalExpenses).toLocaleString()}</div>
-          <div class="rpt-kpi-note">${pct(totalExpenses, villaShare)} of villa share</div>
+          <div class="rpt-kpi-note">${pct(totalExpenses, villaShare)} of ${vrShowCommission ? 'villa share' : 'revenue'}</div>
         </div>
         <div class="rpt-kpi ${netProfit>=0?'pos':'neg'}">
           <div class="rpt-kpi-label">Net profit</div>
@@ -7212,9 +7464,10 @@ async function buildVillaProfitReportHTML(loc, monthDate){
             <tr class="line"><td class="lbl">Booking revenue — Airbnb (${airbnbCount})</td><td class="amt">${Math.round(airbnbLkr).toLocaleString()}</td></tr>
             <tr class="line"><td class="lbl">Booking revenue — Direct (${directCount})</td><td class="amt">${Math.round(directLkr).toLocaleString()}</td></tr>
             ${keptLkr ? `<tr class="line"><td class="lbl">Kept from cancellations (${cancels.length})</td><td class="amt">${Math.round(keptLkr).toLocaleString()}</td></tr>` : ''}
+            ${directExtraTotal ? `<tr class="line"><td class="lbl">Direct payments — extra income</td><td class="amt">${Math.round(directExtraTotal).toLocaleString()}</td></tr>` : ''}
             <tr class="sub"><td>Gross revenue</td><td class="amt">${Math.round(totalRevenueLkr).toLocaleString()}</td></tr>
-            <tr class="line"><td class="lbl">Less: Ceymora management fee (15%)</td>${negCell(commission)}</tr>
-            <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${Math.round(villaShare).toLocaleString()}</td></tr>
+            ${vrShowCommission ? `<tr class="line"><td class="lbl">Less: Ceymora management fee (15%)</td>${negCell(commission)}</tr>
+            <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${Math.round(villaShare).toLocaleString()}</td></tr>` : ''}
 
             <tr class="group"><td>Expenses</td><td class="amt"></td></tr>
             ${pg.plRows}
@@ -7241,10 +7494,22 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       ${cancelHtml}
     </div>
 
+    <div class="rpt-section" data-rpt-section="directpay">
+      <div class="rpt-section-title">1c. Direct Payments Received
+        <span class="rpt-section-count">${directPays.length} payment${directPays.length===1?'':'s'} · ${lkr(directPayTotal)}</span></div>
+      ${directPayHtml}
+    </div>
+
     <div class="rpt-section" data-rpt-section="pettycash">
       <div class="rpt-section-title">2. Petty Cash Expenses <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyCashTotal)}</span></div>
       ${pettyHtml}
     </div>
+
+    ${vrShowOfficeBills ? `<div class="rpt-section" data-rpt-section="officebills">
+      <div class="rpt-section-title">2b. Office Bills Paid From The Same Petty Cash
+        <span class="rpt-section-count">${officeBills.length} bill${officeBills.length===1?'':'s'} · ${lkr(officeBillTotal)} · not charged to this villa</span></div>
+      ${officeBillsHtml}
+    </div>` : ''}
 
     <div class="rpt-section" data-rpt-section="opex">
       <div class="rpt-section-title">
