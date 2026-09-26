@@ -2475,16 +2475,20 @@ if (CONFIGURED) {
 }
 
 // =====================================================================
-// Password required to delete anything in Petty Cash or Inventory.
-// Change this to whatever you like.
+// A deliberate pause before a delete, so nothing goes by a stray click.
 // =====================================================================
-// A second pair of eyes before a delete. It is NOT the security boundary —
-// the database only accepts a delete from an admin login, whatever is typed here.
-const DELETE_PASSWORD = "villa123";
+// This is NOT the security boundary — the database accepts a delete only from an
+// admin login, whatever happens here. It used to ask for a password held in this
+// file, which anyone could read by viewing the page source, so it stopped the
+// careless click and nobody else while looking like real protection. Typing the
+// word is the honest version of the same pause.
 function checkDeletePassword(){
-  const pw = prompt('Enter the password to confirm this delete:');
-  if(pw === null) return false; // cancelled
-  if(pw !== DELETE_PASSWORD){ alert('Incorrect password. Nothing was deleted.'); return false; }
+  const typed = prompt('This cannot be undone.\n\nType  DELETE  to confirm:');
+  if(typed === null) return false;                       // cancelled
+  if(typed.trim().toUpperCase() !== 'DELETE'){
+    alert('Not deleted — the confirmation did not match.');
+    return false;
+  }
   return true;
 }
 
@@ -2776,15 +2780,95 @@ async function issueInvoiceNumbers(villaId, dateISO){
   };
 }
 
+/* ---------------------------------------------------------------------------
+   UPLOADED FILES — two buckets, on purpose
+
+   `receipts` is PRIVATE. Bills, invoices, deposit slips and settlement paperwork
+   live here. They carry guests' names, addresses, phone numbers and amounts, so
+   nothing in this bucket is reachable by URL: the app stores only the file's
+   path and asks Supabase for a short-lived signed link at the moment somebody
+   clicks, which only a signed-in member can obtain.
+
+   `brand` is PUBLIC, and holds exactly two kinds of picture: the Ceymora logo
+   and the villa photos. Both are printed on invoices and sent to guests in their
+   WhatsApp group, so they have to load without a login, and neither is private.
+
+   Files uploaded before this change were public URLs. Those keep working —
+   receiptPathOf() reads the path back out of them — but they stay readable to
+   anyone still holding the old link, so anything truly sensitive is worth
+   re-uploading. There is no way to un-share a URL that has already been out.
+--------------------------------------------------------------------------- */
+function storagePathFor(file){
+  const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+  const now = new Date();
+  const folder = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}`;
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `${folder}/${Date.now()}_${rand}_${safeName}`;
+}
+
+// A private document. Returns the path to store — never a URL.
 async function uploadReceiptFile(file){
   if(!file) return null;
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `${Date.now()}_${safeName}`;
+  const path = storagePathFor(file);
   const { error } = await sb.storage.from('receipts').upload(path, file);
   if(error) throw error;
-  const { data } = sb.storage.from('receipts').getPublicUrl(path);
+  return path;
+}
+
+// The logo and the villa photos, which have to render without a login.
+async function uploadBrandFile(file){
+  if(!file) return null;
+  const path = storagePathFor(file);
+  const { error } = await sb.storage.from('brand').upload(path, file, { upsert:true });
+  if(error) throw error;
+  const { data } = sb.storage.from('brand').getPublicUrl(path);
   return data.publicUrl;
 }
+
+// Accepts either a stored path or one of the old public URLs and returns the path.
+function receiptPathOf(stored){
+  const v = String(stored == null ? '' : stored).trim();
+  if(!v) return null;
+  const marker = '/object/public/receipts/';
+  const i = v.indexOf(marker);
+  if(i !== -1) return decodeURIComponent(v.slice(i + marker.length));
+  const signed = '/object/sign/receipts/';
+  const j = v.indexOf(signed);
+  if(j !== -1) return decodeURIComponent(v.slice(j + signed.length).split('?')[0]);
+  if(/^https?:\/\//i.test(v)) return null;   // some other link entirely
+  return v;
+}
+
+// A link that works for an hour, for this person only.
+async function signedReceiptUrl(stored){
+  const path = receiptPathOf(stored);
+  if(!path) return null;
+  const { data, error } = await sb.storage.from('receipts').createSignedUrl(path, 3600);
+  if(error){ console.error('could not sign receipt link', error); return null; }
+  return data && data.signedUrl ? data.signedUrl : null;
+}
+
+/* Opening one. The blank tab is opened first, while the click is still being
+   handled, because a tab opened after an await is treated as a pop-up and
+   blocked. */
+async function openStoredFile(stored){
+  const tab = window.open('', '_blank', 'noopener,noreferrer');
+  const url = await signedReceiptUrl(stored);
+  if(!url){
+    if(tab) tab.close();
+    alert('That attachment could not be opened. It may have been removed, or you may not have permission to view it.');
+    return;
+  }
+  if(tab) tab.location.href = url; else window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+// One delegated handler for every attachment link in the page.
+document.addEventListener('click', (e)=>{
+  const a = e.target.closest && e.target.closest('[data-receipt]');
+  if(!a) return;
+  e.preventDefault();
+  openStoredFile(a.dataset.receipt);
+});
 
 // Deletes the actual uploaded files from the 'receipts' storage bucket, given the public
 // URLs stored on a row. Called whenever a row with attachments is deleted, so removing a
@@ -2792,11 +2876,7 @@ async function uploadReceiptFile(file){
 // in storage forever.
 async function deleteReceiptFiles(urls){
   if(!sb || !urls || !urls.length) return;
-  const marker = '/object/public/receipts/';
-  const paths = urls.map(u => {
-    const idx = typeof u === 'string' ? u.indexOf(marker) : -1;
-    return idx === -1 ? null : decodeURIComponent(u.slice(idx + marker.length));
-  }).filter(Boolean);
+  const paths = urls.map(receiptPathOf).filter(Boolean);
   if(!paths.length) return;
   try{
     const { error } = await sb.storage.from('receipts').remove(paths);
@@ -2963,7 +3043,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.26-tabs';
+const APP_VERSION = 'v2026.09.26-secure2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3621,7 +3701,7 @@ let editingStaffId = null;
 function openEmployeeModal(staff){
   editingStaffId = staff ? staff.id : null;
   const sel = document.getElementById('empVilla');
-  sel.innerHTML = VILLAS.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  sel.innerHTML = VILLAS.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
   document.getElementById('employeeModalOverlay').querySelector('h3').textContent = staff ? 'Edit employee' : 'Add employee';
   document.getElementById('empName').value = staff ? staff.name : '';
   if(staff) sel.value = staff.villa;
@@ -3744,7 +3824,7 @@ function renderHK(){
       tagSpan.className = 'villa-tag';
       tagSpan.style.background = `color-mix(in srgb, ${villa.color} 12%, white)`;
       tagSpan.style.color = villa.color;
-      tagSpan.innerHTML = `${villa.name}<span class="villa-dot" style="background:${villa.color}"></span>`;
+      tagSpan.innerHTML = `${esc(villa.name)}<span class="villa-dot" style="background:${esc(villa.color)}"></span>`;
       if(canEdit()){
         tagSpan.style.cursor = 'pointer';
         tagSpan.title = 'Click to edit this villa';
@@ -3871,7 +3951,11 @@ async function fetchBookings(){
   if(error){ bookingStatusMsg.textContent='Connection error'; console.error(error); return; }
   let rows = data.map(rowToBooking);
 
-  // Villa-scoped viewers never hold another villa's data in memory at all.
+  /* A villa-scoped person sees only their villa. This filter is the tidy-up, not the
+     protection: the rows have already crossed the wire by the time it runs, so what
+     actually keeps another villa's guest details away from them is the row-level rule
+     in the database (villa_allowed(), in 8-supabase-private-files.sql). Without that
+     rule this line hides the data on screen and nowhere else. */
   const onlyVilla = lockedVilla();
   if(onlyVilla) rows = rows.filter(b => b.villa === onlyVilla);
 
@@ -4105,7 +4189,7 @@ function renderManageList(villaBookings){
       : `<span class="manage-dates" style="font-style:italic;">no rate set</span>`;
     row.innerHTML = `
       <span class="manage-type-dot ${b.type}"></span>
-      <span class="manage-guest">${b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest')}</span>
+      <span class="manage-guest">${esc(b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest'))}</span>
       <span class="manage-dates">${b.checkIn} → ${b.checkOut} · <b>${nights} night${nights===1?'':'s'}</b></span>
       ${moneyHtml}
     `;
@@ -4249,7 +4333,7 @@ async function renderEarnings(){
       if(tab) tab.click(); else { currentVillaCal = v.id; renderCalendar(); }
     });
     tr.innerHTML = `
-      <td style="font-weight:600;">${v.name}</td>
+      <td style="font-weight:600;">${esc(v.name)}</td>
       <td class="num ${t.nights===0?'zero':''}">${t.nights}</td>
       <td class="num ${t.gross===0?'zero':''}">${t.currency} ${t.gross.toLocaleString()}</td>
       <td class="num ${t.grossLkr===0?'zero':''}">${Math.round(t.grossLkr).toLocaleString()}</td>
@@ -4287,7 +4371,7 @@ function renderEarningsDetail(rows){
 
   body.innerHTML = '';
   if(rows.length === 0){
-    body.innerHTML = `<tr><td colspan="6" class="inv-empty">No bookings with a nightly rate for ${villa.name} this month.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="inv-empty">No bookings with a nightly rate for ${esc(villa.name)} this month.</td></tr>`;
     if(hintEl) hintEl.textContent = 'Click a villa row above, or a villa tab at the top, to switch villa.';
     return;
   }
@@ -4302,7 +4386,7 @@ function renderEarningsDetail(rows){
     tr.innerHTML = `
       <td style="font-weight:600;">
         <span class="manage-type-dot ${r.type}" style="display:inline-block; margin-right:6px;"></span>
-        ${r.guest ? r.guest : (r.type==='airbnb' ? 'Airbnb guest' : 'Direct guest')}
+        ${esc(r.guest ? r.guest : (r.type==='airbnb' ? 'Airbnb guest' : 'Direct guest'))}
       </td>
       <td style="color:var(--muted); font-size:12px;">${r.checkIn} → ${r.checkOut}</td>
       <td class="num">${r.nights}</td>
@@ -4839,7 +4923,7 @@ function invoiceHTML(b){
   ${cancelled ? '<div class="stamp">CANCELLED</div>' : ''}
   <div class="head">
     <div>
-      ${co.logoUrlResolved ? `<img class="logo" src="${esc(co.logoUrlResolved)}" alt="">` : ''}
+      ${co.logoUrlResolved ? `<img class="logo" src="${safeUrl(co.logoUrlResolved)}" alt="">` : ''}
       <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
       <div class="co-meta">${esc([co.reg, co.address, co.phone, co.email, co.website].filter(Boolean).join('\n'))}</div>
     </div>
@@ -5081,7 +5165,7 @@ function renderAdvanceWallets(){
       ? 'linear-gradient(135deg, #e03131, #8a1f1f)'
       : 'linear-gradient(135deg, #7048e8, #4425a1)';
     card.innerHTML = `
-      <div class="cash-card-label">${defaultInfo ? defaultInfo.label : name}</div>
+      <div class="cash-card-label">${esc(defaultInfo ? defaultInfo.label : name)}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap for his statement</span></div>
@@ -5479,24 +5563,24 @@ function renderCash(){
         + (isExtraIncome(t) ? ' <span style="color:var(--green); font-size:11px; font-weight:600;">(extra income)</span>' : '')
         + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     } else if(t.type === 'income'){
-      details = 'Money received' + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
+      details = 'Money received' + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     } else if(t.type === 'advance' && t.advanceId){
       details = `Extra paid to ${esc(t.employeeName || '')} to cover bills` + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     } else if(t.type === 'advance'){
       const statusSpan = t.settled
         ? '<span style="color:var(--green); font-size:11px; font-weight:600;">(settled)</span>'
         : '<span style="color:var(--amber); font-size:11px; font-weight:600;">(outstanding)</span>';
-      details = `Advance — ${t.employeeName || 'Unknown'} ${statusSpan}`
-        + (t.note ? `<div class="txn-sub">${t.note}</div>` : '')
-        + (t.settled && t.settledNote ? `<div class="txn-sub">Settled: ${t.settledNote}</div>` : '');
+      details = `Advance — ${esc(t.employeeName || 'Unknown')} ${statusSpan}`
+        + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '')
+        + (t.settled && t.settledNote ? `<div class="txn-sub">Settled: ${esc(t.settledNote)}</div>` : '');
     } else {
-      details = (t.purpose || 'Expense') + ` <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>`
+      details = esc(t.purpose || 'Expense') + ` <span style="color:var(--muted); font-size:11.5px;">(${esc(FOR_LABELS[t.for] || t.for)})</span>`
         + acctChipHTML(t)
         + (t.linkedInventory ? ' 📦' : '')
-        + (t.employeeName ? ` <span style="color:var(--amber); font-size:11px; font-weight:600;">(from ${t.employeeName}'s advance)</span>` : '')
-        + (t.note ? `<div class="txn-sub">${t.note}</div>` : '');
+        + (t.employeeName ? ` <span style="color:var(--amber); font-size:11px; font-weight:600;">(from ${esc(t.employeeName)}'s advance)</span>` : '')
+        + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
     }
-    const invoiceLink = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+    const invoiceLink = invoiceLinksHTML(t);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${t.date}</td>
@@ -5968,9 +6052,9 @@ function openAdvanceModal(record){
     const advExisting = record ? getInvoiceLinks(record) : [];
     const setExisting = record ? (record.settledInvoiceUrls || []) : [];
     g('advFileHint').innerHTML = advExisting.length
-      ? `${advExisting.length} file(s) already attached: ` + advExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ') : '';
+      ? `${advExisting.length} file(s) already attached: ` + advExisting.map((u,i)=>`<a href="#" data-receipt="${esc(u)}">#${i+1}</a>`).join(' ') : '';
     g('advSettledFileHint').innerHTML = setExisting.length
-      ? `${setExisting.length} settlement bill(s) attached: ` + setExisting.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ') : '';
+      ? `${setExisting.length} settlement bill(s) attached: ` + setExisting.map((u,i)=>`<a href="#" data-receipt="${esc(u)}">#${i+1}</a>`).join(' ') : '';
     g('advError').style.display = 'none';
 
     // Settling needs bills first, so a brand-new advance can't be ticked settled.
@@ -6555,7 +6639,7 @@ function advSettleInvoiceHTML(adv){
   const urls = [...(adv.settledInvoiceUrls || [])];
   advBillsFor(adv).forEach(b => urls.push(...getInvoiceLinks(b)));
   if(!urls.length) return ' · <b style="color:var(--red);">no invoice attached</b>';
-  return ' · ' + urls.map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${urls.length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+  return ' · ' + attachmentLinksHTML(urls);
 }
 // Anything Zahny entered without an account is money that can't reach a report.
 // Count it all — not just this month — and put it in front of Makky.
@@ -6715,7 +6799,7 @@ function renderInventory(){
       const s = stock[name];
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${name}</td>
+        <td>${esc(name)}</td>
         ${VILLA_IDS.map(id => `<td class="num ${(s[id]||0)===0?'zero':''}">${s[id]||0}</td>`).join('')}
         <td class="num ${s.office===0?'zero':''}">${s.office}</td>
         <td class="num ${s.store===0?'zero':''}">${s.store}</td>
@@ -6775,7 +6859,7 @@ function renderInventory(){
         : (INV_LOCATION_LABELS[t.toVilla] || t.toVilla);
       tr.innerHTML = `
         <td>${t.date}</td>
-        <td>${t.item}${t.note ? `<div class="txn-sub">${t.note}</div>` : ''}</td>
+        <td>${esc(t.item)}${t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : ''}</td>
         <td class="num">${t.qty}</td>
         <td class="num ${isPurchase && !t.amount ? 'zero' : ''}">${lastCol}</td>
       `;
@@ -6930,7 +7014,7 @@ function pettyGroupsBlock(expenses){
   for(const e of expenses){
     const g = pettyGroupOf(e);
     totals[g] += e.amount; counts[g]++;
-    const links = getInvoiceLinks(e).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(e).length>1?' '+(i+1):''}</a>`).join(' ');
+    const links = invoiceLinksHTML(e);
     const tags = [];
     if(e.linkedInventory){
       const pur = e.linkedPurchaseId ? allInvTxns.find(x => String(x.id) === String(e.linkedPurchaseId)) : null;
@@ -7131,12 +7215,12 @@ function openDirectPurchasesDetail(card){
         curVilla = t.for;
         html += `<div style="font-weight:700; font-size:12.5px; margin:8px 0 2px; display:flex; justify-content:space-between;"><span>${esc(FOR_LABELS[t.for] || t.for)}</span><span>LKR ${Math.round(villaTotals[t.for]).toLocaleString()}</span></div>`;
       }
-      const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1 ? ' '+(i+1) : ''}</a>`).join(' ');
+      const links = invoiceLinksHTML(t);
       html += `<div class="txn-row">
         <span class="txn-badge expense">expense</span>
         <span class="txn-main">
-          <div class="txn-title">${t.purpose || 'Expense'} <span style="color:var(--muted); font-size:11.5px;">(${FOR_LABELS[t.for] || t.for})</span>${links ? ' '+links : ''}</div>
-          <div class="txn-sub">${t.date}${t.employeeName ? ' · paid out of ' + esc(t.employeeName) + "'s advance" : ''}${t.note ? ' · '+t.note : ''}</div>
+          <div class="txn-title">${esc(t.purpose || 'Expense')} <span style="color:var(--muted); font-size:11.5px;">(${esc(FOR_LABELS[t.for] || t.for)})</span>${links ? ' '+links : ''}</div>
+          <div class="txn-sub">${t.date}${t.employeeName ? ' · paid out of ' + esc(t.employeeName) + "'s advance" : ''}${t.note ? ' · '+esc(t.note) : ''}</div>
         </span>
         <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
       </div>`;
@@ -7262,7 +7346,7 @@ function openDirectPayModal(record, villaId){
   dpFileHandler.reset();
   const existing = record ? getInvoiceLinks(record) : [];
   g('dpFileHint').innerHTML = existing.length
-    ? `${existing.length} file(s) already attached: ` + existing.map((u,i)=>`<a href="${u}" target="_blank">#${i+1}</a>`).join(' ') : '';
+    ? `${existing.length} file(s) already attached: ` + existing.map((u,i)=>`<a href="#" data-receipt="${esc(u)}">#${i+1}</a>`).join(' ') : '';
   g('dpError').style.display = 'none';
   g('dpDeleteBtn').style.display = (record && isAdmin()) ? '' : 'none';
   dpApplyCardHint();
@@ -7400,7 +7484,48 @@ function fmtDay(iso){
 }
 function fmtLongDate(d){ return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }
 function pct(part, whole){ return whole > 0 ? Math.round(part/whole*100) + '%' : '—'; }
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/* Escapes text for HTML. Single quote and slash are included deliberately: without
+   them this is only safe inside double-quoted attributes, and the next person to write
+   style='${esc(x)}' would reintroduce an injection without noticing. */
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"'\/]/g, c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'
+  }[c]));
+}
+
+/* A URL is not text, and esc() is the wrong tool for one: it leaves javascript: intact.
+   Attachment URLs come from our own storage, but invoice_urls is an ordinary column and
+   anyone who can write a row can put anything in it — so every link is checked here
+   before it reaches an href. Anything that is not plain http(s) is refused. */
+function safeUrl(u){
+  const raw = String(u == null ? '' : u).trim();
+  if(!raw) return '';
+  try{
+    const parsed = new URL(raw, window.location.href);
+    if(parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    return esc(parsed.href);
+  }catch(e){ return ''; }
+}
+
+/* Every attachment link in the app is built here, so the checks live in one place. */
+function invoiceLinksHTML(t){
+  return attachmentLinksHTML(getInvoiceLinks(t));
+}
+
+function attachmentLinksHTML(urls){
+  const list = (urls || []).filter(Boolean);
+  const many = list.length > 1;
+  return list.map((u,i)=>{
+    const label = `&#128206;${many ? ' '+(i+1) : ''}`;
+    if(receiptPathOf(u)){
+      // Held privately — signed for this person at the moment they click it.
+      return `<a class="invoice-link" href="#" data-receipt="${esc(u)}" title="Open the attachment">${label}</a>`;
+    }
+    const href = safeUrl(u);
+    if(!href) return '<span class="invoice-link" title="This attachment link is not a valid web address.">&#9888;</span>';
+    return `<a class="invoice-link" href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  }).join(' ');
+}
 // Deduction cell for the P&L: shown in brackets and red, but a plain "0" when there's
 // nothing to deduct — "(0)" reads like an error.
 function negCell(n){
@@ -7454,11 +7579,11 @@ function reportHeaderHTML(title, subtitle, monthDate, extraMeta, villaId){
     <div class="rpt-head">
       <div style="display:flex; align-items:flex-start;">
         <div>
-          ${logo ? `<img class="rpt-logo" src="${esc(logo)}" alt="">` : ''}
+          ${logo ? `<img class="rpt-logo" src="${safeUrl(logo)}" alt="">` : ''}
           <div class="rpt-title">${esc(title)}</div>
           <div class="rpt-sub">${esc(subtitle)}</div>
         </div>
-        ${shot ? `<img class="rpt-villa-shot" src="${esc(shot)}" alt="">` : ''}
+        ${shot ? `<img class="rpt-villa-shot" src="${safeUrl(shot)}" alt="">` : ''}
       </div>
       <div class="rpt-meta">
         <div>Period: <b>${fmtLongDate(periodStart)} – ${fmtLongDate(periodEnd)}</b></div>
@@ -7602,7 +7727,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   for(const t of directPays){
     directPayTotal += t.amount;
     if(isExtraIncome(t)) directExtraTotal += t.amount;
-    const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+    const links = invoiceLinksHTML(t);
     dpRowsHtml += `<tr>
       <td class="dim">${fmtDay(t.date)}</td>
       <td><b>${esc(t.purpose || 'Direct payment')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}</td>
@@ -7644,7 +7769,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   for(const o of opEx){
     opExTotal += o.amount;
     opExByCat[o.category] = (opExByCat[o.category] || 0) + o.amount;
-    const opLinks = (o.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${o.invoiceUrls.length>1?' '+(i+1):''}</a>`).join(' ');
+    const opLinks = attachmentLinksHTML(o.invoiceUrls);
     const detail = o.category === 'salary' && o.employeeName ? esc(o.employeeName) : esc(o.note || '');
     opExRows += `<tr>
       <td class="dim">${fmtDay(o.date)}</td>
@@ -7675,7 +7800,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   let officeBillTotal = 0, officeRowsHtml = '';
   for(const t of officeBills){
     officeBillTotal += t.amount;
-    const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+    const links = invoiceLinksHTML(t);
     officeRowsHtml += `<tr>
       <td class="dim">${fmtDay(t.date)}</td>
       <td><b>${esc(t.purpose || 'Bill')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}${links ? ' '+links : ''}</td>
@@ -7954,7 +8079,7 @@ function openBankTransferDetail(placeId){
     html = '<div class="manage-list" style="margin-top:6px;">';
     for(const t of rows){
       total += t.amount;
-      const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+      const links = invoiceLinksHTML(t);
       html += `<div class="txn-row">
         <span class="txn-badge expense">bank</span>
         <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Expense')}${links?' '+links:''}</div>
@@ -7982,7 +8107,7 @@ function openStaffAdvanceStatement(name){
 
   const money = n => 'LKR ' + Math.round(n).toLocaleString();
   const src = t => t.card === 'bank' ? 'Bank transfer' : (CARD_LABELS[t.card] || t.card);
-  const clip = (t) => getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+  const clip = (t) => invoiceLinksHTML(t);
 
   const section = (title, note, rows, sub) => `
     <div class="direct-block-title" style="margin-top:14px;">${title}</div>
@@ -8057,7 +8182,7 @@ function renderSharonExpensesSummary(){
   const villaColors = Object.fromEntries(VR_VILLAS.map(v => [v.id, v.color]));
   wrap.innerHTML = VR_VILLAS.map(v => `
     <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id] || '#495057'}, ${(villaColors[v.id] || '#495057')}cc); cursor:pointer;" data-sharon-villa="${v.id}">
-      <div class="cash-card-label">Sharon → ${v.name}</div>
+      <div class="cash-card-label">Sharon → ${esc(v.name)}</div>
       <div class="cash-card-balance">LKR ${byVilla[v.id].toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">${ownByVilla[v.id] ? 'LKR ' + ownByVilla[v.id].toLocaleString() + ' paid from his own pocket' : 'all from petty cash cards'}</div>
     </div>
@@ -8079,10 +8204,10 @@ function openSharonExpenseDetail(villaId){
     html = '<div class="manage-list" style="margin-top:6px;">';
     for(const t of rows){
       total += t.amount;
-      const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+      const links = invoiceLinksHTML(t);
       html += `<div class="txn-row">
         <span class="txn-badge expense">expense</span>
-        <span class="txn-main"><div class="txn-title">${t.purpose||'Expense'}${links?' '+links:''}</div><div class="txn-sub">${t.date} · ${CARD_LABELS[t.card]||t.card}${t.note?' · '+t.note:''}</div></span>
+        <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Expense')}${links?' '+links:''}</div><div class="txn-sub">${esc(t.date)} · ${esc(CARD_LABELS[t.card]||t.card)}${t.note?' · '+esc(t.note):''}</div></span>
         <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
       </div>`;
     }
@@ -8103,10 +8228,10 @@ function renderMyPurchasesSummary(){
   const sorted = [...mine].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
   let rows = '';
   for(const t of sorted){
-    const links = getInvoiceLinks(t).map((u,i)=>`<a class="invoice-link" href="${u}" target="_blank" rel="noopener">📎${getInvoiceLinks(t).length>1?' '+(i+1):''}</a>`).join(' ');
+    const links = invoiceLinksHTML(t);
     rows += `<div class="txn-row">
-      <span class="txn-badge expense">${FOR_LABELS[t.for]||t.for}</span>
-      <span class="txn-main"><div class="txn-title">${t.purpose||'Purchase'}${links?' '+links:''}</div><div class="txn-sub">${t.date} · ${CARD_LABELS[t.card]||t.card}${t.note?' · '+t.note:''}</div></span>
+      <span class="txn-badge expense">${esc(FOR_LABELS[t.for]||t.for)}</span>
+      <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Purchase')}${links?' '+links:''}</div><div class="txn-sub">${esc(t.date)} · ${esc(CARD_LABELS[t.card]||t.card)}${t.note?' · '+esc(t.note):''}</div></span>
       <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
     </div>`;
   }
@@ -8389,7 +8514,7 @@ function renderActivityLog(rows){
     row.innerHTML = `
       <span class="txn-badge ${actionColor[r.action] || 'expense'}">${r.action}</span>
       <span class="txn-main">
-        <div class="txn-title">${r.username} — ${r.description}</div>
+        <div class="txn-title">${esc(r.username)} — ${esc(r.description)}</div>
         <div class="txn-sub">${when} · ${r.table_name}</div>
       </span>
     `;
@@ -8914,7 +9039,7 @@ function invoiceListHTML(rows){
 <div class="wrap">
   <div class="head">
     <div>
-      ${APP_SETTINGS.logoUrl ? `<img class="logo" src="${esc(APP_SETTINGS.logoUrl)}" alt="">` : ''}
+      ${APP_SETTINGS.logoUrl ? `<img class="logo" src="${safeUrl(APP_SETTINGS.logoUrl)}" alt="">` : ''}
       <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
     </div>
     <div style="text-align:right;">
@@ -8976,7 +9101,7 @@ function initSettings(){
     const hint = document.getElementById('setLogoHint');
     hint.textContent = 'Uploading…';
     try{
-      const url = await uploadReceiptFile(file);
+      const url = await uploadBrandFile(file);
       APP_SETTINGS.logoUrl = url;
       await saveSettings();
       renderLogoPreview();
@@ -9031,7 +9156,7 @@ function renderVillaPhotos(){
     const url = villaImage(v.id);
     return `<div class="villa-photo">
       <h5>${esc(v.name)}</h5>
-      <div class="shot">${url ? `<img src="${esc(url)}" alt="${esc(v.name)}">` : 'No photo yet'}</div>
+      <div class="shot">${url ? `<img src="${safeUrl(url)}" alt="${esc(v.name)}">` : 'No photo yet'}</div>
       <input type="file" accept="image/*" data-villa-photo="${esc(v.id)}" style="margin-top:6px; font-size:11.5px; max-width:190px;">
       ${url ? `<button class="manage-invoice" data-villa-photo-remove="${esc(v.id)}" style="margin-top:4px;">Remove</button>` : ''}
       <div class="field-hint" data-villa-photo-hint="${esc(v.id)}"></div>
@@ -9045,7 +9170,7 @@ function renderVillaPhotos(){
       const hint = wrap.querySelector(`[data-villa-photo-hint="${id}"]`);
       hint.textContent = 'Uploading…';
       try{
-        const url = await uploadReceiptFile(file);
+        const url = await uploadBrandFile(file);
         APP_SETTINGS.villaImages = Object.assign({}, APP_SETTINGS.villaImages || {}, { [id]: url });
         await saveSettings();
         renderVillaPhotos();
@@ -9073,7 +9198,7 @@ function renderPrintHeader(){
   const logo = APP_SETTINGS.logoUrl || '';
   const meta = [co.address, co.phone, co.email, co.website].filter(Boolean).join(' · ');
   el.innerHTML = `
-    ${logo ? `<img class="ph-logo" src="${esc(logo)}" alt="">` : ''}
+    ${logo ? `<img class="ph-logo" src="${safeUrl(logo)}" alt="">` : ''}
     <div class="ph-name">${esc(co.name || 'Ceymora Management')}</div>
     ${meta ? `<div class="ph-meta">${esc(meta)}</div>` : ''}
     <div class="ph-meta">Printed ${esc(fmtLongDate(new Date()))}</div>`;
@@ -9082,7 +9207,7 @@ function renderLogoPreview(){
   renderPrintHeader();
   const box = document.getElementById('setLogoPreview');
   const url = APP_SETTINGS.logoUrl;
-  box.innerHTML = url ? `<img src="${esc(url)}" alt="Ceymora logo">` : 'No logo uploaded yet';
+  box.innerHTML = url ? `<img src="${safeUrl(url)}" alt="Ceymora logo">` : 'No logo uploaded yet';
   document.getElementById('setLogoRemove').style.display = url ? '' : 'none';
 }
 
@@ -10796,7 +10921,7 @@ function renderCoBills(){
         ? [acctLabel(e.accountCode), e.paidVia, e.paid ? '' : (e.dueDate ? 'DUE by ' + fmtDay(e.dueDate) : 'NOT PAID YET')].filter(Boolean).join(' · ')
         : kind === 'income' ? [e.paidVia ? 'into ' + e.paidVia : ''].filter(Boolean).join('')
         : 'as at ' + fmtDay(e.date);
-      const files = (e.invoiceUrls || []).map((u,i)=>`<a class="invoice-link" href="${esc(u)}" target="_blank" rel="noopener">📎${e.invoiceUrls.length>1?' '+(i+1):''}</a>`).join(' ');
+      const files = attachmentLinksHTML(e.invoiceUrls);
       row.innerHTML = `
         <div class="ce-main"><b>${esc(e.description || '—')}</b> ${files}
           <div class="ce-sub">${kind === 'balance' ? '' : fmtDay(e.date) + (sub ? ' · ' : '')}${esc(sub)}</div></div>
@@ -11331,7 +11456,7 @@ function printDocShell(title, bodyHTML, landscape){
 </div>
 ${bodyHTML.replace(/%%LETTERHEAD%%/g, `
     <div>
-      ${logo ? `<img class="logo" src="${esc(logo)}" alt="">` : ''}
+      ${logo ? `<img class="logo" src="${safeUrl(logo)}" alt="">` : ''}
       <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
       <div class="co-meta">${esc([co.reg, co.address, co.phone, co.email].filter(Boolean).join('\n'))}</div>
     </div>`)}
@@ -11697,7 +11822,7 @@ function renderGuestGroups(){
     const row = document.createElement('div');
     row.className = 'grp-row';
     row.innerHTML = `
-      ${shot ? `<img class="shot" src="${esc(shot)}" alt="">` : '<div class="shot"></div>'}
+      ${shot ? `<img class="shot" src="${safeUrl(shot)}" alt="">` : '<div class="shot"></div>'}
       <div class="grp-main">
         <div class="grp-name">${esc(name)}</div>
         <div class="grp-sub">${esc(b.guest || 'Guest')}${b.guests ? ' · ' + esc(b.guests) + ' guests' : ''}
@@ -11728,7 +11853,7 @@ function openGroupBuilder(b){
   g('gmName').textContent = name;
   const shot = villaImage(b.villa);
   g('gmPhotoWrap').innerHTML = shot
-    ? `<img src="${esc(shot)}" alt=""><div style="margin-top:6px;"><a class="rpt-quick" href="${esc(shot)}" target="_blank" rel="noopener" style="text-decoration:none;">Open photo to save</a></div>`
+    ? `<img src="${safeUrl(shot)}" alt=""><div style="margin-top:6px;"><a class="rpt-quick" href="${safeUrl(shot)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">Open photo to save</a></div>`
     : '<div class="field-hint">No photo for this villa yet — add one under Invoices &amp; Setup → Villa photos.</div>';
   const nums = [
     ...(b.phone ? [{ who: (b.guest || 'Guest') + ' (guest)', no: b.phone }] : []),
