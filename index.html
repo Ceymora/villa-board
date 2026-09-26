@@ -900,6 +900,7 @@
 
       <div id="exSummary" class="cash-summary"></div>
       <div class="field-hint" style="margin:8px 0 2px;">Every expense charged to the place chosen above, whoever paid and however they paid. Advances aren't listed — an advance is money handed over, not yet spent; it appears here as the invoices come back.</div>
+      <div class="field-hint" id="exLoadedNote" style="margin:2px 0;"></div>
       <div id="exBody" class="rpt-doc" style="margin-top:8px;"></div>
     </div>
 
@@ -3242,6 +3243,15 @@ function renderVillaExpenses(){
   renderExPickers();
   const rows = exRows();
   renderExSummary(rows);
+  const allExpenses = allCashTxns.filter(t => t.type === 'expense');
+  const firstDate = allExpenses.reduce((m,t)=> (!m || (t.date||'') < m) ? t.date : m, null);
+  const lastDate  = allExpenses.reduce((m,t)=> (!m || (t.date||'') > m) ? t.date : m, null);
+  const loadedNote = document.getElementById('exLoadedNote');
+  if(loadedNote){
+    loadedNote.textContent = allExpenses.length
+      ? `${allExpenses.length} expense${allExpenses.length===1?'':'s'} loaded in total, from ${fmtDay(firstDate)} to ${fmtDay(lastDate)}. A month that looks empty has nothing recorded for it.`
+      : 'No expenses recorded at all yet.';
+  }
   const place = EX_PLACES().find(v=>v.id===exPlace).name;
   let html = `<div class="rpt-head"><div class="rpt-title">Villa expenses — ${esc(place)}</div>
     <div class="rpt-sub">${esc(exPeriodLabel())}${exKind === 'all' ? '' : ' · ' + esc((PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || '')}</div></div>`;
@@ -3620,7 +3630,7 @@ function initBookings(){
 }
 
 async function fetchBookings(){
-  const { data, error } = await sb.from('villa_bookings').select('*');
+  const { data, error } = await fetchAllRows('villa_bookings', 'check_in');
   if(error){ bookingStatusMsg.textContent='Connection error'; console.error(error); return; }
   let rows = data.map(rowToBooking);
 
@@ -4944,8 +4954,29 @@ function initPettyCash(){
   renderCash();
 }
 
+/* Supabase hands back at most 1,000 rows per request and says nothing about it: the
+   call succeeds, the app looks fine, and the oldest records are simply not there. That
+   is why an earlier month could come up empty while this month looked right. This asks
+   for the table a page at a time until a short page says that was the last of it.
+   Ordering by date keeps the pages stable, so nothing is skipped or read twice. */
+async function fetchAllRows(table, orderCol){
+  const PAGE = 1000;
+  let all = [], from = 0;
+  for(;;){
+    let q = sb.from(table).select('*');
+    if(orderCol) q = q.order(orderCol, { ascending: true });
+    const { data, error } = await q.range(from, from + PAGE - 1);
+    if(error) return { data:null, error };
+    all = all.concat(data || []);
+    if(!data || data.length < PAGE) break;
+    from += PAGE;
+    if(from > 200000) break;   // a runaway guard; no table here comes near this
+  }
+  return { data: all, error: null };
+}
+
 async function fetchCash(){
-  const { data, error } = await sb.from('petty_cash_transactions').select('*');
+  const { data, error } = await fetchAllRows('petty_cash_transactions', 'date');
   if(error){ cashStatusMsg.textContent='Connection error'; console.error(error); return; }
   allCashTxns = data.map(rowToCash);
   cashStatusMsg.textContent = 'Synced (live)';
@@ -6391,7 +6422,7 @@ function updateHistTabButtons(){
 }
 
 async function fetchInv(){
-  const { data, error } = await sb.from('inventory_transactions').select('*');
+  const { data, error } = await fetchAllRows('inventory_transactions', 'date');
   if(error){ invStatusMsg.textContent='Connection error'; console.error(error); return; }
   allInvTxns = data.map(rowToInv);
   invStatusMsg.textContent = 'Synced (live)';
@@ -6884,7 +6915,7 @@ let allOpEx = [];
 let opExInited = false;
 
 async function fetchOpEx(){
-  const { data, error } = await sb.from('villa_operating_expenses').select('*');
+  const { data, error } = await fetchAllRows('villa_operating_expenses', 'date');
   if(error){ console.error(error); return; }
   allOpEx = data.map(r => ({ id:r.id, villaId:r.villa_id, category:r.category, amount:Number(r.amount), date:r.date, note:r.note, employeeName:r.employee_name, invoiceUrls:r.invoice_urls || [] }));
   renderVillaReport();
@@ -9123,7 +9154,7 @@ function coAmount(periodISO, section, category){
 /* ---------------------------- data ---------------------------- */
 async function fetchCompany(){
   if(!sb) return;
-  const { data, error } = await sb.from('company_monthly_accounts').select('*');
+  const { data, error } = await fetchAllRows('company_monthly_accounts', 'period');
   if(error){
     document.getElementById('coEntryStatus').textContent = 'Could not load — has the company_monthly_accounts table been created?';
     console.error(error);
@@ -10121,7 +10152,7 @@ function rowToPay(r){ return {
 
 async function fetchCoEntries(){
   if(!sb) return;
-  const { data, error } = await sb.from('company_entries').select('*');
+  const { data, error } = await fetchAllRows('company_entries', 'period');
   if(error){ console.error('company_entries', error); acctTableMissing('company_entries'); return; }
   allCoEntries = data.map(rowToCe);
 }
@@ -10133,7 +10164,7 @@ async function fetchStaffProfiles(){
 }
 async function fetchPayroll(){
   if(!sb) return;
-  const { data, error } = await sb.from('payroll_entries').select('*');
+  const { data, error } = await fetchAllRows('payroll_entries', 'period');
   if(error){ console.error('payroll_entries', error); acctTableMissing('payroll_entries'); return; }
   allPayroll = data.map(rowToPay);
 }
@@ -11458,7 +11489,7 @@ function rowToOwnerPay(r){ return { id:r.id, villa:r.villa, period:r.period, dat
   method:r.method || '', note:r.note || '', invoiceUrls:r.invoice_urls || [], createdBy:r.created_by || '' }; }
 async function fetchOwnerPayments(){
   if(!sb) return;
-  const { data, error } = await sb.from('owner_payments').select('*');
+  const { data, error } = await fetchAllRows('owner_payments', 'period');
   if(error){ console.error('owner_payments', error); acctTableMissing('owner_payments'); return; }
   allOwnerPayments = data.map(rowToOwnerPay);
 }
