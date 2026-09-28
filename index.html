@@ -3101,7 +3101,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-accounts';
+const APP_VERSION = 'v2026.09.28-protected';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3314,7 +3314,9 @@ const DB_CHECKS = [
     test: async () => { const { error } = await sb.from('villas').select('currency').limit(1); return !error; } },
   { file:'8-supabase-private-files.sql', what:'Bills and invoices held privately, not public by URL',
     critical:true,
-    test: async () => { const { error } = await sb.rpc('villa_allowed', { v:'kalava' }); return !error; } },
+    // Asks the database whether the bills bucket really is private AND the rule that
+    // lets staff open bills really exists — a half-finished run shows as not done.
+    test: async () => { const { data, error } = await sb.rpc('files_are_private'); return !error && data === true; } },
 ];
 
 async function runDbSetupCheck(){
