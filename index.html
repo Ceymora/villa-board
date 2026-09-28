@@ -371,6 +371,22 @@
   }
   .rpt-picker .sep{ width:1px; height:16px; background:var(--board-line); }
 
+  /* The database setup warning. Deliberately loud: an unprotected database is
+     the one problem that makes every other protection meaningless. */
+  .db-warn{
+    border:2px solid var(--red); background:var(--red-bg); border-radius:10px;
+    padding:14px 16px; margin-bottom:16px; font-size:13px; line-height:1.55;
+  }
+  .db-warn h4{ margin:0 0 6px; font-size:15px; color:#a51111; font-family:'Kalam',cursive; }
+  .db-warn ul{ margin:8px 0 0; padding-left:20px; }
+  .db-warn li{ margin-bottom:3px; }
+  .db-warn .ok{ color:var(--green); font-weight:700; }
+  .db-warn .no{ color:var(--red); font-weight:700; }
+  .db-warn .db-dismiss{
+    background:none; border:none; color:var(--muted); text-decoration:underline;
+    cursor:pointer; font-size:12px; padding:0; margin-top:8px;
+  }
+
   /* Permission tick boxes */
   .perm-group{ margin-top:12px; }
   .perm-group-title{
@@ -860,6 +876,8 @@
 <div class="frame">
   <div class="board" id="board">
 
+    <div id="dbCheckBanner" style="display:none;"></div>
+
     <div class="setup-banner" id="setupBanner">
       <b>⚠ One-time setup needed:</b> This file needs to be connected to your free Supabase database before it will save anything.
       Find the <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> section near the bottom and paste in your own project's values.
@@ -901,6 +919,10 @@
       <div class="rpt-picker no-print">
         <span class="rpt-picker-label">Show:</span>
         <div id="exKindTabs" class="villatabs" style="margin:0; display:inline-flex;"></div>
+        <span class="sep"></span>
+        <span class="sep"></span>
+        <span class="rpt-picker-label">Group by:</span>
+        <div id="exGroupTabs" class="villatabs" style="margin:0; display:inline-flex;"></div>
         <span class="sep"></span>
         <button class="add-booking-btn" id="exExportBtn">⬇️ Export CSV</button>
         <button class="add-booking-btn" id="exPrintBtn">🖨️ Print / PDF</button>
@@ -1524,6 +1546,28 @@
               <div><label>Website</label><input type="text" id="setCoWeb" placeholder="e.g. www.ceymora.com"></div>
               <div><label>Invoice prefix (company)</label><input type="text" id="setCoPrefix" placeholder="CM" maxlength="6"></div>
             </div>
+
+            <div class="pay-block" style="margin-top:14px;">
+              <div class="direct-block-title">Tax on invoices</div>
+              <div class="modal-checkbox-row">
+                <input type="checkbox" id="setTaxEnabled">
+                <label for="setTaxEnabled">Charge and show tax on invoices</label>
+              </div>
+              <div class="field-hint" style="margin-top:-4px;">Leave this off if Ceymora is not registered for VAT. Check the rates and the order they apply in with your accountant — they change, and getting them wrong on an issued invoice is hard to undo.</div>
+              <div id="setTaxFields" style="display:none; margin-top:10px;">
+                <div class="set-grid">
+                  <div><label>VAT registration number</label><input type="text" id="setTaxVatNo" placeholder="e.g. 114123456-7000"></div>
+                  <div><label>VAT rate (%)</label><input type="number" id="setTaxVatRate" min="0" max="100" step="0.1" placeholder="18"></div>
+                  <div><label>SSCL rate (%)</label><input type="number" id="setTaxSsclRate" min="0" max="100" step="0.1" placeholder="2.5"></div>
+                </div>
+                <div class="modal-checkbox-row" style="margin-top:10px;">
+                  <input type="checkbox" id="setTaxInclusive">
+                  <label for="setTaxInclusive">The nightly rates I enter already include tax</label>
+                </div>
+                <div class="field-hint" style="margin-top:-4px;">Unticked, tax is added on top of the nightly rate. Ticked, the rate is treated as the final price and the tax is worked back out of it.</div>
+                <div class="field-hint" id="setTaxExample" style="margin-top:8px; font-weight:600;"></div>
+              </div>
+            </div>
             <div style="margin-top:12px;">
               <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;">Address</label>
               <textarea id="setCoAddress" style="width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px; font-size:13px; font-family:inherit; min-height:56px;" placeholder="Street, city, country"></textarea>
@@ -1816,6 +1860,11 @@
     <label>Goes into the accounts as</label>
     <select id="expAccount"></select>
     <div class="field-hint" id="expAccountHint"></div>
+    <div id="expSalaryWarn" class="adv-status warn" style="display:none; margin:6px 0 4px;">
+      <b>Salaries go through Staff &amp; Payroll, not here.</b> Payroll works out EPF, ETF and the pay slip,
+      and records the cost. Entering it here as well would count the same salary twice.
+      <div style="margin-top:6px;"><button type="button" class="add-booking-btn" id="expSalaryGo">Open Staff &amp; Payroll</button></div>
+    </div>
     <div id="expWhoseWrap" style="display:none;">
       <label>Whose mobile is it</label>
       <select id="expWhose"></select>
@@ -1889,7 +1938,7 @@
           <div><label>For which villa / place</label><select id="advBillFor"></select></div>
         </div>
         <div id="advBillAccountWrap" style="display:none;">
-          <label>Company account</label>
+          <label id="advBillAccountLabel">What it was for</label>
           <select id="advBillAccount" class="acct-select" style="max-width:none;"></select>
         </div>
         <div class="modal-checkbox-row">
@@ -2651,6 +2700,15 @@ const SETTINGS_DEFAULTS = {
   villaImages: {},
   groupNumbers: '+94771556138, +94744105189, +94741566138',
   invoicePrefix: 'CM',
+  /* Tax on invoices. Off until switched on, because it is only correct for a
+     registered business and the rates change. SSCL is worked out on the net value
+     and VAT on the net plus SSCL, which is the usual Sri Lankan treatment — confirm
+     the rates and the order with your accountant before issuing anything. */
+  taxEnabled: false,
+  taxVatNo: '',
+  taxVatRate: 18,
+  taxSsclRate: 2.5,
+  taxInclusive: false,
   villaCodes: { kalava: 'KAL', noelia: 'NOE', brisa: 'BRI' },
   damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
   depositPercent: 25,
@@ -3043,7 +3101,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.26-secure2';
+const APP_VERSION = 'v2026.09.28-accounts';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3233,8 +3291,67 @@ async function restoreSession(){
   }catch(e){ console.error('session restore failed', e); }
 }
 
+/* ---------------------------------------------------------------------------
+   IS THE DATABASE ACTUALLY SET UP?
+
+   Everything that protects this data lives in the SQL files, not in this page.
+   Until they are run, the key printed in this file is the only thing between
+   anyone and every record — and nothing on screen would tell you. So the app
+   asks the database a question only each file can answer, and says plainly
+   which are missing.
+
+   The checks are cheap and read-only. A failure here never blocks the app.
+--------------------------------------------------------------------------- */
+const DB_CHECKS = [
+  { file:'5-supabase-security.sql', what:'Real logins and row-level rules on every table',
+    critical:true,
+    test: async () => { const { error } = await sb.rpc('is_member'); return !error; } },
+  { file:'6-supabase-registration-and-permissions.sql', what:'Register-and-approve, and the permission tick boxes',
+    critical:true,
+    test: async () => { const { error } = await sb.rpc('has_perm', { want:'admin' }); return !error; } },
+  { file:'7-supabase-villas.sql', what:'Villas from the database, with their own currency',
+    critical:false,
+    test: async () => { const { error } = await sb.from('villas').select('currency').limit(1); return !error; } },
+  { file:'8-supabase-private-files.sql', what:'Bills and invoices held privately, not public by URL',
+    critical:true,
+    test: async () => { const { error } = await sb.rpc('villa_allowed', { v:'kalava' }); return !error; } },
+];
+
+async function runDbSetupCheck(){
+  const wrap = document.getElementById('dbCheckBanner');
+  if(!wrap || !sb) return;
+  if(sessionStorage.getItem('dbCheckDismissed') === '1') return;
+
+  const results = [];
+  for(const c of DB_CHECKS){
+    let ok = false;
+    try{ ok = await c.test(); }catch(e){ ok = false; }
+    results.push(Object.assign({ ok }, c));
+  }
+  const missing = results.filter(r => !r.ok);
+  if(!missing.length){ wrap.style.display = 'none'; return; }
+
+  const anyCritical = missing.some(r => r.critical);
+  wrap.innerHTML = `
+    <div class="db-warn">
+      <h4>${anyCritical ? '&#9888; This database is not fully protected yet' : 'One setup step is still outstanding'}</h4>
+      ${anyCritical ? `<div>Until the files below are run, the rules that decide who may read and change your
+        records are not installed. Anyone who has this page can reach every booking, guest address, invoice
+        and salary in it. Run them in the Supabase SQL editor, in order.</div>` : ''}
+      <ul>${results.map(r => `<li><span class="${r.ok ? 'ok' : 'no'}">${r.ok ? '&#10003;' : '&#10007;'}</span>
+        <b>${esc(r.file)}</b> — ${esc(r.what)}${r.ok ? '' : (r.critical ? ' <b>(not run)</b>' : ' (not run)')}</li>`).join('')}</ul>
+      <button type="button" class="db-dismiss" id="dbCheckDismiss">Hide this until I sign in again</button>
+    </div>`;
+  wrap.style.display = '';
+  document.getElementById('dbCheckDismiss').addEventListener('click', ()=>{
+    sessionStorage.setItem('dbCheckDismissed', '1');
+    wrap.style.display = 'none';
+  });
+}
+
 function startApp(){
   applyRolePermissions();
+  if(isAdmin()) runDbSetupCheck();
   renderHK();
   subscribeWeek(currentMonday);
 }
@@ -3374,6 +3491,7 @@ let exInited = false;
 let exPlace = 'all';             // which villa / place, or 'all'
 let exKind = 'all';              // one of PETTY_GROUPS' keys, or 'all'
 let exAllTime = false;
+let exGroupBy = 'paid';          // 'paid' = how it was paid, 'account' = what it was for
 let exMonthDate = new Date();
 
 const EX_PLACES = () => ([
@@ -3453,6 +3571,21 @@ function renderExPickers(){
     kt.appendChild(b);
   });
 
+  const gt = document.getElementById('exGroupTabs');
+  gt.innerHTML = '';
+  [['paid','How it was paid'],['account','What it was for']].forEach(([k,label])=>{
+    const b = document.createElement('button');
+    b.className = 'villatab-btn';
+    b.textContent = label;
+    b.dataset.exGroup = k;
+    const on = k === exGroupBy;
+    b.style.background = on ? 'var(--frame)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--muted)';
+    if(on) b.classList.add('active');
+    b.addEventListener('click', ()=>{ exGroupBy = k; renderVillaExpenses(); });
+    gt.appendChild(b);
+  });
+
   document.getElementById('exMonthLabel').textContent = exPeriodLabel();
   ['exPrevMonth','exNextMonth','exThisMonth'].forEach(id=>{
     document.getElementById(id).disabled = exAllTime;
@@ -3521,7 +3654,9 @@ function renderVillaExpenses(){
   let html = `<div class="rpt-head"><div class="rpt-title">Villa expenses — ${esc(place)}</div>
     <div class="rpt-sub">${esc(exPeriodLabel())}${exKind === 'all' ? '' : ' · ' + esc((PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || '')}</div></div>`;
 
-  if(exPlace === 'all'){
+  if(exGroupBy === 'account'){
+    html += accountGroupsBlock(rows, exPlace === 'all');
+  } else if(exPlace === 'all'){
     // One block per place, so "everything" is still readable rather than one long list.
     const places = EX_PLACES().filter(v => v.id !== 'all');
     let any = false;
@@ -3554,6 +3689,52 @@ function renderVillaExpenses(){
     html += pettyGroupsBlock(rows).html;
   }
   document.getElementById('exBody').innerHTML = html;
+}
+
+/* The same rows, grouped by what the money was spent on. Villa accounts first in
+   their own order, then Store, then company accounts, then anything still unsorted.
+   How it was paid still shows on every line, so nothing is lost by switching. */
+function accountGroupsBlock(rows, showPlace){
+  if(!rows.length) return '<div class="rpt-empty">Nothing recorded for this period.</div>';
+  const groups = {};
+  for(const r of rows){ const k = acctOf(r) || '__none'; (groups[k] = groups[k] || []).push(r); }
+  const order = [
+    ...VILLA_ACCTS.map(([k]) => k), 'store',
+    ...CO_GROUPS.flatMap(g => g.items.map(([k]) => k)),
+    ...CO_ANNUAL.map(([k]) => k),
+  ];
+  const keys = Object.keys(groups).sort((a,b)=>{
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+  const paidFrom = t => t.employeeName ? `${esc(t.employeeName)}'s advance` : esc(CARD_LABELS[t.card] || t.card || '');
+  let grand = 0;
+  let html = '';
+  for(const k of keys){
+    const list = groups[k].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    const total = list.reduce((n,t)=> n + t.amount, 0);
+    grand += total;
+    const title = k === '__none' ? 'Not sorted into an account yet' : acctLabel(k);
+    const where = k === '__none' ? '' : (isVillaAcct(k) ? 'Villa cost' : k === 'store' ? 'Store' : 'Company — ' + acctGroupLabel(k));
+    html += `
+      <div class="rpt-section-title" style="font-size:13.5px; margin-top:12px;${k === '__none' ? ' color:var(--amber);' : ''}">${esc(title)}
+        <span class="rpt-section-count">${esc(where)}${where ? ' · ' : ''}${list.length} item${list.length===1?'':'s'} · ${lkr(total)}</span></div>
+      <table class="rpt-table">
+        <thead><tr><th>Date</th><th>Description</th>${showPlace ? '<th>Place</th>' : ''}<th>How it was paid</th><th class="r">Amount (LKR)</th></tr></thead>
+        <tbody>${list.map(t => `<tr>
+          <td class="dim">${fmtDay(t.date)}</td>
+          <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''} ${invoiceLinksHTML(t)}</td>
+          ${showPlace ? `<td class="dim">${esc(FOR_LABELS[t.for] || t.for || '—')}</td>` : ''}
+          <td class="dim">${paidFrom(t)}</td>
+          <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
+        </tr>`).join('')}
+          <tr class="subtotal"><td colspan="${showPlace ? 4 : 3}">Subtotal — ${esc(title)}</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
+        </tbody>
+      </table>`;
+  }
+  html += `<table class="rpt-table" style="margin-top:14px;"><tbody><tr class="subtotal">
+    <td><b>Total</b></td><td class="r"><b>${Math.round(grand).toLocaleString()}</b></td></tr></tbody></table>`;
+  return html;
 }
 
 function exportVillaExpensesCSV(){
@@ -4622,11 +4803,38 @@ function depositPct(){
 // The single source of truth for every money figure on a direct booking — the
 // on-screen quote box, the saved row and the printed invoice all call this, so
 // they can never disagree with each other.
+/* Splits an accommodation figure into net, SSCL and VAT.
+   Exclusive: the rate is before tax, and tax is added on top.
+   Inclusive: the rate already contains tax, and this works backwards out of it. */
+function taxBreakdown(amount){
+  const on = !!APP_SETTINGS.taxEnabled;
+  const s = on ? (Number(APP_SETTINGS.taxSsclRate) || 0) / 100 : 0;
+  const v = on ? (Number(APP_SETTINGS.taxVatRate)  || 0) / 100 : 0;
+  const a = Number(amount) || 0;
+  if(!on || (s === 0 && v === 0)) return { on:false, net:a, sscl:0, vat:0, gross:a, sRate:0, vRate:0 };
+  let net;
+  if(APP_SETTINGS.taxInclusive){
+    net = a / ((1 + s) * (1 + v));
+  } else {
+    net = a;
+  }
+  const sscl = net * s;
+  const vat  = (net + sscl) * v;
+  const round2 = n => Math.round(n * 100) / 100;
+  return { on:true, net:round2(net), sscl:round2(sscl), vat:round2(vat),
+           gross:round2(net + sscl + vat),
+           sRate: (Number(APP_SETTINGS.taxSsclRate) || 0),
+           vRate: (Number(APP_SETTINGS.taxVatRate)  || 0) };
+}
+
 function quoteFor(opts){
   const nights = (opts.checkIn && opts.checkOut && opts.checkOut > opts.checkIn)
     ? Math.round((parseISO(opts.checkOut) - parseISO(opts.checkIn)) / 86400000) : 0;
   const rate    = Number(opts.rate) || 0;
-  const accom   = nights * rate;
+  const lineTotal = nights * rate;
+  // A refundable deposit is not a supply, so no tax is charged on it.
+  const tax     = taxBreakdown(lineTotal);
+  const accom   = tax.gross;               // what the guest pays for the stay, tax included
   const damage  = Number(opts.damage) || 0;
   const pct     = opts.terms === 'full' ? 100 : depositPct();
   const dueOnBooking = accom * pct / 100;
@@ -4635,6 +4843,7 @@ function quoteFor(opts){
   const netTotal     = accom + damage;
   const paid         = Number(opts.paid) || 0;
   return { nights, rate, accom, damage, pct, dueOnBooking, balance, payableNow, netTotal, paid,
+           tax, accomNet: tax.net,
            outstanding: Math.max(0, netTotal - paid) };
 }
 
@@ -4664,7 +4873,10 @@ function recalcQuote(){
   box.innerHTML = `
     <div class="quote-line muted"><span>Nights</span><span>${q.nights}</span></div>
     <div class="quote-line muted"><span>Rate per night</span><span>${money(cur, q.rate)}</span></div>
-    <div class="quote-line"><span>Accommodation total</span><span>${money(cur, q.accom)}</span></div>
+    ${q.tax.on ? `<div class="quote-line muted"><span>Accommodation, before tax</span><span>${money(cur, q.accomNet)}</span></div>
+    ${q.tax.sscl > 0 ? `<div class="quote-line muted"><span>SSCL @ ${q.tax.sRate}%</span><span>${money(cur, q.tax.sscl)}</span></div>` : ''}
+    ${q.tax.vat > 0 ? `<div class="quote-line muted"><span>VAT @ ${q.tax.vRate}%</span><span>${money(cur, q.tax.vat)}</span></div>` : ''}` : ''}
+    <div class="quote-line"><span>Accommodation total${q.tax.on ? ' (incl. tax)' : ''}</span><span>${money(cur, q.accom)}</span></div>
     <div class="quote-line muted"><span>Payment terms</span><span>${termsLabel}</span></div>
     <div class="quote-line due"><span>Due on confirmation (${q.pct}%)</span><span>${money(cur, q.dueOnBooking)}</span></div>
     <div class="quote-line"><span>Refundable damage deposit</span><span>${money(cur, q.damage)}</span></div>
@@ -4854,9 +5066,21 @@ function invoiceHTML(b){
         <span class="sm">${nicedate(b.checkIn)} → ${nicedate(b.checkOut)}${b.guests ? ' · ' + b.guests + ' guest' + (b.guests==1?'':'s') : ''}</span>
       </td>
       <td class="num">${q.nights}</td>
-      <td class="num">${m(q.rate)}</td>
-      <td class="num">${m(q.accom)}</td>
+      <td class="num">${m(q.tax.on && !APP_SETTINGS.taxInclusive ? q.rate : q.accomNet / (q.nights || 1))}</td>
+      <td class="num">${m(q.accomNet)}</td>
     </tr>`);
+  if(q.tax.on){
+    if(q.tax.sscl > 0) rows.push(`
+    <tr>
+      <td><b>SSCL @ ${q.tax.sRate}%</b><br><span class="sm">Social Security Contribution Levy on the accommodation value</span></td>
+      <td class="num">—</td><td class="num">—</td><td class="num">${m(q.tax.sscl)}</td>
+    </tr>`);
+    if(q.tax.vat > 0) rows.push(`
+    <tr>
+      <td><b>VAT @ ${q.tax.vRate}%</b><br><span class="sm">On the accommodation value including SSCL</span></td>
+      <td class="num">—</td><td class="num">—</td><td class="num">${m(q.tax.vat)}</td>
+    </tr>`);
+  }
   if(q.damage > 0){
     rows.push(`
     <tr>
@@ -4925,10 +5149,12 @@ function invoiceHTML(b){
     <div>
       ${co.logoUrlResolved ? `<img class="logo" src="${safeUrl(co.logoUrlResolved)}" alt="">` : ''}
       <div class="co-name">${esc(co.name || 'Ceymora Management')}</div>
-      <div class="co-meta">${esc([co.reg, co.address, co.phone, co.email, co.website].filter(Boolean).join('\n'))}</div>
+      <div class="co-meta">${esc([co.reg,
+        (APP_SETTINGS.taxEnabled && APP_SETTINGS.taxVatNo) ? 'VAT Reg. No. ' + APP_SETTINGS.taxVatNo : '',
+        co.address, co.phone, co.email, co.website].filter(Boolean).join('\n'))}</div>
     </div>
     <div class="right">
-      <h1 class="title">INVOICE</h1>
+      <h1 class="title">${APP_SETTINGS.taxEnabled && (Number(APP_SETTINGS.taxVatRate)||0) > 0 ? 'TAX INVOICE' : 'INVOICE'}</h1>
       <div class="nos">
         <div><span class="tag">CEYMORA</span> <b>${esc(b.invoiceNoCo || '—')}</b></div>
         <div><span class="tag villa">${esc(villaCode(b.villa))}</span> <b>${esc(b.invoiceNoVilla || '—')}</b></div>
@@ -4957,7 +5183,10 @@ ${q.nights} night${q.nights===1?'':'s'}${b.guests ? ' · ' + b.guests + ' guest'
   </table>
 
   <div class="totals">
-    <div class="tl"><span>Accommodation total</span><span>${m(q.accom)}</span></div>
+    ${q.tax.on ? `<div class="tl muted"><span>Accommodation, before tax</span><span>${m(q.accomNet)}</span></div>
+    ${q.tax.sscl > 0 ? `<div class="tl muted"><span>SSCL @ ${q.tax.sRate}%</span><span>${m(q.tax.sscl)}</span></div>` : ''}
+    ${q.tax.vat > 0 ? `<div class="tl muted"><span>VAT @ ${q.tax.vRate}%</span><span>${m(q.tax.vat)}</span></div>` : ''}` : ''}
+    <div class="tl"><span>Accommodation total${q.tax.on ? ' (including tax)' : ''}</span><span>${m(q.accom)}</span></div>
     <div class="tl muted"><span>Payment terms</span><span>${q.pct === 100 ? 'Paid in full (100%)' : q.pct + '% on confirmation'}</span></div>
     <div class="tl"><span>Due on confirmation (${q.pct}%)</span><span>${m(q.dueOnBooking)}</span></div>
     ${q.damage > 0 ? `<div class="tl"><span>Refundable damage deposit</span><span>${m(q.damage)}</span></div>` : ''}
@@ -5837,6 +6066,12 @@ document.getElementById('expCancel').addEventListener('click', ()=>{
 document.getElementById('expenseModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='expenseModalOverlay') e.currentTarget.classList.remove('open'); });
 document.getElementById('expSave').addEventListener('click', async ()=>{
   const errEl = document.getElementById('expError');
+  {
+    const code = document.getElementById('expAccount').value;
+    const txt = document.getElementById('expPurpose').value + ' ' + document.getElementById('expNote').value;
+    if(!editingCashId && looksLikeSalary(code, txt) &&
+       !confirm('This looks like a salary.\n\nSalaries belong in Staff & Payroll, which works out EPF/ETF and records the cost. If it is also entered here it will be counted twice.\n\nOnly press OK if this is a one-off cash payment that is NOT in payroll.')) return;
+  }
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
   const date = document.getElementById('expDate').value;
   const card = document.getElementById('expCard').value;
@@ -6229,17 +6464,25 @@ function advQuickReset(){
   forSel.innerHTML = Object.keys(FOR_LABELS).map(k => `<option value="${k}">${esc(FOR_LABELS[k])}</option>`).join('');
   const adv = advPanelRecord;
   forSel.value = (adv && adv.card === 'kalava_card') ? 'kalava' : firstVillaId();
-  g('advBillAccount').innerHTML = acctOptionsHTML('', { companyOnly:true, placeholder:'— Pick the company account —' });
+  g('advBillAccount').dataset.touched = '';
   advQuickForChanged();
 }
-// Only office bills need a company account picked; villa and Store ones are obvious.
+// Office bills pick a company account, villa bills a villa account; Store is obvious.
 function advQuickForChanged(){
   const forWhom = document.getElementById('advBillFor').value;
-  document.getElementById('advBillAccountWrap').style.display = forWhom === 'office' ? '' : 'none';
+  const sel = document.getElementById('advBillAccount');
+  document.getElementById('advBillAccountWrap').style.display = forWhom === 'store' ? 'none' : '';
+  const purpose = document.getElementById('advBillPurpose').value;
   if(forWhom === 'office'){
-    const sel = document.getElementById('advBillAccount');
-    if(!sel.value) sel.value = suggestAccount(document.getElementById('advBillPurpose').value) || '';
+    sel.innerHTML = acctOptionsHTML('', { companyOnly:true, placeholder:'— Pick the company account —' });
+    document.getElementById('advBillAccountLabel').textContent = 'Company account';
+    sel.value = suggestAccount(purpose) || '';
+  } else if(forWhom !== 'store'){
+    sel.innerHTML = VILLA_ACCTS.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
+    document.getElementById('advBillAccountLabel').textContent = 'What it was for';
+    sel.value = suggestVillaAccount(purpose);
   }
+  sel.dataset.touched = '';
 }
 document.getElementById('advBillFor').addEventListener('change', advQuickForChanged);
 ['fVilla','fCheckIn','fCheckOut'].forEach(id=>{
@@ -6263,7 +6506,11 @@ document.getElementById('bookingGroupCopy').addEventListener('click', async ()=>
 document.getElementById('advBillAmount').addEventListener('input', advRenderRecon);
 document.getElementById('advBillPurpose').addEventListener('input', ()=>{
   const sel = document.getElementById('advBillAccount');
-  if(document.getElementById('advBillFor').value === 'office' && !sel.dataset.touched) sel.value = suggestAccount(document.getElementById('advBillPurpose').value) || '';
+  if(sel.dataset.touched) return;
+  const forWhom = document.getElementById('advBillFor').value;
+  const purpose = document.getElementById('advBillPurpose').value;
+  if(forWhom === 'office') sel.value = suggestAccount(purpose) || '';
+  else if(forWhom !== 'store') sel.value = suggestVillaAccount(purpose);
 });
 document.getElementById('advBillAccount').addEventListener('change', e => e.target.dataset.touched = '1');
 // Returns true when the typed invoice was saved (or there was nothing typed), false when
@@ -6279,7 +6526,7 @@ async function advAddDraftInvoice(){
   const amount = parseFloat(g('advBillAmount').value);
   const purpose = g('advBillPurpose').value.trim();
   const forWhom = g('advBillFor').value;
-  const account = forWhom === 'office' ? (g('advBillAccount').value || null) : (forWhom === 'store' ? 'store' : 'villa');
+  const account = forWhom === 'store' ? 'store' : (g('advBillAccount').value || (forWhom === 'office' ? null : 'villa'));
   if(!amount || amount <= 0) return fail('Enter the invoice amount.');
   if(!purpose) return fail('Say what the invoice is for.');
   if(forWhom === 'office' && !account) return fail('Pick the company account for this office bill.');
@@ -9082,6 +9329,12 @@ function printInvoiceList(){
 let settingsInited = false;
 
 function initSettings(){
+  ['setTaxEnabled','setTaxVatRate','setTaxSsclRate','setTaxInclusive'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('change', applyTaxFieldsUI);
+    if(el.type === 'number') el.addEventListener('input', applyTaxFieldsUI);
+  });
   settingsInited = true;
   if(!bookingsInited) initBookings();
 
@@ -9225,6 +9478,12 @@ function fillSettingsForm(){
   g('setCoPrefix').value  = APP_SETTINGS.invoicePrefix || 'CM';
   g('setDepositPct').value = depositPct();
   renderVillaCodeRows();
+  g('setTaxEnabled').checked   = !!APP_SETTINGS.taxEnabled;
+  g('setTaxVatNo').value       = APP_SETTINGS.taxVatNo || '';
+  g('setTaxVatRate').value     = APP_SETTINGS.taxVatRate !== undefined ? APP_SETTINGS.taxVatRate : 18;
+  g('setTaxSsclRate').value    = APP_SETTINGS.taxSsclRate !== undefined ? APP_SETTINGS.taxSsclRate : 2.5;
+  g('setTaxInclusive').checked = !!APP_SETTINGS.taxInclusive;
+  applyTaxFieldsUI();
   g('setReminderDays').value = reminderDays();
   g('setReminderStaffNumbers').value = APP_SETTINGS.reminderStaffNumbers || '';
   g('setReminderTemplate').value = APP_SETTINGS.reminderTemplate || SETTINGS_DEFAULTS.reminderTemplate;
@@ -9244,6 +9503,12 @@ function readSettingsForm(){
     bank: g('setCoBank'), terms: g('setCoTerms'),
   };
   APP_SETTINGS.invoicePrefix = (g('setCoPrefix') || 'CM').toUpperCase();
+  APP_SETTINGS.taxEnabled   = document.getElementById('setTaxEnabled').checked;
+  APP_SETTINGS.taxVatNo     = g('setTaxVatNo');
+  APP_SETTINGS.taxInclusive = document.getElementById('setTaxInclusive').checked;
+  const vRate = parseFloat(g('setTaxVatRate')), sRate = parseFloat(g('setTaxSsclRate'));
+  APP_SETTINGS.taxVatRate  = (isFinite(vRate) && vRate >= 0 && vRate <= 100) ? vRate : 0;
+  APP_SETTINGS.taxSsclRate = (isFinite(sRate) && sRate >= 0 && sRate <= 100) ? sRate : 0;
   const pct = parseFloat(g('setDepositPct'));
   APP_SETTINGS.depositPercent = (isFinite(pct) && pct > 0 && pct <= 100) ? pct : 25;
   // Merged, never replaced: replacing it used to wipe the code of any villa whose
@@ -9272,6 +9537,27 @@ function readSettingsForm(){
 }
 
 // One invoice-code box per villa, drawn the same way the deposits are.
+/* Shows the effect of the settings on a round number, because "inclusive or not"
+   is the part people get wrong and a worked example settles it at a glance. */
+function applyTaxFieldsUI(){
+  const on = document.getElementById('setTaxEnabled').checked;
+  document.getElementById('setTaxFields').style.display = on ? '' : 'none';
+  const ex = document.getElementById('setTaxExample');
+  if(!ex) return;
+  if(!on){ ex.textContent = ''; return; }
+  const saved = { e:APP_SETTINGS.taxEnabled, v:APP_SETTINGS.taxVatRate, s:APP_SETTINGS.taxSsclRate, i:APP_SETTINGS.taxInclusive };
+  APP_SETTINGS.taxEnabled   = true;
+  APP_SETTINGS.taxVatRate   = parseFloat(document.getElementById('setTaxVatRate').value) || 0;
+  APP_SETTINGS.taxSsclRate  = parseFloat(document.getElementById('setTaxSsclRate').value) || 0;
+  APP_SETTINGS.taxInclusive = document.getElementById('setTaxInclusive').checked;
+  const t = taxBreakdown(100000);
+  const n = x => Math.round(x).toLocaleString();
+  ex.textContent = APP_SETTINGS.taxInclusive
+    ? `A nightly total of 100,000 becomes: ${n(t.net)} before tax + ${n(t.sscl)} SSCL + ${n(t.vat)} VAT = 100,000 for the guest.`
+    : `A nightly total of 100,000 becomes: 100,000 + ${n(t.sscl)} SSCL + ${n(t.vat)} VAT = ${n(t.gross)} for the guest.`;
+  Object.assign(APP_SETTINGS, { taxEnabled:saved.e, taxVatRate:saved.v, taxSsclRate:saved.s, taxInclusive:saved.i });
+}
+
 function renderVillaCodeRows(){
   const wrap = document.getElementById('setVillaCodes');
   if(!wrap) return;
@@ -10375,6 +10661,59 @@ function fmt2(v){ return Number(v||0).toLocaleString('en-US', { minimumFractionD
 function monthLabel(d){ return d.toLocaleDateString('en-GB', { month:'long', year:'numeric' }); }
 
 /* ---------------------------- accounts ---------------------------- */
+/* What a villa's money was spent ON. How it was paid (petty cash, card, bank,
+   Sharon) is a separate question, answered by the card — so "water bottles, paid
+   from petty cash" and "water bill, paid by bank transfer" are two different
+   accounts even though both are water. Every code here starts with villa_ so the
+   whole family can be recognised at once; plain 'villa' is kept for everything
+   recorded before these existed. */
+const VILLA_ACCTS = [
+  ['villa_water',       'Drinking water & bottles'],
+  ['villa_food',        'Food & groceries'],
+  ['villa_cleaning',    'Cleaning supplies'],
+  ['villa_amenities',   'Guest amenities & toiletries'],
+  ['villa_linen',       'Linen & towels'],
+  ['villa_gas',         'Gas'],
+  ['villa_repairs',     'Repairs & maintenance'],
+  ['villa_garden_pool', 'Garden & pool'],
+  ['villa_util_water',  'Water bill'],
+  ['villa_util_elec',   'Electricity bill'],
+  ['villa_util_phone',  'Internet & phone'],
+  ['villa_transport',   'Transport'],
+  ['villa',             'Other villa cost'],
+];
+const VILLA_ACCT_LABEL = Object.fromEntries(VILLA_ACCTS);
+function isVillaAcct(code){ return !!code && (code === 'villa' || String(code).startsWith('villa_')); }
+
+// Word cues for a villa purchase. A bill comes before the bottle, so "water bill"
+// lands on the bill and "water" alone on drinking water.
+const VILLA_ACCT_KEYWORDS = [
+  [/water bill|water board|nwsdb/i, 'villa_util_water'],
+  [/electric|\bceb\b|leco/i, 'villa_util_elec'],
+  [/internet|wi-?fi|broadband|\bslt\b|dialog|mobitel|router/i, 'villa_util_phone'],
+  [/water|bottle/i, 'villa_water'],
+  [/fruit|veg|food|grocer|bread|milk|egg|rice|sugar|tea|coffee|meat|fish|chicken/i, 'villa_food'],
+  [/clean|detergent|soap|mop|broom|bleach|garbage|bin bag/i, 'villa_cleaning'],
+  [/shampoo|toilet|tissue|amenit|towel ?set|toiletr|welcome/i, 'villa_amenities'],
+  [/linen|sheet|pillow|duvet|towel|bedding/i, 'villa_linen'],
+  [/\bgas\b|lpg|cylinder/i, 'villa_gas'],
+  [/pool|chlorine|garden|plant|lawn|salt/i, 'villa_garden_pool'],
+  [/repair|plumb|electrician|mason|carpent|paint|fix|bulb/i, 'villa_repairs'],
+  [/tuk|taxi|fuel|petrol|diesel|transport|pickme|uber/i, 'villa_transport'],
+];
+function suggestVillaAccount(text){
+  const t = String(text || '');
+  for(const [re, code] of VILLA_ACCT_KEYWORDS){ if(re.test(t)) return code; }
+  return 'villa';
+}
+
+// Salaries are paid through Staff & Payroll. Recording one here as well would
+// count it twice — once in payroll and once as an expense.
+const SALARY_ACCTS = ['staff_salary', 'wages', 'bonus'];
+function looksLikeSalary(code, text){
+  return SALARY_ACCTS.includes(code) || /\bsalar(y|ies)\b|\bwages?\b/i.test(String(text || ''));
+}
+
 function isCompanyAcct(code){ return !!(code && CO_CAT_INDEX[code]); }
 // Where an expense goes. An explicit choice wins; otherwise villa and Store
 // purchases are obvious, and anything for the Office still needs sorting.
@@ -10385,7 +10724,7 @@ function acctOf(t){
   return null;
 }
 function acctLabel(code){
-  if(code === 'villa') return 'Villa cost';
+  if(isVillaAcct(code)) return VILLA_ACCT_LABEL[code] || 'Other villa cost';
   if(code === 'store') return 'Store stock';
   return (CO_CAT_INDEX[code] || {}).label || code || '';
 }
@@ -10400,8 +10739,9 @@ function acctOptionsHTML(selected, opts){
   const sel = v => v === selected ? ' selected' : '';
   let h = `<option value="">${esc(opts.placeholder || '— Pick an account —')}</option>`;
   if(!opts.companyOnly){
-    h += `<optgroup label="Charged to the villas (not a company expense)">
-      <option value="villa"${sel('villa')}>Villa cost — charged to the villa it was for</option>
+    h += `<optgroup label="Villa costs — charged to the villa it was for">` +
+      VILLA_ACCTS.map(([k,l])=>`<option value="${k}"${sel(k)}>${esc(l)}</option>`).join('') +
+      `</optgroup><optgroup label="Store">
       <option value="store"${sel('store')}>Store stock — charged to villas when distributed</option>
     </optgroup>`;
   }
@@ -10443,6 +10783,7 @@ function acctChipHTML(t){
   const code = acctOf(t);
   if(!code) return ' <span class="acct-chip open" title="Pick a company account for this — Company Accounts → Sort expenses">needs an account</span>';
   if(isCompanyAcct(code)) return ` <span class="acct-chip co" title="Company Accounts → ${esc(acctGroupLabel(code))}">${esc(acctLabel(code))}</span>`;
+  if(isVillaAcct(code) && code !== 'villa') return ` <span class="acct-chip" title="Villa cost">${esc(acctLabel(code))}</span>`;
   return '';
 }
 
@@ -10450,9 +10791,9 @@ function acctChipHTML(t){
 let expAccountTouched = false;
 function expAccountAutoValue(){
   const forWhom = document.getElementById('expFor').value;
-  if(forWhom === 'store') return 'store';
-  if(forWhom !== 'office') return 'villa';
   const txt = document.getElementById('expPurpose').value + ' ' + document.getElementById('expNote').value;
+  if(forWhom === 'store') return 'store';
+  if(forWhom !== 'office') return suggestVillaAccount(txt);
   return suggestAccount(txt) || '';
 }
 // Names the company might be paying a mobile bill for: staff profiles first, then
@@ -10489,13 +10830,21 @@ function updateExpenseAccountHint(auto){
   const hint = document.getElementById('expAccountHint');
   let msg;
   if(!code) msg = 'Pick the company account this belongs to — it decides where it lands in Company Accounts.';
-  else if(code === 'villa') msg = `Charged to ${FOR_LABELS[forWhom] || 'the villa'} — shows in that villa's report, not in the company's profit & loss.`;
+  else if(isVillaAcct(code)) msg = `${acctLabel(code)}, charged to ${FOR_LABELS[forWhom] || 'the villa'} — shows in that villa's report, not in the company's profit & loss.`;
   else if(code === 'store') msg = 'Store stock — charged to the villas as items are distributed, not a company expense.';
   else msg = `Company expense → Company Accounts › ${acctGroupLabel(code)} › ${acctLabel(code)}.`;
-  if(auto && code && forWhom === 'office') msg = 'Suggested from what you typed. ' + msg;
+  if(auto && code && code !== 'villa' && forWhom !== 'store') msg = 'Suggested from what you typed — change it if it is wrong. ' + msg;
   hint.textContent = msg;
+  updateSalaryWarning();
   document.getElementById('expAccount').classList.toggle('open', !code);
   applyWhosePicker('expWhose', 'expWhoseWrap', 'expPurpose', code);
+}
+function updateSalaryWarning(){
+  const warn = document.getElementById('expSalaryWarn');
+  if(!warn) return;
+  const code = document.getElementById('expAccount').value;
+  const txt = document.getElementById('expPurpose').value + ' ' + document.getElementById('expNote').value;
+  warn.style.display = looksLikeSalary(code, txt) ? '' : 'none';
 }
 function expAccountAuto(){
   if(expAccountTouched) return;
@@ -10518,6 +10867,13 @@ function initExpenseAccountField(record){
   document.getElementById('expFor').addEventListener('change', ()=> setTimeout(expAccountAuto, 0));
   document.getElementById('expCard').addEventListener('change', ()=> setTimeout(expAccountAuto, 0));
   document.getElementById('expPurpose').addEventListener('input', expAccountAuto);
+  document.getElementById('expPurpose').addEventListener('input', updateSalaryWarning);
+  document.getElementById('expSalaryGo').addEventListener('click', ()=>{
+    document.getElementById('expenseModalOverlay').classList.remove('open');
+    const tab = document.querySelector('.maintab-btn[data-tab="payroll"]');
+    if(tab && tab.style.display !== 'none') tab.click();
+    else alert('Salaries are recorded under Staff & Payroll. Ask Makky to enter it there.');
+  });
   document.getElementById('expNote').addEventListener('input', expAccountAuto);
 })();
 
@@ -10647,7 +11003,7 @@ function coLinkedFigures(monthDate){
   allCashTxns.filter(t => t.type === 'expense' && t.date >= start && t.date < end).forEach(t=>{
     const code = acctOf(t);
     if(!code){ petty.open += t.amount; petty.openCount++; return; }
-    if(code === 'villa'){ petty.villa += t.amount; return; }
+    if(isVillaAcct(code)){ petty.villa += t.amount; return; }
     if(code === 'store'){ petty.store += t.amount; return; }
     petty.company += t.amount;
     add(code, 'petty', t.amount);
@@ -10820,7 +11176,7 @@ function renderCoSort(){
   monthTx.forEach(t=>{
     const code = acctOf(t);
     if(!code){ tally.open += t.amount; tally.openCount++; }
-    else if(code === 'villa' || code === 'store') tally.villaStore += t.amount;
+    else if(isVillaAcct(code) || code === 'store') tally.villaStore += t.amount;
     else tally.company += t.amount;
   });
   const openAllTime = unsortedExpenses();
