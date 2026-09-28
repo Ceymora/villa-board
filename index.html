@@ -396,6 +396,49 @@
     cursor:pointer; font-size:12px; padding:0; margin-top:8px;
   }
 
+  /* ---- View-only sections: every control that changes something is removed ---- */
+  .ro-banner{
+    background:var(--blue-bg); border:1px solid #b9d4f1; color:#1b4f86; border-radius:8px;
+    padding:8px 12px; font-size:12.5px; margin-bottom:12px;
+  }
+  body.ro-housekeeping #housekeepingPanel :is(#addVillaBtn,#addEmployeeBtn,#resetWeek,.manage-edit,.manage-del),
+  body.ro-housekeeping :is(#villaSave,#villaDeleteBtn,#empSave,#empDeleteBtn),
+  body.ro-bookings #bookingsPanel :is(#addBookingBtn,.manage-edit,.manage-del),
+  body.ro-bookings :is(#btnSave,#btnDelete,#cxConfirm),
+  body.ro-pettycash #pettyCashPanel :is(.toolbar-actions .add-booking-btn,.manage-edit,.manage-del,.adv-undo-btn,[data-adv-act]),
+  body.ro-pettycash :is(#incSave,#expSave,#advSave,#advDeleteBtn,#advBillAdd,#advUndoEntries,#mpSave),
+  body.ro-inventory #inventoryPanel :is(#addPurchaseBtn,#addDistributeBtn,.manage-edit,.manage-del,.inv-del-btn),
+  body.ro-inventory :is(#purSave,#distSave),
+  body.ro-villareport #villaReportPanel :is(#vrOwnerPayBtn,#vrDirectPayBtn,#myPurchaseBtn,#opExButtons,[data-opex-id],[data-dp-id]),
+  body.ro-villareport :is(#opSave,#opExSave,#dpSave,#dpDeleteBtn),
+  body.ro-company #companyPanel :is(#coSortAuto,#coRebuild,#coPullCommission,#coCalcEpf,#coCopyPrev,#coSaveBtn,.manage-edit,.manage-del),
+  body.ro-company :is(#ceSave,#ceDelete),
+  body.ro-payroll #payrollPanel :is(#payPrepare,#payAddStaff,.manage-edit,.manage-del),
+  body.ro-payroll :is(#spSave,#spDelete,#psSave,#psDelete),
+  body.ro-settings #settingsPanel :is(#setSaveBtn,[data-villa-photo],[data-villa-photo-remove],#setLogoFile,#setLogoRemove),
+  body.ro-users #usersPanel :is(#addUserBtn,.manage-edit,[data-approve],[data-reject]),
+  body.ro-users :is(#userSave,#userDeleteBtn){ display:none !important; }
+  /* Clicks that would start an edit do nothing in a view-only section. */
+  body.ro-housekeeping #housekeepingPanel .mark,
+  body.ro-bookings #bookingsPanel .cal-daybg{ pointer-events:none !important; cursor:default !important; }
+  /* Typed figures stay readable but cannot be changed. */
+  body.ro-company #companyPanel :is(input:not([type=radio]):not([type=checkbox]),textarea),
+  body.ro-payroll #payrollPanel :is(input,textarea),
+  body.ro-settings #settingsPanel :is(input:not([type=file]),textarea){ pointer-events:none; background:#f7f5f0; }
+
+  /* ---- The permission grid ---- */
+  #userModalOverlay .modal{ width:min(560px, 100%); max-width:560px; }
+  .perm-grid{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+  .perm-grid th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted);
+    padding:6px 8px; border-bottom:2px solid var(--board-line); }
+  .perm-grid th.c, .perm-grid td.c{ text-align:center; width:92px; }
+  .perm-grid td{ padding:7px 8px; border-bottom:1px solid #eeebe1; vertical-align:middle; }
+  .perm-grid tr.on-see td:first-child{ font-weight:700; }
+  .perm-grid .what{ display:block; font-size:11px; color:var(--muted); font-weight:400; margin-top:1px; }
+  .perm-grid input[type=checkbox]{ width:17px; height:17px; cursor:pointer; }
+  .perm-grid .na{ color:#c9c3b6; font-size:11px; }
+  .perm-grid.locked{ opacity:.55; pointer-events:none; }
+
   /* Permission tick boxes */
   .perm-group{ margin-top:12px; }
   .perm-group-title{
@@ -3073,36 +3116,54 @@ let currentUser = null; // { username, email, role, perms:Set, villaScopes:[] }
    A profile with nothing ticked falls back to whatever its old role allowed,
    so nobody loses access the day this arrives.
 --------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   WHAT EACH PERSON MAY DO — one row per section of the app, two ticks per row:
+   "Can see" opens the tab; "Can change" lets them add, edit and save there.
+   Change always includes see. A section with no Change column is a view in its
+   own right (Reports, Villa Expenses, the Activity Log) — its figures are changed
+   where they are recorded, not there.
+
+   The database checks the same ticks on every read and write (file 9), so a
+   hidden button is never the only thing standing in the way.
+--------------------------------------------------------------------------- */
+const AREAS = [
+  { key:'housekeeping', label:'Housekeeping',      see:'tab_housekeeping', change:'edit_housekeeping',
+    changeLabel:'tick off rooms, add staff',                     panel:'housekeepingPanel' },
+  { key:'bookings',     label:'Bookings Calendar', see:'tab_bookings',     change:'edit_bookings',
+    changeLabel:'add, edit and cancel bookings, invoices',       panel:'bookingsPanel' },
+  { key:'pettycash',    label:'Petty Cash',        see:'tab_pettycash',    change:'edit_cash',
+    changeLabel:'record expenses, money in, advances, transfers', panel:'pettyCashPanel' },
+  { key:'inventory',    label:'Inventory',         see:'tab_inventory',    change:'edit_inventory',
+    changeLabel:'record purchases and send stock to villas',     panel:'inventoryPanel' },
+  { key:'expenses',     label:'Villa Expenses',    see:'tab_expenses',     change:null,
+    changeLabel:'',                                              panel:'expensesPanel' },
+  { key:'villareport',  label:'Villa Report',      see:'tab_villareport',  change:'edit_villareport',
+    changeLabel:'owner payments, direct payments, villa bills',  panel:'villaReportPanel' },
+  { key:'reports',      label:'Reports',           see:'tab_reports',      change:null,
+    changeLabel:'',                                              panel:'reportsPanel' },
+  { key:'company',      label:'Company Accounts',  see:'tab_company',      change:'edit_company',
+    changeLabel:'enter and sort the monthly figures',            panel:'companyPanel' },
+  { key:'payroll',      label:'Staff & Payroll',   see:'tab_payroll',      change:'edit_payroll',
+    changeLabel:'staff profiles, salaries, pay slips',           panel:'payrollPanel' },
+  { key:'activitylog',  label:'Activity Log',      see:'tab_activitylog',  change:null,
+    changeLabel:'',                                              panel:'activityLogPanel' },
+  { key:'settings',     label:'Invoices & Setup',  see:'tab_settings',     change:'edit_settings',
+    changeLabel:'company details, logo, villa photos, tax, deposits', panel:'settingsPanel' },
+  { key:'users',        label:'Users',             see:'tab_users',        change:'manage_users',
+    changeLabel:'approve people and change their ticks',          panel:'usersPanel' },
+];
+const AREA = Object.fromEntries(AREAS.map(a => [a.key, a]));
+const TRUSTED_PERMS = [
+  { key:'approve_undo',   label:'Approve an undo on a settled advance' },
+  { key:'delete_records', label:'Delete records' },
+  { key:'backup',         label:'Download a full backup of everything' },
+  { key:'admin',          label:'Full admin — everything, always', master:true },
+];
+// Kept in the old shape for the summaries elsewhere in the app.
 const PERM_GROUPS = [
-  { title:'Tabs they can open', items:[
-    { key:'tab_housekeeping', label:'Housekeeping' },
-    { key:'tab_bookings',     label:'Bookings Calendar' },
-    { key:'tab_pettycash',    label:'Petty Cash' },
-    { key:'tab_inventory',    label:'Inventory' },
-    { key:'tab_expenses',     label:'Villa Expenses' },
-    { key:'tab_villareport',  label:'Villa Report' },
-    { key:'tab_reports',      label:'Reports' },
-    { key:'tab_company',      label:'Company Accounts' },
-    { key:'tab_payroll',      label:'Staff & Payroll' },
-    { key:'tab_activitylog',  label:'Activity Log' },
-    { key:'tab_settings',     label:'Invoices & Setup' },
-    { key:'tab_users',        label:'Users' },
-  ]},
-  { title:'What they can change', items:[
-    { key:'edit_cash',       label:'Record & edit petty cash, expenses, advances' },
-    { key:'edit_inventory',  label:'Record & edit inventory' },
-    { key:'edit_bookings',   label:'Add & edit bookings' },
-    { key:'edit_housekeeping', label:'Tick off housekeeping' },
-    { key:'edit_company',    label:'Enter company account figures' },
-    { key:'edit_payroll',    label:'Enter payroll & staff pay' },
-  ]},
-  { title:'Trusted actions', items:[
-    { key:'approve_undo',   label:'Approve an undo on a settled advance' },
-    { key:'delete_records', label:'Delete records' },
-    { key:'manage_users',   label:'Add people and change what they can do' },
-    { key:'backup',         label:'Download a full backup of everything' },
-    { key:'admin',          label:'Full admin — everything above, always', master:true },
-  ]},
+  { title:'Can see', items: AREAS.map(a => ({ key:a.see, label:a.label })) },
+  { title:'Can change', items: AREAS.filter(a => a.change).map(a => ({ key:a.change, label:a.label + ' — ' + a.changeLabel })) },
+  { title:'Trusted actions', items: TRUSTED_PERMS },
 ];
 const ALL_PERMS = PERM_GROUPS.flatMap(g => g.items.map(i => i.key));
 const PERM_LABEL = Object.fromEntries(PERM_GROUPS.flatMap(g => g.items.map(i => [i.key, i.label])));
@@ -3115,6 +3176,7 @@ const PERM_PRESETS = {
                             'edit_cash','edit_inventory','edit_bookings'],
   viewer: ['tab_housekeeping','tab_bookings','tab_pettycash','tab_inventory','tab_expenses',
            'tab_villareport','tab_reports'],
+  bookings_only: ['tab_bookings','edit_bookings','tab_housekeeping'],
   viewer_villa_select: ['tab_villareport','tab_bookings'],
   viewer_villa_fixed:  ['tab_villareport','tab_bookings'],
 };
@@ -3123,6 +3185,7 @@ const PRESET_LABELS = {
   cash_inventory: 'Petty cash & inventory (Zahny)',
   cash_inventory_bookings: 'Petty cash, inventory & bookings',
   viewer: 'View everything, no editing',
+  bookings_only: 'Bookings (can change) + housekeeping (view)',
   viewer_villa_select: 'Villa report only',
 };
 
@@ -3143,9 +3206,13 @@ function hasPerm(key){
   return currentUser.perms.has('admin') || currentUser.perms.has(key);
 }
 function canEdit(){ return hasPerm('edit_cash'); }
+function canChange(area){ const a = AREA[area]; return !!(a && a.change && hasPerm(a.change)); }
+function canSee(area){ const a = AREA[area]; return !!a && (hasPerm(a.see) || (a.change && hasPerm(a.change))); }
+function canApproveUndo(){ return hasPerm('approve_undo'); }
+function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-backup';
+const APP_VERSION = 'v2026.09.28-access';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3361,6 +3428,9 @@ const DB_CHECKS = [
     // Asks the database whether the bills bucket really is private AND the rule that
     // lets staff open bills really exists — a half-finished run shows as not done.
     test: async () => { const { data, error } = await sb.rpc('files_are_private'); return !error && data === true; } },
+  { file:'9-supabase-section-permissions.sql', what:'The database obeys each person\'s "Can see / Can change" ticks',
+    critical:true,
+    test: async () => { const { data, error } = await sb.rpc('section_perms_ready'); return !error && data === true; } },
 ];
 
 async function runDbSetupCheck(){
@@ -3403,30 +3473,31 @@ function startApp(){
 }
 
 function applyRolePermissions(){
-  /* Tabs appear because a box is ticked for them, not because of a job title.
-     Every tab is listed here once; anything the person has not been given is
-     simply not in the tab bar. The database enforces the same list again on
-     every read and write, so hiding a tab is the courtesy, not the lock. */
-  const TAB_PERM = {
-    housekeeping:'tab_housekeeping', bookings:'tab_bookings', pettycash:'tab_pettycash',
-    inventory:'tab_inventory', expenses:'tab_expenses', villareport:'tab_villareport',
-    reports:'tab_reports', company:'tab_company', payroll:'tab_payroll',
-    activitylog:'tab_activitylog', users:'tab_users', settings:'tab_settings',
-  };
+  /* A tab appears when its section is ticked "Can see" (or "Can change"). A
+     section they can see but not change turns read-only: its add, edit, save and
+     delete controls disappear and a "View only" note says why. Downloads and
+     printing stay, because reading a figure includes taking a copy of it. */
   const btnOf = t => document.querySelector('.maintab-btn[data-tab="' + t + '"]');
   const allowed = [];
-  for(const tab in TAB_PERM){
-    const btn = btnOf(tab);
+  for(const a of AREAS){
+    const btn = btnOf(a.key);
     if(!btn) continue;
-    const on = hasPerm(TAB_PERM[tab]);
+    const on = canSee(a.key);
     btn.style.display = on ? '' : 'none';
-    if(on) allowed.push(tab);
+    if(on) allowed.push(a.key);
+    const readOnly = on && a.change && !canChange(a.key);
+    document.body.classList.toggle('ro-' + a.key, !!readOnly);
+    const panel = document.getElementById(a.panel);
+    if(panel && readOnly && !panel.querySelector(':scope > .ro-banner')){
+      const note = document.createElement('div');
+      note.className = 'ro-banner';
+      note.innerHTML = '&#128065; <b>View only.</b> You can look, print and download here, but not change anything. Ask Makky if you need to.';
+      panel.prepend(note);
+    }
+    if(panel && !readOnly){ const n = panel.querySelector(':scope > .ro-banner'); if(n) n.remove(); }
   }
-
-  // Someone with no editing tick at all gets the read-only skin.
-  const canChangeSomething = ['edit_cash','edit_inventory','edit_bookings','edit_housekeeping',
-    'edit_company','edit_payroll','manage_users','admin'].some(hasPerm);
-  document.body.classList.toggle('viewer-mode', !canChangeSomething);
+  // The old all-or-nothing read-only switch is replaced by the per-section one.
+  document.body.classList.remove('viewer-mode');
 
   // Land on the first tab they actually have, whichever that is.
   const PANELS = {
@@ -3493,6 +3564,8 @@ function applyRolePermissions(){
 document.querySelectorAll('.maintab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const tab = btn.dataset.tab;
+    // A hidden tab is not a locked one — refuse it here too.
+    if(currentUser && AREA[tab] && !canSee(tab)) return;
     // Month figures live in the form until they're saved — don't drop them on a tab change.
     if(typeof coDirty !== 'undefined' && coDirty && tab !== 'company'
        && document.getElementById('companyPanel').style.display !== 'none'){
@@ -3964,7 +4037,7 @@ document.getElementById('empSave').addEventListener('click', async ()=>{
 });
 document.getElementById('empDeleteBtn').addEventListener('click', async ()=>{
   if(!editingStaffId) return;
-  if(!isAdmin()){ alert('Only an admin can delete employees.'); return; }
+  if(!canDelete()){ alert('You do not have permission to delete records.'); return; }
   if(!checkDeletePassword()) return;
   if(!confirm('Remove this employee from the board?')) return;
   try{
@@ -4052,7 +4125,7 @@ function renderHK(){
       tagSpan.style.background = `color-mix(in srgb, ${villa.color} 12%, white)`;
       tagSpan.style.color = villa.color;
       tagSpan.innerHTML = `${esc(villa.name)}<span class="villa-dot" style="background:${esc(villa.color)}"></span>`;
-      if(canEdit()){
+      if(canChange('housekeeping')){
         tagSpan.style.cursor = 'pointer';
         tagSpan.title = 'Click to edit this villa';
         tagSpan.addEventListener('click', ()=> openVillaModal(villa));
@@ -4065,7 +4138,7 @@ function renderHK(){
     const nameSpan = document.createElement('span');
     nameSpan.className = 'staffname';
     nameSpan.textContent = person.name;
-    if(canEdit()){
+    if(canChange('housekeeping')){
       nameSpan.style.cursor = 'pointer';
       nameSpan.style.textDecoration = 'underline dotted';
       nameSpan.title = 'Click to edit this employee';
@@ -4429,7 +4502,7 @@ function renderManageList(villaBookings){
       invBtn.addEventListener('click', ()=> printInvoice(b));
       row.appendChild(invBtn);
     }
-    if(canEdit()){
+    if(canChange('bookings')){
       const editBtn = document.createElement('button');
       editBtn.className = 'manage-edit';
       editBtn.textContent = 'Edit';
@@ -5885,9 +5958,9 @@ function renderCash(){
     if(isAdvanceParent(t) && t.settled){
       const ub = document.createElement('button');
       ub.className = 'adv-undo-btn'; ub.style.marginRight = '4px';
-      ub.textContent = isAdmin() ? (t.undoRequestedBy ? '↩ Approve undo' : '↩ Undo') : '↩ Request undo';
-      if(isAdmin() || (canEdit() && !t.undoRequestedBy)){
-        ub.addEventListener('click', ()=> isAdmin() ? advApproveUndo(t) : advRequestUndo(t));
+      ub.textContent = canApproveUndo() ? (t.undoRequestedBy ? '↩ Approve undo' : '↩ Undo') : '↩ Request undo';
+      if(canApproveUndo() || (canEdit() && !t.undoRequestedBy)){
+        ub.addEventListener('click', ()=> canApproveUndo() ? advApproveUndo(t) : advRequestUndo(t));
         actionTd.appendChild(ub);
       }
     }
@@ -5896,7 +5969,7 @@ function renderCash(){
     delBtn.textContent = 'Delete';
     delBtn.addEventListener('click', async ()=>{
       const parentAdv = (t.advanceId && allCashTxns.find(a => String(a.id) === String(t.advanceId))) || (t.type === 'advance' ? t : null);
-      if(!isAdmin() && parentAdv && parentAdv.settled){
+      if(!canApproveUndo() && parentAdv && parentAdv.settled){
         alert('This line belongs to a settled advance, so only Makky can delete it. Request an undo first if it\'s wrong.');
         return;
       }
@@ -6039,7 +6112,7 @@ let expLinkAdvanceId = null, expReturnToAdvance = null;
 // invoice exactly like any other bill — it just never touches a card.
 let expBankMode = false;
 function billLockedBySettledAdvance(t){
-  if(!t || !t.advanceId || isAdmin()) return false;
+  if(!t || !t.advanceId || canApproveUndo()) return false;
   const parent = allCashTxns.find(a => String(a.id) === String(t.advanceId));
   return !!(parent && parent.settled);
 }
@@ -6304,7 +6377,7 @@ function advLogHTML(log){
     return `${esc(when)} — ${esc(e.text)}${e.by ? ' · ' + esc(e.by) : ''}`;
   }).join('<br>') + '</div>';
 }
-function advLocked(record){ return !!(record && record.settled && !isAdmin()); }
+function advLocked(record){ return !!(record && record.settled && !canApproveUndo()); }
 
 function openAdvanceModal(record){
   // A top-up or returned-cash line belongs to its advance — open that instead.
@@ -6650,9 +6723,9 @@ function renderAdvStatus(){
   if(adv.settled){
     if(adv.undoRequestedBy){
       cls = cls === 'bad' ? 'bad' : 'warn';
-      head += `<br><b>Undo requested by ${esc(adv.undoRequestedBy)}</b>${adv.undoReason ? ' — “' + esc(adv.undoReason) + '”' : ''}. ${isAdmin() ? 'Waiting for your approval.' : 'Waiting for Makky to approve.'}`;
-      if(isAdmin()) actions = `<button type="button" class="btn btn-save" data-adv-act="approve">Approve undo</button> <button type="button" class="btn btn-cancel" data-adv-act="reject">Reject</button>`;
-    } else if(isAdmin()){
+      head += `<br><b>Undo requested by ${esc(adv.undoRequestedBy)}</b>${adv.undoReason ? ' — “' + esc(adv.undoReason) + '”' : ''}. ${canApproveUndo() ? 'Waiting for your approval.' : 'Waiting for Makky to approve.'}`;
+      if(canApproveUndo()) actions = `<button type="button" class="btn btn-save" data-adv-act="approve">Approve undo</button> <button type="button" class="btn btn-cancel" data-adv-act="reject">Reject</button>`;
+    } else if(canApproveUndo()){
       actions = `<button type="button" class="adv-undo-btn" data-adv-act="undo">↩ Undo settlement</button>`;
     } else if(canEdit()){
       actions = `<button type="button" class="adv-undo-btn" data-adv-act="request">↩ Request undo</button>`;
@@ -6686,7 +6759,7 @@ async function advRequestUndo(adv){
   await advReload(adv.id, true);
 }
 async function advApproveUndo(adv){
-  if(!isAdmin()){ alert('Only Makky (admin) can undo a settlement.'); return; }
+  if(!canApproveUndo()){ alert('You do not have permission to approve an undo.'); return; }
   const asked = adv.undoRequestedBy ? `${adv.undoRequestedBy} asked: “${adv.undoReason || ''}”\n\n` : '';
   if(!confirm(`${asked}Reopen ${adv.employeeName}'s advance of LKR ${adv.amount.toLocaleString()}?\n\nIts bills and any returned cash stay recorded (they're real). The advance goes back to “Advances to staff” so the bills can be corrected, then settled again.`)) return;
   const log = [...(adv.settleLog || []), advStamp(adv.undoRequestedBy ? `Undo approved (asked by ${adv.undoRequestedBy})` : 'Settlement undone')];
@@ -6699,7 +6772,7 @@ async function advApproveUndo(adv){
   await advReload(adv.id, true);
 }
 async function advRejectUndo(adv){
-  if(!isAdmin()) return;
+  if(!canApproveUndo()) return;
   const why = prompt('Reason for rejecting (optional):', '');
   if(why === null) return;
   const log = [...(adv.settleLog || []), advStamp(`Undo request from ${adv.undoRequestedBy} rejected${why.trim() ? ': ' + why.trim() : ''}`)];
@@ -6913,10 +6986,10 @@ function renderSettledAdvances(){
     view.className = 'manage-invoice'; view.textContent = 'View details';
     view.addEventListener('click', ()=> openAdvanceModal(t));
     row.appendChild(view);
-    if(isAdmin() && t.undoRequestedBy){
+    if(canApproveUndo() && t.undoRequestedBy){
       const ap = document.createElement('button'); ap.className = 'adv-undo-btn'; ap.textContent = '↩ Approve undo';
       ap.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(ap);
-    } else if(isAdmin()){
+    } else if(canApproveUndo()){
       const un = document.createElement('button'); un.className = 'adv-undo-btn'; un.textContent = '↩ Undo settlement';
       un.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(un);
     } else if(canEdit() && !t.undoRequestedBy){
@@ -6945,11 +7018,11 @@ function renderUnsortedNotice(){
   const tab = document.querySelector('.maintab-btn[data-tab="company"]');
   if(tab){
     if(!tab.dataset.base) tab.dataset.base = tab.textContent;
-    tab.textContent = tab.dataset.base + (isAdmin() && open.length ? ` 🔔${open.length}` : '');
+    tab.textContent = tab.dataset.base + (canChange('company') && open.length ? ` 🔔${open.length}` : '');
   }
   const el = document.getElementById('unsortedNotice');
   if(!el) return;
-  if(!open.length || !canEdit()){ el.style.display = 'none'; return; }
+  if(!open.length || !(canEdit() || canChange('company'))){ el.style.display = 'none'; return; }
   el.style.display = '';
   el.innerHTML = `<b>${open.length} expense${open.length===1?'':'s'} (LKR ${Math.round(amount).toLocaleString()}) ${open.length===1?'has':'have'} no account yet</b>, so ${open.length===1?'it is':'they are'} missing from the company reports.
     <div style="margin-top:6px;"><button type="button" class="rpt-quick" id="goSortNow">Sort them now</button></div>`;
@@ -6973,9 +7046,9 @@ function renderUndoRequests(){
   const tab = document.querySelector('.maintab-btn[data-tab="pettycash"]');
   if(tab){
     if(!tab.dataset.base) tab.dataset.base = tab.textContent;
-    tab.textContent = tab.dataset.base + (isAdmin() && pending.length ? ` 🔔${pending.length}` : '');
+    tab.textContent = tab.dataset.base + (canApproveUndo() && pending.length ? ` 🔔${pending.length}` : '');
   }
-  if(!isAdmin() || !pending.length){ sec.style.display = 'none'; return; }
+  if(!canApproveUndo() || !pending.length){ sec.style.display = 'none'; return; }
   sec.style.display = '';
   wrap.innerHTML = '';
   for(const t of pending){
@@ -7158,7 +7231,7 @@ function renderInventory(){
       `;
       const actionTd = document.createElement('td');
       actionTd.style.whiteSpace = 'nowrap';
-      if(canEdit()){
+      if(canChange('inventory')){
         const editBtn = document.createElement('button');
         editBtn.className = 'manage-edit';
         editBtn.textContent = 'Edit';
@@ -7553,6 +7626,10 @@ function initVillaReport(){
   if(!cashInited){ initPettyCash(); }
   if(!invInited){ initInventory(); }
   if(!bookingsInited){ initBookings(); }
+  // Owner payments show in each villa's settlement; load them here too, so someone
+  // who only has the Villa Report still sees them (they used to arrive only with
+  // Company Accounts or Payroll).
+  if(!allOwnerPayments.length) fetchOwnerPayments().then(()=>{ if(typeof renderVillaReport === 'function') renderVillaReport(); });
   if(!opExInited){
     opExInited = true;
     fetchOpEx();
@@ -7581,7 +7658,7 @@ function initVillaReport(){
   document.getElementById('vrThisMonth').addEventListener('click', ()=>{ vrMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderVillaReport(); });
   document.getElementById('vrPrintBtn').addEventListener('click', ()=> window.print());
 
-  if(canEdit() || isAdmin()){
+  if(canChange('villareport') || canChange('pettycash')){
     document.getElementById('myPurchaseBtn').style.display = '';
     document.getElementById('myPurchasesSummary').style.display = '';
     document.getElementById('myPurchaseBtn').addEventListener('click', ()=> openMyPurchaseModal());
@@ -7641,7 +7718,7 @@ function openDirectPayModal(record, villaId){
   g('dpFileHint').innerHTML = existing.length
     ? `${existing.length} file(s) already attached: ` + existing.map((u,i)=>`<a href="#" data-receipt="${esc(u)}">#${i+1}</a>`).join(' ') : '';
   g('dpError').style.display = 'none';
-  g('dpDeleteBtn').style.display = (record && isAdmin()) ? '' : 'none';
+  g('dpDeleteBtn').style.display = (record && canDelete()) ? '' : 'none';
   dpApplyCardHint();
   g('dpModalOverlay').classList.add('open');
 }
@@ -7655,7 +7732,7 @@ document.getElementById('dpSave').addEventListener('click', async ()=>{
   const errEl = g('dpError');
   const fail = m => { errEl.textContent = m; errEl.style.display = 'block'; };
   if(!sb) return fail('Not connected to Supabase yet.');
-  if(!canEdit() && !isAdmin()) return fail('You do not have permission to record payments.');
+  if(!(canChange('villareport') || canChange('pettycash'))) return fail('You do not have permission to record payments.');
   const date = g('dpDate').value;
   const amount = parseFloat(g('dpAmount').value);
   const villa = g('dpVilla').value;
@@ -7693,7 +7770,7 @@ document.getElementById('dpSave').addEventListener('click', async ()=>{
 });
 
 document.getElementById('dpDeleteBtn').addEventListener('click', async ()=>{
-  if(!editingDirectPayId || !isAdmin()) return;
+  if(!editingDirectPayId || !canDelete()) return;
   if(!checkDeletePassword()) return;
   if(!confirm('Delete this direct payment?')) return;
   try{
@@ -7717,11 +7794,11 @@ async function renderVillaReport(){
   if(myToken !== villaReportToken) return; // a newer render started
 
   document.getElementById('villaReportBody').innerHTML = html;
-  if(canEdit() || isAdmin()) renderMyPurchasesSummary();
+  if(canChange('villareport') || canChange('pettycash')) renderMyPurchasesSummary();
 
   // Wire up the "+ category" buttons — admin only
   const btnWrap = document.getElementById('opExButtons');
-  if(btnWrap && isAdmin()){
+  if(btnWrap && canChange('villareport')){
     const categories = [
       { key:'salary', label:'+ Salary' },
       { key:'water', label:'+ Water Bill' },
@@ -7739,7 +7816,7 @@ async function renderVillaReport(){
   }
   // Wire up delete buttons for operating expense rows — admin only
   document.querySelectorAll('#villaReportBody [data-opex-id]').forEach(btn=>{
-    if(!isAdmin()){ btn.style.display = 'none'; return; }
+    if(!canDelete()){ btn.style.display = 'none'; return; }
     btn.addEventListener('click', async ()=>{
       if(!checkDeletePassword()) return;
       if(confirm('Delete this expense?')){
@@ -7754,7 +7831,7 @@ async function renderVillaReport(){
   });
   // Edit buttons on the direct payment rows
   document.querySelectorAll('#villaReportBody [data-dp-id]').forEach(btn=>{
-    if(!canEdit() && !isAdmin()){ btn.style.display = 'none'; return; }
+    if(!(canChange('villareport') || canChange('pettycash'))){ btn.style.display = 'none'; return; }
     btn.addEventListener('click', ()=>{
       const rec = allCashTxns.find(t => String(t.id) === btn.dataset.dpId);
       if(rec) openDirectPayModal(rec);
@@ -8858,13 +8935,16 @@ async function fetchAppUsers(){
 function permSummary(u){
   const set = permsOf(u);
   if(set.has('admin')) return '<b>Full admin</b> — everything';
-  const tabs = PERM_GROUPS[0].items.filter(i => set.has(i.key)).map(i => i.label);
-  const does = [...PERM_GROUPS[1].items, ...PERM_GROUPS[2].items]
-    .filter(i => set.has(i.key)).map(i => i.label);
-  if(!tabs.length && !does.length) return '<span class="dim">Nothing ticked yet</span>';
-  let out = tabs.length ? `<b>Sees:</b> ${esc(tabs.join(', '))}` : '<b>Sees:</b> nothing';
-  if(does.length) out += `<div class="ce-sub"><b>Can:</b> ${esc(does.join(' · '))}</div>`;
-  else out += '<div class="ce-sub">View only</div>';
+  const change = [], view = [];
+  for(const a of AREAS){
+    if(a.change && set.has(a.change)) change.push(a.label);
+    else if(set.has(a.see)) view.push(a.label);
+  }
+  const extra = TRUSTED_PERMS.filter(t => t.key !== 'admin' && set.has(t.key)).map(t => t.label);
+  if(!change.length && !view.length && !extra.length) return '<span class="dim">Nothing ticked yet</span>';
+  let out = change.length ? `<b>Can change:</b> ${esc(change.join(', '))}` : '<b>Can change:</b> nothing';
+  if(view.length) out += `<div class="ce-sub"><b>View only:</b> ${esc(view.join(', '))}</div>`;
+  if(extra.length) out += `<div class="ce-sub"><b>Also:</b> ${esc(extra.join(' · '))}</div>`;
   return out;
 }
 function scopeSummary(u){
@@ -8943,20 +9023,51 @@ let editingUsername = null;   // the email of the profile being edited
 let userPermState = new Set();
 let userScopeState = new Set();
 
+/* One row per section: "Can see" and "Can change". Ticking Change ticks See with
+   it; unticking See clears Change, because you cannot change what you cannot open. */
 function renderPermChips(){
   const grid = document.getElementById('userPermGrid');
   const master = userPermState.has('admin');
-  grid.innerHTML = PERM_GROUPS.map(g => `
+  const has = k => master || userPermState.has(k);
+  grid.innerHTML = `
+    <table class="perm-grid${master ? ' locked' : ''}">
+      <thead><tr><th>Section</th><th class="c">Can see</th><th class="c">Can change</th></tr></thead>
+      <tbody>${AREAS.map(a => {
+        const see = has(a.see) || (a.change && has(a.change));
+        const chg = a.change && has(a.change);
+        return `<tr class="${see ? 'on-see' : ''}">
+          <td>${esc(a.label)}${a.change ? `<span class="what">Change = ${esc(a.changeLabel)}</span>`
+                                         : '<span class="what">A view — figures are changed where they are recorded</span>'}</td>
+          <td class="c"><input type="checkbox" data-see="${esc(a.key)}" ${see ? 'checked' : ''} ${master ? 'disabled' : ''}
+                 aria-label="${esc(a.label)} — can see"></td>
+          <td class="c">${a.change ? `<input type="checkbox" data-chg="${esc(a.key)}" ${chg ? 'checked' : ''} ${master ? 'disabled' : ''}
+                 aria-label="${esc(a.label)} — can change">` : '<span class="na">—</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
     <div class="perm-group">
-      <div class="perm-group-title">${esc(g.title)}</div>
-      <div class="perm-row">${g.items.map(i => {
+      <div class="perm-group-title">Trusted actions</div>
+      <div class="perm-row">${TRUSTED_PERMS.map(i => {
         const on = master || userPermState.has(i.key);
         const locked = master && i.key !== 'admin';
         return `<label class="perm-chip${on ? ' on' : ''}${i.master ? ' master' : ''}${locked ? ' locked' : ''}">
           <input type="checkbox" data-perm="${esc(i.key)}" ${on ? 'checked' : ''} ${locked ? 'disabled' : ''}>
           ${esc(i.label)}</label>`;
       }).join('')}</div>
-    </div>`).join('');
+    </div>`;
+
+  grid.querySelectorAll('[data-see]').forEach(cb => cb.addEventListener('change', ()=>{
+    const a = AREA[cb.dataset.see];
+    if(cb.checked) userPermState.add(a.see);
+    else { userPermState.delete(a.see); if(a.change) userPermState.delete(a.change); }
+    renderPermChips();
+  }));
+  grid.querySelectorAll('[data-chg]').forEach(cb => cb.addEventListener('change', ()=>{
+    const a = AREA[cb.dataset.chg];
+    if(cb.checked){ userPermState.add(a.change); userPermState.add(a.see); }
+    else userPermState.delete(a.change);
+    renderPermChips();
+  }));
   grid.querySelectorAll('[data-perm]').forEach(cb=>{
     cb.addEventListener('change', ()=>{
       const k = cb.dataset.perm;
@@ -9214,7 +9325,7 @@ function renderReminderList(){
     inv.addEventListener('click', ()=> printInvoice(b));
     row.appendChild(inv);
 
-    if(canEdit()){
+    if(canChange('bookings')){
       const pay = document.createElement('button');
       pay.className = 'manage-edit';
       pay.textContent = 'Record payment';
@@ -9226,7 +9337,7 @@ function renderReminderList(){
 }
 
 async function markReminded(b){
-  if(!sb || !canEdit()) return;
+  if(!sb || !canChange('bookings')) return;
   try{
     await sb.from('villa_bookings').update({ reminder_sent_on: todayISO() }).eq('id', b.id);
     logActivity('update', 'villa_bookings', `Sent balance reminder to ${b.guest || 'guest'} for ${b.checkIn}`);
@@ -9401,6 +9512,7 @@ function initSettings(){
   document.getElementById('printInvoiceListBtn').addEventListener('click', printInvoiceList);
 
   document.getElementById('setLogoFile').addEventListener('change', async (e)=>{
+    if(!canChange('settings')){ e.target.value = ''; alert('You do not have permission to change the logo.'); return; }
     const file = e.target.files && e.target.files[0];
     if(!file) return;
     const hint = document.getElementById('setLogoHint');
@@ -9433,6 +9545,7 @@ function initSettings(){
 
   document.getElementById('setSaveBtn').addEventListener('click', async ()=>{
     const msg = document.getElementById('setSaveMsg');
+    if(!canChange('settings')){ msg.textContent = 'You do not have permission to change the setup.'; return; }
     readSettingsForm();
     msg.textContent = 'Saving…';
     try{
@@ -9471,6 +9584,7 @@ function renderVillaPhotos(){
     inp.addEventListener('change', async (e)=>{
       const file = e.target.files && e.target.files[0];
       if(!file) return;
+      if(!canChange('settings')){ e.target.value = ''; alert('You do not have permission to change villa photos.'); return; }
       const id = inp.dataset.villaPhoto;
       const hint = wrap.querySelector(`[data-villa-photo-hint="${id}"]`);
       hint.textContent = 'Uploading…';
@@ -9794,7 +9908,7 @@ function renderCancelledList(){
       pb.addEventListener('click', ()=> printInvoice(b));
       row.appendChild(pb);
     }
-    if(canEdit()){
+    if(canChange('bookings')){
       const rb = document.createElement('button');
       rb.className = 'manage-edit';
       rb.textContent = 'Restore';
@@ -10217,7 +10331,7 @@ async function coAutoFillCommissionIfFresh(periodISO){
 async function saveCompanyMonth(){
   const msg = document.getElementById('coSaveMsg');
   if(!sb){ msg.textContent = 'Not connected to Supabase yet.'; return; }
-  if(!isAdmin()){ msg.textContent = 'Only an admin can save company figures.'; return; }
+  if(!canChange('company')){ msg.textContent = 'You do not have permission to change company figures.'; return; }
   const p = coPeriodISO(coMonthDate);
   const rows = [];
 
@@ -11252,7 +11366,7 @@ function renderCoSort(){
       : 'No petty cash expenses recorded in ' + esc(allMonths ? 'any month' : monthLabel(coMonthDate)) + '.'}</div>`;
     return;
   }
-  const editable = canEdit();
+  const editable = canChange('company');
   wrap.innerHTML = `<table class="inv-table pay-table">
     <thead><tr><th>Date</th><th>Expense</th><th class="hide-sm">For</th><th class="hide-sm">Card</th><th class="r">LKR</th><th>Goes to</th></tr></thead>
     <tbody>${rows.map(t=>`
@@ -11289,7 +11403,7 @@ function renderCoSort(){
 }
 
 async function coSortAuto(){
-  if(!canEdit()){ alert('Only an admin can sort expenses.'); return; }
+  if(!canChange('company')){ alert('You do not have permission to sort expenses.'); return; }
   const allMonths = document.getElementById('coSortPeriod').value === 'all';
   const { start, end } = monthRangeLocal(coMonthDate);
   const open = allCashTxns.filter(t => t.type === 'expense' && !acctOf(t) && (allMonths || (t.date >= start && t.date < end)));
@@ -11334,7 +11448,7 @@ function renderCoBills(){
         <div class="ce-main"><b>${esc(e.description || '—')}</b> ${files}
           <div class="ce-sub">${kind === 'balance' ? '' : fmtDay(e.date) + (sub ? ' · ' : '')}${esc(sub)}</div></div>
         <div class="ce-amt">${Math.round(e.amount).toLocaleString()}</div>`;
-      if(canEdit()){
+      if(canChange('company')){
         const b = document.createElement('button');
         b.className = 'manage-edit'; b.textContent = 'Edit';
         b.addEventListener('click', ()=> openCeModal(kind, e));
@@ -11357,7 +11471,7 @@ function knownAccountNames(){
 }
 
 function openCeModal(kind, record){
-  if(!canEdit()){ alert('Only an admin can add company entries.'); return; }
+  if(!canChange('company')){ alert('You do not have permission to add company entries.'); return; }
   ceKind = kind; editingCe = record;
   const g = id => document.getElementById(id);
   const titles = { expense:'a bill or payment', income:'income', balance:'a bank or cash balance' };
@@ -11455,7 +11569,7 @@ document.getElementById('ceDelete').addEventListener('click', async ()=>{
 });
 
 async function ceCopyBalances(){
-  if(!canEdit() || !sb) return;
+  if(!canChange('company') || !sb) return;
   const prev = new Date(coMonthDate.getFullYear(), coMonthDate.getMonth()-1, 1);
   const pr = monthRangeLocal(prev), cr = monthRangeLocal(coMonthDate);
   const latest = {};
@@ -11629,7 +11743,7 @@ function renderPayRun(){
 }
 
 async function payPrepareMonth(){
-  if(!isAdmin() || !sb){ alert('Only an admin can prepare payroll.'); return; }
+  if(!canChange('payroll') || !sb){ alert('You do not have permission to prepare payroll.'); return; }
   const period = ymKey(payMonthDate);
   const have = new Set(allPayroll.filter(p => p.period === period).map(p => p.profileId));
   const todo = allStaffProfiles.filter(s => s.active && !have.has(s.id));
@@ -11678,7 +11792,7 @@ function renderPayStaff(){
 }
 
 function openSpModal(s){
-  if(!isAdmin()){ alert('Only an admin can edit staff profiles.'); return; }
+  if(!canChange('payroll')){ alert('You do not have permission to edit staff profiles.'); return; }
   editingSp = s;
   const g = id => document.getElementById(id);
   g('spModalTitle').textContent = s ? 'Edit ' + s.fullName : 'Add staff member';
@@ -11771,7 +11885,7 @@ function psRenderPreview(){
     <div class="quote-line muted"><span>Employer EPF 12% + ETF 3% (not deducted)</span><span>${fmt2(c.epfEmployer + c.etf)}</span></div>`;
 }
 function openPsModal(p){
-  if(!isAdmin()){ alert('Only an admin can edit payroll.'); return; }
+  if(!canChange('payroll')){ alert('You do not have permission to edit payroll.'); return; }
   editingPs = p;
   const g = id => document.getElementById(id);
   g('psModalTitle').textContent = `${p.name} — ${monthLabel(payMonthDate)}`;
@@ -12422,7 +12536,7 @@ function ownerSettlementHTML(villaId, monthDate, netProfit){
 }
 
 function openOwnerPayModal(villaId, monthDate){
-  if(!isAdmin()){ alert('Only an admin can record owner payments.'); return; }
+  if(!canChange('villareport')){ alert('You do not have permission to record owner payments.'); return; }
   const g = id => document.getElementById(id);
   const period = ymKey(monthDate);
   g('opVilla').value = villaId;
