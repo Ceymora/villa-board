@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Where this page may load code from and send data to. Even if something slipped
+     past the escaping, it could only talk to Ceymora's own database — not to anyone else. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://wjbgbuvatrsnamsbvqrs.supabase.co wss://wjbgbuvatrsnamsbvqrs.supabase.co https://cdn.jsdelivr.net https://*.currency-api.pages.dev; img-src 'self' data: blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- Links opened from here (bills, WhatsApp) are not told which page they came from. -->
+<meta name="referrer" content="no-referrer">
 <title>Villa Management Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <style>
   :root{
     --board:#faf9f5;
@@ -918,6 +924,209 @@
     .pay-table .hide-sm{ display:none; }
   }
 
+
+  /* =====================================================================
+     THE LOOK — calmer, roomier, easier to read.
+     Everything below only restyles; it never hides or moves a control.
+     Screen only: printed reports keep their own print styles.
+     ===================================================================== */
+  @media screen{
+    :root{
+      --page:#efeae1;
+      --surface:#ffffff;
+      --soft:#f7f4ee;
+      --soft-2:#f1ece2;
+      --board-line:#e6e0d4;
+      --muted:#7d776a;
+      --ink:#26231f;
+      --accent:#7a5236;
+      --accent-soft:#f3e9df;
+      --ring:0 0 0 3px rgba(122,82,54,.18);
+      --shadow-sm:0 1px 2px rgba(60,40,20,.06);
+      --shadow-md:0 2px 6px rgba(60,40,20,.06), 0 10px 28px rgba(60,40,20,.08);
+    }
+    body{
+      font-size:15px; line-height:1.5; padding:28px clamp(12px, 2.5vw, 40px) 48px;
+      background:linear-gradient(180deg, #f4f0e8 0%, var(--page) 100%) fixed;
+      -webkit-font-smoothing:antialiased;
+    }
+    /* The page now uses the width of the screen, up to a comfortable maximum. */
+    .frame{ max-width:1560px; background:none; padding:0; box-shadow:none; border-radius:0; }
+    .board{
+      background:var(--surface); border-radius:24px; padding:36px clamp(18px, 3vw, 48px) 32px;
+      box-shadow:var(--shadow-md); border:1px solid #e9e3d8; overflow:visible;
+    }
+    .board::before{ display:none; }
+
+    /* ---- header ---- */
+    .board > h1{
+      font-family:'Fraunces', Georgia, serif; font-weight:600; font-size:34px; letter-spacing:-.015em;
+      transform:none; margin:0 0 4px; padding-right:360px; line-height:1.15;
+    }
+    .board > .sub{ font-size:14.5px; color:var(--muted); margin-bottom:26px; padding-right:360px; }
+    .who-bar{ top:30px !important; right:clamp(18px, 3vw, 48px) !important; gap:10px !important; }
+    .who-badge{
+      display:flex; align-items:center; gap:10px; font-size:13px !important; color:var(--ink) !important;
+      background:var(--soft) !important; border:1px solid var(--board-line) !important; padding:6px 14px 6px 6px !important; border-radius:40px !important;
+    }
+    .who-badge .who-avatar{
+      width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff; display:inline-flex;
+      align-items:center; justify-content:center; font-weight:700; font-size:13px;
+    }
+    .who-badge .who-ver{ color:var(--muted); font-size:11.5px; }
+    .who-logout{ font-size:13px !important; padding:8px 16px !important; border-radius:40px !important; }
+    .who-logout:hover{ background:var(--soft) !important; color:var(--ink) !important; }
+
+    /* ---- the main tabs: a soft pill bar that stays in reach while scrolling ---- */
+    .maintabs{
+      background:var(--soft-2); border:none; border-radius:18px; padding:6px; gap:4px; row-gap:4px;
+      margin-bottom:28px; position:sticky; top:10px; z-index:30;
+      box-shadow:0 1px 0 rgba(255,255,255,.8) inset, var(--shadow-sm);
+    }
+    .maintab-btn{
+      font-family:'Inter', system-ui, sans-serif; font-size:14.5px; font-weight:600; letter-spacing:-.005em;
+      padding:10px 16px; border:none; border-radius:12px; margin:0; color:#6c665a;
+      transition:background .15s ease, color .15s ease, box-shadow .15s ease;
+    }
+    .maintab-btn:hover{ background:rgba(255,255,255,.75); color:var(--ink); }
+    .maintab-btn.active{
+      background:#fff; color:var(--accent); border:none;
+      box-shadow:0 1px 2px rgba(0,0,0,.06), 0 6px 16px rgba(122,82,54,.14);
+    }
+    @media (max-width:1100px){ .maintab-btn{ font-size:14px; padding:9px 12px; } }
+
+    /* ---- headings inside the tabs ---- */
+    .manage-title, .earn-detail-title, .modal h3, .rpt-title, .db-warn h4, .cmp-head{
+      font-family:'Fraunces', Georgia, serif; font-weight:600; letter-spacing:-.01em;
+    }
+    .manage-title{ font-size:20px; }
+    .earn-detail-title{ font-size:17px; }
+    .manage-section{ margin-top:34px; border-top:1px solid var(--board-line); padding-top:24px; }
+    .manage-header{ margin-bottom:6px; }
+    .field-hint{ font-size:12.5px; line-height:1.55; }
+    .cal-hint{ font-size:13px; padding:12px 16px; border-radius:12px; background:var(--soft); border:1px solid var(--board-line); }
+
+    /* ---- toolbars, navigation and buttons ---- */
+    .toolbar{ gap:14px; margin-bottom:20px; }
+    .weeknav{ font-family:'Inter', system-ui, sans-serif; font-size:16px; font-weight:600; gap:10px; }
+    .weeknav button, .add-booking-btn, .allowed-action-btn, .rpt-quick, .cmp-open-btn, #cashExportBtn{
+      font-family:'Inter', system-ui, sans-serif; font-weight:600; font-size:13.5px;
+      background:#fff; border:1px solid var(--board-line); padding:9px 16px; border-radius:11px;
+      color:var(--ink); box-shadow:var(--shadow-sm); cursor:pointer;
+      transition:background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .08s ease;
+    }
+    .weeknav button:hover, .add-booking-btn:hover, .allowed-action-btn:hover, .rpt-quick:hover, .cmp-open-btn:hover, #cashExportBtn:hover{
+      background:var(--soft); border-color:#d9d1c2;
+    }
+    .add-booking-btn:active, .weeknav button:active{ transform:translateY(1px); }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{ outline:none; box-shadow:var(--ring); }
+    .villatabs{ gap:8px; margin-bottom:16px; }
+    .villatab-btn{
+      font-family:'Inter', system-ui, sans-serif; font-size:13.5px; font-weight:600;
+      padding:8px 16px; border-radius:40px; border:1px solid var(--board-line);
+    }
+    .legend{ font-size:13px; gap:18px; }
+    .btn{ font-size:14px; padding:10px 20px; border-radius:11px; }
+    .btn-save{ background:var(--ink); }
+    .btn-save:hover{ background:#000; }
+
+    /* ---- tables ---- */
+    .inv-table{ border:1px solid var(--board-line); border-radius:14px; overflow:hidden; background:#fff; }
+    .inv-table th{
+      font-size:11.5px; letter-spacing:.05em; padding:12px 16px; background:var(--soft);
+      border-bottom:1px solid var(--board-line);
+    }
+    .inv-table td{ padding:13px 16px; font-size:14px; border-bottom:1px solid #efeae0; }
+    .inv-table tbody tr:last-child td{ border-bottom:none; }
+    .inv-table tbody tr:hover td{ background:#fcfaf6; }
+    .earn-total-row td{ background:var(--soft); }
+    .inv-empty, .manage-empty{ font-size:13.5px; padding:14px 0; }
+
+    /* ---- lists and rows ---- */
+    .manage-list{ max-height:480px; gap:8px; margin-top:12px; }
+    .manage-row, .txn-row{
+      font-size:14px; padding:12px 16px; border-radius:14px; border:1px solid var(--board-line);
+      box-shadow:var(--shadow-sm); transition:box-shadow .15s ease, border-color .15s ease;
+    }
+    .manage-row:hover, .txn-row:hover{ border-color:#d9d1c2; box-shadow:0 4px 14px rgba(60,40,20,.08); }
+    .manage-dates, .txn-sub{ font-size:12.5px; }
+    .manage-edit, .manage-del{ font-size:12.5px; padding:6px 12px; border-radius:9px; }
+    .txn-amount{ font-family:'Inter', system-ui, sans-serif; font-size:15.5px; font-variant-numeric:tabular-nums; }
+
+    /* ---- the coloured summary cards ---- */
+    .cash-summary{ gap:18px; margin-bottom:24px; }
+    .cash-card{ border-radius:18px; padding:20px 22px; min-width:220px; box-shadow:0 8px 22px rgba(0,0,0,.12); }
+    .cash-card-label{ font-size:12px; letter-spacing:.06em; }
+    .cash-card-balance{ font-family:'Fraunces', Georgia, serif; font-weight:600; font-size:30px; letter-spacing:-.01em; margin-top:6px; }
+    .cash-card-sub{ font-size:12px; line-height:1.6; }
+
+    /* ---- housekeeping board ---- */
+    thead th{ font-size:12px; padding:8px 8px 12px; }
+    thead .daynum{ font-family:'Inter', system-ui, sans-serif; font-weight:700; font-size:15px; }
+    .villa-tag{ font-family:'Inter', system-ui, sans-serif; font-size:14px; }
+    .staffname{ font-size:14.5px; }
+    .staffrole{ font-size:12px; }
+    .staffcell{ padding:12px 12px; }
+    td.cell{ padding:8px; }
+    .mark{ width:66px; height:46px; border-radius:12px; font-size:18px; }
+
+    /* ---- booking calendar ---- */
+    .cal-weekdays div{ font-size:12px; padding-bottom:8px; }
+    .cal-weeks{ border:1px solid var(--board-line); border-radius:16px; overflow:hidden; }
+    .cal-week{ height:104px; }
+    .cal-week:last-child{ border-bottom:none; }
+    .cal-daybg{ padding:7px 8px 0; }
+    .cal-daynum{ font-size:13px; }
+    .today .cal-daynum{ width:24px; height:24px; font-size:12px; }
+    .cal-pills-overlay{ top:32px; }
+    .booking-pill{ font-size:11.5px; height:18px; line-height:18px; }
+
+    /* ---- pop-up forms ---- */
+    .modal-overlay{ background:rgba(38,30,20,.42); backdrop-filter:blur(3px); }
+    .modal{ border-radius:20px; padding:28px 30px; width:460px; max-height:92vh; overflow:auto; box-shadow:0 30px 80px rgba(0,0,0,.28); }
+    .modal-wide{ width:760px; }
+    .modal h3{ font-size:23px; margin-bottom:16px; }
+    .modal label{ font-size:12.5px; margin:14px 0 6px; color:#6c665a; }
+    .modal input[type=date], .modal input[type=text], .modal input[type=number], .modal input[type=email],
+    .modal select, .modal textarea, .login-card input, .login-card select, .cmp-when input, .acct-select{
+      padding:10px 12px; border:1px solid #ddd6c8; border-radius:10px; font-size:14px; background:#fff;
+      transition:border-color .15s ease, box-shadow .15s ease;
+    }
+    .modal input:focus, .modal select:focus, .modal textarea:focus, .login-card input:focus{ border-color:var(--accent); box-shadow:var(--ring); outline:none; }
+    .type-choice label{ padding:11px; border-radius:11px; font-size:13.5px; }
+    .modal-actions{ margin-top:24px; }
+
+    /* ---- reports ---- */
+    .rpt-doc{ border-radius:18px; padding:34px 38px; box-shadow:var(--shadow-sm); }
+    .rpt-picker{ gap:10px 14px; padding:12px 16px; border-radius:14px; }
+    .cmp-box{ border-radius:14px; padding:12px 14px; }
+    .cmp-table td{ padding:10px 12px; font-size:14px; }
+    #vrModeTabs .villatab-btn.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+    #vrModeTabs .villatab-btn:not(.active){ background:#fff; color:var(--muted); }
+    .rpt-quick{ text-decoration:none; }
+    .inv-table td .ce-sub, td .ce-sub{ font-weight:400; color:var(--muted); font-size:12.5px; margin-top:2px; }
+
+    /* ---- sign-in ---- */
+    #loginScreen{ background:linear-gradient(180deg, #f4f0e8 0%, var(--page) 100%); }
+    .login-card{ width:400px; padding:42px 40px 34px; border-radius:24px; box-shadow:0 30px 80px rgba(60,40,20,.18); border:1px solid #ece6db; }
+    .login-card h1{ font-family:'Fraunces', Georgia, serif; font-weight:600; font-size:28px; transform:none; letter-spacing:-.015em; }
+    .login-card label{ font-size:12.5px; margin:16px 0 6px; }
+    .login-card button{ padding:12px; border-radius:12px; font-size:15px; }
+    .login-card .login-link{
+      width:auto; margin:0; padding:4px 0; background:none; color:var(--accent); font-size:13.5px; font-weight:600;
+      text-decoration:none; text-align:center;
+    }
+    .login-card .login-link:hover{ text-decoration:underline; }
+  }
+  @media screen and (max-width:900px){
+    .board > h1, .board > .sub{ padding-right:0; }
+    .who-bar{ position:static !important; margin-bottom:14px; flex-wrap:wrap; }
+    .maintabs{ position:static; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .maintab-btn{ flex-shrink:0; }
+    .weeknav{ flex-wrap:wrap; }
+    .board > h1{ font-size:27px; }
+    .modal, .modal-wide{ width:94vw; }
+  }
 </style>
 </head>
 <body>
@@ -2696,6 +2905,13 @@
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
+// This page must never run inside someone else's page (a trick used to make people
+// click things they cannot see).
+if(window.top !== window.self){
+  document.documentElement.innerHTML = '<body style="font-family:sans-serif;padding:40px">This page can only be opened directly.</body>';
+  throw new Error('framed');
+}
+
 // =====================================================================
 // STEP 1: Replace these with YOUR Supabase project's values.
 // Project Settings > Data API > Project URL, and the "anon public" key.
@@ -3319,7 +3535,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-fx2';
+const APP_VERSION = 'v2026.09.28-look';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3496,11 +3712,45 @@ async function doForgotPassword(){
 }
 
 // Coming back to an open session — no need to sign in again.
+/* ---------------------------------------------------------------------------
+   SIGN OUT WHEN NOBODY IS USING IT
+   A phone or laptop left signed in is the easiest way in. After IDLE_MINUTES with
+   no taps, clicks or typing, the app signs itself out — and it also checks the
+   last-used time when the page is opened again, so a device left for a day comes
+   back to the sign-in screen, not to the accounts.
+--------------------------------------------------------------------------- */
+const IDLE_MINUTES = 120;
+const IDLE_KEY = 'ceyLastActive';
+let lastActive = Date.now(), lastSaved = 0;
+function markActive(){
+  lastActive = Date.now();
+  if(lastActive - lastSaved > 30000){ lastSaved = lastActive; try{ localStorage.setItem(IDLE_KEY, String(lastActive)); }catch(e){} }
+}
+['click','keydown','touchstart','scroll','mousemove'].forEach(ev => window.addEventListener(ev, markActive, { passive:true }));
+function idleTooLong(){
+  let saved = 0; try{ saved = Number(localStorage.getItem(IDLE_KEY)) || 0; }catch(e){}
+  const last = Math.max(lastActive, saved);
+  return Date.now() - last > IDLE_MINUTES * 60000;
+}
+async function idleSignOut(){
+  try{ if(sb) await sb.auth.signOut(); }catch(e){}
+  try{ sessionStorage.setItem('idleSignedOut', '1'); localStorage.removeItem(IDLE_KEY); }catch(e){}
+  location.reload();
+}
+setInterval(()=>{ if(currentUser && idleTooLong()) idleSignOut(); }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && currentUser && idleTooLong()) idleSignOut(); });
+
 async function restoreSession(){
   if(!sb) return;
   try{
     const { data: { session } } = await sb.auth.getSession();
+    try{ if(sessionStorage.getItem('idleSignedOut') === '1'){ sessionStorage.removeItem('idleSignedOut');
+      loginMsg('ok', `Signed out after ${IDLE_MINUTES / 60} hours without use. Sign in again to carry on.`); } }catch(e){}
     if(!session) return;
+    // A session left untouched too long (saved last-used time) is closed, not reopened.
+    let saved = 0; try{ saved = Number(localStorage.getItem(IDLE_KEY)) || 0; }catch(e){}
+    if(saved && Date.now() - saved > IDLE_MINUTES * 60000){ lastActive = 0; return idleSignOut(); }
+    markActive();
     const profile = await loadMyProfile();
     if(!profile) return;
     if(profile.pending) return showPending(profile.email);
@@ -3644,6 +3894,7 @@ function applyRolePermissions(){
 
   // Add a small badge showing who's signed in, top-right of the board, with a logout button
   const badgeWrap = document.createElement('div');
+  badgeWrap.className = 'who-bar';
   badgeWrap.style.cssText = 'position:absolute; top:14px; right:18px; display:flex; align-items:center; gap:8px; z-index:5;';
 
   const badge = document.createElement('div');
@@ -3652,11 +3903,14 @@ function applyRolePermissions(){
   const whoLabel = hasPerm('admin') ? 'Admin'
     : (canEdit() || hasPerm('edit_inventory') || hasPerm('edit_bookings')) ? 'Can record'
     : 'View only';
-  badge.textContent = `${currentUser.username} (${whoLabel}) · ${APP_VERSION}`;
+  badge.className = 'who-badge';
+  const initial = String(currentUser.username || '?').trim().charAt(0).toUpperCase() || '?';
+  badge.innerHTML = `<span class="who-avatar">${esc(initial)}</span><span><b>${esc(currentUser.username)}</b> · ${esc(whoLabel)} <span class="who-ver">· ${esc(APP_VERSION)}</span></span>`;
   badge.title = 'App version ' + APP_VERSION + ' — if this is missing, the browser is still using an old copy of the page.';
 
   const logoutBtn = document.createElement('button');
   logoutBtn.textContent = 'Log out';
+  logoutBtn.className = 'who-logout';
   logoutBtn.style.cssText = 'font-family:Inter,sans-serif; font-size:11.5px; font-weight:600; color:var(--muted); background:#fff; border:1px solid var(--board-line); padding:4px 10px; border-radius:20px; cursor:pointer;';
   logoutBtn.addEventListener('click', async ()=>{
     if(!confirm('Log out?')) return;
@@ -3667,7 +3921,8 @@ function applyRolePermissions(){
   badgeWrap.appendChild(badge);
   badgeWrap.appendChild(logoutBtn);
   document.getElementById('board').style.position = 'relative';
-  document.getElementById('board').appendChild(badgeWrap);
+  const boardEl = document.getElementById('board');
+  boardEl.insertBefore(badgeWrap, boardEl.firstChild);
 }
 
 /* ============================= TAB SWITCHING ============================= */
@@ -4656,8 +4911,9 @@ async function fetchFxJson(dateOrLatest, fromCurrency){
       const res = await fetch(url);
       if(!res.ok) continue;
       const data = await res.json();
-      const rate = data && data[from] && data[from].lkr ? data[from].lkr : null;
-      if(rate) return rate;
+      // Only a sensible number is accepted from the rate service.
+      const rate = Number(data && data[from] && data[from].lkr);
+      if(Number.isFinite(rate) && rate > 0 && rate < 1e6) return rate;
     }catch(e){
       console.error('FX rate fetch failed for', url, e);
     }
@@ -9729,7 +9985,8 @@ function renderPendingUsers(){
   list.innerHTML = pending.map(u => `
     <div class="ce-row pend-row">
       <div class="ce-main"><b>${esc(u.full_name || u.email)}</b>
-        <div class="ce-sub">${esc(u.email)}${u.requested_at ? ' · asked ' + esc(fmtDay(String(u.requested_at).slice(0,10))) : ''}</div></div>
+        <div class="ce-sub">${esc(u.email)}${u.requested_at ? ' · asked ' + esc(fmtDay(String(u.requested_at).slice(0,10))) : ''}</div>
+        ${(u.permissions || []).length ? '<div class="ce-sub" style="color:#b25b00;">You added this email earlier and set their ticks. Check it is really them (a call or WhatsApp) before approving.</div>' : ''}</div>
       <button type="button" class="manage-edit" data-approve="${esc(u.email)}">Review &amp; approve</button>
       <button type="button" class="manage-del" data-reject="${esc(u.email)}">Reject</button>
     </div>`).join('');
@@ -9895,7 +10152,7 @@ document.getElementById('userSave').addEventListener('click', async ()=>{
       const { error } = await sb.from('profiles').insert({ email, ...payload });
       if(error) throw error;
       logActivity('create', 'profiles', `Gave ${email} access — ${perms.length} permission(s)`);
-      alert(`${email} is on the list.\n\nTell them to open the app, press "New here? Register for access", and use this same email with a password of their choosing. It will go straight through — you have already approved them.`);
+      alert(`${email} is on the list.\n\nTell them to open the app, press "New here? Register for access", and use this same email with a password of their choosing. They will then show under "Waiting for approval" with the ticks you chose — press "Review & approve" once you know it is really them.`);
     }
     document.getElementById('userModalOverlay').classList.remove('open');
     fetchAppUsers();
