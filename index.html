@@ -1134,7 +1134,19 @@
 <div class="print-header" id="printHeader"></div>
 
 <div id="loginScreen">
-  <div class="login-card">
+  <!-- Shown only when someone arrives from a "reset your password" email. -->
+  <div class="login-card" id="resetCard" style="display:none;">
+    <h1>🔑 Choose a new password</h1>
+    <div class="sub" style="font-size:12.5px;color:var(--muted);" id="resetSub">For your Villa Management Board login.</div>
+    <label>New password</label>
+    <input type="password" id="resetPw1" autocomplete="new-password" placeholder="At least 8 characters">
+    <label>Type it again</label>
+    <input type="password" id="resetPw2" autocomplete="new-password" placeholder="Same password again">
+    <div class="login-error" id="resetError"></div>
+    <div class="login-ok" id="resetOk"></div>
+    <button id="resetSave">Save my new password</button>
+  </div>
+  <div class="login-card" id="mainLoginCard">
     <h1>🏡 Villa Management Board</h1>
     <div class="sub" style="font-size:12.5px;color:var(--muted);" id="loginSub">Sign in to continue</div>
     <div id="regNameWrap" style="display:none;">
@@ -2923,9 +2935,15 @@ const SUPABASE_ANON_KEY = "sb_publishable_6ubvcWXRhH2JKmuPooh_6w_2WzeO5MD";
 const CONFIGURED = SUPABASE_URL !== "PASTE_YOUR_SUPABASE_URL_HERE";
 document.getElementById('setupBanner').style.display = CONFIGURED ? 'none' : 'block';
 
+// Arriving from a password-reset email? The link carries type=recovery. Read it
+// before the database library tidies the address bar.
+const ARRIVED_FOR_RESET = /type=recovery/.test(location.hash + location.search);
+let resetMode = ARRIVED_FOR_RESET;
+
 let sb = null;
 if (CONFIGURED) {
   sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((event)=>{ if(event === 'PASSWORD_RECOVERY'){ resetMode = true; showResetCard(); } });
 }
 
 // =====================================================================
@@ -3535,7 +3553,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-look';
+const APP_VERSION = 'v2026.09.28-reset';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3706,7 +3724,9 @@ async function doRegister(){
 async function doForgotPassword(){
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   if(!email) return loginMsg('error', 'Type your email first.');
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  // The link in the email brings them back to this very page (without any #… left over).
+  const back = window.location.origin + window.location.pathname;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: back });
   if(error) return loginMsg('error', error.message);
   loginMsg('ok', 'If that address has a login, a reset link is on its way.');
 }
@@ -3740,10 +3760,50 @@ async function idleSignOut(){
 setInterval(()=>{ if(currentUser && idleTooLong()) idleSignOut(); }, 60000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && currentUser && idleTooLong()) idleSignOut(); });
 
+/* ---- Setting a new password after the reset email ---- */
+function showResetCard(){
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('mainLoginCard').style.display = 'none';
+  document.getElementById('resetCard').style.display = '';
+  setTimeout(()=>{ const f = document.getElementById('resetPw1'); if(f) f.focus(); }, 50);
+}
+document.getElementById('resetSave').addEventListener('click', async ()=>{
+  const p1 = document.getElementById('resetPw1').value, p2 = document.getElementById('resetPw2').value;
+  const err = document.getElementById('resetError'), ok = document.getElementById('resetOk');
+  err.style.display = 'none'; ok.style.display = 'none';
+  const fail = t => { err.textContent = t; err.style.display = 'block'; };
+  if(!p1 || p1.length < 8) return fail('Choose a password of at least 8 characters.');
+  if(p1 !== p2) return fail("The two passwords don't match.");
+  const btn = document.getElementById('resetSave'); btn.disabled = true;
+  try{
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if(error) return fail(/expired|invalid|session/i.test(error.message)
+      ? 'This reset link has expired or was already used. Go back to the sign-in page and ask for a new one.'
+      : error.message);
+    ok.textContent = 'Saved — signing you in…'; ok.style.display = 'block';
+    resetMode = false;
+    try{ history.replaceState(null, '', location.origin + location.pathname); }catch(e){}
+    try{ localStorage.setItem(IDLE_KEY, String(Date.now())); }catch(e){}
+    const profile = await loadMyProfile();
+    document.getElementById('resetCard').style.display = 'none';
+    document.getElementById('mainLoginCard').style.display = '';
+    if(profile && profile.pending) return showPending(profile.email);
+    if(!profile || profile.blocked) return showNoAccess(profile ? profile.email : '', profile && profile.suspended);
+    await enterApp(profile);
+  } finally { btn.disabled = false; }
+});
+
 async function restoreSession(){
   if(!sb) return;
+  if(resetMode){
+    // Give the library a moment to read the link, then ask for the new password.
+    await sb.auth.getSession();
+    return showResetCard();
+  }
   try{
     const { data: { session } } = await sb.auth.getSession();
+    if(resetMode) return showResetCard();
     try{ if(sessionStorage.getItem('idleSignedOut') === '1'){ sessionStorage.removeItem('idleSignedOut');
       loginMsg('ok', `Signed out after ${IDLE_MINUTES / 60} hours without use. Sign in again to carry on.`); } }catch(e){}
     if(!session) return;
