@@ -450,6 +450,9 @@
   .cmp-head{ font-family:Georgia, serif; font-size:19px; margin:4px 0 2px; }
   .cmp-sub{ font-size:12px; color:var(--muted); margin-bottom:12px; }
   .cmp-note{ font-size:11.5px; color:var(--muted); margin:8px 0 18px; line-height:1.5; }
+  #cmpModalOverlay .cmp-modal{ width:min(1180px, 96vw); max-width:1180px; max-height:92vh; overflow:auto; }
+  .cmp-modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .cmp-open-btn{ white-space:nowrap; }
 
   /* ---- The permission grid ---- */
   #userModalOverlay .modal{ width:min(560px, 100%); max-width:560px; }
@@ -1003,6 +1006,7 @@
         <span class="sep"></span>
         <button class="add-booking-btn" id="exExportBtn">⬇️ Export CSV</button>
         <button class="add-booking-btn" id="exPrintBtn">🖨️ Print / PDF</button>
+        <button class="add-booking-btn cmp-open-btn" data-cmp-open="costs">📈 Compare</button>
       </div>
 
       <div id="exSummary" class="cash-summary"></div>
@@ -1105,6 +1109,9 @@
             <select id="earnShowCur" class="acct-select" style="max-width:110px; margin-left:6px;"></select></label>
           <label class="earn-move"><input type="checkbox" id="earnShowFxMove"> Show how the rate moved from booking day to check-in</label>
           <span class="field-hint">Only the view changes — no saved figure is converted.</span>
+          <span style="flex:1"></span>
+          <button class="rpt-quick" id="earnCompareBtn">📈 Compare periods</button>
+          <button class="rpt-quick" id="earnPrintBtn">🖨️ Print earnings</button>
         </div>
         <div class="field-hint" id="earningsStatusMsg" style="margin:4px 0 8px;">Loading exchange rates…</div>
         <table class="inv-table">
@@ -1223,6 +1230,7 @@
             <button id="cashThisMonth">This month</button>
             <select id="cashMonthPick" class="acct-select" style="max-width:170px; margin-left:6px;"></select>
             <button id="cashExportBtn" title="Download these transactions as a spreadsheet file">⬇ Export CSV</button>
+            <button class="cmp-open-btn" data-cmp-open="costs" title="Compare petty cash spending between two periods">📈 Compare</button>
           </div>
         </div>
         <div class="manage-header" style="border-top:none; padding-top:0;">
@@ -1248,6 +1256,7 @@
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addPurchaseBtn">+ Purchase item</button>
           <button class="add-booking-btn" id="addDistributeBtn">+ Distribute</button>
+          <button class="add-booking-btn cmp-open-btn" data-cmp-open="inventory">📈 Compare</button>
         </div>
       </div>
 
@@ -1316,7 +1325,12 @@
       </div>
 
       <div id="vrCompare" style="display:none">
+        <div id="cmpRoot">
         <div class="cmp-controls no-print">
+          <div class="cmp-box">
+            <div class="cmp-title">Figures</div>
+            <select id="cmpFocus" class="acct-select"></select>
+          </div>
           <div class="cmp-box">
             <div class="cmp-title">Look at</div>
             <select id="cmpKind" class="acct-select">
@@ -1340,12 +1354,17 @@
             <div class="cmp-title">Villa</div>
             <select id="cmpVilla" class="acct-select"></select>
           </div>
+          <div class="cmp-box">
+            <div class="cmp-title">Show amounts in</div>
+            <span id="cmpCurWrap"></span>
+          </div>
           <div class="cmp-box" style="justify-content:flex-end;">
             <button class="add-booking-btn" id="cmpDownload">⬇ Download</button>
             <button class="add-booking-btn" id="cmpPrint">🖨️ Print</button>
           </div>
         </div>
         <div id="cmpBody"></div>
+        </div>
       </div>
 
       <div id="vrReportWrap">
@@ -1382,6 +1401,9 @@
         <span class="rpt-picker-label">On this report:</span>
         <label><input type="checkbox" id="vrShowCommission" checked> Show the Ceymora 15% management fee</label>
         <label><input type="checkbox" id="vrShowOfficeBills"> Show office bills paid from the same petty cash</label>
+        <span class="sep"></span>
+        <label>Show amounts in <span id="vrShowCurWrap"></span></label>
+        <span class="field-hint">View only — saved figures stay in LKR. Print keeps the currency you pick.</span>
       </div>
 
       <div id="myPurchasesSummary" style="display:none;"></div>
@@ -2310,6 +2332,16 @@
 </div>
 
 <!-- Add/edit user modal (admin only) -->
+<div class="modal-overlay" id="cmpModalOverlay">
+  <div class="modal cmp-modal">
+    <div class="cmp-modal-head">
+      <h2 style="margin:0;">📈 Look back &amp; compare</h2>
+      <button class="btn btn-cancel" id="cmpModalClose">Close</button>
+    </div>
+    <div id="cmpModalHost"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="userModalOverlay">
   <div class="modal"><div class="modal-scroll">
     <h3 id="userModalTitle">Add user</h3>
@@ -3287,7 +3319,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-fx';
+const APP_VERSION = 'v2026.09.28-fx2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4713,6 +4745,48 @@ function fmtShow(v, cur){
   return cur === 'LKR' ? Math.round(v).toLocaleString() : moneyFull(v, cur);
 }
 
+/* ---------------------------------------------------------------------------
+   SHOWING A REPORT IN ANOTHER CURRENCY (view only, nothing saved changes)
+   Each stay keeps its own value: a USD stay shown in USD is exactly what the guest
+   agreed; shown in any other currency it is converted at its own rate day. Costs
+   are in rupees, so they are converted at one rate for the report: the rate on the
+   last day of the period, or today's while the period is still running.
+   The report formatters print "LKR equivalents at the report rate" divided by that
+   rate, so every figure — stays and costs alike — lands in the chosen currency.
+--------------------------------------------------------------------------- */
+let RPT_CUR = { cur:'LKR', rate:1 };
+function rn(x){
+  const v = (Number(x) || 0) / (RPT_CUR.cur === 'LKR' ? 1 : (RPT_CUR.rate || 1));
+  return Math.round(v).toLocaleString();
+}
+async function reportRateFor(cur, lastDayISO){
+  if(!cur || cur === 'LKR') return 1;
+  const d = lastDayISO > todayISO() ? todayISO() : lastDayISO;
+  return await getFxRate(d, cur);
+}
+// A stay's value in the report currency, handed back as rupees at the report rate.
+async function revForReport(b, native, lkrValue, cur, reportRate, day){
+  if(!cur || cur === 'LKR' || !lkrValue || !reportRate) return lkrValue;
+  let show;
+  if(cur === bookingCur(b)) show = native;
+  else { const r = await getFxRate(day || fxDateOf(b), cur); if(!r) return lkrValue; show = lkrValue / r; }
+  return show * reportRate;
+}
+function curPickerHTML(id, value){
+  return `<select id="${id}" class="acct-select" style="max-width:100px;">${SHOW_CURRENCIES.map(c => `<option value="${c}"${c===value?' selected':''}>${c}</option>`).join('')}</select>`;
+}
+function rememberCur(key, v){ try{ localStorage.setItem(key, v); }catch(e){} }
+function recallCur(key){ try{ const v = localStorage.getItem(key); return SHOW_CURRENCIES.includes(v) ? v : 'LKR'; }catch(e){ return 'LKR'; } }
+// Opens a print window holding just this piece of the page, with the app's styles.
+function printPiece(title, html){
+  const w = window.open('', '_blank');
+  if(!w){ alert('Allow pop-ups for this page to print.'); return; }
+  const css = [...document.querySelectorAll('style')].map(x => x.textContent).join('\n');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}
+    body{background:#fff;padding:24px;} .no-print{display:none !important;} button{display:none !important;}</style></head><body>${html}</body></html>`);
+  w.document.close(); setTimeout(()=> w.print(), 350);
+}
+
 let earningsRenderToken = 0;
 async function renderEarnings(){
   const myToken = ++earningsRenderToken; // avoids stale results overwriting a newer render
@@ -4898,6 +4972,16 @@ function renderEarningsDetail(rows){
     hintEl.textContent = `Ceymora fee (15%): ${lab(fee)} · Villa net: ${lab(sumShow - fee)}`;
   }
 }
+
+document.getElementById('earnPrintBtn').addEventListener('click', ()=>{
+  const sec = document.getElementById('earningsBody').closest('.manage-section');
+  const month = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  const clone = sec.cloneNode(true);
+  clone.querySelectorAll('.earn-cur-bar').forEach(el => el.outerHTML =
+    `<div class="field-hint" style="margin:4px 0 8px;">Shown in <b>${esc(earnShowCur)}</b> · printed ${esc(new Date().toLocaleString('en-GB'))}</div>`);
+  printPiece(`Ceymora earnings — ${month} (${earnShowCur})`,
+    `<div class="rpt-doc"><h2 style="font-family:Georgia,serif; margin:0 0 4px;">Earnings — ${esc(month)}</h2>${clone.innerHTML}</div>`);
+});
 
 // The "Show in" currency picker and the rate-change switch above the earnings.
 (function wireEarningsCurrency(){
@@ -7648,7 +7732,7 @@ function pettyGroupsBlock(expenses){
       <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
       <td class="dim">${esc(e.employeeName ? 'Staff advance' : (CARD_LABELS[e.card] || e.card || ''))}</td>
       <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
-      <td class="r rpt-money-out">${Math.round(e.amount).toLocaleString()}</td>
+      <td class="r rpt-money-out">${rn(e.amount)}</td>
     </tr>`;
   }
   const total = PETTY_GROUPS.reduce((sum,g)=> sum + totals[g.key], 0);
@@ -7657,12 +7741,12 @@ function pettyGroupsBlock(expenses){
     : PETTY_GROUPS.filter(g => counts[g.key]).map(g => `
       <div class="rpt-section-title" style="font-size:13.5px; margin-top:10px;">${esc(g.label)} <span class="rpt-section-count">${counts[g.key]} item${counts[g.key]===1?'':'s'} · ${lkr(totals[g.key])}</span></div>
       <table class="rpt-table">
-        <thead><tr><th>Date</th><th>Description</th><th>Paid from</th><th>Notes</th><th class="r">Amount (LKR)</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th>Paid from</th><th>Notes</th><th class="r">Amount (${RPT_CUR.cur})</th></tr></thead>
         <tbody>${rowsBy[g.key]}
-          <tr class="subtotal"><td colspan="4">Subtotal</td><td class="r">${Math.round(totals[g.key]).toLocaleString()}</td></tr>
+          <tr class="subtotal"><td colspan="4">Subtotal</td><td class="r">${rn(totals[g.key])}</td></tr>
         </tbody>
       </table>`).join('') + (PETTY_GROUPS.filter(g => counts[g.key]).length > 1
-        ? `<table class="rpt-table" style="margin-top:8px;"><tbody><tr class="subtotal"><td>All petty cash spending</td><td class="r">${Math.round(total).toLocaleString()}</td></tr></tbody></table>` : '');
+        ? `<table class="rpt-table" style="margin-top:8px;"><tbody><tr class="subtotal"><td>All petty cash spending</td><td class="r">${rn(total)}</td></tr></tbody></table>` : '');
   const plRows = PETTY_GROUPS.filter(g => g.always || totals[g.key]).map(g => `<tr class="line"><td class="lbl">${esc(g.pl)}</td>${negCell(totals[g.key])}</tr>`).join('');
   return { total, totals, html, plRows };
 }
@@ -7940,15 +8024,33 @@ function renderVillaPicker(){
 }
 
 let villaReportToken = 0;
+let vrShowCur = recallCur('vrShowCur');
+(function wireVrCurrency(){
+  const w = document.getElementById('vrShowCurWrap');
+  if(!w) return;
+  w.innerHTML = curPickerHTML('vrShowCur', vrShowCur);
+  document.getElementById('vrShowCur').addEventListener('change', e => { vrShowCur = e.target.value; rememberCur('vrShowCur', vrShowCur); renderVillaReport(); });
+})();
 
 /* ===========================================================================
    LOOK BACK & COMPARE — how a villa (or all of them) did over any stretch of
-   time, next to another stretch: money in, costs, guests, nights.
-   Everything is worked out the same way as the monthly villa report, so the two
-   always agree: a stay counts in the period it checks in, its rupee value uses
-   bookingRate(), costs are the villa's petty cash, operating costs and store
-   supplies dated inside the period.
+   time, next to another stretch. One view, reached from every villa tab:
+     Villa Report      -> everything (the "Look back & compare" button)
+     Bookings Calendar -> guests, nights and money in
+     Petty Cash / Villa Expenses -> what was spent, group by group
+     Inventory         -> store supplies sent to each villa
+   Worked out exactly like the monthly villa report, so the two always agree: a
+   stay counts in the period it checks in, at its own rate day (bookingRate());
+   costs are those dated inside the period.
+   "Show amounts in" is a view only: each stay at its own rate day, rupee costs at
+   the rate on the last day of each period. Print keeps what is on screen.
 =========================================================================== */
+const CMP_FOCUS = {
+  all:       { label:'Everything — money in, costs, profit', can: () => canSee('villareport') },
+  bookings:  { label:'Guests, nights & money in',            can: () => canSee('bookings') || canSee('villareport') },
+  costs:     { label:'Spending — petty cash & bank',         can: () => canSee('pettycash') || canSee('expenses') || canSee('villareport') },
+  inventory: { label:'Store supplies sent to villas',         can: () => canSee('inventory') || canSee('villareport') },
+};
 function compareVillas(){
   const sc = (currentUser && currentUser.villaScopes) || [];
   const one = lockedVilla();
@@ -7957,13 +8059,22 @@ function compareVillas(){
   else if(sc.length > 1) list = list.filter(v => sc.includes(v.id));
   return list;
 }
-async function villaPeriodStats(villaId, fromISO, toExcl){
+// Makes sure the records a figure needs are loaded, whichever tab the view was opened from.
+async function ensureCompareData(focus){
+  const jobs = [];
+  if(!allBookings.length && !cancelledBookings.length && typeof fetchBookings === 'function') jobs.push(fetchBookings());
+  if(focus !== 'bookings' && !allCashTxns.length && typeof fetchCash === 'function') jobs.push(fetchCash());
+  if((focus === 'all' || focus === 'inventory') && !allInvTxns.length && typeof fetchInv === 'function') jobs.push(fetchInv());
+  if(focus === 'all' && !allOpEx.length && typeof fetchOpEx === 'function') jobs.push(fetchOpEx());
+  try{ await Promise.all(jobs); }catch(e){ console.error('compare: loading records', e); }
+}
+async function villaPeriodStats(villaId, fromISO, toExcl, cur, rate){
   const nightsOf = b => Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
   const st = { stays:0, guests:0, nights:0, stayDays:0, occupied:0, bookingRev:0, keptRev:0, extraRev:0,
-               petty:0, opex:0, supplies:0, unrated:0, noFx:0, airbnb:0, direct:0 };
+               petty:0, opex:0, supplies:0, supplyCount:0, unrated:0, noFx:0, airbnb:0, direct:0, pettyBy:{} };
+  PETTY_GROUPS.forEach(g => st.pettyBy[g.key] = 0);
   for(const b of allBookings){
     if(b.villa !== villaId) continue;
-    // nights that fall inside the period, from any stay overlapping it
     const a = b.checkIn > fromISO ? b.checkIn : fromISO, z = b.checkOut < toExcl ? b.checkOut : toExcl;
     if(a < z) st.occupied += Math.round((parseISO(z) - parseISO(a)) / 86400000);
     if(b.checkIn < fromISO || b.checkIn >= toExcl) continue;
@@ -7972,30 +8083,36 @@ async function villaPeriodStats(villaId, fromISO, toExcl){
     if(b.type === 'airbnb') st.airbnb++; else st.direct++;
     if(!b.rateUsd){ st.unrated++; continue; }
     const r = await bookingRate(b);
-    if(r) st.bookingRev += n * b.rateUsd * r; else st.noFx++;
+    if(r) st.bookingRev += await revForReport(b, n * b.rateUsd, n * b.rateUsd * r, cur, rate); else st.noFx++;
   }
   for(const b of cancelledBookings){
     if(b.villa !== villaId || !(b.retainedAmount > 0)) continue;
     const when = b.cancelledOn || b.checkIn;
     if(when < fromISO || when >= toExcl) continue;
     const r = await cancelRate(b);
-    if(r) st.keptRev += b.retainedAmount * r; else st.noFx++;
+    if(r) st.keptRev += await revForReport(b, b.retainedAmount, b.retainedAmount * r, cur, rate, b.type === 'airbnb' ? when : null);
+    else st.noFx++;
   }
   for(const t of allCashTxns){
     if(t.for !== villaId || !t.date || t.date < fromISO || t.date >= toExcl) continue;
     if(isDirectPayment(t) && isExtraIncome(t)) st.extraRev += t.amount;
+    if(t.type === 'expense'){ st.petty += t.amount; st.pettyBy[pettyGroupOf(t)] += t.amount; }
   }
-  st.petty = pettyGroupsBlock(allCashTxns.filter(t => t.type === 'expense' && t.for === villaId && t.date >= fromISO && t.date < toExcl)).total;
   st.opex = allOpEx.filter(o => o.villaId === villaId && o.date >= fromISO && o.date < toExcl).reduce((x, o) => x + o.amount, 0);
-  st.supplies = buildSuppliesSection(villaId, fromISO, toExcl).total || 0;
+  const sup = buildSuppliesSection(villaId, fromISO, toExcl);
+  st.supplies = sup.total || 0; st.supplyCount = sup.count || 0;
   return st;
 }
 function addStats(list){
-  const out = {};
-  for(const st of list) for(const k of Object.keys(st)) out[k] = (out[k] || 0) + st[k];
+  const out = { pettyBy:{} };
+  PETTY_GROUPS.forEach(g => out.pettyBy[g.key] = 0);
+  for(const st of list) for(const k of Object.keys(st)){
+    if(k === 'pettyBy'){ for(const g of Object.keys(st.pettyBy)) out.pettyBy[g] += st.pettyBy[g]; }
+    else out[k] = (out[k] || 0) + st[k];
+  }
   return out;
 }
-function finishStats(st, days, villaCount){
+function finishStats(st, days, villaCount, rate){
   st.revenue = st.bookingRev + st.keptRev + st.extraRev;
   st.fee = st.revenue * 0.15;
   st.share = st.revenue - st.fee;
@@ -8005,6 +8122,8 @@ function finishStats(st, days, villaCount){
   st.occPct = st.available ? st.occupied / st.available * 100 : 0;
   st.adr = st.nights ? st.bookingRev / st.nights : 0;
   st.avgStay = st.stays ? st.nights / st.stays : 0;
+  st.rate = rate || 1;
+  for(const g of PETTY_GROUPS) st['petty_' + g.key] = st.pettyBy[g.key] || 0;
   return st;
 }
 
@@ -8014,34 +8133,30 @@ function cmpDefaults(){
   const now = new Date();
   const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);   // last full month
   const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-  return { kind:'month', with:'lastyear', villa:'all',
+  return { focus:'all', kind:'month', with:'lastyear', villa:'all', cur: recallCur('cmpShowCur'),
     A:{ month: ym(lm), year: now.getFullYear() - 1, from: toISO(new Date(now.getFullYear(), now.getMonth(), 1)), to: todayISO() },
     B:{ month: ym(new Date(lm.getFullYear() - 1, lm.getMonth(), 1)), year: now.getFullYear() - 2,
         from: toISO(new Date(now.getFullYear() - 1, now.getMonth(), 1)), to: toISO(new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())) } };
 }
-// A period as [from, toExclusive) plus a label.
 function periodOf(kind, w){
   if(kind === 'month'){
     const [y, m] = (w.month || '').split('-').map(Number);
     if(!y || !m) return null;
-    const a = new Date(y, m - 1, 1), z = new Date(y, m, 1);
-    return { from: toISO(a), to: toISO(z), label: a.toLocaleDateString('en-GB', { month:'long', year:'numeric' }) };
+    return { from: toISO(new Date(y, m - 1, 1)), to: toISO(new Date(y, m, 1)) };
   }
   if(kind === 'year'){
     const y = Number(w.year); if(!y) return null;
-    return { from: y + '-01-01', to: (y + 1) + '-01-01', label: String(y) };
+    return { from: y + '-01-01', to: (y + 1) + '-01-01' };
   }
   if(!w.from || !w.to || w.to < w.from) return null;
   const z = new Date(parseISO(w.to)); z.setDate(z.getDate() + 1);
-  return { from: w.from, to: toISO(z), label: fmtDay(w.from) + ' – ' + fmtDay(w.to) + ' ' + w.to.slice(0, 4) };
+  return { from: w.from, to: toISO(z) };
 }
 function shiftPeriod(P, how){
   const a = parseISO(P.from), z = parseISO(P.to);
   if(how === 'lastyear'){
-    const a2 = new Date(a.getFullYear() - 1, a.getMonth(), a.getDate()), z2 = new Date(z.getFullYear() - 1, z.getMonth(), z.getDate());
-    return { from: toISO(a2), to: toISO(z2) };
+    return { from: toISO(new Date(a.getFullYear() - 1, a.getMonth(), a.getDate())), to: toISO(new Date(z.getFullYear() - 1, z.getMonth(), z.getDate())) };
   }
-  // the period just before, of the same length (a month before a month, a year before a year)
   if(cmpState.kind === 'month') return { from: toISO(new Date(a.getFullYear(), a.getMonth() - 1, 1)), to: P.from };
   if(cmpState.kind === 'year') return { from: (a.getFullYear() - 1) + '-01-01', to: P.from };
   const len = Math.round((z - a) / 86400000);
@@ -8062,7 +8177,7 @@ function labelFor(p){
 function renderCmpInputs(){
   const k = cmpState.kind;
   for(const side of ['A', 'B']){
-    const el = document.querySelector(`.cmp-when[data-for="${side}"]`);
+    const el = document.querySelector(`#cmpRoot .cmp-when[data-for="${side}"]`);
     if(side === 'B' && cmpState.with !== 'custom'){ el.innerHTML = ''; el.style.display = 'none'; continue; }
     el.style.display = '';
     const w = cmpState[side];
@@ -8072,62 +8187,103 @@ function renderCmpInputs(){
     el.querySelectorAll('input').forEach(inp => inp.addEventListener('change', ()=>{ w[inp.dataset.f] = inp.value; renderCompare(); }));
   }
 }
+function fillCmpControls(){
+  const fs = document.getElementById('cmpFocus');
+  const allowed = Object.keys(CMP_FOCUS).filter(k => CMP_FOCUS[k].can());
+  if(!allowed.includes(cmpState.focus)) cmpState.focus = allowed[0] || 'bookings';
+  fs.innerHTML = allowed.map(k => `<option value="${k}">${esc(CMP_FOCUS[k].label)}</option>`).join('');
+  fs.value = cmpState.focus;
+  const vs = document.getElementById('cmpVilla');
+  const list = compareVillas();
+  vs.innerHTML = (list.length > 1 ? '<option value="all">All villas</option>' : '') + list.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  if(![...vs.options].some(o => o.value === cmpState.villa)) cmpState.villa = vs.options[0] ? vs.options[0].value : 'all';
+  vs.value = cmpState.villa;
+  document.getElementById('cmpKind').value = cmpState.kind;
+  document.getElementById('cmpWith').value = cmpState.with;
+  document.getElementById('cmpCurWrap').innerHTML = curPickerHTML('cmpShowCur', cmpState.cur);
+  document.getElementById('cmpShowCur').addEventListener('change', e => { cmpState.cur = e.target.value; rememberCur('cmpShowCur', cmpState.cur); renderCompare(); });
+  renderCmpInputs();
+}
 
 let cmpToken = 0, cmpLast = null;
 async function renderCompare(){
   const body = document.getElementById('cmpBody');
-  if(!body) return;
+  if(!body || !cmpState) return;
   const my = ++cmpToken;
+  const focus = cmpState.focus;
   const PA = periodOf(cmpState.kind, cmpState.A);
   if(!PA){ body.innerHTML = '<div class="manage-empty">Pick the period to look at.</div>'; return; }
   let PB = null;
   if(cmpState.with === 'custom') PB = periodOf(cmpState.kind, cmpState.B);
   else if(cmpState.with !== 'none') PB = shiftPeriod(PA, cmpState.with);
-  if(PB) PB.label = PB.label || labelFor(PB);
-  PA.label = labelFor(PA);
+  PA.label = labelFor(PA); if(PB) PB.label = labelFor(PB);
   body.innerHTML = '<div class="manage-empty">Working it out — fetching the exchange rate for each booking…</div>';
+  await ensureCompareData(focus);
+  if(my !== cmpToken) return;
+
+  // One rate per period for rupee figures when shown in another currency.
+  let cur = cmpState.cur || 'LKR';
+  const lastDayOf = P => toISO(new Date(parseISO(P.to).getTime() - 86400000));
+  let rA = await reportRateFor(cur, lastDayOf(PA)), rB = PB ? await reportRateFor(cur, lastDayOf(PB)) : 1;
+  let fxFailed = false;
+  if(!rA || !rB){ cur = 'LKR'; rA = 1; rB = 1; fxFailed = true; }
 
   const villas = compareVillas().filter(v => cmpState.villa === 'all' || v.id === cmpState.villa);
   const daysOf = P => Math.round((parseISO(P.to) - parseISO(P.from)) / 86400000);
   const per = {};
   for(const v of villas){
-    per[v.id] = { A: finishStats(await villaPeriodStats(v.id, PA.from, PA.to), daysOf(PA), 1) };
-    if(PB) per[v.id].B = finishStats(await villaPeriodStats(v.id, PB.from, PB.to), daysOf(PB), 1);
+    per[v.id] = { A: finishStats(await villaPeriodStats(v.id, PA.from, PA.to, cur, rA), daysOf(PA), 1, rA) };
+    if(PB) per[v.id].B = finishStats(await villaPeriodStats(v.id, PB.from, PB.to, cur, rB), daysOf(PB), 1, rB);
     if(my !== cmpToken) return;
   }
-  const A = finishStats(addStats(villas.map(v => per[v.id].A)), daysOf(PA), villas.length);
-  const B = PB ? finishStats(addStats(villas.map(v => per[v.id].B)), daysOf(PB), villas.length) : null;
-  cmpLast = { PA, PB, A, B, villas, per };
+  const A = finishStats(addStats(villas.map(v => per[v.id].A)), daysOf(PA), villas.length, rA);
+  const B = PB ? finishStats(addStats(villas.map(v => per[v.id].B)), daysOf(PB), villas.length, rB) : null;
+  cmpLast = { PA, PB, A, B, villas, per, cur, focus };
 
   const n0 = v => Math.round(v).toLocaleString();
   const n1 = v => (Math.round(v * 10) / 10).toLocaleString();
-  const ROWS = [
-    ['grp', 'Guests & nights'],
-    ['stays',    'Stays (bookings checking in)', n0, true],
-    ['guests',   'Guests', n0, true],
-    ['nights',   'Nights booked', n0, true],
-    ['stayDays', 'Days booked (check-in day to check-out day)', n0, true],
-    ['occupied', 'Nights occupied inside the period', n0, true],
-    ['occPct',   'Occupancy', v => Math.round(v) + '%', true, 'pts'],
-    ['avgStay',  'Average stay (nights)', n1, true],
-    ['grp', 'Money in (LKR)'],
-    ['bookingRev', 'Booking revenue', n0, true],
-    ['keptRev',  'Kept from cancellations', n0, true],
-    ['extraRev', 'Direct payments — extra income', n0, true],
-    ['revenue',  'Total revenue', n0, true, null, 'key'],
-    ['adr',      'Average per night', n0, true],
-    ['fee',      'Ceymora fee (15%)', n0, true],
-    ['share',    "Villa's share (85%)", n0, true],
-    ['grp', 'Costs (LKR)'],
-    ['petty',    'Petty cash expenses', n0, false],
-    ['opex',     'Salaries, bills & other operating costs', n0, false],
-    ['supplies', 'Store supplies received', n0, false],
-    ['costs',    'Total costs', n0, false, null, 'key'],
-    ['grp', 'Result (LKR)'],
-    ['net',      "Net profit (villa's share less costs)", n0, true, null, 'key'],
-  ];
+  const pctF = v => Math.round(v) + '%';
+  const M = 'money';
+  const pettyRows = PETTY_GROUPS.map(g => ['petty_' + g.key, g.pl, M, false]);
+  const GROUPS = {
+    guests: ['Guests & nights', [
+      ['stays',    'Stays (bookings checking in)', n0, true],
+      ['guests',   'Guests', n0, true],
+      ['nights',   'Nights booked', n0, true],
+      ['stayDays', 'Days booked (check-in day to check-out day)', n0, true],
+      ['occupied', 'Nights occupied inside the period', n0, true],
+      ['occPct',   'Occupancy', pctF, true, 'pts'],
+      ['avgStay',  'Average stay (nights)', n1, true],
+    ]],
+    money: [`Money in (${cur})`, [
+      ['bookingRev', 'Booking revenue', M, true],
+      ['keptRev',  'Kept from cancellations', M, true],
+      ['extraRev', 'Direct payments — extra income', M, true],
+      ['revenue',  'Total revenue', M, true, null, 'key'],
+      ['adr',      'Average per night', M, true],
+      ['fee',      'Ceymora fee (15%)', M, true],
+      ['share',    "Villa's share (85%)", M, true],
+    ]],
+    costs: [`Costs (${cur})`, [
+      ['petty',    'Petty cash & bank spending', M, false],
+      ['opex',     'Salaries, bills & other operating costs', M, false],
+      ['supplies', 'Store supplies received', M, false],
+      ['costs',    'Total costs', M, false, null, 'key'],
+    ]],
+    spend: [`Spending (${cur})`, [...pettyRows, ['petty', 'Total spending', M, false, null, 'key']]],
+    supplies: [`Store supplies (${cur})`, [
+      ['supplyCount', 'Transfers from Store', n0, true],
+      ['supplies', 'Value of supplies received', M, false, null, 'key'],
+    ]],
+    result: [`Result (${cur})`, [
+      ['net', "Net profit (villa's share less costs)", M, true, null, 'key'],
+    ]],
+  };
+  const LAYOUT = { all:['guests','money','costs','result'], bookings:['guests','money'], costs:['spend'], inventory:['supplies'] }[focus];
+
+  const fmt = (f, v, st) => f === M ? n0(v / (st.rate || 1)) : f(v);
+  const val = (f, v, st) => f === M ? v / (st.rate || 1) : v;
   const change = (a, b, goodUp, mode) => {
-    if(b === null || b === undefined) return '';
     const d = a - b;
     if(Math.abs(d) < 0.5 && mode !== 'pts') return '<td class="flat">no change</td><td class="flat">—</td>';
     const cls = d === 0 ? 'flat' : ((d > 0) === goodUp ? 'up' : 'down');
@@ -8139,51 +8295,82 @@ async function renderCompare(){
   const villaLabel = cmpState.villa === 'all' ? (villas.length === 1 ? villas[0].name : 'All villas') : (villas[0] || {}).name || '';
   let html = `<div class="rpt-doc" id="cmpDoc">
     <div class="cmp-head">${esc(PA.label)}${PB ? ' <span style="color:var(--muted); font-size:15px;">compared with</span> ' + esc(PB.label) : ''}</div>
-    <div class="cmp-sub">${esc(villaLabel)} · money in LKR</div>
+    <div class="cmp-sub">${esc(villaLabel)} · ${esc(CMP_FOCUS[focus].label)} · amounts in ${esc(cur)}</div>
     <table class="cmp-table"><thead><tr><th></th><th>${esc(PA.label)}</th>${PB ? `<th>${esc(PB.label)}</th><th>Change</th><th>%</th>` : ''}</tr></thead><tbody>`;
-  for(const r of ROWS){
-    if(r[0] === 'grp'){ html += `<tr class="grp"><td colspan="${PB ? 5 : 2}">${esc(r[1])}</td></tr>`; continue; }
-    const [k, label, fmt, goodUp, mode, cls] = r;
-    html += `<tr class="${cls || ''}"><td>${esc(label)}</td><td>${fmt(A[k])}</td>${PB ? `<td>${fmt(B[k])}</td>${change(A[k], B[k], goodUp, mode)}` : ''}</tr>`;
+  for(const gk of LAYOUT){
+    const [title, rows] = GROUPS[gk];
+    html += `<tr class="grp"><td colspan="${PB ? 5 : 2}">${esc(title)}</td></tr>`;
+    for(const [k, label, f, goodUp, mode, cls] of rows){
+      html += `<tr class="${cls || ''}"><td>${esc(label)}</td><td>${fmt(f, A[k], A)}</td>${PB ? `<td>${fmt(f, B[k], B)}</td>${change(val(f, A[k], A), val(f, B[k], B), goodUp, mode)}` : ''}</tr>`;
+    }
   }
   html += '</tbody></table>';
 
   if(villas.length > 1){
+    const COLS = {
+      all:       [['stays','Stays',n0],['guests','Guests',n0],['nights','Nights',n0],['occPct','Occupancy',pctF],['revenue','Revenue',M],['costs','Costs',M],['net','Net profit',M]],
+      bookings:  [['stays','Stays',n0],['guests','Guests',n0],['nights','Nights',n0],['occPct','Occupancy',pctF],['revenue','Revenue',M],['share',"Villa's share",M]],
+      costs:     [...PETTY_GROUPS.filter(g => villas.some(v => per[v.id].A.pettyBy[g.key] || (per[v.id].B && per[v.id].B.pettyBy[g.key])))
+                    .map(g => ['petty_' + g.key, g.pl, M]), ['petty','Total spending',M]],
+      inventory: [['supplyCount','Transfers',n0],['supplies','Value received',M]],
+    }[focus];
     html += `<div class="rpt-section-title" style="margin-top:18px;">Villa by villa</div>
-      <table class="cmp-table"><thead><tr><th>Villa</th><th>Stays</th><th>Guests</th><th>Nights</th><th>Occupancy</th><th>Revenue</th><th>Costs</th><th>Net profit</th></tr></thead><tbody>`;
+      <table class="cmp-table"><thead><tr><th>Villa</th>${COLS.map(c => `<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>`;
     for(const v of villas){
       const a = per[v.id].A, b = per[v.id].B;
-      const cell = (k, f) => `<td>${f(a[k])}${b ? `<span class="vs">was ${f(b[k])}</span>` : ''}</td>`;
-      html += `<tr><td><b>${esc(v.name)}</b></td>${cell('stays', n0)}${cell('guests', n0)}${cell('nights', n0)}${cell('occPct', x => Math.round(x) + '%')}${cell('revenue', n0)}${cell('costs', n0)}${cell('net', n0)}</tr>`;
+      html += `<tr><td><b>${esc(v.name)}</b></td>${COLS.map(([k, , f]) => `<td>${fmt(f, a[k], a)}${b ? `<span class="vs">was ${fmt(f, b[k], b)}</span>` : ''}</td>`).join('')}</tr>`;
     }
     html += '</tbody></table>';
   }
   const unrated = A.unrated + (B ? B.unrated : 0), noFx = A.noFx + (B ? B.noFx : 0);
+  const rateNote = cur === 'LKR' ? '' :
+    `<br>Shown in ${esc(cur)} for viewing only — saved figures stay in LKR. Each stay is converted at its own rate day;
+     rupee costs at 1 ${esc(cur)} = ${rA.toFixed(2)} LKR for ${esc(PA.label)}${PB ? ` and ${rB.toFixed(2)} LKR for ${esc(PB.label)}` : ''} (the last day of each period, or today).`;
   html += `<div class="cmp-note">
       A stay counts in the period it checks in. Direct bookings are valued at the exchange rate on the day they were booked
       (or the rate locked on the booking), Airbnb bookings at the rate on the check-in day. Costs are those dated inside the period.
-      Office bills are not a villa's cost and are left out.
-      ${unrated ? `<br><b>${unrated} stay${unrated === 1 ? ' has' : 's have'} no nightly rate</b> and add no revenue.` : ''}
-      ${noFx ? `<br><b>${noFx} could not be converted</b> — no exchange rate could be fetched for that day.` : ''}
+      Office bills are not a villa's cost and are left out.${rateNote}
+      ${fxFailed ? `<br><b>No ${esc(cmpState.cur)} rate could be fetched just now, so this is shown in LKR.</b>` : ''}
+      ${(focus === 'all' || focus === 'bookings') && unrated ? `<br><b>${unrated} stay${unrated === 1 ? ' has' : 's have'} no nightly rate</b> and add no revenue.` : ''}
+      ${(focus === 'all' || focus === 'bookings') && noFx ? `<br><b>${noFx} could not be converted</b> — no exchange rate could be fetched for that day.` : ''}
+      <br>Printed ${esc(new Date().toLocaleString('en-GB'))}.
     </div></div>`;
   body.innerHTML = html;
 }
 
 function cmpDownload(){
   if(!cmpLast) return;
-  const { PA, PB, A, B, villas, per } = cmpLast;
-  const keys = [['stays','Stays'],['guests','Guests'],['nights','Nights booked'],['stayDays','Days booked'],['occupied','Nights occupied in period'],
-    ['occPct','Occupancy %'],['avgStay','Average stay (nights)'],['bookingRev','Booking revenue LKR'],['keptRev','Kept from cancellations LKR'],
-    ['extraRev','Direct payments extra income LKR'],['revenue','Total revenue LKR'],['adr','Average per night LKR'],['fee','Ceymora fee LKR'],
-    ['share','Villa share LKR'],['petty','Petty cash LKR'],['opex','Operating costs LKR'],['supplies','Store supplies LKR'],['costs','Total costs LKR'],['net','Net profit LKR']];
+  const { PA, PB, A, B, villas, per, cur, focus } = cmpLast;
+  const money = [['bookingRev','Booking revenue'],['keptRev','Kept from cancellations'],['extraRev','Direct payments extra income'],['revenue','Total revenue'],
+    ['adr','Average per night'],['fee','Ceymora fee'],['share','Villa share'],['petty','Petty cash & bank spending'],
+    ...PETTY_GROUPS.map(g => ['petty_' + g.key, g.pl]),['opex','Operating costs'],['supplies','Store supplies'],['costs','Total costs'],['net','Net profit']];
+  const counts = [['stays','Stays'],['guests','Guests'],['nights','Nights booked'],['stayDays','Days booked'],['occupied','Nights occupied in period'],
+    ['occPct','Occupancy %'],['avgStay','Average stay (nights)'],['supplyCount','Store transfers']];
   const r2 = v => Math.round(v * 100) / 100;
   const rows = [['Villa', 'Figure', PA.label, ...(PB ? [PB.label, 'Change'] : [])]];
-  const add = (name, a, b) => keys.forEach(([k, l]) => rows.push([name, l, r2(a[k]), ...(b ? [r2(b[k]), r2(a[k] - b[k])] : [])]));
+  const add = (name, a, b) => {
+    counts.forEach(([k, l]) => rows.push([name, l, r2(a[k]), ...(b ? [r2(b[k]), r2(a[k] - b[k])] : [])]));
+    money.forEach(([k, l]) => { const x = a[k] / a.rate, y = b ? b[k] / b.rate : 0; rows.push([name, `${l} (${cur})`, r2(x), ...(b ? [r2(y), r2(x - y)] : [])]); });
+  };
   add(villas.length > 1 ? 'All villas' : villas[0].name, A, B);
   if(villas.length > 1) villas.forEach(v => add(v.name, per[v.id].A, per[v.id].B));
-  downloadCSV(`ceymora-compare-${PA.from}${PB ? '-vs-' + PB.from : ''}.csv`, rows);
+  downloadCSV(`ceymora-compare-${focus}-${PA.from}${PB ? '-vs-' + PB.from : ''}-${cur}.csv`, rows);
 }
 
+// Where the one compare view lives: inside the Villa Report, or in the pop-up.
+function homeCompareRoot(){ const root = document.getElementById('cmpRoot'), home = document.getElementById('vrCompare'); if(root && home && root.parentNode !== home) home.appendChild(root); }
+function openCompare(focus){
+  if(!cmpState) cmpState = cmpDefaults();
+  if(focus && CMP_FOCUS[focus] && CMP_FOCUS[focus].can()) cmpState.focus = focus;
+  document.getElementById('cmpModalHost').appendChild(document.getElementById('cmpRoot'));
+  document.getElementById('cmpModalOverlay').classList.add('open');
+  fillCmpControls();
+  renderCompare();
+}
+function closeCompare(){
+  document.getElementById('cmpModalOverlay').classList.remove('open');
+  homeCompareRoot();
+}
 function setVrMode(mode){
   document.querySelectorAll('#vrModeTabs [data-vrmode]').forEach(b => {
     const on = b.dataset.vrmode === mode;
@@ -8193,34 +8380,32 @@ function setVrMode(mode){
   document.getElementById('vrCompare').style.display = mode === 'compare' ? '' : 'none';
   document.getElementById('vrReportWrap').style.display = mode === 'compare' ? 'none' : '';
   if(mode === 'compare'){
+    homeCompareRoot();
     if(!cmpState) cmpState = cmpDefaults();
-    const vs = document.getElementById('cmpVilla');
-    const list = compareVillas();
-    vs.innerHTML = (list.length > 1 ? '<option value="all">All villas</option>' : '') + list.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
-    if(![...vs.options].some(o => o.value === cmpState.villa)) cmpState.villa = vs.options[0] ? vs.options[0].value : 'all';
-    vs.value = cmpState.villa;
-    document.getElementById('cmpKind').value = cmpState.kind;
-    document.getElementById('cmpWith').value = cmpState.with;
-    renderCmpInputs();
+    cmpState.focus = 'all';
+    fillCmpControls();
     renderCompare();
   }
 }
 (function wireCompare(){
   document.querySelectorAll('#vrModeTabs [data-vrmode]').forEach(b => b.addEventListener('click', ()=> setVrMode(b.dataset.vrmode)));
+  document.getElementById('cmpFocus').addEventListener('change', e => { cmpState.focus = e.target.value; renderCompare(); });
   document.getElementById('cmpKind').addEventListener('change', e => { cmpState.kind = e.target.value; renderCmpInputs(); renderCompare(); });
   document.getElementById('cmpWith').addEventListener('change', e => { cmpState.with = e.target.value; renderCmpInputs(); renderCompare(); });
   document.getElementById('cmpVilla').addEventListener('change', e => { cmpState.villa = e.target.value; renderCompare(); });
   document.getElementById('cmpDownload').addEventListener('click', cmpDownload);
   document.getElementById('cmpPrint').addEventListener('click', ()=>{
     const doc = document.getElementById('cmpDoc');
-    if(!doc) return;
-    const w = window.open('', '_blank');
-    if(!w){ alert('Allow pop-ups for this page to print.'); return; }
-    const css = [...document.querySelectorAll('style')].map(x => x.textContent).join('\n');
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ceymora — ${esc(cmpLast ? cmpLast.PA.label : 'comparison')}</title><style>${css} body{background:#fff;padding:24px;}</style></head><body>${doc.outerHTML}</body></html>`);
-    w.document.close(); setTimeout(()=> w.print(), 300);
+    if(!doc || !cmpLast) return;
+    printPiece(`Ceymora — ${cmpLast.PA.label}${cmpLast.PB ? ' vs ' + cmpLast.PB.label : ''} (${cmpLast.cur})`, doc.outerHTML);
   });
+  document.querySelectorAll('[data-cmp-open]').forEach(b => b.addEventListener('click', ()=> openCompare(b.dataset.cmpOpen)));
+  const eb = document.getElementById('earnCompareBtn');
+  if(eb) eb.addEventListener('click', ()=> openCompare('bookings'));
+  document.getElementById('cmpModalClose').addEventListener('click', closeCompare);
+  document.getElementById('cmpModalOverlay').addEventListener('click', e => { if(e.target.id === 'cmpModalOverlay') closeCompare(); });
 })();
+
 /* ------------------------- DIRECT PAYMENTS FROM GUESTS -------------------------
    Stored as an income row against the villa. Received onto a card, it lifts that
    card's float like any other money in; received into the bank, it touches no card.
@@ -8382,7 +8567,7 @@ async function renderVillaReport(){
 /* ======================= REPORT FORMATTING HELPERS ======================= */
 // Everything the reports print goes through these so the whole document is
 // consistent: same date style, same money style, same empty-state wording.
-function lkr(n){ return 'LKR ' + Math.round(Number(n)||0).toLocaleString(); }
+function lkr(n){ return RPT_CUR.cur + ' ' + rn(n); }
 function fmtDay(iso){
   if(!iso) return '';
   const d = parseISO(iso);
@@ -8436,7 +8621,7 @@ function attachmentLinksHTML(urls){
 // nothing to deduct — "(0)" reads like an error.
 function negCell(n){
   const v = Math.round(Number(n)||0);
-  return v > 0 ? `<td class="amt neg">(${v.toLocaleString()})</td>` : '<td class="amt">0</td>';
+  return v > 0 ? `<td class="amt neg">(${rn(v)})</td>` : '<td class="amt">0</td>';
 }
 
 // Wires a "what goes in this report" checkbox strip to the sections of a report body.
@@ -8522,6 +8707,12 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   const daysInMonth = Math.round((monthEndExclusive - monthStart) / 86400000);
   const villaInfo = VR_VILLAS.find(v=>v.id===loc) || CAL_VILLAS.find(v=>v.id===loc) || { name: loc };
   const villaCurrency = (CAL_VILLAS.find(v=>v.id===loc) || {}).currency || 'USD';
+  // The currency this report is shown in, and its one rate for rupee costs.
+  let showCur = vrShowCur;
+  const lastDay = toISO(new Date(monthEndExclusive.getTime() - 86400000));
+  let showRate = await reportRateFor(showCur, lastDay);
+  if(!showRate){ showCur = 'LKR'; showRate = 1; }
+  const rnx = x => Math.round((Number(x) || 0) / showRate).toLocaleString();
 
   /* ---------------- 1. REVENUE: bookings checking in this month ---------------- */
   const bookings = allBookings
@@ -8540,7 +8731,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       lineGross = nights * b.rateUsd;
       grossNative += lineGross;
       const rate = await bookingRate(b);
-      if(rate){ lineLkr = lineGross * rate; grossLkr += lineLkr; }
+      if(rate){ lineLkr = await revForReport(b, lineGross, lineGross * rate, showCur, showRate); grossLkr += lineLkr; }
       else { noFxCount++; }
       bookedNights += nights;
       if(b.type === 'airbnb'){ airbnbCount++; if(lineLkr) airbnbLkr += lineLkr; }
@@ -8555,7 +8746,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       <td class="c">${nights}</td>
       <td class="r">${b.rateUsd ? moneyFull(b.rateUsd, cur) : '—'}</td>
       <td class="r">${lineGross!==null ? moneyFull(lineGross, cur) : '—'}</td>
-      <td class="r ${lineLkr!==null?'rpt-money-in':'dim'}">${lineLkr!==null ? Math.round(lineLkr).toLocaleString() : '—'}</td>
+      <td class="r ${lineLkr!==null?'rpt-money-in':'dim'}">${lineLkr!==null ? rnx(lineLkr) : '—'}</td>
     </tr>`;
   }
 
@@ -8565,7 +8756,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
         <thead><tr>
           <th>Stay dates</th><th>Guest</th><th>Source</th>
           <th class="c">Nights</th><th class="r">Rate / night</th>
-          <th class="r">Gross (${esc(villaCurrency)})</th><th class="r">Gross (LKR)</th>
+          <th class="r">Gross (${esc(villaCurrency)})</th><th class="r">Value in ${showCur}</th>
         </tr></thead>
         <tbody>${bookingRowsHtml}
           <tr class="subtotal">
@@ -8573,7 +8764,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
             <td class="c">${bookedNights}</td>
             <td></td>
             <td class="r">${moneyFull(grossNative, villaCurrency)}</td>
-            <td class="r">${Math.round(grossLkr).toLocaleString()}</td>
+            <td class="r">${rnx(grossLkr)}</td>
           </tr>
         </tbody>
       </table>
@@ -8604,27 +8795,31 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     const rate = await cancelRate(b);
     let lineLkr = null;
     keptNative += b.retainedAmount;
-    if(rate){ lineLkr = b.retainedAmount * rate; keptLkr += lineLkr; } else { keptNoFx++; }
+    if(rate){ lineLkr = await revForReport(b, b.retainedAmount, b.retainedAmount * rate, showCur, showRate,
+                                          b.type === 'airbnb' ? (b.cancelledOn || b.checkIn) : null); keptLkr += lineLkr; } else { keptNoFx++; }
     cancelRowsHtml += `<tr>
       <td class="dim">${b.cancelledOn ? fmtDay(b.cancelledOn) : '—'}</td>
       <td><b>${esc(b.guest || 'Guest')}</b><div class="dim">stay was ${fmtDay(b.checkIn)} – ${fmtDay(b.checkOut)}</div></td>
       <td class="dim">${esc(b.cancelReason || '')}${b.cancelNote ? `<div class="dim">${esc(b.cancelNote)}</div>` : ''}</td>
       <td class="r dim">${moneyFull(b.refundedAmount || 0, cur)}</td>
       <td class="r">${moneyFull(b.retainedAmount, cur)}</td>
-      <td class="r ${lineLkr!==null?'rpt-money-in':'dim'}">${lineLkr!==null ? Math.round(lineLkr).toLocaleString() : '—'}</td>
+      <td class="r ${lineLkr!==null?'rpt-money-in':'dim'}">${lineLkr!==null ? rnx(lineLkr) : '—'}</td>
     </tr>`;
   }
   const cancelHtml = cancels.length === 0
     ? '<div class="rpt-empty">No cancellation money kept in this period.</div>'
     : `<table class="rpt-table">
-        <thead><tr><th>Cancelled on</th><th>Guest</th><th>Reason</th><th class="r">Refunded (${esc(villaCurrency)})</th><th class="r">Kept (${esc(villaCurrency)})</th><th class="r">Kept (LKR)</th></tr></thead>
+        <thead><tr><th>Cancelled on</th><th>Guest</th><th>Reason</th><th class="r">Refunded (${esc(villaCurrency)})</th><th class="r">Kept (${esc(villaCurrency)})</th><th class="r">Kept (${showCur})</th></tr></thead>
         <tbody>${cancelRowsHtml}
           <tr class="subtotal"><td colspan="4">Total kept — ${cancels.length} cancellation${cancels.length===1?'':'s'}</td>
-            <td class="r">${moneyFull(keptNative, villaCurrency)}</td><td class="r">${Math.round(keptLkr).toLocaleString()}</td></tr>
+            <td class="r">${moneyFull(keptNative, villaCurrency)}</td><td class="r">${rnx(keptLkr)}</td></tr>
         </tbody></table>
       ${keptNoFx ? `<div class="rpt-note">${keptNoFx} cancellation${keptNoFx===1?'':'s'} could not be converted to LKR (no exchange rate for that date).</div>` : ''}
       <div class="rpt-note">Money kept from a late cancellation is shared the same way as a stay: 15% to Ceymora, 85% to the villa. A guest refunded in full leaves nothing to share.</div>`;
 
+  // No more waiting from here on, so the shared formatters can safely follow this report.
+  RPT_CUR = { cur: showCur, rate: showRate };
+  try{
   /* ---------------- 1c. DIRECT PAYMENTS RECEIVED ---------------- */
   const directPays = allCashTxns
     .filter(t => isDirectPayment(t) && t.for === loc && t.date >= monthStartISO && t.date < monthEndISO)
@@ -8639,17 +8834,17 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       <td><b>${esc(t.purpose || 'Direct payment')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}</td>
       <td class="dim">${esc(CARD_LABELS[t.card] || t.card || '')}${links ? ' '+links : ''}</td>
       <td class="dim">${isExtraIncome(t) ? 'Extra income' : 'Against a booking above'}</td>
-      <td class="r rpt-money-in">${Math.round(t.amount).toLocaleString()}</td>
+      <td class="r rpt-money-in">${rnx(t.amount)}</td>
       <td class="r no-print"><button class="manage-edit no-print" data-dp-id="${esc(String(t.id))}">Edit</button></td>
     </tr>`;
   }
   const directPayHtml = directPays.length === 0
     ? '<div class="rpt-empty">No direct payments recorded for this villa in this period.</div>'
     : `<table class="rpt-table">
-        <thead><tr><th>Date</th><th>Who paid / what for</th><th>Received into</th><th>Counts as</th><th class="r">Amount (LKR)</th><th class="no-print"></th></tr></thead>
+        <thead><tr><th>Date</th><th>Who paid / what for</th><th>Received into</th><th>Counts as</th><th class="r">Amount (${showCur})</th><th class="no-print"></th></tr></thead>
         <tbody>${dpRowsHtml}
           <tr class="subtotal"><td colspan="4">Total received directly — ${directPays.length} payment${directPays.length===1?'':'s'}</td>
-            <td class="r">${Math.round(directPayTotal).toLocaleString()}</td><td class="no-print"></td></tr>
+            <td class="r">${rnx(directPayTotal)}</td><td class="no-print"></td></tr>
         </tbody></table>
       ${directExtraTotal < directPayTotal ? '<div class="rpt-note">Payments marked "Against a booking above" are money you have collected for a stay already counted under Bookings — they are shown so you can see what has actually come in, and are not added to revenue a second time.</div>' : ''}`;
 
@@ -8681,16 +8876,16 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       <td class="dim">${fmtDay(o.date)}</td>
       <td><b>${esc(OPEX_LABELS[o.category] || o.category)}</b></td>
       <td>${detail || '<span class="dim">—</span>'}${opLinks ? ' '+opLinks : ''}</td>
-      <td class="r rpt-money-out">${Math.round(o.amount).toLocaleString()}</td>
+      <td class="r rpt-money-out">${rnx(o.amount)}</td>
       <td class="r no-print"><button class="manage-del no-print" data-opex-id="${o.id}">Delete</button></td>
     </tr>`;
   }
   const opExHtml = opEx.length === 0
     ? '<div class="rpt-empty">No salaries, bills or other operating costs recorded for this period.</div>'
     : `<table class="rpt-table">
-        <thead><tr><th>Date</th><th>Category</th><th>Detail</th><th class="r">Amount (LKR)</th><th class="no-print"></th></tr></thead>
+        <thead><tr><th>Date</th><th>Category</th><th>Detail</th><th class="r">Amount (${showCur})</th><th class="no-print"></th></tr></thead>
         <tbody>${opExRows}
-          <tr class="subtotal"><td colspan="3">Total — ${opEx.length} item${opEx.length===1?'':'s'}</td><td class="r">${Math.round(opExTotal).toLocaleString()}</td><td class="no-print"></td></tr>
+          <tr class="subtotal"><td colspan="3">Total — ${opEx.length} item${opEx.length===1?'':'s'}</td><td class="r">${rnx(opExTotal)}</td><td class="no-print"></td></tr>
         </tbody>
       </table>`;
 
@@ -8712,16 +8907,16 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       <td><b>${esc(t.purpose || 'Bill')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}${links ? ' '+links : ''}</td>
       <td class="dim">${esc(acctLabel(acctOf(t)) || '')}</td>
       <td class="dim">${esc(t.employeeName ? t.employeeName + "'s advance" : (CARD_LABELS[t.card] || t.card || ''))}</td>
-      <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
+      <td class="r rpt-money-out">${rnx(t.amount)}</td>
     </tr>`;
   }
   const officeBillsHtml = officeBills.length === 0
     ? '<div class="rpt-empty">No office bills were paid from petty cash in this period.</div>'
     : `<table class="rpt-table">
-        <thead><tr><th>Date</th><th>What it was</th><th>Company account</th><th>Paid from</th><th class="r">Amount (LKR)</th></tr></thead>
+        <thead><tr><th>Date</th><th>What it was</th><th>Company account</th><th>Paid from</th><th class="r">Amount (${showCur})</th></tr></thead>
         <tbody>${officeRowsHtml}
           <tr class="subtotal"><td colspan="4">Total — ${officeBills.length} bill${officeBills.length===1?'':'s'}</td>
-            <td class="r">${Math.round(officeBillTotal).toLocaleString()}</td></tr>
+            <td class="r">${rnx(officeBillTotal)}</td></tr>
         </tbody></table>
       <div class="rpt-note">These are office costs, not ${esc(villaInfo.name)}'s. They are here only so you can see everything that left the petty cash card this month, and they are <b>not</b> included in the totals or the profit above.</div>`;
 
@@ -8740,13 +8935,13 @@ async function buildVillaProfitReportHTML(loc, monthDate){
 
   return `
   <div class="rpt-doc">
-    ${reportHeaderHTML(villaInfo.name, 'Monthly Financial Report', monthDate, 'All figures in <b>LKR</b>', loc)}
+    ${reportHeaderHTML(villaInfo.name, 'Monthly Financial Report', monthDate, `All figures in <b>${showCur}</b>`, loc)}
 
     <div data-rpt-section="summary">
       <div class="rpt-kpis">
         <div class="rpt-kpi">
           <div class="rpt-kpi-label">Gross revenue</div>
-          <div class="rpt-kpi-value">${Math.round(totalRevenueLkr).toLocaleString()}</div>
+          <div class="rpt-kpi-value">${rnx(totalRevenueLkr)}</div>
           <div class="rpt-kpi-note">${bookings.length} booking${bookings.length===1?'':'s'}</div>
         </div>
         <div class="rpt-kpi">
@@ -8756,17 +8951,17 @@ async function buildVillaProfitReportHTML(loc, monthDate){
         </div>
         <div class="rpt-kpi">
           <div class="rpt-kpi-label">Avg. nightly rate</div>
-          <div class="rpt-kpi-value">${Math.round(adr).toLocaleString()}</div>
+          <div class="rpt-kpi-value">${rnx(adr)}</div>
           <div class="rpt-kpi-note">across ${bookedNights} paid night${bookedNights===1?'':'s'}</div>
         </div>
         <div class="rpt-kpi">
           <div class="rpt-kpi-label">Total expenses</div>
-          <div class="rpt-kpi-value">${Math.round(totalExpenses).toLocaleString()}</div>
+          <div class="rpt-kpi-value">${rnx(totalExpenses)}</div>
           <div class="rpt-kpi-note">${pct(totalExpenses, villaShare)} of ${vrShowCommission ? 'villa share' : 'revenue'}</div>
         </div>
         <div class="rpt-kpi ${netProfit>=0?'pos':'neg'}">
           <div class="rpt-kpi-label">Net profit</div>
-          <div class="rpt-kpi-value">${Math.round(netProfit).toLocaleString()}</div>
+          <div class="rpt-kpi-value">${rnx(netProfit)}</div>
           <div class="rpt-kpi-note">${margin===null ? 'no revenue this period' : margin+'% of gross revenue'}</div>
         </div>
       </div>
@@ -8775,14 +8970,14 @@ async function buildVillaProfitReportHTML(loc, monthDate){
         <div class="rpt-section-title">Profit &amp; Loss Statement</div>
         <table class="rpt-pl">
           <tbody>
-            <tr class="group"><td>Revenue</td><td class="amt">LKR</td></tr>
-            <tr class="line"><td class="lbl">Booking revenue — Airbnb (${airbnbCount})</td><td class="amt">${Math.round(airbnbLkr).toLocaleString()}</td></tr>
-            <tr class="line"><td class="lbl">Booking revenue — Direct (${directCount})</td><td class="amt">${Math.round(directLkr).toLocaleString()}</td></tr>
-            ${keptLkr ? `<tr class="line"><td class="lbl">Kept from cancellations (${cancels.length})</td><td class="amt">${Math.round(keptLkr).toLocaleString()}</td></tr>` : ''}
-            ${directExtraTotal ? `<tr class="line"><td class="lbl">Direct payments — extra income</td><td class="amt">${Math.round(directExtraTotal).toLocaleString()}</td></tr>` : ''}
-            <tr class="sub"><td>Gross revenue</td><td class="amt">${Math.round(totalRevenueLkr).toLocaleString()}</td></tr>
+            <tr class="group"><td>Revenue</td><td class="amt">${showCur}</td></tr>
+            <tr class="line"><td class="lbl">Booking revenue — Airbnb (${airbnbCount})</td><td class="amt">${rnx(airbnbLkr)}</td></tr>
+            <tr class="line"><td class="lbl">Booking revenue — Direct (${directCount})</td><td class="amt">${rnx(directLkr)}</td></tr>
+            ${keptLkr ? `<tr class="line"><td class="lbl">Kept from cancellations (${cancels.length})</td><td class="amt">${rnx(keptLkr)}</td></tr>` : ''}
+            ${directExtraTotal ? `<tr class="line"><td class="lbl">Direct payments — extra income</td><td class="amt">${rnx(directExtraTotal)}</td></tr>` : ''}
+            <tr class="sub"><td>Gross revenue</td><td class="amt">${rnx(totalRevenueLkr)}</td></tr>
             ${vrShowCommission ? `<tr class="line"><td class="lbl">Less: Ceymora management fee (15%)</td>${negCell(commission)}</tr>
-            <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${Math.round(villaShare).toLocaleString()}</td></tr>` : ''}
+            <tr class="sub"><td>Villa's share of revenue (85%)</td><td class="amt">${rnx(villaShare)}</td></tr>` : ''}
 
             <tr class="group"><td>Expenses</td><td class="amt"></td></tr>
             ${pg.plRows}
@@ -8790,7 +8985,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
             <tr class="line"><td class="lbl">Store supplies received</td>${negCell(supplies.total)}</tr>
             <tr class="sub"><td>Total expenses</td>${negCell(totalExpenses)}</tr>
 
-            <tr class="grand"><td>Net profit for the period</td><td class="amt ${netProfit>=0?'pos':'neg'}">${netProfit<0 ? '('+Math.abs(Math.round(netProfit)).toLocaleString()+')' : Math.round(netProfit).toLocaleString()}</td></tr>
+            <tr class="grand"><td>Net profit for the period</td><td class="amt ${netProfit>=0?'pos':'neg'}">${netProfit<0 ? '('+rnx(Math.abs(netProfit))+')' : rnx(netProfit)}</td></tr>
           </tbody>
         </table>
         <div class="rpt-note">Figures in brackets are amounts deducted. Revenue counts bookings that check in during this period; occupancy counts nights that fall inside it.
@@ -8844,11 +9039,13 @@ async function buildVillaProfitReportHTML(loc, monthDate){
 
     <div class="rpt-foot">
       Prepared by Ceymora · ${esc(villaInfo.name)} · ${monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.
-      Foreign-currency bookings are converted to LKR at the published rate for each booking's check-in date.
+      Direct bookings are valued at the exchange rate on the day they were booked, Airbnb bookings at the rate on the check-in day.
+      ${showCur !== 'LKR' ? `Shown in ${showCur}: each stay at its own rate day; rupee costs at 1 ${showCur} = ${showRate.toFixed(2)} LKR (${fmtDay(lastDay > todayISO() ? todayISO() : lastDay)}). The saved figures stay in LKR.` : ''}
       This report is generated from the live management board and may change if entries are added or corrected afterwards.
     </div>
   </div>
   `;
+  } finally { RPT_CUR = { cur:'LKR', rate:1 }; }
 }
 
 // Items sent from Store to a villa/office during the period. Priced at whatever was
@@ -8885,13 +9082,13 @@ function buildSuppliesSection(loc, monthStartISO, monthEndISO){
       <td class="dim">${fmtDay(r.date)}</td>
       <td><b>${esc(r.item)}</b>${r.note ? `<div class="dim">${esc(r.note)}</div>` : ''}</td>
       <td class="c">${r.qty}</td>
-      <td class="r ${linePrice===null?'dim':'rpt-money-out'}">${linePrice!==null ? linePrice.toLocaleString()+(isEstimated?' *':'') : '—'}</td>
+      <td class="r ${linePrice===null?'dim':'rpt-money-out'}">${linePrice!==null ? rn(linePrice)+(isEstimated?' *':'') : '—'}</td>
     </tr>`;
   }
   const html = `<table class="rpt-table">
-      <thead><tr><th>Date</th><th>Item</th><th class="c">Qty</th><th class="r">Value (LKR)</th></tr></thead>
+      <thead><tr><th>Date</th><th>Item</th><th class="c">Qty</th><th class="r">Value (${RPT_CUR.cur})</th></tr></thead>
       <tbody>${rows}
-        <tr class="subtotal"><td colspan="3">Total — ${received.length} transfer${received.length===1?'':'s'}</td><td class="r">${total.toLocaleString()}</td></tr>
+        <tr class="subtotal"><td colspan="3">Total — ${received.length} transfer${received.length===1?'':'s'}</td><td class="r">${rn(total)}</td></tr>
       </tbody>
     </table>
     ${anyEstimated ? '<div class="rpt-note">* Valued at the item\'s average purchase cost — no price was entered on that transfer.</div>' : ''}
@@ -13060,10 +13257,10 @@ function ownerSettlementHTML(villaId, monthDate, netProfit){
       <span class="rpt-section-count">${pays.length} payment${pays.length===1?'':'s'} · ${lkr(paid)} paid</span></div>
     <table class="rpt-table">
       <tbody>
-        <tr class="line"><td class="lbl">Net profit for the period (owner's)</td><td class="amt">${Math.round(netProfit).toLocaleString()}</td></tr>
-        ${pays.map(p=>`<tr class="line"><td class="lbl">Paid ${fmtDay(p.date)}${p.method ? ' · ' + esc(p.method) : ''}${p.note ? ' · ' + esc(p.note) : ''}</td><td class="amt">(${Math.round(p.amount).toLocaleString()})</td></tr>`).join('')}
+        <tr class="line"><td class="lbl">Net profit for the period (owner's)</td><td class="amt">${rn(netProfit)}</td></tr>
+        ${pays.map(p=>`<tr class="line"><td class="lbl">Paid ${fmtDay(p.date)}${p.method ? ' · ' + esc(p.method) : ''}${p.note ? ' · ' + esc(p.note) : ''}</td><td class="amt">(${rn(p.amount)})</td></tr>`).join('')}
         <tr class="grand"><td>${balance > 0 ? 'Still to settle with the owner' : balance < 0 ? 'Overpaid to the owner' : 'Settled in full ✓'}</td>
-          <td class="amt">${Math.abs(Math.round(balance)).toLocaleString()}</td></tr>
+          <td class="amt">${rn(Math.abs(balance))}</td></tr>
       </tbody>
     </table>
     <div class="rpt-note">Payments are recorded with “+ Record owner payment” above the report. A month with no payment yet shows the whole profit as still to settle.</div>
