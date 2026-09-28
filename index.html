@@ -426,6 +426,31 @@
   body.ro-payroll #payrollPanel :is(input,textarea),
   body.ro-settings #settingsPanel :is(input:not([type=file]),textarea){ pointer-events:none; background:#f7f5f0; }
 
+  .earn-cur-bar{ display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin:6px 0 2px; font-size:13px; }
+  .earn-cur-bar label{ display:flex; align-items:center; gap:4px; margin:0; font-weight:600; }
+  .earn-cur-bar .earn-move{ font-weight:400; }
+
+  /* ---- Look back & compare ---- */
+  .cmp-controls{ display:flex; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+  .cmp-box{ display:flex; flex-direction:column; gap:6px; background:#fff; border:1px solid var(--board-line);
+    border-radius:10px; padding:10px 12px; min-width:200px; }
+  .cmp-title{ font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); font-weight:700; }
+  .cmp-when{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:12.5px; }
+  .cmp-when input{ padding:5px 7px; border:1px solid var(--board-line); border-radius:6px; font:inherit; }
+  .cmp-when input[type=number]{ width:90px; }
+  .cmp-table{ width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+  .cmp-table th{ text-align:right; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted);
+    padding:8px 10px; border-bottom:2px solid var(--board-line); }
+  .cmp-table th:first-child, .cmp-table td:first-child{ text-align:left; }
+  .cmp-table td{ padding:7px 10px; border-bottom:1px solid #eeebe1; text-align:right; font-variant-numeric:tabular-nums; }
+  .cmp-table tr.grp td{ background:#f7f5f0; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); text-align:left; }
+  .cmp-table tr.key td{ font-weight:700; }
+  .cmp-table .up{ color:var(--green); } .cmp-table .down{ color:var(--red); } .cmp-table .flat{ color:var(--muted); }
+  .cmp-table .vs{ display:block; font-size:11px; color:var(--muted); font-weight:400; }
+  .cmp-head{ font-family:Georgia, serif; font-size:19px; margin:4px 0 2px; }
+  .cmp-sub{ font-size:12px; color:var(--muted); margin-bottom:12px; }
+  .cmp-note{ font-size:11.5px; color:var(--muted); margin:8px 0 18px; line-height:1.5; }
+
   /* ---- The permission grid ---- */
   #userModalOverlay .modal{ width:min(560px, 100%); max-width:560px; }
   .perm-grid{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
@@ -1075,6 +1100,12 @@
 
       <div class="manage-section">
         <div class="manage-title">Earnings this month — all villas (15% Ceymora management fee)</div>
+        <div class="earn-cur-bar">
+          <label>Show amounts in
+            <select id="earnShowCur" class="acct-select" style="max-width:110px; margin-left:6px;"></select></label>
+          <label class="earn-move"><input type="checkbox" id="earnShowFxMove"> Show how the rate moved from booking day to check-in</label>
+          <span class="field-hint">Only the view changes — no saved figure is converted.</span>
+        </div>
         <div class="field-hint" id="earningsStatusMsg" style="margin:4px 0 8px;">Loading exchange rates…</div>
         <table class="inv-table">
           <thead>
@@ -1082,9 +1113,9 @@
               <th>Villa</th>
               <th style="text-align:center">Nights</th>
               <th style="text-align:center">Gross (native currency)</th>
-              <th style="text-align:center">Gross (LKR)</th>
-              <th style="text-align:center">Ceymora fee (LKR)</th>
-              <th style="text-align:center">Villa net (LKR)</th>
+              <th style="text-align:center">Gross (<span class="earnShowCurLabel">LKR</span>)</th>
+              <th style="text-align:center">Ceymora fee (<span class="earnShowCurLabel">LKR</span>)</th>
+              <th style="text-align:center">Villa net (<span class="earnShowCurLabel">LKR</span>)</th>
             </tr>
           </thead>
           <tbody id="earningsBody"></tbody>
@@ -1095,16 +1126,7 @@
           <span class="field-hint" id="earningsDetailHint">Tap a villa row above (or a villa tab) to switch.</span>
         </div>
         <table class="inv-table" id="earningsDetailTable">
-          <thead>
-            <tr>
-              <th>Guest</th>
-              <th>Dates</th>
-              <th style="text-align:center">Nights</th>
-              <th style="text-align:center">Per night</th>
-              <th style="text-align:center">Total</th>
-              <th style="text-align:center">Total (LKR)</th>
-            </tr>
-          </thead>
+          <thead id="earningsDetailHead"></thead>
           <tbody id="earningsDetailBody"></tbody>
         </table>
       </div>
@@ -1288,6 +1310,45 @@
 
     <!-- ===================== VILLA REPORT PANEL ===================== -->
     <div id="villaReportPanel" style="display:none">
+      <div class="villatabs no-print" id="vrModeTabs" style="margin-bottom:10px;">
+        <button class="villatab-btn active" data-vrmode="report">📄 Monthly report</button>
+        <button class="villatab-btn" data-vrmode="compare">📈 Look back &amp; compare</button>
+      </div>
+
+      <div id="vrCompare" style="display:none">
+        <div class="cmp-controls no-print">
+          <div class="cmp-box">
+            <div class="cmp-title">Look at</div>
+            <select id="cmpKind" class="acct-select">
+              <option value="month">A month</option>
+              <option value="year">A whole year</option>
+              <option value="range">Dates I choose</option>
+            </select>
+            <div class="cmp-when" data-for="A"></div>
+          </div>
+          <div class="cmp-box">
+            <div class="cmp-title">Compare with</div>
+            <select id="cmpWith" class="acct-select">
+              <option value="lastyear">The same time a year before</option>
+              <option value="prev">The period just before</option>
+              <option value="custom">Another period I choose</option>
+              <option value="none">Nothing — just this period</option>
+            </select>
+            <div class="cmp-when" data-for="B"></div>
+          </div>
+          <div class="cmp-box">
+            <div class="cmp-title">Villa</div>
+            <select id="cmpVilla" class="acct-select"></select>
+          </div>
+          <div class="cmp-box" style="justify-content:flex-end;">
+            <button class="add-booking-btn" id="cmpDownload">⬇ Download</button>
+            <button class="add-booking-btn" id="cmpPrint">🖨️ Print</button>
+          </div>
+        </div>
+        <div id="cmpBody"></div>
+      </div>
+
+      <div id="vrReportWrap">
       <div class="toolbar">
         <div id="villaReportPicker" class="villatabs"></div>
         <div class="weeknav">
@@ -1326,6 +1387,7 @@
       <div id="myPurchasesSummary" style="display:none;"></div>
 
       <div id="villaReportBody"></div>
+      </div><!-- /vrReportWrap -->
     </div>
 
     <!-- ===================== REPORTS PANEL ===================== -->
@@ -1790,6 +1852,15 @@
 
       <label>Booking placed on</label>
       <input type="date" id="dBookingDate">
+
+      <div id="dFxWrap">
+        <label>Exchange rate for this booking — LKR for 1 <span class="dCurLabel">USD</span></label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="number" id="dFxRate" min="0" step="0.01" placeholder="e.g. 330.00" style="max-width:160px;">
+          <button type="button" class="rpt-quick" id="dFxFetch">Use the rate on the booking day</button>
+        </div>
+        <div class="field-hint" id="dFxHint">The price was agreed on the booking day, so it is worth the same in rupees whatever the rate does afterwards.</div>
+      </div>
 
       <label>Special requests</label>
       <textarea id="dRequests" placeholder="e.g. Airport pickup at 14:00, cot for infant, late check-out"></textarea>
@@ -2652,6 +2723,10 @@ function rowToBooking(r){ return {
   cancelNote: r.cancel_note || '',
   retainedAmount: r.retained_amount !== null && r.retained_amount !== undefined ? Number(r.retained_amount) : 0,
   refundedAmount: r.refunded_amount !== null && r.refunded_amount !== undefined ? Number(r.refunded_amount) : 0,
+  // The exchange rate agreed on the day a direct booking was made (LKR per 1 unit of
+  // its currency). Once saved it never moves — see bookingRate().
+  agreedRate: r.fx_rate !== null && r.fx_rate !== undefined && Number(r.fx_rate) > 0 ? Number(r.fx_rate) : null,
+  agreedRateDate: r.fx_rate_date || null,
 }; }
 function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
 function getInvoiceLinks(t){
@@ -3212,7 +3287,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-access';
+const APP_VERSION = 'v2026.09.28-fx';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3431,6 +3506,9 @@ const DB_CHECKS = [
   { file:'9-supabase-section-permissions.sql', what:'The database obeys each person\'s "Can see / Can change" ticks',
     critical:true,
     test: async () => { const { data, error } = await sb.rpc('section_perms_ready'); return !error && data === true; } },
+  { file:'10-supabase-booking-exchange-rate.sql', what:'Direct bookings keep the exchange rate agreed on the booking day',
+    critical:false,
+    test: async () => { HAS_FX_COLS = null; return await fxColsReady(); } },
 ];
 
 async function runDbSetupCheck(){
@@ -4323,7 +4401,8 @@ function assignLanes(bookings){
 
 /* ---- small money helpers (used by the calendar pills + earnings breakdown) ---- */
 function curSymbol(cur){
-  return cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur === 'LKR' ? 'Rs' : '$';
+  if(!cur || cur === 'USD') return '$';
+  return cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur === 'LKR' ? 'Rs' : cur === 'INR' ? '₹' : cur === 'JPY' ? '¥' : cur + ' ';
 }
 // compact form for the tiny pill badge: $120, $1.2k
 function moneyShort(amount, cur){
@@ -4575,6 +4654,65 @@ async function getFxRate(dateISO, fromCurrency){
   return rate;
 }
 
+/* ---------------------------------------------------------------------------
+   WHICH DAY'S EXCHANGE RATE A BOOKING IS WORTH — one rule, used everywhere
+   (earnings, villa report, company commission, period comparison):
+
+   * DIRECT booking: the rate on the day it was BOOKED. The guest agreed the price
+     that day, so a later move in the rate cannot change what the stay is worth.
+     If a rate was locked in on the booking form, that exact figure is used.
+     Example: booked 25 Sept for USD 500 at 330.00 -> LKR 165,000, even if the
+     rate is 335.00 on the day they check in.
+   * AIRBNB booking: the rate on the CHECK-IN day. The guest pays Airbnb in full,
+     and Airbnb only pays us out on the check-in day, so that is when the money
+     becomes rupees.
+   A day that has not happened yet uses the latest published rate until it does.
+--------------------------------------------------------------------------- */
+function bookingCur(b){ return b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD'; }
+function fxDateOf(b){ return (b.type !== 'airbnb' && b.bookingDate) ? b.bookingDate : b.checkIn; }
+function fxBasisLabel(b){
+  if(b.type === 'airbnb') return 'check-in day';
+  if(b.agreedRate) return 'locked on booking day';
+  return b.bookingDate ? 'booking day' : 'check-in day';
+}
+async function bookingRate(b){
+  const cur = bookingCur(b);
+  if(cur === 'LKR') return 1;
+  if(b.type !== 'airbnb' && b.agreedRate) return b.agreedRate;
+  return getFxRate(fxDateOf(b), cur);
+}
+// Money kept from a cancelled booking. A direct guest paid at the booking-day rate;
+// Airbnb pays out what it keeps around the day the booking is cancelled.
+async function cancelRate(b){
+  if(b.type !== 'airbnb') return bookingRate(b);
+  return getFxRate(b.cancelledOn || b.checkIn, bookingCur(b));
+}
+// Is the new rate column there yet (file 10)? Asked once.
+let HAS_FX_COLS = null;
+async function fxColsReady(){
+  if(HAS_FX_COLS !== null || !sb) return !!HAS_FX_COLS;
+  try{ const { error } = await sb.from('villa_bookings').select('fx_rate').limit(1); HAS_FX_COLS = !error; }
+  catch(e){ HAS_FX_COLS = false; }
+  return HAS_FX_COLS;
+}
+
+/* The currency the earnings are shown in. Only the view changes — nothing saved
+   is converted. Each booking is converted at its own rate day (above). */
+const SHOW_CURRENCIES = ['LKR','USD','EUR','GBP','AUD','CAD','CHF','INR','CNY','JPY','AED','SGD','RUB'];
+let earnShowCur = (()=>{ try{ return localStorage.getItem('earnShowCur') || 'LKR'; }catch(e){ return 'LKR'; } })();
+let earnShowFxMove = false;
+// A booking's value in the chosen currency, from its native amount and LKR value.
+async function inShowCur(b, native, lkrValue, cur){
+  if(cur === bookingCur(b)) return native;
+  if(cur === 'LKR') return lkrValue;
+  const r = await getFxRate(fxDateOf(b), cur);
+  return r ? lkrValue / r : null;
+}
+function fmtShow(v, cur){
+  if(v === null || v === undefined || isNaN(v)) return '—';
+  return cur === 'LKR' ? Math.round(v).toLocaleString() : moneyFull(v, cur);
+}
+
 let earningsRenderToken = 0;
 async function renderEarnings(){
   const myToken = ++earningsRenderToken; // avoids stale results overwriting a newer render
@@ -4591,40 +4729,58 @@ async function renderEarnings(){
     b.rateUsd && b.checkIn >= monthStartISO && b.checkIn < monthEndISO
   );
 
-  const totals = {}; // villaId -> { nights, gross, currency, grossLkr }
+  const show = earnShowCur;
+  const totals = {}; // villaId -> { nights, gross, currency, grossLkr, grossShow }
   const details = {}; // villaId -> [ per-booking rows, for the breakdown table below ]
   const earnVillas = visibleCalVillas();
-  for(const v of earnVillas){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0 }; details[v.id] = []; }
+  for(const v of earnVillas){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0, grossShow:0 }; details[v.id] = []; }
+  let missing = 0;
 
   for(const b of relevant){
     const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
     const gross = nights * b.rateUsd;
-    const bookingCurrency = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
-    const rate = await getFxRate(b.checkIn, bookingCurrency);
+    const bookingCurrency = bookingCur(b);
+    const rate = await bookingRate(b);
+    const lkrValue = rate ? gross * rate : 0;
+    const showValue = rate ? await inShowCur(b, gross, lkrValue, show) : null;
+    // How the rate moved between the rate day and the check-in day (direct bookings).
+    let ciRate = null;
+    if(earnShowFxMove && b.type !== 'airbnb' && bookingCurrency !== 'LKR') ciRate = await getFxRate(b.checkIn, bookingCurrency);
     if(myToken !== earningsRenderToken) return; // a newer render started, abandon this one
-    if(!totals[b.villa]) totals[b.villa] = { nights:0, gross:0, currency:bookingCurrency, grossLkr:0 };
+    if(!rate || showValue === null) missing++;
+    if(!totals[b.villa]) totals[b.villa] = { nights:0, gross:0, currency:bookingCurrency, grossLkr:0, grossShow:0 };
     if(!details[b.villa]) details[b.villa] = [];
     totals[b.villa].nights += nights;
     totals[b.villa].gross += gross;
-    if(rate) totals[b.villa].grossLkr += gross * rate;
+    totals[b.villa].grossLkr += lkrValue;
+    totals[b.villa].grossShow += showValue || 0;
+    let moveShow = null;
+    if(ciRate && rate){
+      const moveLkr = gross * (ciRate - rate);
+      moveShow = show === 'LKR' ? moveLkr : (show === bookingCurrency ? moveLkr / ciRate : await (async()=>{ const r = await getFxRate(b.checkIn, show); return r ? moveLkr / r : null; })());
+    }
     details[b.villa].push({
       guest: b.guest, type: b.type, checkIn: b.checkIn, checkOut: b.checkOut,
       nights, rate: b.rateUsd, currency: bookingCurrency, gross,
-      grossLkr: rate ? gross * rate : 0
+      grossLkr: lkrValue, grossShow: showValue, fxRate: rate, fxDate: fxDateOf(b), fxBasis: fxBasisLabel(b),
+      ciRate, moveShow,
     });
   }
 
-  statusEl.textContent = relevant.length === 0
+  statusEl.innerHTML = relevant.length === 0
     ? 'No bookings with a nightly rate set for this month yet — add one via the Rate per night field.'
-    : 'Rates fetched for each booking\'s check-in date (currency-api).';
+    : 'Direct bookings are converted at the rate on the day they were <b>booked</b> (the price the guest agreed); '
+      + 'Airbnb bookings at the rate on the <b>check-in</b> day, when Airbnb pays out. A day still to come uses today\'s rate.'
+      + (missing ? ` <b>${missing} booking${missing===1?'':'s'} could not be converted</b> — no rate could be fetched.` : '');
+  document.querySelectorAll('.earnShowCurLabel').forEach(el => el.textContent = show);
 
   body.innerHTML = '';
   let grandGrossLkr = 0, grandFeeLkr = 0, grandNetLkr = 0;
   for(const v of earnVillas){
     const t = totals[v.id];
-    const fee = t.grossLkr * 0.15;
-    const net = t.grossLkr * 0.85;
-    grandGrossLkr += t.grossLkr; grandFeeLkr += fee; grandNetLkr += net;
+    const fee = t.grossShow * 0.15;
+    const net = t.grossShow * 0.85;
+    grandGrossLkr += t.grossShow; grandFeeLkr += fee; grandNetLkr += net;
     const tr = document.createElement('tr');
     tr.className = 'earn-row-villa' + (v.id === currentVillaCal ? ' selected' : '');
     tr.title = 'Click to see this villa\'s booking-by-booking breakdown';
@@ -4636,9 +4792,9 @@ async function renderEarnings(){
       <td style="font-weight:600;">${esc(v.name)}</td>
       <td class="num ${t.nights===0?'zero':''}">${t.nights}</td>
       <td class="num ${t.gross===0?'zero':''}">${t.currency} ${t.gross.toLocaleString()}</td>
-      <td class="num ${t.grossLkr===0?'zero':''}">${Math.round(t.grossLkr).toLocaleString()}</td>
-      <td class="num ${fee===0?'zero':''}">${Math.round(fee).toLocaleString()}</td>
-      <td class="num ${net===0?'zero':''}">${Math.round(net).toLocaleString()}</td>
+      <td class="num ${t.grossShow===0?'zero':''}">${fmtShow(t.grossShow, show)}</td>
+      <td class="num ${fee===0?'zero':''}">${fmtShow(fee, show)}</td>
+      <td class="num ${net===0?'zero':''}">${fmtShow(net, show)}</td>
     `;
     body.appendChild(tr);
   }
@@ -4648,9 +4804,9 @@ async function renderEarnings(){
   totalTr.innerHTML = `
     <td>Total Ceymora commission</td>
     <td></td><td></td>
-    <td class="num">${Math.round(grandGrossLkr).toLocaleString()}</td>
-    <td class="num" style="color:var(--green);">${Math.round(grandFeeLkr).toLocaleString()}</td>
-    <td class="num">${Math.round(grandNetLkr).toLocaleString()}</td>
+    <td class="num">${fmtShow(grandGrossLkr, show)}</td>
+    <td class="num" style="color:var(--green);">${fmtShow(grandFeeLkr, show)}</td>
+    <td class="num">${fmtShow(grandNetLkr, show)}</td>
   `;
   body.appendChild(totalTr);
 
@@ -4661,27 +4817,50 @@ async function renderEarnings(){
 // guest name, dates, nights booked, nightly rate, and the line total.
 function renderEarningsDetail(rows){
   const body = document.getElementById('earningsDetailBody');
+  const head = document.getElementById('earningsDetailHead');
   const titleEl = document.getElementById('earningsDetailTitle');
   const hintEl = document.getElementById('earningsDetailHint');
   if(!body) return;
+  const show = earnShowCur, move = earnShowFxMove;
 
   const villa = CAL_VILLAS.find(v=>v.id===currentVillaCal) || { name:'Selected villa', currency:'USD' };
   const monthName = currentMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
   titleEl.textContent = `Breakdown — ${villa.name} · ${monthName}`;
+  if(head) head.innerHTML = `<tr>
+      <th>Guest</th><th>Dates</th><th style="text-align:center">Nights</th>
+      <th style="text-align:center">Per night</th><th style="text-align:center">Total</th>
+      <th style="text-align:center">Rate used (LKR)</th>
+      <th style="text-align:center">Total (${esc(show)})</th>
+      ${move ? `<th style="text-align:center">Rate on check-in day</th><th style="text-align:center">Rate change effect (${esc(show)})</th>` : ''}
+    </tr>`;
+  const cols = move ? 9 : 7;
 
   body.innerHTML = '';
   if(rows.length === 0){
-    body.innerHTML = `<tr><td colspan="6" class="inv-empty">No bookings with a nightly rate for ${esc(villa.name)} this month.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${cols}" class="inv-empty">No bookings with a nightly rate for ${esc(villa.name)} this month.</td></tr>`;
     if(hintEl) hintEl.textContent = 'Click a villa row above, or a villa tab at the top, to switch villa.';
     return;
   }
 
   const sorted = [...rows].sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
-  let sumNights = 0, sumGross = 0, sumLkr = 0;
+  let sumNights = 0, sumGross = 0, sumShow = 0, sumMove = 0;
   const cur = sorted[0].currency;
+  const rateTxt = r => r.currency === 'LKR' ? '—'
+    : (r.fxRate ? `${r.fxRate.toFixed(2)}<div class="ce-sub">${esc(r.fxBasis)} · ${esc(fmtDay(r.fxDate))}</div>` : '<span class="dim">no rate</span>');
 
   for(const r of sorted){
-    sumNights += r.nights; sumGross += r.gross; sumLkr += r.grossLkr;
+    sumNights += r.nights; sumGross += r.gross; sumShow += r.grossShow || 0; sumMove += r.moveShow || 0;
+    let moveCells = '';
+    if(move){
+      if(r.type === 'airbnb' || r.currency === 'LKR') moveCells = '<td class="num dim">same day</td><td class="num dim">—</td>';
+      else if(!r.ciRate || !r.fxRate) moveCells = '<td class="num dim">—</td><td class="num dim">—</td>';
+      else {
+        const up = r.moveShow >= 0;
+        moveCells = `<td class="num">${r.ciRate.toFixed(2)}${r.checkIn > todayISO() ? '<div class="ce-sub">today\'s rate</div>' : ''}</td>
+          <td class="num" style="color:${up ? 'var(--green)' : 'var(--red)'};" title="What the same booking would be worth at the check-in-day rate, minus what it is worth at the booking-day rate. Information only — it does not change the booking.">
+            ${up ? '+' : '−'}${fmtShow(Math.abs(r.moveShow), show)}</td>`;
+      }
+    }
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="font-weight:600;">
@@ -4692,7 +4871,9 @@ function renderEarningsDetail(rows){
       <td class="num">${r.nights}</td>
       <td class="num">${moneyFull(r.rate, r.currency)}</td>
       <td class="num" style="color:var(--red);">${moneyFull(r.gross, r.currency)}</td>
-      <td class="num ${r.grossLkr===0?'zero':''}">${Math.round(r.grossLkr).toLocaleString()}</td>
+      <td class="num" style="font-size:12px;">${rateTxt(r)}</td>
+      <td class="num ${!r.grossShow?'zero':''}">${fmtShow(r.grossShow, show)}</td>
+      ${moveCells}
     `;
     body.appendChild(tr);
   }
@@ -4705,15 +4886,34 @@ function renderEarningsDetail(rows){
     <td class="num">${sumNights}</td>
     <td></td>
     <td class="num" style="color:var(--red);">${moneyFull(sumGross, cur)}</td>
-    <td class="num">${Math.round(sumLkr).toLocaleString()}</td>
+    <td></td>
+    <td class="num">${fmtShow(sumShow, show)}</td>
+    ${move ? `<td></td><td class="num" style="color:${sumMove>=0?'var(--green)':'var(--red)'};">${sumMove>=0?'+':'−'}${fmtShow(Math.abs(sumMove), show)}</td>` : ''}
   `;
   body.appendChild(totalTr);
 
   if(hintEl){
-    const fee = sumLkr * 0.15;
-    hintEl.textContent = `Ceymora fee (15%): LKR ${Math.round(fee).toLocaleString()} · Villa net: LKR ${Math.round(sumLkr - fee).toLocaleString()}`;
+    const fee = sumShow * 0.15;
+    const lab = v => show === 'LKR' ? 'LKR ' + fmtShow(v, show) : fmtShow(v, show);
+    hintEl.textContent = `Ceymora fee (15%): ${lab(fee)} · Villa net: ${lab(sumShow - fee)}`;
   }
 }
+
+// The "Show in" currency picker and the rate-change switch above the earnings.
+(function wireEarningsCurrency(){
+  const sel = document.getElementById('earnShowCur');
+  if(!sel) return;
+  sel.innerHTML = SHOW_CURRENCIES.map(c => `<option value="${c}">${c}</option>`).join('');
+  if(!SHOW_CURRENCIES.includes(earnShowCur)) earnShowCur = 'LKR';
+  sel.value = earnShowCur;
+  sel.addEventListener('change', ()=>{
+    earnShowCur = sel.value;
+    try{ localStorage.setItem('earnShowCur', earnShowCur); }catch(e){}
+    renderEarnings();
+  });
+  const mv = document.getElementById('earnShowFxMove');
+  if(mv) mv.addEventListener('change', ()=>{ earnShowFxMove = mv.checked; renderEarnings(); });
+})();
 
 /* ---- Modal ---- */
 const overlay = document.getElementById('modalOverlay');
@@ -4819,6 +5019,8 @@ document.getElementById('fVilla').addEventListener('change', (e)=>{
   // Only pull in this villa's standard deposit when the booking is new — never
   // overwrite a figure that was already agreed with a guest.
   if(!editingBookingId) document.getElementById('dDamage').value = damageDepositFor(editingBookingVilla);
+  const fxw = document.getElementById('dFxWrap'); if(fxw) fxw.style.display = cur === 'LKR' ? 'none' : '';
+  autoFillFxRate(false);
   recalcQuote();
 });
 
@@ -4842,6 +5044,14 @@ function fillDirectFields(booking){
 
   document.getElementById('dPaidOn').value = booking ? (booking.paidOn || '') : '';
   setPayTermsUI(booking && booking.payTerms ? booking.payTerms : 'deposit');
+
+  // The agreed exchange rate. A saved one is shown as it is and never refreshed;
+  // otherwise the rate on the booking day is filled in for you.
+  const fx = g('dFxRate');
+  fx.dataset.auto = booking && booking.agreedRate ? '0' : '1';
+  fx.value = booking && booking.agreedRate ? booking.agreedRate : '';
+  g('dFxWrap').style.display = directCur() === 'LKR' ? 'none' : '';
+  if(!(booking && booking.agreedRate)) autoFillFxRate();
 
   // Work out which gate button reflects the saved state.
   let gate = 'hold';
@@ -5005,7 +5215,43 @@ function recalcQuote(){
     <div class="quote-line muted"><span>Received so far</span><span>${money(cur, q.paid)}</span></div>
     <div class="quote-line ${q.outstanding > 0 ? 'due' : ''}"><span>Still outstanding</span><span>${money(cur, q.outstanding)}</span></div>
   `;
+  // What the stay is worth in rupees, at the rate agreed on the booking day.
+  const fxEl = document.getElementById('dFxRate');
+  const fxHint = document.getElementById('dFxHint');
+  const r = fxEl ? parseFloat(fxEl.value) : NaN;
+  if(cur !== 'LKR' && r > 0){
+    const accomLkr = q.accom * r;
+    box.innerHTML += `<div class="quote-line muted" style="border-top:1px dashed #ddd; margin-top:4px; padding-top:4px;">
+        <span>Accommodation in LKR at ${r.toFixed(2)}</span><span>LKR ${Math.round(accomLkr).toLocaleString()}</span></div>`;
+    if(fxHint){
+      const day = document.getElementById('dBookingDate').value || todayISO();
+      fxHint.textContent = `${money(cur, q.accom)} × ${r.toFixed(2)} = LKR ${Math.round(accomLkr).toLocaleString()}. `
+        + (fxEl.dataset.auto === '1' ? `The rate on ${fmtDay(day)}. ` : 'The rate you typed in. ')
+        + 'Locked with the booking — later rate changes do not change it.';
+    }
+  }
 }
+
+/* ---- The agreed exchange rate on a direct booking ---- */
+function directCur(){ return (CAL_VILLAS.find(v => v.id === (editingBookingVilla || currentVillaCal)) || {}).currency || 'USD'; }
+let fxFillToken = 0;
+async function autoFillFxRate(force){
+  const fx = document.getElementById('dFxRate');
+  if(!fx || (!force && fx.dataset.auto !== '1')) return;
+  const cur = directCur();
+  if(cur === 'LKR'){ fx.value = ''; recalcQuote(); return; }
+  const day = document.getElementById('dBookingDate').value || todayISO();
+  const my = ++fxFillToken;
+  document.getElementById('dFxHint').textContent = 'Fetching the rate for ' + fmtDay(day) + '…';
+  const r = await getFxRate(day, cur);
+  if(my !== fxFillToken) return;
+  if(r){ fx.value = r.toFixed(2); fx.dataset.auto = '1'; }
+  recalcQuote();
+  if(!r) document.getElementById('dFxHint').textContent = 'No rate could be fetched just now — type the agreed rate in.';
+}
+document.getElementById('dFxRate').addEventListener('input', ()=>{ document.getElementById('dFxRate').dataset.auto = '0'; recalcQuote(); });
+document.getElementById('dFxFetch').addEventListener('click', ()=> autoFillFxRate(true));
+document.getElementById('dBookingDate').addEventListener('change', ()=> autoFillFxRate(false));
 
 // Recalculate the quote whenever anything that feeds it changes.
 ['fCheckIn','fCheckOut','fRateUsd','dDamage','dPaid'].forEach(id=>{
@@ -5103,6 +5349,15 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
       damage_deposit:   q.damage,
       amount_paid:      q.paid,
     });
+    // Lock the exchange rate agreed on the booking day (needs file 10).
+    if(currency !== 'LKR' && await fxColsReady()){
+      let r = parseFloat(document.getElementById('dFxRate').value);
+      if(!(r > 0)) r = await getFxRate(payload.booking_date, currency);
+      payload.fx_rate = r > 0 ? Math.round(r * 10000) / 10000 : null;
+      payload.fx_rate_date = payload.fx_rate ? payload.booking_date : null;
+    }
+  } else if(await fxColsReady()){
+    payload.fx_rate = null; payload.fx_rate_date = null;   // Airbnb: the check-in day decides
   }
 
   const saveBtn = document.getElementById('btnSave');
@@ -7685,6 +7940,287 @@ function renderVillaPicker(){
 }
 
 let villaReportToken = 0;
+
+/* ===========================================================================
+   LOOK BACK & COMPARE — how a villa (or all of them) did over any stretch of
+   time, next to another stretch: money in, costs, guests, nights.
+   Everything is worked out the same way as the monthly villa report, so the two
+   always agree: a stay counts in the period it checks in, its rupee value uses
+   bookingRate(), costs are the villa's petty cash, operating costs and store
+   supplies dated inside the period.
+=========================================================================== */
+function compareVillas(){
+  const sc = (currentUser && currentUser.villaScopes) || [];
+  const one = lockedVilla();
+  let list = VR_VILLAS.length ? VR_VILLAS : CAL_VILLAS;
+  if(one) list = list.filter(v => v.id === one);
+  else if(sc.length > 1) list = list.filter(v => sc.includes(v.id));
+  return list;
+}
+async function villaPeriodStats(villaId, fromISO, toExcl){
+  const nightsOf = b => Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
+  const st = { stays:0, guests:0, nights:0, stayDays:0, occupied:0, bookingRev:0, keptRev:0, extraRev:0,
+               petty:0, opex:0, supplies:0, unrated:0, noFx:0, airbnb:0, direct:0 };
+  for(const b of allBookings){
+    if(b.villa !== villaId) continue;
+    // nights that fall inside the period, from any stay overlapping it
+    const a = b.checkIn > fromISO ? b.checkIn : fromISO, z = b.checkOut < toExcl ? b.checkOut : toExcl;
+    if(a < z) st.occupied += Math.round((parseISO(z) - parseISO(a)) / 86400000);
+    if(b.checkIn < fromISO || b.checkIn >= toExcl) continue;
+    const n = nightsOf(b);
+    st.stays++; st.nights += n; st.stayDays += n + 1; st.guests += Number(b.guests) || 0;
+    if(b.type === 'airbnb') st.airbnb++; else st.direct++;
+    if(!b.rateUsd){ st.unrated++; continue; }
+    const r = await bookingRate(b);
+    if(r) st.bookingRev += n * b.rateUsd * r; else st.noFx++;
+  }
+  for(const b of cancelledBookings){
+    if(b.villa !== villaId || !(b.retainedAmount > 0)) continue;
+    const when = b.cancelledOn || b.checkIn;
+    if(when < fromISO || when >= toExcl) continue;
+    const r = await cancelRate(b);
+    if(r) st.keptRev += b.retainedAmount * r; else st.noFx++;
+  }
+  for(const t of allCashTxns){
+    if(t.for !== villaId || !t.date || t.date < fromISO || t.date >= toExcl) continue;
+    if(isDirectPayment(t) && isExtraIncome(t)) st.extraRev += t.amount;
+  }
+  st.petty = pettyGroupsBlock(allCashTxns.filter(t => t.type === 'expense' && t.for === villaId && t.date >= fromISO && t.date < toExcl)).total;
+  st.opex = allOpEx.filter(o => o.villaId === villaId && o.date >= fromISO && o.date < toExcl).reduce((x, o) => x + o.amount, 0);
+  st.supplies = buildSuppliesSection(villaId, fromISO, toExcl).total || 0;
+  return st;
+}
+function addStats(list){
+  const out = {};
+  for(const st of list) for(const k of Object.keys(st)) out[k] = (out[k] || 0) + st[k];
+  return out;
+}
+function finishStats(st, days, villaCount){
+  st.revenue = st.bookingRev + st.keptRev + st.extraRev;
+  st.fee = st.revenue * 0.15;
+  st.share = st.revenue - st.fee;
+  st.costs = st.petty + st.opex + st.supplies;
+  st.net = st.share - st.costs;
+  st.available = days * villaCount;
+  st.occPct = st.available ? st.occupied / st.available * 100 : 0;
+  st.adr = st.nights ? st.bookingRev / st.nights : 0;
+  st.avgStay = st.stays ? st.nights / st.stays : 0;
+  return st;
+}
+
+// ---- the periods ----
+let cmpState = null;
+function cmpDefaults(){
+  const now = new Date();
+  const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);   // last full month
+  const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  return { kind:'month', with:'lastyear', villa:'all',
+    A:{ month: ym(lm), year: now.getFullYear() - 1, from: toISO(new Date(now.getFullYear(), now.getMonth(), 1)), to: todayISO() },
+    B:{ month: ym(new Date(lm.getFullYear() - 1, lm.getMonth(), 1)), year: now.getFullYear() - 2,
+        from: toISO(new Date(now.getFullYear() - 1, now.getMonth(), 1)), to: toISO(new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())) } };
+}
+// A period as [from, toExclusive) plus a label.
+function periodOf(kind, w){
+  if(kind === 'month'){
+    const [y, m] = (w.month || '').split('-').map(Number);
+    if(!y || !m) return null;
+    const a = new Date(y, m - 1, 1), z = new Date(y, m, 1);
+    return { from: toISO(a), to: toISO(z), label: a.toLocaleDateString('en-GB', { month:'long', year:'numeric' }) };
+  }
+  if(kind === 'year'){
+    const y = Number(w.year); if(!y) return null;
+    return { from: y + '-01-01', to: (y + 1) + '-01-01', label: String(y) };
+  }
+  if(!w.from || !w.to || w.to < w.from) return null;
+  const z = new Date(parseISO(w.to)); z.setDate(z.getDate() + 1);
+  return { from: w.from, to: toISO(z), label: fmtDay(w.from) + ' – ' + fmtDay(w.to) + ' ' + w.to.slice(0, 4) };
+}
+function shiftPeriod(P, how){
+  const a = parseISO(P.from), z = parseISO(P.to);
+  if(how === 'lastyear'){
+    const a2 = new Date(a.getFullYear() - 1, a.getMonth(), a.getDate()), z2 = new Date(z.getFullYear() - 1, z.getMonth(), z.getDate());
+    return { from: toISO(a2), to: toISO(z2) };
+  }
+  // the period just before, of the same length (a month before a month, a year before a year)
+  if(cmpState.kind === 'month') return { from: toISO(new Date(a.getFullYear(), a.getMonth() - 1, 1)), to: P.from };
+  if(cmpState.kind === 'year') return { from: (a.getFullYear() - 1) + '-01-01', to: P.from };
+  const len = Math.round((z - a) / 86400000);
+  const a2 = new Date(a); a2.setDate(a2.getDate() - len);
+  return { from: toISO(a2), to: P.from };
+}
+function labelFor(p){
+  const a = parseISO(p.from), z = parseISO(p.to);
+  const zi = new Date(z); zi.setDate(zi.getDate() - 1);
+  if(a.getDate() === 1 && z.getDate() === 1){
+    const months = (z.getFullYear() - a.getFullYear()) * 12 + z.getMonth() - a.getMonth();
+    if(months === 1) return a.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+    if(months === 12 && a.getMonth() === 0) return String(a.getFullYear());
+  }
+  return fmtDay(p.from) + ' ' + p.from.slice(0, 4) + ' – ' + fmtDay(toISO(zi)) + ' ' + toISO(zi).slice(0, 4);
+}
+
+function renderCmpInputs(){
+  const k = cmpState.kind;
+  for(const side of ['A', 'B']){
+    const el = document.querySelector(`.cmp-when[data-for="${side}"]`);
+    if(side === 'B' && cmpState.with !== 'custom'){ el.innerHTML = ''; el.style.display = 'none'; continue; }
+    el.style.display = '';
+    const w = cmpState[side];
+    el.innerHTML = k === 'month' ? `<input type="month" data-f="month" value="${esc(w.month)}">`
+      : k === 'year' ? `<input type="number" data-f="year" min="2015" max="2100" value="${esc(String(w.year))}">`
+      : `<input type="date" data-f="from" value="${esc(w.from)}"> to <input type="date" data-f="to" value="${esc(w.to)}">`;
+    el.querySelectorAll('input').forEach(inp => inp.addEventListener('change', ()=>{ w[inp.dataset.f] = inp.value; renderCompare(); }));
+  }
+}
+
+let cmpToken = 0, cmpLast = null;
+async function renderCompare(){
+  const body = document.getElementById('cmpBody');
+  if(!body) return;
+  const my = ++cmpToken;
+  const PA = periodOf(cmpState.kind, cmpState.A);
+  if(!PA){ body.innerHTML = '<div class="manage-empty">Pick the period to look at.</div>'; return; }
+  let PB = null;
+  if(cmpState.with === 'custom') PB = periodOf(cmpState.kind, cmpState.B);
+  else if(cmpState.with !== 'none') PB = shiftPeriod(PA, cmpState.with);
+  if(PB) PB.label = PB.label || labelFor(PB);
+  PA.label = labelFor(PA);
+  body.innerHTML = '<div class="manage-empty">Working it out — fetching the exchange rate for each booking…</div>';
+
+  const villas = compareVillas().filter(v => cmpState.villa === 'all' || v.id === cmpState.villa);
+  const daysOf = P => Math.round((parseISO(P.to) - parseISO(P.from)) / 86400000);
+  const per = {};
+  for(const v of villas){
+    per[v.id] = { A: finishStats(await villaPeriodStats(v.id, PA.from, PA.to), daysOf(PA), 1) };
+    if(PB) per[v.id].B = finishStats(await villaPeriodStats(v.id, PB.from, PB.to), daysOf(PB), 1);
+    if(my !== cmpToken) return;
+  }
+  const A = finishStats(addStats(villas.map(v => per[v.id].A)), daysOf(PA), villas.length);
+  const B = PB ? finishStats(addStats(villas.map(v => per[v.id].B)), daysOf(PB), villas.length) : null;
+  cmpLast = { PA, PB, A, B, villas, per };
+
+  const n0 = v => Math.round(v).toLocaleString();
+  const n1 = v => (Math.round(v * 10) / 10).toLocaleString();
+  const ROWS = [
+    ['grp', 'Guests & nights'],
+    ['stays',    'Stays (bookings checking in)', n0, true],
+    ['guests',   'Guests', n0, true],
+    ['nights',   'Nights booked', n0, true],
+    ['stayDays', 'Days booked (check-in day to check-out day)', n0, true],
+    ['occupied', 'Nights occupied inside the period', n0, true],
+    ['occPct',   'Occupancy', v => Math.round(v) + '%', true, 'pts'],
+    ['avgStay',  'Average stay (nights)', n1, true],
+    ['grp', 'Money in (LKR)'],
+    ['bookingRev', 'Booking revenue', n0, true],
+    ['keptRev',  'Kept from cancellations', n0, true],
+    ['extraRev', 'Direct payments — extra income', n0, true],
+    ['revenue',  'Total revenue', n0, true, null, 'key'],
+    ['adr',      'Average per night', n0, true],
+    ['fee',      'Ceymora fee (15%)', n0, true],
+    ['share',    "Villa's share (85%)", n0, true],
+    ['grp', 'Costs (LKR)'],
+    ['petty',    'Petty cash expenses', n0, false],
+    ['opex',     'Salaries, bills & other operating costs', n0, false],
+    ['supplies', 'Store supplies received', n0, false],
+    ['costs',    'Total costs', n0, false, null, 'key'],
+    ['grp', 'Result (LKR)'],
+    ['net',      "Net profit (villa's share less costs)", n0, true, null, 'key'],
+  ];
+  const change = (a, b, goodUp, mode) => {
+    if(b === null || b === undefined) return '';
+    const d = a - b;
+    if(Math.abs(d) < 0.5 && mode !== 'pts') return '<td class="flat">no change</td><td class="flat">—</td>';
+    const cls = d === 0 ? 'flat' : ((d > 0) === goodUp ? 'up' : 'down');
+    if(mode === 'pts') return `<td class="${cls}">${d > 0 ? '+' : ''}${Math.round(d)} pts</td><td class="flat">—</td>`;
+    const pc = b !== 0 ? Math.round(d / Math.abs(b) * 100) : null;
+    return `<td class="${cls}">${d > 0 ? '+' : '−'}${Math.round(Math.abs(d)).toLocaleString()}</td>
+            <td class="${cls}">${pc === null ? 'new' : (pc > 0 ? '+' : '') + pc + '%'}</td>`;
+  };
+  const villaLabel = cmpState.villa === 'all' ? (villas.length === 1 ? villas[0].name : 'All villas') : (villas[0] || {}).name || '';
+  let html = `<div class="rpt-doc" id="cmpDoc">
+    <div class="cmp-head">${esc(PA.label)}${PB ? ' <span style="color:var(--muted); font-size:15px;">compared with</span> ' + esc(PB.label) : ''}</div>
+    <div class="cmp-sub">${esc(villaLabel)} · money in LKR</div>
+    <table class="cmp-table"><thead><tr><th></th><th>${esc(PA.label)}</th>${PB ? `<th>${esc(PB.label)}</th><th>Change</th><th>%</th>` : ''}</tr></thead><tbody>`;
+  for(const r of ROWS){
+    if(r[0] === 'grp'){ html += `<tr class="grp"><td colspan="${PB ? 5 : 2}">${esc(r[1])}</td></tr>`; continue; }
+    const [k, label, fmt, goodUp, mode, cls] = r;
+    html += `<tr class="${cls || ''}"><td>${esc(label)}</td><td>${fmt(A[k])}</td>${PB ? `<td>${fmt(B[k])}</td>${change(A[k], B[k], goodUp, mode)}` : ''}</tr>`;
+  }
+  html += '</tbody></table>';
+
+  if(villas.length > 1){
+    html += `<div class="rpt-section-title" style="margin-top:18px;">Villa by villa</div>
+      <table class="cmp-table"><thead><tr><th>Villa</th><th>Stays</th><th>Guests</th><th>Nights</th><th>Occupancy</th><th>Revenue</th><th>Costs</th><th>Net profit</th></tr></thead><tbody>`;
+    for(const v of villas){
+      const a = per[v.id].A, b = per[v.id].B;
+      const cell = (k, f) => `<td>${f(a[k])}${b ? `<span class="vs">was ${f(b[k])}</span>` : ''}</td>`;
+      html += `<tr><td><b>${esc(v.name)}</b></td>${cell('stays', n0)}${cell('guests', n0)}${cell('nights', n0)}${cell('occPct', x => Math.round(x) + '%')}${cell('revenue', n0)}${cell('costs', n0)}${cell('net', n0)}</tr>`;
+    }
+    html += '</tbody></table>';
+  }
+  const unrated = A.unrated + (B ? B.unrated : 0), noFx = A.noFx + (B ? B.noFx : 0);
+  html += `<div class="cmp-note">
+      A stay counts in the period it checks in. Direct bookings are valued at the exchange rate on the day they were booked
+      (or the rate locked on the booking), Airbnb bookings at the rate on the check-in day. Costs are those dated inside the period.
+      Office bills are not a villa's cost and are left out.
+      ${unrated ? `<br><b>${unrated} stay${unrated === 1 ? ' has' : 's have'} no nightly rate</b> and add no revenue.` : ''}
+      ${noFx ? `<br><b>${noFx} could not be converted</b> — no exchange rate could be fetched for that day.` : ''}
+    </div></div>`;
+  body.innerHTML = html;
+}
+
+function cmpDownload(){
+  if(!cmpLast) return;
+  const { PA, PB, A, B, villas, per } = cmpLast;
+  const keys = [['stays','Stays'],['guests','Guests'],['nights','Nights booked'],['stayDays','Days booked'],['occupied','Nights occupied in period'],
+    ['occPct','Occupancy %'],['avgStay','Average stay (nights)'],['bookingRev','Booking revenue LKR'],['keptRev','Kept from cancellations LKR'],
+    ['extraRev','Direct payments extra income LKR'],['revenue','Total revenue LKR'],['adr','Average per night LKR'],['fee','Ceymora fee LKR'],
+    ['share','Villa share LKR'],['petty','Petty cash LKR'],['opex','Operating costs LKR'],['supplies','Store supplies LKR'],['costs','Total costs LKR'],['net','Net profit LKR']];
+  const r2 = v => Math.round(v * 100) / 100;
+  const rows = [['Villa', 'Figure', PA.label, ...(PB ? [PB.label, 'Change'] : [])]];
+  const add = (name, a, b) => keys.forEach(([k, l]) => rows.push([name, l, r2(a[k]), ...(b ? [r2(b[k]), r2(a[k] - b[k])] : [])]));
+  add(villas.length > 1 ? 'All villas' : villas[0].name, A, B);
+  if(villas.length > 1) villas.forEach(v => add(v.name, per[v.id].A, per[v.id].B));
+  downloadCSV(`ceymora-compare-${PA.from}${PB ? '-vs-' + PB.from : ''}.csv`, rows);
+}
+
+function setVrMode(mode){
+  document.querySelectorAll('#vrModeTabs [data-vrmode]').forEach(b => {
+    const on = b.dataset.vrmode === mode;
+    b.classList.toggle('active', on);
+    b.style.background = on ? 'var(--ink)' : '#fff'; b.style.color = on ? '#fff' : 'var(--muted)';
+  });
+  document.getElementById('vrCompare').style.display = mode === 'compare' ? '' : 'none';
+  document.getElementById('vrReportWrap').style.display = mode === 'compare' ? 'none' : '';
+  if(mode === 'compare'){
+    if(!cmpState) cmpState = cmpDefaults();
+    const vs = document.getElementById('cmpVilla');
+    const list = compareVillas();
+    vs.innerHTML = (list.length > 1 ? '<option value="all">All villas</option>' : '') + list.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+    if(![...vs.options].some(o => o.value === cmpState.villa)) cmpState.villa = vs.options[0] ? vs.options[0].value : 'all';
+    vs.value = cmpState.villa;
+    document.getElementById('cmpKind').value = cmpState.kind;
+    document.getElementById('cmpWith').value = cmpState.with;
+    renderCmpInputs();
+    renderCompare();
+  }
+}
+(function wireCompare(){
+  document.querySelectorAll('#vrModeTabs [data-vrmode]').forEach(b => b.addEventListener('click', ()=> setVrMode(b.dataset.vrmode)));
+  document.getElementById('cmpKind').addEventListener('change', e => { cmpState.kind = e.target.value; renderCmpInputs(); renderCompare(); });
+  document.getElementById('cmpWith').addEventListener('change', e => { cmpState.with = e.target.value; renderCmpInputs(); renderCompare(); });
+  document.getElementById('cmpVilla').addEventListener('change', e => { cmpState.villa = e.target.value; renderCompare(); });
+  document.getElementById('cmpDownload').addEventListener('click', cmpDownload);
+  document.getElementById('cmpPrint').addEventListener('click', ()=>{
+    const doc = document.getElementById('cmpDoc');
+    if(!doc) return;
+    const w = window.open('', '_blank');
+    if(!w){ alert('Allow pop-ups for this page to print.'); return; }
+    const css = [...document.querySelectorAll('style')].map(x => x.textContent).join('\n');
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ceymora — ${esc(cmpLast ? cmpLast.PA.label : 'comparison')}</title><style>${css} body{background:#fff;padding:24px;}</style></head><body>${doc.outerHTML}</body></html>`);
+    w.document.close(); setTimeout(()=> w.print(), 300);
+  });
+})();
 /* ------------------------- DIRECT PAYMENTS FROM GUESTS -------------------------
    Stored as an income row against the villa. Received onto a card, it lifts that
    card's float like any other money in; received into the bank, it touches no card.
@@ -8003,7 +8539,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     if(b.rateUsd){
       lineGross = nights * b.rateUsd;
       grossNative += lineGross;
-      const rate = await getFxRate(b.checkIn, cur);
+      const rate = await bookingRate(b);
       if(rate){ lineLkr = lineGross * rate; grossLkr += lineLkr; }
       else { noFxCount++; }
       bookedNights += nights;
@@ -8065,7 +8601,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   let keptLkr = 0, keptNative = 0, keptNoFx = 0, cancelRowsHtml = '';
   for(const b of cancels){
     const cur = b.currency || villaCurrency;
-    const rate = await getFxRate(b.cancelledOn || b.checkIn, cur);
+    const rate = await cancelRate(b);
     let lineLkr = null;
     keptNative += b.retainedAmount;
     if(rate){ lineLkr = b.retainedAmount * rate; keptLkr += lineLkr; } else { keptNoFx++; }
@@ -8257,7 +8793,8 @@ async function buildVillaProfitReportHTML(loc, monthDate){
             <tr class="grand"><td>Net profit for the period</td><td class="amt ${netProfit>=0?'pos':'neg'}">${netProfit<0 ? '('+Math.abs(Math.round(netProfit)).toLocaleString()+')' : Math.round(netProfit).toLocaleString()}</td></tr>
           </tbody>
         </table>
-        <div class="rpt-note">Figures in brackets are amounts deducted. Revenue counts bookings that check in during this period; occupancy counts nights that fall inside it.</div>
+        <div class="rpt-note">Figures in brackets are amounts deducted. Revenue counts bookings that check in during this period; occupancy counts nights that fall inside it.
+          Direct bookings are converted to LKR at the rate on the day they were booked; Airbnb bookings at the rate on the check-in day.</div>
       </div>
     </div>
 
@@ -10247,7 +10784,7 @@ async function coCopyPrevious(){
 }
 
 // The actual link to Bookings: each villa's 15% Ceymora fee, for bookings checking in
-// during the given month, converted to LKR at each booking's own check-in-date rate.
+// during the given month, converted to LKR at each booking's own rate (bookingRate()).
 // Shared by the manual "Pull commission" button and the automatic fill on a fresh month.
 async function computeCommissionByVilla(monthDate){
   const monthStart = toISO(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
@@ -10256,8 +10793,7 @@ async function computeCommissionByVilla(monthDate){
   for(const b of allBookings){
     if(!b.rateUsd || b.checkIn < monthStart || b.checkIn >= monthEnd) continue;
     const nights = Math.round((parseISO(b.checkOut) - parseISO(b.checkIn)) / 86400000);
-    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
-    const rate = await getFxRate(b.checkIn, cur);
+    const rate = await bookingRate(b);
     if(!rate) continue;
     perVilla[b.villa] = (perVilla[b.villa] || 0) + nights * b.rateUsd * rate * 0.15;
   }
@@ -10267,8 +10803,7 @@ async function computeCommissionByVilla(monthDate){
     if(!b.retainedAmount) continue;
     const when = b.cancelledOn || b.checkIn;
     if(when < monthStart || when >= monthEnd) continue;
-    const cur = b.currency || (CAL_VILLAS.find(v=>v.id===b.villa)||{}).currency || 'USD';
-    const rate = await getFxRate(when, cur);
+    const rate = await cancelRate(b);
     if(!rate) continue;
     perVilla[b.villa] = (perVilla[b.villa] || 0) + b.retainedAmount * rate * 0.15;
   }
