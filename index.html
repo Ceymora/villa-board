@@ -371,6 +371,15 @@
   }
   .rpt-picker .sep{ width:1px; height:16px; background:var(--board-line); }
 
+  /* The download pop-up */
+  .dl-formats{ display:flex; flex-direction:column; gap:8px; margin:4px 0 10px; }
+  .dl-format{
+    display:flex; gap:10px; align-items:flex-start; cursor:pointer; font-weight:400;
+    border:1px solid var(--board-line); border-radius:9px; padding:10px 12px; font-size:12.5px; line-height:1.45;
+  }
+  .dl-format input{ margin-top:3px; }
+  .dl-format:has(input:checked){ border-color:var(--frame); background:#fbf6f1; }
+
   /* The database setup warning. Deliberately loud: an unprotected database is
      the one problem that makes every other protection meaningless. */
   .db-warn{
@@ -1598,6 +1607,7 @@
 
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:22px;">
         <button class="add-booking-btn" id="setSaveBtn" style="background:var(--frame); color:#fff; border-color:var(--frame); font-size:14px; padding:9px 20px;">💾 Save setup</button>
+        <button class="add-booking-btn" id="backupBtn" style="display:none; font-size:14px; padding:9px 20px;">🗄️ Download a full backup</button>
         <span class="field-hint" id="setSaveMsg"></span>
       </div>
 
@@ -2259,6 +2269,39 @@
       <button class="btn btn-save" id="dpSave">Save</button>
     </div>
   </div>
+</div>
+
+<!-- Download: asks what and how before anything is saved -->
+<div class="modal-overlay" id="dlModalOverlay">
+  <div class="modal"><div class="modal-scroll">
+    <h3 id="dlTitle">Download</h3>
+    <div class="field-hint" id="dlWhat" style="margin-bottom:10px;"></div>
+
+    <div id="dlSetsWrap" style="display:none;">
+      <label>What to include</label>
+      <div id="dlSets" class="perm-row" style="margin-bottom:4px;"></div>
+      <div style="margin-bottom:8px;">
+        <button type="button" class="rpt-quick" id="dlAll">Tick all</button> ·
+        <button type="button" class="rpt-quick" id="dlNone">Untick all</button>
+      </div>
+    </div>
+
+    <label>Format</label>
+    <div class="dl-formats">
+      <label class="dl-format"><input type="radio" name="dlFormat" value="csv" checked>
+        <span><b>CSV</b> — opens in Excel or Google Sheets. Every figure, ready to sort and add up.<span id="dlCsvNote"></span></span></label>
+      <label class="dl-format"><input type="radio" name="dlFormat" value="pdf">
+        <span><b>PDF</b> — a printed-style document to read, file or send. Opens ready to print; choose <i>Save as PDF</i>.</span></label>
+    </div>
+
+    <div class="modal-error" id="dlError"></div>
+    <div class="field-hint" id="dlDone" style="display:none; color:var(--green); font-weight:700;"></div>
+    <div class="modal-actions">
+      <div style="flex:1"></div>
+      <button class="btn btn-cancel" id="dlCancel">Cancel</button>
+      <button class="btn btn-save" id="dlGo">⬇️ Download</button>
+    </div>
+  </div></div>
 </div>
 
 <!-- Owner payment -->
@@ -3057,6 +3100,7 @@ const PERM_GROUPS = [
     { key:'approve_undo',   label:'Approve an undo on a settled advance' },
     { key:'delete_records', label:'Delete records' },
     { key:'manage_users',   label:'Add people and change what they can do' },
+    { key:'backup',         label:'Download a full backup of everything' },
     { key:'admin',          label:'Full admin — everything above, always', master:true },
   ]},
 ];
@@ -3101,7 +3145,7 @@ function hasPerm(key){
 function canEdit(){ return hasPerm('edit_cash'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-protected';
+const APP_VERSION = 'v2026.09.28-backup';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -9331,6 +9375,12 @@ function printInvoiceList(){
 let settingsInited = false;
 
 function initSettings(){
+  const bb = document.getElementById('backupBtn');
+  if(bb && !bb.dataset.wired){
+    bb.dataset.wired = '1';
+    bb.style.display = (isAdmin() || hasPerm('backup')) ? '' : 'none';
+    bb.addEventListener('click', openBackupDialog);
+  }
   ['setTaxEnabled','setTaxVatRate','setTaxSsclRate','setTaxInclusive'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
@@ -12428,14 +12478,269 @@ function toCSV(rows){
     return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }).join(',')).join('\r\n');
 }
-function downloadCSV(filename, rows){
-  const blob = new Blob(['\ufeff' + toCSV(rows)], { type:'text/csv;charset=utf-8;' });
+/* ---------------------------------------------------------------------------
+   DOWNLOADS
+
+   Nothing is saved to the computer without being asked first. Every export in
+   the app goes through downloadCSV(), and downloadCSV() no longer downloads: it
+   opens the pop-up, says what is about to be saved, and offers CSV or PDF. Only
+   the Download button in that pop-up writes a file.
+--------------------------------------------------------------------------- */
+function saveBlob(filename, blob){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
 }
+function saveCSVFile(filename, rows){
+  saveBlob(filename, new Blob(['\ufeff' + toCSV(rows)], { type:'text/csv;charset=utf-8;' }));
+}
+
+// Kept under its old name so every existing export button goes through the pop-up.
+function downloadCSV(filename, rows){
+  const title = filename.replace(/\.csv$/i, '').replace(/[-_]+/g, ' ').replace(/^./, c => c.toUpperCase());
+  openDownloadDialog({
+    title: 'Download — ' + title,
+    what: `${Math.max(0, rows.length - 1)} row${rows.length === 2 ? '' : 's'}, exactly as shown on screen.`,
+    run: async (format, _sets, win) => {
+      if(format === 'pdf') return openPdfDocument(title, [{ heading: title, rows }], win);
+      saveCSVFile(filename, rows);
+      return `Download started — ${filename}. Check your Downloads folder.`;
+    },
+  });
+}
+
+/* A print-ready document built from table rows. Opened in its own tab, where the
+   browser's print dialog saves it as a PDF. The tab is opened before anything
+   slow happens, because a tab opened later is treated as a pop-up and blocked. */
+function openPdfDocument(title, sections, existingWin){
+  const w = existingWin || window.open('', '_blank');
+  if(!w) throw new Error('The browser blocked the new tab. Allow pop-ups for this site and try again.');
+  const co = (APP_SETTINGS && APP_SETTINGS.company) || {};
+  const logo = APP_SETTINGS && APP_SETTINGS.logoUrl ? safeUrl(APP_SETTINGS.logoUrl) : '';
+  const cell = v => esc(v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : v));
+  const body = sections.map(sec => {
+    const rows = sec.rows || [];
+    const head = rows[0] || [];
+    const data = rows.slice(1);
+    return `<h2>${esc(sec.heading)} <span>${data.length} row${data.length === 1 ? '' : 's'}</span></h2>` +
+      (data.length ? `<table><thead><tr>${head.map(h => `<th>${cell(h)}</th>`).join('')}</tr></thead>
+        <tbody>${data.map(r => `<tr>${r.map(v => `<td>${cell(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+        : '<p class="empty">Nothing recorded.</p>');
+  }).join('');
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+  @page{ size:A4 landscape; margin:12mm; }
+  body{ font-family:Arial,Helvetica,sans-serif; color:#222; margin:0; padding:18px; font-size:9.5px; }
+  header{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #7a5236; padding-bottom:8px; margin-bottom:10px; }
+  header img{ max-height:44px; display:block; margin-bottom:4px; }
+  header .co{ font-size:15px; font-weight:700; }
+  header .meta{ text-align:right; color:#666; line-height:1.5; }
+  h1{ font-size:14px; margin:0; }
+  h2{ font-size:12px; margin:16px 0 5px; page-break-after:avoid; }
+  h2 span{ font-weight:400; color:#888; font-size:10px; }
+  table{ width:100%; border-collapse:collapse; margin-bottom:6px; table-layout:auto; }
+  th{ background:#f3eee8; text-align:left; font-size:8.5px; text-transform:uppercase; letter-spacing:.3px; }
+  th, td{ border:1px solid #ddd; padding:3px 5px; vertical-align:top; word-break:break-word; }
+  tr{ page-break-inside:avoid; }
+  .empty{ color:#888; font-style:italic; }
+  .bar{ text-align:center; margin-bottom:14px; }
+  .bar button{ font-size:13px; padding:8px 18px; border-radius:6px; border:none; background:#2b2b2b; color:#fff; cursor:pointer; margin:0 4px; }
+  @media print{ .bar{ display:none; } body{ padding:0; } }
+</style></head><body>
+<div class="bar"><button onclick="window.print()">🖨️ Print / Save as PDF</button><button onclick="window.close()" style="background:#eee;color:#222;">Close</button></div>
+<header>
+  <div>${logo ? `<img src="${logo}" alt="">` : ''}<div class="co">${esc(co.name || 'Ceymora Management')}</div><h1>${esc(title)}</h1></div>
+  <div class="meta">Prepared ${esc(new Date().toLocaleString('en-GB'))}<br>by ${esc((currentUser && currentUser.username) || '')}</div>
+</header>
+${body}
+</body></html>`);
+  w.document.close();
+  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 600);
+  return 'Opened as a document in a new tab — choose Save as PDF in the print window.';
+}
+
+/* ---------------------------------------------------------------------------
+   A ZIP WRITER. Files are stored uncompressed, which every computer can open and
+   which needs no outside library — so a backup never depends on a third-party
+   script being reachable.
+--------------------------------------------------------------------------- */
+const CRC_TABLE = (()=>{ const t = new Uint32Array(256);
+  for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t; })();
+function crc32(bytes){ let c = 0xFFFFFFFF; for(let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files){   // files: [{ name, text }]
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  for(const f of files){
+    const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+    h.setUint16(8, 0, true); h.setUint16(10, dosTime, true); h.setUint16(12, dosDate, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+    h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(10, 0, true); c.setUint16(12, dosTime, true); c.setUint16(14, dosDate, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true);
+    c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+    central.push(new Uint8Array(c.buffer), name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((n, a) => n + a.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type:'application/zip' });
+}
+
+/* What a full backup covers. Read fresh from the database at the moment of the
+   download, so it holds what is saved, not just what happens to be on screen —
+   and, because it goes through the same row rules as everything else, a person
+   can only ever back up what they are allowed to see. */
+const BACKUP_SETS = [
+  { key:'villa_bookings',           label:'Bookings & guests',         order:'check_in' },
+  { key:'petty_cash_transactions',  label:'Petty cash & expenses',     order:'date' },
+  { key:'inventory_transactions',   label:'Inventory',                 order:'date' },
+  { key:'villa_operating_expenses', label:'Villa operating expenses',  order:'date' },
+  { key:'company_entries',          label:'Company accounts entries',  order:'period' },
+  { key:'company_monthly_accounts', label:'Company monthly accounts',  order:'period' },
+  { key:'payroll_entries',          label:'Payroll',                   order:'period' },
+  { key:'staff_profiles',           label:'Staff profiles',            order:null },
+  { key:'owner_payments',           label:'Owner payments',            order:'period' },
+  { key:'villas',                   label:'Villas',                    order:null },
+  { key:'staff',                    label:'Housekeeping staff',        order:null },
+  { key:'profiles',                 label:'Users & access',            order:null },
+  { key:'app_settings',             label:'Invoice setup',             order:null },
+  { key:'activity_log',             label:'Activity log',              order:'created_at' },
+];
+
+function rowsForTable(data){
+  const cols = [];
+  for(const r of data) for(const k of Object.keys(r)) if(!cols.includes(k)) cols.push(k);
+  const val = v => v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : v);
+  return [cols, ...data.map(r => cols.map(c => val(r[c])))];
+}
+
+function openBackupDialog(){
+  if(!(isAdmin() || hasPerm('backup'))){ alert('Only an admin can download a full backup.'); return; }
+  const stamp = todayISO();
+  openDownloadDialog({
+    title: 'Download a full backup',
+    what: 'A copy of everything saved in the database, read fresh right now. Keep it somewhere safe — it holds guests\' details, salaries and accounts.',
+    sets: BACKUP_SETS.map(b => ({ key:b.key, label:b.label })),
+    run: async (format, chosen, win) => {
+      const sections = [];
+      const missing = [];
+      for(const b of BACKUP_SETS.filter(b => chosen.includes(b.key))){
+        const { data, error } = await fetchAllRows(b.key, b.order);
+        if(error){ missing.push(b.label); continue; }
+        sections.push({ key:b.key, heading:b.label, rows: rowsForTable(data || []) });
+      }
+      if(!sections.length) throw new Error('none of the chosen parts could be read.');
+      logActivity('export', 'backup', `Downloaded a ${format.toUpperCase()} backup: ${sections.map(x => x.heading).join(', ')}`);
+      const note = missing.length ? ` (could not read: ${missing.join(', ')})` : '';
+      if(format === 'pdf'){
+        openPdfDocument(`Full backup — ${stamp}`, sections, win);
+        return 'Opened as a document in a new tab — choose Save as PDF in the print window.' + note;
+      }
+      const readme = [
+        'Ceymora Management — backup taken ' + new Date().toLocaleString('en-GB'),
+        'by ' + ((currentUser && currentUser.username) || ''),
+        '',
+        'One CSV file per part of the database. Open any of them in Excel or Google Sheets.',
+        'The column names are the database column names, so this backup can be loaded back',
+        'into Supabase table by table (Table editor -> Insert -> Import data from CSV).',
+        '',
+        'This file holds guests\' personal details, salaries and company accounts.',
+        'Keep it somewhere private.',
+        '',
+        ...sections.map(x => `${x.key}.csv — ${x.heading}: ${x.rows.length - 1} rows`),
+      ].join('\r\n');
+      const zip = makeZip([
+        { name:`ceymora-backup-${stamp}/READ-ME.txt`, text: readme },
+        ...sections.map(x => ({ name:`ceymora-backup-${stamp}/${x.key}.csv`, text: '\ufeff' + toCSV(x.rows) })),
+      ]);
+      saveBlob(`ceymora-backup-${stamp}.zip`, zip);
+      return `Download started — ceymora-backup-${stamp}.zip. Check your Downloads folder.` + note;
+    },
+  });
+}
+
+/* The pop-up itself. opts: { title, what, sets?, run(format, chosenSets, win) } */
+let dlCurrent = null;
+function openDownloadDialog(opts){
+  dlCurrent = opts;
+  const g = id => document.getElementById(id);
+  g('dlTitle').textContent = opts.title || 'Download';
+  g('dlWhat').textContent = opts.what || '';
+  g('dlError').style.display = 'none';
+  g('dlDone').style.display = 'none';
+  g('dlGo').disabled = false;
+  g('dlGo').textContent = '⬇️ Download';
+  g('dlCsvNote').textContent = opts.sets ? ' Each part becomes its own file, packed together in one ZIP.' : '';
+  document.querySelector('input[name=dlFormat][value=csv]').checked = true;
+  const wrap = g('dlSetsWrap');
+  if(opts.sets && opts.sets.length){
+    wrap.style.display = '';
+    g('dlSets').innerHTML = opts.sets.map(st =>
+      `<label class="perm-chip on"><input type="checkbox" data-dlset="${esc(st.key)}" checked> ${esc(st.label)}</label>`).join('');
+    g('dlSets').querySelectorAll('[data-dlset]').forEach(cb => cb.addEventListener('change', ()=>{
+      cb.closest('.perm-chip').classList.toggle('on', cb.checked);
+    }));
+  } else {
+    wrap.style.display = 'none';
+    g('dlSets').innerHTML = '';
+  }
+  g('dlModalOverlay').classList.add('open');
+}
+function dlSetAll(on){
+  document.querySelectorAll('#dlSets [data-dlset]').forEach(cb => {
+    cb.checked = on; cb.closest('.perm-chip').classList.toggle('on', on);
+  });
+}
+document.getElementById('dlAll').addEventListener('click', ()=> dlSetAll(true));
+document.getElementById('dlNone').addEventListener('click', ()=> dlSetAll(false));
+document.getElementById('dlCancel').addEventListener('click', ()=> document.getElementById('dlModalOverlay').classList.remove('open'));
+document.getElementById('dlModalOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'dlModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('dlGo').addEventListener('click', async ()=>{
+  const g = id => document.getElementById(id);
+  if(!dlCurrent) return;
+  const format = (document.querySelector('input[name=dlFormat]:checked') || {}).value || 'csv';
+  const chosen = [...document.querySelectorAll('#dlSets [data-dlset]:checked')].map(cb => cb.dataset.dlset);
+  if(dlCurrent.sets && !chosen.length){
+    g('dlError').textContent = 'Tick at least one thing to include.'; g('dlError').style.display = 'block'; return;
+  }
+  // The PDF tab is opened now, while the click still counts, so it is not blocked.
+  let win = null;
+  if(format === 'pdf'){
+    win = window.open('', '_blank');
+    if(!win){ g('dlError').textContent = 'The browser blocked the new tab. Allow pop-ups for this site, then try again.'; g('dlError').style.display = 'block'; return; }
+    try{ win.document.write('<p style="font-family:Arial;padding:30px;color:#666">Preparing the document…</p>'); }catch(e){}
+  }
+  g('dlError').style.display = 'none';
+  g('dlGo').disabled = true; g('dlGo').textContent = 'Preparing…';
+  try{
+    const msg = await dlCurrent.run(format, chosen, win);
+    g('dlDone').textContent = '✓ ' + (msg || 'Download started.');
+    g('dlDone').style.display = 'block';
+    g('dlGo').textContent = 'Done';
+    setTimeout(()=> g('dlModalOverlay').classList.remove('open'), 2200);
+  }catch(e){
+    console.error(e);
+    if(win) try{ win.close(); }catch(_){}
+    g('dlError').textContent = 'Could not prepare the download — ' + (e.message || 'please try again.');
+    g('dlError').style.display = 'block';
+    g('dlGo').disabled = false; g('dlGo').textContent = '⬇️ Download';
+  }
+});
 function exportPettyCashCSV(){
   const range = cashRange();
   const rows = allCashTxns
