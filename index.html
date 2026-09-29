@@ -460,6 +460,7 @@
   .cmp-modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
   .cmp-open-btn{ white-space:nowrap; }
 
+  .doc-nos{ display:inline-block; margin-left:6px; font-size:11.5px; color:#6c665a; background:#f3efe7; border-radius:6px; padding:1px 7px; white-space:nowrap; }
   .card-tools{ display:flex; gap:8px; justify-content:flex-end; margin:-6px 0 14px; }
   .bin-modal{ width:min(860px, 96vw) !important; max-width:860px; }
   .bin-row{ display:flex; gap:14px; align-items:flex-start; justify-content:space-between; background:#fff; border:1px solid var(--board-line);
@@ -1379,11 +1380,11 @@
     <div id="pettyCashPanel" style="display:none">
       <div class="cash-summary">
         <div class="cash-card ceymora">
-          <div class="cash-card-label"><span data-cardname="ceymora">Ceymora Card</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-pettyname="ceymora">Ceymora Petty Cash</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="ceymoraBalance">LKR 0</div>
         </div>
         <div class="cash-card kalava">
-          <div class="cash-card-label"><span data-cardname="kalava_card">Kalava Villa Card</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-pettyname="kalava_card">Kalava Villa Petty Cash</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
         <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
@@ -2203,8 +2204,8 @@
     <input type="date" id="incDate">
     <label>Received into</label>
     <select id="incCard">
-      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
-      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
+      <option value="ceymora" data-pettyopt="ceymora">Ceymora Petty Cash</option>
+      <option value="kalava_card" data-pettyopt="kalava_card">Kalava Villa Petty Cash</option>
     </select>
     <label>Amount (LKR)</label>
     <input type="number" id="incAmount" min="0" step="1" placeholder="e.g. 50000">
@@ -2231,12 +2232,14 @@
     <input type="date" id="expDate">
     <label>Paid from</label>
     <select id="expCard">
-      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
-      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
-      <option value="bank">Bank transfer (not petty cash)</option>
+      <option value="ceymora">Ceymora Petty Cash</option>
+      <option value="kalava_card">Kalava Villa Petty Cash</option>
+      <option value="bank:ceymora">Bank transfer from Ceymora</option>
+      <option value="bank:kalava">Bank transfer from Kalava Villa</option>
+      <option value="bank" hidden disabled>Bank transfer (account not stated)</option>
       <option value="sharon">Sharon paid personally (not petty cash)</option>
     </select>
-    <div class="field-hint" id="expCardHint">Ceymora Card can be used for any villa or the office.</div>
+    <div class="field-hint" id="expCardHint">Ceymora Petty Cash can be used for any villa or the office.</div>
     <label>For</label>
     <select id="expFor">
       <option value="office">Office</option>
@@ -2276,6 +2279,17 @@
       <input type="number" id="expItemQty" min="0" step="1" placeholder="e.g. 5">
       <div class="field-hint" id="expStockNoMatchHint" style="display:none; color:var(--amber);">Couldn't match this to its original item record — re-enter the item and quantity to fix it going forward.</div>
     </div>
+    <div class="frm-row" style="margin-top:4px;">
+      <div>
+        <label>Invoice / bill number</label>
+        <input type="text" id="expInvoiceNo" maxlength="60" placeholder="From the shop's bill, e.g. INV-2231">
+      </div>
+      <div>
+        <label>Payment voucher number</label>
+        <input type="text" id="expVoucherNo" maxlength="40" placeholder="Given automatically when you save">
+      </div>
+    </div>
+    <div class="field-hint" id="expDocHint">The voucher number is issued in order (PV-2026-0001, 0002…) when you save. Type one only if a paper voucher already has a number.</div>
     <label>Note (optional)</label>
     <input type="text" id="expNote">
     <label>Attach invoice / receipt (optional)</label>
@@ -2302,11 +2316,15 @@
     <datalist id="staffNameList"></datalist>
     <label>How was the money given?</label>
     <select id="advGiveMode">
-      <option value="ceymora" data-cardopt="ceymora" data-cardopt-prefix="Cash — from the ">Cash — from the Ceymora Card</option>
-      <option value="kalava_card" data-cardopt="kalava_card" data-cardopt-prefix="Cash — from the ">Cash — from the Kalava Villa Card</option>
-      <option value="bank">Bank transfer — sent from the bank</option>
+      <option value="ceymora" data-pettyopt="ceymora" data-pettyopt-prefix="Cash — from ">Cash — from Ceymora Petty Cash</option>
+      <option value="kalava_card" data-pettyopt="kalava_card" data-pettyopt-prefix="Cash — from ">Cash — from Kalava Villa Petty Cash</option>
+      <option value="bank:ceymora">Bank transfer from Ceymora</option>
+      <option value="bank:kalava">Bank transfer from Kalava Villa</option>
+      <option value="bank" hidden disabled>Bank transfer (account not stated)</option>
     </select>
     <div class="field-hint" id="advGiveModeHint"></div>
+    <label>Payment voucher number</label>
+    <input type="text" id="advVoucherNo" maxlength="40" placeholder="Given automatically when you save">
     <label>Amount (LKR)</label>
     <input type="number" id="advAmount" min="0" step="1" placeholder="e.g. 10000">
     <label>Note (optional)</label>
@@ -2550,9 +2568,10 @@
     <label>Paid from</label>
     <select id="mpCard">
       <option value="sharon">Sharon paid personally (not petty cash)</option>
-      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
-      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
-      <option value="bank">Bank transfer (not petty cash)</option>
+      <option value="ceymora" data-pettyopt="ceymora">Ceymora Petty Cash</option>
+      <option value="kalava_card" data-pettyopt="kalava_card">Kalava Villa Petty Cash</option>
+      <option value="bank:ceymora">Bank transfer from Ceymora</option>
+      <option value="bank:kalava">Bank transfer from Kalava Villa</option>
     </select>
     <div class="field-hint" id="mpCardHint"></div>
     <label>What was it for</label>
@@ -2589,9 +2608,15 @@
   <div class="modal">
     <h3>✏️ Rename the petty cash cards</h3>
     <div class="field-hint">Only the names change. Every balance, expense and report stays exactly as it is — they just show the new name.</div>
-    <label>First card (used for any villa or the office)</label>
+    <div class="direct-block-title" style="margin-top:12px;">When cash is spent from them</div>
+    <label>First float (used for any villa or the office)</label>
+    <input type="text" id="cashName1" maxlength="40">
+    <label>Second float (Kalava Villa only)</label>
+    <input type="text" id="cashName2" maxlength="40">
+    <div class="direct-block-title" style="margin-top:14px;">When paid by card ("Payment From Card")</div>
+    <label>First card</label>
     <input type="text" id="cardName1" maxlength="40">
-    <label>Second card (Kalava Villa only)</label>
+    <label>Second card</label>
     <input type="text" id="cardName2" maxlength="40">
     <div class="modal-error" id="cardNameError"></div>
     <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
@@ -2664,9 +2689,11 @@
     <input type="text" id="dpFrom" placeholder="e.g. Mr Silva — balance for 12–15 Sept">
     <label>Received into</label>
     <select id="dpCard">
-      <option value="bank">Bank account</option>
-      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
-      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
+      <option value="bank:ceymora">Bank — Ceymora account</option>
+      <option value="bank:kalava">Bank — Kalava Villa account</option>
+      <option value="bank" hidden disabled>Bank account (not stated)</option>
+      <option value="ceymora" data-pettyopt="ceymora">Ceymora Petty Cash</option>
+      <option value="kalava_card" data-pettyopt="kalava_card">Kalava Villa Petty Cash</option>
     </select>
     <div class="field-hint" id="dpCardHint"></div>
     <div class="modal-checkbox-row" style="margin-top:10px;">
@@ -3046,7 +3073,7 @@ function rowToBooking(r){ return {
   agreedRate: r.fx_rate !== null && r.fx_rate !== undefined && Number(r.fx_rate) > 0 ? Number(r.fx_rate) : null,
   agreedRateDate: r.fx_rate_date || null,
 }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -3193,6 +3220,8 @@ const SETTINGS_DEFAULTS = {
   // What the two petty cash cards are called everywhere in the app. Only the
   // names change — every record stays attached to the same card.
   cardNames: { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' },
+  // The same two floats when cash is spent from them (not paid by card).
+  cashNames: { ceymora: 'Ceymora Petty Cash', kalava_card: 'Kalava Villa Petty Cash' },
   depositPercent: 25,
   reminderDays: 30,
   reminderStaffNumbers: '',
@@ -3509,11 +3538,11 @@ const advFileHandler = createMultiFileHandler('advFile', 'advFileList');
 // advance's bills land in the villa's Bank transfers section by themselves.
 function advApplyGiveMode(){
   const g = id => document.getElementById(id);
-  const card = g('advGiveMode').value;
-  const bank = card === 'bank';
+  const v = g('advGiveMode').value;
+  const bank = isBankVal(v);
   g('advGiveModeHint').textContent = bank
-    ? 'Sent from the bank — neither card is touched. It stays on his balance until he brings the invoices, and whatever he spends shows under Bank transfers for that villa.'
-    : `Comes off the ${CARD_LABELS[card] || card}'s petty cash float, the way it works today.`;
+    ? `${bankLabel(splitPay(v).bankAccount)} — no petty cash is touched. It stays on his balance until he brings the invoices, and whatever he spends shows under Bank transfers for that villa.`
+    : `Comes out of ${pettyName(v)}, the way it works today.`;
 }
 const advSettledFileHandler = createMultiFileHandler('advSettledFile', 'advSettledFileList');
 function rowToInv(r){ return { id:r.id, type:r.type, date:r.date, item:r.item, qty:Number(r.qty), toVilla:r.to_villa, note:r.note, amount:r.amount!==null&&r.amount!==undefined?Number(r.amount):null }; }
@@ -3638,7 +3667,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.29-restore';
+const APP_VERSION = 'v2026.09.29-vouchers';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3935,6 +3964,9 @@ const DB_CHECKS = [
   { file:'9-supabase-section-permissions.sql', what:'The database obeys each person\'s "Can see / Can change" ticks',
     critical:true,
     test: async () => { const { data, error } = await sb.rpc('section_perms_ready'); return !error && data === true; } },
+  { file:'14-supabase-invoice-and-voucher-numbers.sql', what:'Invoice numbers, payment voucher numbers and which bank account',
+    critical:false,
+    test: async () => { HAS_PC_COLS = null; return await pcColsReady(); } },
   { file:'13-supabase-deleted-items.sql', what:'Anything deleted can be put back from "Deleted items"',
     critical:false,
     test: async () => { const { data, error } = await sb.rpc('bin_ready'); return !error && data === true; } },
@@ -4343,7 +4375,7 @@ function accountGroupsBlock(rows, showPlace){
     const ia = order.indexOf(a), ib = order.indexOf(b);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
-  const paidFrom = t => t.employeeName ? `${esc(t.employeeName)}'s advance` : esc(CARD_LABELS[t.card] || t.card || '');
+  const paidFrom = t => t.employeeName ? `${esc(t.employeeName)}'s advance` : esc(payLabel(t));
   let grand = 0;
   let html = '';
   for(const k of keys){
@@ -4359,7 +4391,7 @@ function accountGroupsBlock(rows, showPlace){
         <thead><tr><th>Date</th><th>Description</th>${showPlace ? '<th>Place</th>' : ''}<th>How it was paid</th><th class="r">Amount (LKR)</th></tr></thead>
         <tbody>${list.map(t => `<tr>
           <td class="dim">${fmtDay(t.date)}</td>
-          <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''} ${invoiceLinksHTML(t)}</td>
+          <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''} ${invoiceLinksHTML(t)}${docNosHTML(t)}</td>
           ${showPlace ? `<td class="dim">${esc(FOR_LABELS[t.for] || t.for || '—')}</td>` : ''}
           <td class="dim">${paidFrom(t)}</td>
           <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
@@ -4377,19 +4409,19 @@ function exportVillaExpensesCSV(){
   const rows = exRows();
   if(!rows.length){ alert('Nothing to export for these filters.'); return; }
   const groupName = k => (PETTY_GROUPS.find(g=>g.key===k)||{}).pl || k;
-  const out = [['Date','Place','Section','Description','Paid from','Paid by staff advance of','Account','Stock item','Note','Invoice','Amount LKR']];
+  const out = [['Date','Place','Section','Description','Paid from','Paid by staff advance of','Account','Stock item','Note','Invoice no.','Payment voucher no.','Attachments','Amount LKR']];
   for(const t of rows){
     const pur = t.linkedInventory && t.linkedPurchaseId
       ? allInvTxns.find(x => String(x.id) === String(t.linkedPurchaseId)) : null;
     out.push([
       t.date, FOR_LABELS[t.for] || t.for || '', groupName(pettyGroupOf(t)),
-      t.purpose || 'Expense', CARD_LABELS[t.card] || t.card || '', t.employeeName || '',
+      t.purpose || 'Expense', payLabel(t), t.employeeName || '',
       acctLabel(acctOf(t)) || '', pur ? `${pur.item} x ${pur.qty}` : (t.linkedInventory ? 'stock item' : ''),
-      t.note || '', getInvoiceLinks(t).join(' '), t.amount,
+      t.note || '', t.invoiceNo || '', t.voucherNo || '', getInvoiceLinks(t).join(' '), t.amount,
     ]);
   }
   const total = rows.reduce((s2,t)=>s2+t.amount,0);
-  out.push([]); out.push(['', '', '', '', '', '', '', '', '', 'Total', total]);
+  out.push([]); out.push(['', '', '', '', '', '', '', '', '', '', '', 'Total', total]);
   const when = exAllTime ? 'all-time' : ymKey(exMonthDate);
   downloadCSV(`villa-expenses-${exPlace}-${exKind === 'all' ? 'all' : exKind}-${when}.csv`, out);
 }
@@ -6168,6 +6200,70 @@ async function restoreBooking(b){
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', bank: 'Bank transfer', sharon: 'Paid by Sharon personally' };
 const CARD_DEFAULT_NAMES = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
+const CASH_DEFAULT_NAMES = { ceymora: 'Ceymora Petty Cash', kalava_card: 'Kalava Villa Petty Cash' };
+// Which bank account a bank transfer went from (or into).
+const BANK_ACCOUNTS = { ceymora: 'Ceymora', kalava: 'Kalava Villa' };
+function pettyName(k){
+  const n = ((APP_SETTINGS && APP_SETTINGS.cashNames) || {})[k];
+  return (n && String(n).trim()) || CASH_DEFAULT_NAMES[k] || cardName(k);
+}
+function bankLabel(acct){ return acct && BANK_ACCOUNTS[acct] ? `Bank transfer from ${BANK_ACCOUNTS[acct]}` : 'Bank transfer'; }
+/* How a line was paid, in words: petty cash, a card payment, which bank account,
+   or Sharon's own money. Works on app records and on raw database rows. */
+function payLabel(t){
+  if(!t) return '';
+  const card = t.card;
+  const acct = t.bankAccount || t.bank_account || null;
+  if(card === 'bank') return bankLabel(acct);
+  if(card === 'sharon') return CARD_LABELS.sharon;
+  if(card === 'ceymora' || card === 'kalava_card'){
+    const direct = t.type === 'expense' && (t.directExpense || t.direct_expense) && !(t.employeeName || t.employee_name);
+    return direct ? cardName(card) : pettyName(card);
+  }
+  return CARD_LABELS[card] || card || '';
+}
+// The "Paid from" lists carry the bank account in the value: "bank:ceymora".
+function isBankVal(v){ return String(v || '').split(':')[0] === 'bank'; }
+function splitPay(v){
+  const [card, acct] = String(v || '').split(':');
+  return card === 'bank' ? { card:'bank', bankAccount: acct || null } : { card, bankAccount:null };
+}
+function payValue(card, acct){ return card === 'bank' ? (acct ? 'bank:' + acct : 'bank') : card; }
+// Shows the "account not stated" choice only for an old transfer that has none.
+function setPaySelect(sel, card, acct){
+  const el = typeof sel === 'string' ? document.getElementById(sel) : sel;
+  if(!el) return;
+  const v = payValue(card, acct);
+  const legacy = el.querySelector('option[value="bank"]');
+  if(legacy){ legacy.hidden = v !== 'bank'; legacy.disabled = v !== 'bank'; }
+  el.value = v;
+  if(el.value !== v && card === 'bank') el.value = 'bank:ceymora';
+}
+/* Invoice and payment voucher numbers (file 14). */
+let HAS_PC_COLS = null;
+async function pcColsReady(){
+  if(HAS_PC_COLS !== null || !sb) return !!HAS_PC_COLS;
+  try{ const { error } = await sb.from('petty_cash_transactions').select('invoice_no,voucher_no,bank_account').limit(1); HAS_PC_COLS = !error; }
+  catch(e){ HAS_PC_COLS = false; }
+  return HAS_PC_COLS;
+}
+async function nextVoucherNo(dateISO){
+  const y = String(dateISO || todayISO()).slice(0, 4);
+  try{
+    const { data, error } = await sb.rpc('next_invoice_no', { p_scope: 'PV-' + y });
+    if(error || !data) return null;
+    return `PV-${y}-${String(data).padStart(4, '0')}`;
+  }catch(e){ return null; }
+}
+function docNosHTML(t){
+  const bits = [];
+  if(t && t.invoiceNo) bits.push(`Invoice ${esc(t.invoiceNo)}`);
+  if(t && t.voucherNo) bits.push(`Voucher ${esc(t.voucherNo)}`);
+  return bits.length ? `<span class="doc-nos">${bits.join(' · ')}</span>` : '';
+}
+function docNosText(t){
+  return [t && t.invoiceNo ? 'Invoice ' + t.invoiceNo : '', t && t.voucherNo ? 'Voucher ' + t.voucherNo : ''].filter(Boolean).join(' · ');
+}
 function cardName(k){
   const n = ((APP_SETTINGS && APP_SETTINGS.cardNames) || {})[k];
   return (n && String(n).trim()) || CARD_DEFAULT_NAMES[k] || k;
@@ -6185,6 +6281,8 @@ function applyCardNames(){
     }
   }
   document.querySelectorAll('[data-cardname]').forEach(el => el.textContent = cardName(el.dataset.cardname));
+  document.querySelectorAll('[data-pettyname]').forEach(el => el.textContent = pettyName(el.dataset.pettyname));
+  document.querySelectorAll('[data-pettyopt]').forEach(el => el.textContent = (el.dataset.pettyoptPrefix || '') + pettyName(el.dataset.pettyopt));
   document.querySelectorAll('[data-cardopt]').forEach(el => el.textContent = (el.dataset.cardoptPrefix || '') + cardName(el.dataset.cardopt));
   const hint = document.getElementById('expCardHint');
   if(hint && /can be used for any villa/.test(hint.textContent)) hint.textContent = `${cardName('ceymora')} can be used for any villa or the office.`;
@@ -6195,6 +6293,8 @@ function openRenameCards(){
   const o = document.getElementById('cardNameModalOverlay');
   document.getElementById('cardName1').value = cardName('ceymora');
   document.getElementById('cardName2').value = cardName('kalava_card');
+  document.getElementById('cashName1').value = pettyName('ceymora');
+  document.getElementById('cashName2').value = pettyName('kalava_card');
   document.getElementById('cardNameError').style.display = 'none';
   o.classList.add('open');
 }
@@ -6202,17 +6302,20 @@ document.getElementById('renameCardsBtn').addEventListener('click', openRenameCa
 document.getElementById('cardNameCancel').addEventListener('click', ()=> document.getElementById('cardNameModalOverlay').classList.remove('open'));
 document.getElementById('cardNameSave').addEventListener('click', async ()=>{
   const a = document.getElementById('cardName1').value.trim(), b = document.getElementById('cardName2').value.trim();
+  const c = document.getElementById('cashName1').value.trim(), d = document.getElementById('cashName2').value.trim();
   const err = document.getElementById('cardNameError');
   const fail = t => { err.textContent = t; err.style.display = 'block'; };
-  if(!a || !b) return fail('Both cards need a name.');
-  if(a.length > 40 || b.length > 40) return fail('Keep each name under 40 characters.');
-  if(a.toLowerCase() === b.toLowerCase()) return fail('The two cards need different names, or nobody can tell them apart.');
-  const before = [cardName('ceymora'), cardName('kalava_card')];
+  if(!a || !b || !c || !d) return fail('Every box needs a name.');
+  if([a,b,c,d].some(x => x.length > 40)) return fail('Keep each name under 40 characters.');
+  if(a.toLowerCase() === b.toLowerCase() || c.toLowerCase() === d.toLowerCase()) return fail('The two need different names, or nobody can tell them apart.');
+  const before = { cards: Object.assign({}, APP_SETTINGS.cardNames), cash: Object.assign({}, APP_SETTINGS.cashNames) };
+  const was = [pettyName('ceymora'), pettyName('kalava_card'), cardName('ceymora'), cardName('kalava_card')];
   APP_SETTINGS.cardNames = { ceymora: a, kalava_card: b };
+  APP_SETTINGS.cashNames = { ceymora: c, kalava_card: d };
   try{ await saveSettings(); }
-  catch(e){ APP_SETTINGS.cardNames = { ceymora: before[0], kalava_card: before[1] }; return fail('Could not save — check the connection and try again.'); }
+  catch(e){ APP_SETTINGS.cardNames = before.cards; APP_SETTINGS.cashNames = before.cash; return fail('Could not save — check the connection and try again.'); }
   applyCardNames();
-  logActivity('update', 'app_settings', `Renamed the petty cash cards: "${before[0]}" → "${a}", "${before[1]}" → "${b}"`);
+  logActivity('update', 'app_settings', `Renamed: "${was[0]}" → "${c}", "${was[1]}" → "${d}", "${was[2]}" → "${a}", "${was[3]}" → "${b}"`);
   document.getElementById('cardNameModalOverlay').classList.remove('open');
 });
 
@@ -6453,19 +6556,20 @@ function updateExpenseCardLock(){
   const card = document.getElementById('expCard').value;
   const forSelect = document.getElementById('expFor');
   const hint = document.getElementById('expCardHint');
+  const nm = k => expDirectMode ? cardName(k) : pettyName(k);
   if(card === 'kalava_card'){
     forSelect.value = 'kalava';
     forSelect.disabled = true;
-    hint.textContent = `${cardName('kalava_card')} can only be used for Kalava Villa expenses.`;
-  } else if(card === 'bank'){
+    hint.textContent = `${nm('kalava_card')} can only be used for Kalava Villa expenses.`;
+  } else if(isBankVal(card)){
     forSelect.disabled = false;
-    hint.textContent = 'Paid by bank transfer — charged to the villa/office below, but nothing comes out of either card.';
+    hint.textContent = `${bankLabel(splitPay(card).bankAccount)} — charged to the villa/office below; no petty cash is touched.`;
   } else if(card === 'sharon'){
     forSelect.disabled = false;
     hint.textContent = 'Sharon paid with his own money — charged to the villa/office below, but nothing comes out of petty cash.';
   } else {
     forSelect.disabled = false;
-    hint.textContent = `${cardName('ceymora')} can be used for any villa or the office.`;
+    hint.textContent = `${nm('ceymora')} can be used for any villa or the office.`;
   }
   updateExpenseStockLabel();
 }
@@ -6697,7 +6801,7 @@ function renderCash(){
   `;
   const tbody = table.querySelector('tbody');
   for(const t of sorted){
-    const cardLabel = CARD_LABELS[t.card] || t.card;
+    const cardLabel = esc(payLabel(t));
     let details;
     if(t.type === 'income' && t.advanceId){
       details = `Unused cash returned — ${esc(t.employeeName || '')}` + (t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : '');
@@ -6728,7 +6832,7 @@ function renderCash(){
     tr.innerHTML = `
       <td>${t.date}</td>
       <td><span class="txn-badge ${t.type}">${t.type}</span></td>
-      <td>${details}${invoiceLink ? ' '+invoiceLink : ''}</td>
+      <td>${details}${invoiceLink ? ' '+invoiceLink : ''}${docNosHTML(t)}</td>
       <td>${cardLabel}</td>
       <td class="num" style="color:${t.type==='income' ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${t.type==='income'?'+':'−'} ${t.amount.toLocaleString()}</td>
     `;
@@ -6773,7 +6877,7 @@ function renderCash(){
         try{
           // The bill stays in storage: the record can be restored from Deleted items.
           await sb.from('petty_cash_transactions').delete().eq('id', t.id);
-          const label = t.type==='income' ? CARD_LABELS[t.card] : (t.type==='advance' ? `Advance to ${t.employeeName||''}` : t.purpose);
+          const label = t.type==='income' ? payLabel(t) : (t.type==='advance' ? `Advance to ${t.employeeName||''}` : t.purpose);
           logActivity('delete', 'petty_cash_transactions', `Deleted ${t.type}: ${label} — LKR ${t.amount.toLocaleString()}`);
         }catch(e){ console.error(e); }
       }
@@ -6847,11 +6951,11 @@ document.getElementById('incSave').addEventListener('click', async ()=>{
       }
       const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
       if(error) throw error;
-      logActivity('update', 'petty_cash_transactions', `Edited money received: LKR ${amount.toLocaleString()} into ${CARD_LABELS[card]}`);
+      logActivity('update', 'petty_cash_transactions', `Edited money received: LKR ${amount.toLocaleString()} into ${pettyName(card)}`);
     } else {
       const { error } = await sb.from('petty_cash_transactions').insert({ type:'income', date, card, amount, note, invoice_urls: newUrls });
       if(error) throw error;
-      logActivity('create', 'petty_cash_transactions', `Recorded money received: LKR ${amount.toLocaleString()} into ${CARD_LABELS[card]}`);
+      logActivity('create', 'petty_cash_transactions', `Recorded money received: LKR ${amount.toLocaleString()} into ${pettyName(card)}`);
     }
     document.getElementById('incomeModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
@@ -6883,6 +6987,11 @@ function applyDirectExpenseUI(){
   });
   if(on && (g('expFor').value === 'office' || g('expFor').value === 'store')) g('expFor').value = firstVillaId();
 
+  // Petty cash is spent from the floats; "Payment From Card" is paid with the cards.
+  const cs = g('expCard');
+  const o1 = cs.querySelector('option[value="ceymora"]'), o2 = cs.querySelector('option[value="kalava_card"]');
+  if(o1) o1.textContent = on ? cardName('ceymora') : pettyName('ceymora');
+  if(o2) o2.textContent = on ? cardName('kalava_card') : pettyName('kalava_card');
   const hint = g('expCardHint');
   if(on){
     hint.innerHTML = `<b>${esc(cardName('kalava_card'))}</b> → Direct Kalava Villa Purchases. &nbsp;<b>${esc(cardName('ceymora'))}</b> → Direct ${esc(cardName('ceymora'))} Expenses.`+' Either way the cost still counts toward that villa\'s petty cash.';
@@ -6894,11 +7003,12 @@ function applyDirectExpenseUI(){
   // In bank transfer mode the payment method is the whole point of the button, so it is
   // fixed rather than left as one option among four.
   const cardSel = g('expCard');
+  const current = cardSel.value;
   Array.from(cardSel.options).forEach(opt => {
-    const hide = expBankMode && opt.value !== 'bank';
+    const hide = (expBankMode && !isBankVal(opt.value)) || (opt.value === 'bank' && current !== 'bank');
     opt.hidden = hide; opt.disabled = hide;
   });
-  if(expBankMode) cardSel.value = 'bank';
+  if(expBankMode && !isBankVal(cardSel.value)) cardSel.value = 'bank:ceymora';
 }
 
 let expLinkAdvanceId = null, expReturnToAdvance = null;
@@ -6924,7 +7034,9 @@ function openExpenseModal(record, forceDirect, opts){
   expBankMode = opts.bank ? true : (record ? record.card === 'bank' : false);
   try{
     document.getElementById('expDate').value = record ? record.date : todayISO();
-    document.getElementById('expCard').value = record ? record.card : 'ceymora';
+    setPaySelect('expCard', record ? record.card : 'ceymora', record ? record.bankAccount : null);
+    document.getElementById('expInvoiceNo').value = record ? (record.invoiceNo || '') : '';
+    document.getElementById('expVoucherNo').value = record ? (record.voucherNo || '') : '';
     document.getElementById('expFor').value = record ? record.for : firstVillaId();
     document.getElementById('expFor').disabled = false;
     document.getElementById('expPurpose').value = record ? record.purpose : '';
@@ -6937,7 +7049,7 @@ function openExpenseModal(record, forceDirect, opts){
       advSel.insertAdjacentHTML('beforeend', `<option value="${esc(fundedName)}">${esc(fundedName)}</option>`);
     }
     advSel.value = fundedName;
-    if(!record && opts.card) document.getElementById('expCard').value = opts.card;
+    if(!record && opts.card) setPaySelect('expCard', opts.card, opts.card === 'bank' ? 'ceymora' : null);
     updateExpenseAdvanceHint();
 
     const wasStock = record ? !!record.linkedInventory : false;
@@ -6988,7 +7100,9 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   }
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
   const date = document.getElementById('expDate').value;
-  const card = document.getElementById('expCard').value;
+  const { card, bankAccount } = splitPay(document.getElementById('expCard').value);
+  const invoiceNo = document.getElementById('expInvoiceNo').value.trim() || null;
+  let voucherNo = document.getElementById('expVoucherNo').value.trim() || null;
   const forWhom = document.getElementById('expFor').value;
   const purpose = document.getElementById('expPurpose').value.trim();
   const amount = parseFloat(document.getElementById('expAmount').value);
@@ -7013,6 +7127,18 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     else { const open = oldestOpenAdvanceFor(fundedByEmployee); advanceId = open ? String(open.id) : null; }
   }
   if(!accountCode){ errEl.textContent='Pick which account this goes into, so the company accounts stay sorted.'; errEl.style.display='block'; return; }
+  // The same shop invoice entered twice is almost always a mistake.
+  if(invoiceNo){
+    const twin = allCashTxns.find(t => t.id !== editingCashId && t.invoiceNo && t.invoiceNo.trim().toLowerCase() === invoiceNo.toLowerCase());
+    if(twin && !confirm(`Invoice ${invoiceNo} is already recorded: ${twin.purpose || 'expense'} — LKR ${Number(twin.amount).toLocaleString()} on ${twin.date}.\n\nSave this one as well?`)) return;
+  }
+  if(voucherNo){
+    const twinV = allCashTxns.find(t => t.id !== editingCashId && t.voucherNo && t.voucherNo.trim().toLowerCase() === voucherNo.toLowerCase());
+    if(twinV){ errEl.textContent = `Voucher ${voucherNo} is already used (${twinV.purpose || 'a payment'} on ${twinV.date}). Leave it empty to get the next number.`; errEl.style.display='block'; return; }
+  }
+  const docCols = await pcColsReady();
+  if(docCols && !voucherNo && !editingCashId) voucherNo = await nextVoucherNo(date);
+  const docFields = docCols ? { bank_account: card === 'bank' ? bankAccount : null, invoice_no: invoiceNo, voucher_no: voucherNo } : {};
 
   try{
     const newUrls = [];
@@ -7084,7 +7210,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
         logActivity('update', 'inventory_transactions', `Removed stock link from expense: ${purpose}`);
       }
 
-      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId };
+      const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId, ...docFields };
       if(newUrls.length){
         const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
@@ -7098,10 +7224,10 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     }
 
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
-      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId
+      type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId, ...docFields
     }).select().single();
     if(error) throw error;
-    logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${CARD_LABELS[card]})`);
+    logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${payLabel({ card, bankAccount, type:'expense', directExpense: expDirectMode })}${voucherNo ? ', voucher ' + voucherNo : ''})`);
     if(isStock){
       const { data: purchaseRow, error: invErr } = await sb.from('inventory_transactions').insert({
         type:'purchase', date, item:itemName, qty:itemQty, amount, note: 'Via petty cash: ' + purpose
@@ -7189,7 +7315,8 @@ function openAdvanceModal(record){
 
     g('advDate').value = record ? record.date : todayISO();
     g('advEmployee').value = record ? (record.employeeName || '') : '';
-    g('advGiveMode').value = record ? record.card : 'ceymora';
+    setPaySelect('advGiveMode', record ? record.card : 'ceymora', record ? record.bankAccount : null);
+    g('advVoucherNo').value = record ? (record.voucherNo || '') : '';
     advApplyGiveMode();
     g('advAmount').value = record ? record.amount : '';
     g('advNote').value = record ? (record.note || '') : '';
@@ -7350,14 +7477,14 @@ document.getElementById('advMoveToggle').addEventListener('click', ()=>{
           <span style="flex:1;">${fmtDay(t.date)} · <b>${esc(t.purpose || 'Expense')}</b> · ${esc(FOR_LABELS[t.for] || t.for || '')}${Math.abs(t.amount - advFigures(adv).left) < 1 ? ' <span class="adv-chip wait">matches the amount still open</span>' : ''}</span>
           <b>${Math.round(t.amount).toLocaleString()}</b></label>`).join('')
       + '<button type="button" class="rpt-quick" id="advMoveDo">Move ticked bills into this advance</button>'
-    : `<div class="co-empty-hint">No bills on the ${esc(CARD_LABELS[adv.card] || adv.card)} from ${fmtDay(adv.date)} onwards that aren't already linked to someone.</div>`;
+    : `<div class="co-empty-hint">No bills on the ${esc(payLabel(adv))} from ${fmtDay(adv.date)} onwards that aren't already linked to someone.</div>`;
   const btn = document.getElementById('advMoveDo');
   if(btn) btn.addEventListener('click', async ()=>{
     const ids = [...list.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
     if(!ids.length){ alert('Tick at least one bill.'); return; }
     const picked = allCashTxns.filter(t => ids.includes(String(t.id)));
     const sum = picked.reduce((s2,t)=> s2 + t.amount, 0);
-    if(!confirm(`Move ${picked.length} bill${picked.length===1?'':'s'} (LKR ${sum.toLocaleString()}) into ${adv.employeeName}'s advance?\n\nThe ${CARD_LABELS[adv.card]} balance goes back up by LKR ${sum.toLocaleString()}, because this money already left the card with the advance.`)) return;
+    if(!confirm(`Move ${picked.length} bill${picked.length===1?'':'s'} (LKR ${sum.toLocaleString()}) into ${adv.employeeName}'s advance?\n\nThe ${pettyName(adv.card)} balance goes back up by LKR ${sum.toLocaleString()}, because this money already left the card with the advance.`)) return;
     for(const t of picked){
       await sb.from('petty_cash_transactions').update({ employee_name: adv.employeeName, advance_id: String(adv.id) }).eq('id', t.id);
     }
@@ -7586,7 +7713,8 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   if(!sb) return fail('Not connected to Supabase yet.');
   const date = g('advDate').value;
   const employeeName = g('advEmployee').value.trim();
-  const card = g('advGiveMode').value;
+  const { card, bankAccount } = splitPay(g('advGiveMode').value);
+  let advVoucher = g('advVoucherNo').value.trim() || null;
   const amount = parseFloat(g('advAmount').value);
   const note = g('advNote').value.trim();
   let settled = g('advSettled').checked;
@@ -7628,9 +7756,16 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
   if(newlySettling) log.push(advStamp(`Settled — bills LKR ${Math.round(f.billed).toLocaleString()}, returned LKR ${Math.round(f.returned).toLocaleString()}${f.paidOut ? ', extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}${f.left >= 1 ? `, LKR ${Math.round(f.left).toLocaleString()} left to recover` : ''}`));
   if(unsettling) log.push(advStamp('Settlement undone'));
 
+  if(advVoucher){
+    const twinV = allCashTxns.find(t => t.id !== editingCashId && t.voucherNo && t.voucherNo.trim().toLowerCase() === advVoucher.toLowerCase());
+    if(twinV) return fail(`Voucher ${advVoucher} is already used (${twinV.purpose || 'a payment'} on ${twinV.date}). Leave it empty to get the next number.`);
+  }
+  const advDocCols = await pcColsReady();
+  if(advDocCols && !advVoucher && !original) advVoucher = await nextVoucherNo(date);
   const payload = {
     type:'advance', date, card, employee_name: employeeName, amount, note,
     settled, settled_date: settledDate, settled_note: settled ? (settledNote || null) : null,
+    ...(advDocCols ? { bank_account: card === 'bank' ? bankAccount : null, voucher_no: advVoucher } : {}),
   };
   if(original){
     payload.settle_log = log;
@@ -7655,7 +7790,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
       // Cash handed back → a "money in" line on the same card.
       const ret = advReturnRow(original);
       if(f.returned > 0){
-        const rp = { type:'income', date: settledDate || todayISO(), card, amount: f.returned, employee_name: employeeName,
+        const rp = { type:'income', date: settledDate || todayISO(), card, ...(advDocCols ? { bank_account: card === 'bank' ? bankAccount : null } : {}), amount: f.returned, employee_name: employeeName,
           advance_id: String(editingCashId), note: `Unused cash returned from ${employeeName}'s advance of ${date}` };
         const { error: e2 } = ret ? await sb.from('petty_cash_transactions').update(rp).eq('id', ret.id)
                                   : await sb.from('petty_cash_transactions').insert(rp);
@@ -7666,7 +7801,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
       // Extra paid to cover bills → another (already settled) advance line on the same card.
       const top = advTopUpRow(original);
       if(f.paidOut > 0){
-        const tp = { type:'advance', date: settledDate || todayISO(), card, amount: f.paidOut, employee_name: employeeName,
+        const tp = { type:'advance', date: settledDate || todayISO(), card, ...(advDocCols ? { bank_account: card === 'bank' ? bankAccount : null } : {}), amount: f.paidOut, employee_name: employeeName,
           advance_id: String(editingCashId), settled: true, settled_date: settledDate || todayISO(),
           note: `Extra paid to ${employeeName} to cover bills on the advance of ${date}` };
         const { error: e3 } = top ? await sb.from('petty_cash_transactions').update(tp).eq('id', top.id)
@@ -7680,7 +7815,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
     } else {
       const { error } = await sb.from('petty_cash_transactions').insert(payload);
       if(error) throw error;
-      logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${CARD_LABELS[card]}`);
+      logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${payLabel({ card, bankAccount, type:'advance' })}${advVoucher ? ', voucher ' + advVoucher : ''}`);
     }
     g('advanceModalOverlay').classList.remove('open');
   }catch(e){
@@ -7719,7 +7854,7 @@ function renderAdvances(){
       row.className = 'manage-row';
       row.innerHTML = `
         <span class="manage-type-dot" style="background:var(--amber);"></span>
-        <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— ${esc(CARD_LABELS[t.card]||t.card)}</span></span>
+        <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— ${esc(payLabel(t))}</span></span>
         <span class="manage-dates">${t.date}${t.note ? ' · '+esc(t.note) : ''} · LKR ${t.amount.toLocaleString()} · bills LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}
           · <b>${f.left === 0 ? 'ready to settle ✓' : 'LKR ' + Math.round(f.left).toLocaleString() + ' still to account for'}</b></span>`;
       if(canEdit()){
@@ -8183,10 +8318,11 @@ function pettyGroupsBlock(expenses){
     }
     if(e.employeeName) tags.push(`from ${esc(e.employeeName)}'s advance`);
     if(e.card === 'sharon') tags.push('his own money');
+    const nos = docNosText(e); if(nos) tags.push(esc(nos));
     rowsBy[g] += `<tr>
       <td class="dim">${fmtDay(e.date)}</td>
       <td><b>${esc(e.purpose || 'Expense')}</b>${e.note ? `<div class="dim">${esc(e.note)}</div>` : ''}</td>
-      <td class="dim">${esc(e.employeeName ? 'Staff advance' : (CARD_LABELS[e.card] || e.card || ''))}</td>
+      <td class="dim">${esc(e.employeeName ? 'Staff advance' : payLabel(e))}</td>
       <td class="dim">${tags.join(' · ')}${links ? ' '+links : ''}</td>
       <td class="r rpt-money-out">${rn(e.amount)}</td>
     </tr>`;
@@ -8238,7 +8374,7 @@ function buildVillaReportHTML(loc, monthDate){
   const grandTotal = pettyTotal + supplies.total - chargedOut;
 
   const cardRows = Object.keys(byCard).map(c =>
-    `<tr class="line"><td class="lbl">${esc(CARD_LABELS[c] || c)}</td>${negCell(byCard[c])}</tr>`
+    `<tr class="line"><td class="lbl">${esc((c==='ceymora'||c==='kalava_card') ? pettyName(c) : (c==='bank' ? 'Bank transfers' : (CARD_LABELS[c] || c)))}</td>${negCell(byCard[c])}</tr>`
   ).join('');
 
   return `
@@ -8319,7 +8455,7 @@ function renderDirectCardSubs(){
 }
 // Every line that makes up a card's balance, so a figure can always be explained.
 function openCardBalanceDetail(card){
-  const label = CARD_LABELS[card] || card;
+  const label = pettyName(card);
   const rows = allCashTxns.filter(t => t.card === card).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const sum = f => rows.filter(f).reduce((s2,t)=> s2 + t.amount, 0);
   const topUps    = sum(t => t.type === 'income' && !t.advanceId);
@@ -8871,9 +9007,9 @@ let editingDirectPayId = null;
 
 function dpApplyCardHint(){
   const card = document.getElementById('dpCard').value;
-  document.getElementById('dpCardHint').textContent = card === 'bank'
-    ? 'Into the bank — no petty cash card changes.'
-    : `Added to the ${CARD_LABELS[card] || card}'s float, because the cash is now on that card.`;
+  document.getElementById('dpCardHint').textContent = isBankVal(card)
+    ? `Into the ${BANK_ACCOUNTS[splitPay(card).bankAccount] || ''} bank account — no petty cash changes.`
+    : `Added to ${pettyName(card)}, because the cash is now in that float.`;
 }
 
 function openDirectPayModal(record, villaId){
@@ -8887,7 +9023,7 @@ function openDirectPayModal(record, villaId){
   g('dpDate').value = record ? record.date : todayISO();
   g('dpAmount').value = record ? record.amount : '';
   g('dpFrom').value = record ? (record.purpose || '') : '';
-  g('dpCard').value = record ? record.card : 'bank';
+  setPaySelect('dpCard', record ? record.card : 'bank', record ? record.bankAccount : 'ceymora');
   g('dpExtra').checked = record ? isExtraIncome(record) : false;
   g('dpNote').value = record ? (record.note || '') : '';
   dpFileHandler.reset();
@@ -8921,7 +9057,8 @@ document.getElementById('dpSave').addEventListener('click', async ()=>{
     const urls = [];
     for(const fl of dpFileHandler.getFiles()) urls.push(await uploadReceiptFile(fl));
     const payload = {
-      type:'income', date, card: g('dpCard').value, for: villa, purpose: from,
+      type:'income', date, card: splitPay(g('dpCard').value).card, for: villa, purpose: from,
+      ...((await pcColsReady()) ? { bank_account: splitPay(g('dpCard').value).bankAccount } : {}),
       amount, note: g('dpNote').value.trim() || null,
       account_code: g('dpExtra').checked ? DP_ACCT_EXTRA : DP_ACCT,
     };
@@ -9286,7 +9423,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     dpRowsHtml += `<tr>
       <td class="dim">${fmtDay(t.date)}</td>
       <td><b>${esc(t.purpose || 'Direct payment')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}</td>
-      <td class="dim">${esc(CARD_LABELS[t.card] || t.card || '')}${links ? ' '+links : ''}</td>
+      <td class="dim">${esc(payLabel(t))}${links ? ' '+links : ''}</td>
       <td class="dim">${isExtraIncome(t) ? 'Extra income' : 'Against a booking above'}</td>
       <td class="r rpt-money-in">${rnx(t.amount)}</td>
       <td class="r no-print"><button class="manage-edit no-print" data-dp-id="${esc(String(t.id))}">Edit</button></td>
@@ -9360,7 +9497,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
       <td class="dim">${fmtDay(t.date)}</td>
       <td><b>${esc(t.purpose || 'Bill')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}${links ? ' '+links : ''}</td>
       <td class="dim">${esc(acctLabel(acctOf(t)) || '')}</td>
-      <td class="dim">${esc(t.employeeName ? t.employeeName + "'s advance" : (CARD_LABELS[t.card] || t.card || ''))}</td>
+      <td class="dim">${esc(t.employeeName ? t.employeeName + "'s advance" : payLabel(t))}</td>
       <td class="r rpt-money-out">${rnx(t.amount)}</td>
     </tr>`;
   }
@@ -9664,7 +9801,7 @@ function openStaffAdvanceStatement(name){
   const backs    = mine.filter(t => t.type === 'income' && t.advanceId).sort(byDate);
 
   const money = n => 'LKR ' + Math.round(n).toLocaleString();
-  const src = t => t.card === 'bank' ? 'Bank transfer' : (CARD_LABELS[t.card] || t.card);
+  const src = t => payLabel(t);
   const clip = (t) => invoiceLinksHTML(t);
 
   const section = (title, note, rows, sub) => `
@@ -9765,7 +9902,7 @@ function openSharonExpenseDetail(villaId){
       const links = invoiceLinksHTML(t);
       html += `<div class="txn-row">
         <span class="txn-badge expense">expense</span>
-        <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Expense')}${links?' '+links:''}</div><div class="txn-sub">${esc(t.date)} · ${esc(CARD_LABELS[t.card]||t.card)}${t.note?' · '+esc(t.note):''}</div></span>
+        <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Expense')}${links?' '+links:''}</div><div class="txn-sub">${esc(t.date)} · ${esc(payLabel(t))}${t.note?' · '+esc(t.note):''}</div></span>
         <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
       </div>`;
     }
@@ -9789,7 +9926,7 @@ function renderMyPurchasesSummary(){
     const links = invoiceLinksHTML(t);
     rows += `<div class="txn-row">
       <span class="txn-badge expense">${esc(FOR_LABELS[t.for]||t.for)}</span>
-      <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Purchase')}${links?' '+links:''}</div><div class="txn-sub">${esc(t.date)} · ${esc(CARD_LABELS[t.card]||t.card)}${t.note?' · '+esc(t.note):''}</div></span>
+      <span class="txn-main"><div class="txn-title">${esc(t.purpose||'Purchase')}${links?' '+links:''}</div><div class="txn-sub">${esc(t.date)} · ${esc(payLabel(t))}${t.note?' · '+esc(t.note):''}</div></span>
       <span class="txn-amount expense">LKR ${t.amount.toLocaleString()}</span>
     </div>`;
   }
@@ -9828,16 +9965,16 @@ function updateMpCardHint(){
   const hint = document.getElementById('mpCardHint');
   if(card === 'kalava_card'){
     villaSel.value = 'kalava'; villaSel.disabled = true;
-    hint.textContent = `${cardName('kalava_card')} can only be used for Kalava Villa.`;
-  } else if(card === 'bank'){
+    hint.textContent = `${pettyName('kalava_card')} can only be used for Kalava Villa.`;
+  } else if(isBankVal(card)){
     villaSel.disabled = false;
-    hint.textContent = 'Paid by bank transfer — charged to the villa, but nothing comes out of either card.';
+    hint.textContent = `${bankLabel(splitPay(card).bankAccount)} — charged to the villa; no petty cash is touched.`;
   } else if(card === 'sharon'){
     villaSel.disabled = false;
     hint.textContent = 'Paid with Sharon\'s own money — charged to the villa, but nothing comes out of petty cash.';
   } else {
     villaSel.disabled = false;
-    hint.textContent = `${cardName('ceymora')} can be used for any villa.`;
+    hint.textContent = `${pettyName('ceymora')} can be used for any villa.`;
   }
 }
 document.getElementById('mpCard').addEventListener('change', updateMpCardHint);
@@ -9848,7 +9985,7 @@ document.getElementById('mpSave').addEventListener('click', async ()=>{
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
   const date = document.getElementById('mpDate').value;
   const villaId = document.getElementById('mpVilla').value;
-  const card = document.getElementById('mpCard').value;
+  const { card, bankAccount } = splitPay(document.getElementById('mpCard').value);
   const purpose = document.getElementById('mpPurpose').value.trim();
   const amount = parseFloat(document.getElementById('mpAmount').value);
   const note = document.getElementById('mpNote').value.trim();
@@ -9865,6 +10002,7 @@ document.getElementById('mpSave').addEventListener('click', async ()=>{
     const { error } = await sb.from('petty_cash_transactions').insert({
       type:'expense', date, card, for: villaId, purpose, amount, note,
       purchased_by: recordFor, invoice_urls: invoiceUrls,
+      ...((await pcColsReady()) ? { bank_account: card === 'bank' ? bankAccount : null, voucher_no: await nextVoucherNo(date) } : {}),
     });
     if(error) throw error;
     const byline = mpOnBehalfOf ? `${currentUser.username} recorded ${mpOnBehalfOf}'s expense` : `${currentUser.username} recorded a purchase`;
@@ -10072,7 +10210,7 @@ function binSummary(table, r){
   switch(table){
     case 'petty_cash_transactions': {
       const kind = r.type === 'income' ? 'Money received' : r.type === 'advance' ? `Advance to ${r.employee_name || 'staff'}` : 'Expense';
-      return `${kind}${r.purpose ? ': ' + r.purpose : ''} — ${binMoney(r.amount)}${r.for ? ' · ' + place(r.for) : ''}${r.card ? ' · ' + (CARD_LABELS[r.card] || r.card) : ''}${r.date ? ' · ' + r.date : ''}`;
+      return `${kind}${r.purpose ? ': ' + r.purpose : ''} — ${binMoney(r.amount)}${r.for ? ' · ' + place(r.for) : ''}${r.card ? ' · ' + payLabel(r) : ''}${r.date ? ' · ' + r.date : ''}`;
     }
     case 'inventory_transactions':
       return `${r.type === 'distribute' ? 'Sent to ' + place(r.to_villa) : 'Purchase'}: ${r.item || ''} × ${r.qty || ''}${r.amount ? ' — ' + binMoney(r.amount) : ''}${r.date ? ' · ' + r.date : ''}`;
@@ -12071,7 +12209,7 @@ function coPettyCashHTML(){
       <td><b>${details}</b></td>
       <td class="dim">${esc(FOR_LABELS[t.for] || t.for)}</td>
       <td class="dim">${acctOf(t) ? esc(acctLabel(acctOf(t))) : '<b style="color:#a06800;">Not sorted</b>'}</td>
-      <td class="dim">${esc(CARD_LABELS[t.card] || t.card)}${tag ? `<div class="dim">${tag}</div>` : ''}</td>
+      <td class="dim">${esc(payLabel(t))}${tag ? `<div class="dim">${tag}</div>` : ''}</td>
       <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
     </tr>`;
   }).join('');
@@ -12747,7 +12885,7 @@ function renderCoSort(){
         <td>${fmtDay(t.date)}${allMonths ? `<div class="ce-sub">${esc(parseISO(t.date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }))}</div>` : ''}</td>
         <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="ce-sub">${esc(t.note)}</div>` : ''}</td>
         <td class="hide-sm">${esc(FOR_LABELS[t.for] || t.for || '')}</td>
-        <td class="hide-sm">${esc(CARD_LABELS[t.card] || t.card || '')}</td>
+        <td class="hide-sm">${esc(payLabel(t))}</td>
         <td class="r">${Math.round(t.amount).toLocaleString()}</td>
         <td><select class="acct-select ${acctOf(t) ? '' : 'open'}" data-txn="${t.id}" ${editable ? '' : 'disabled'}>${acctOptionsHTML(acctOf(t) || '')}</select></td>
       </tr>`).join('')}
@@ -14234,11 +14372,11 @@ function exportPettyCashCSV(){
     .filter(t => cashPeriod === 'all' || (t.date >= range.from && t.date < range.to))
     .filter(t => cashKind === 'all' || t.type === cashKind)
     .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-  const out = [['Date','Type','Details','For','Account','Card','Paid from advance of','Amount LKR','Money on card LKR','Note']];
+  const out = [['Date','Type','Details','For','Account','Paid from / into','Paid from advance of','Invoice no.','Payment voucher no.','Amount LKR','Money on card LKR','Note']];
   rows.forEach(t => out.push([
     t.date, t.type, t.purpose || (t.type === 'advance' ? 'Advance — ' + (t.employeeName||'') : 'Money received'),
-    FOR_LABELS[t.for] || t.for || '', acctLabel(acctOf(t)) || '', CARD_LABELS[t.card] || t.card || '',
-    t.employeeName || '', t.amount, cardEffect(t), t.note || '',
+    FOR_LABELS[t.for] || t.for || '', acctLabel(acctOf(t)) || '', payLabel(t),
+    t.employeeName || '', t.invoiceNo || '', t.voucherNo || '', t.amount, cardEffect(t), t.note || '',
   ]));
   downloadCSV(`petty-cash-${cashKind === 'all' ? '' : cashKind + '-'}${cashPeriod === 'all' ? 'all-time' : cashPeriod === 'week' ? 'week-' + range.from : ymKey(cashMonthDate)}.csv`, out);
 }
