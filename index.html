@@ -1380,7 +1380,7 @@
     <div id="pettyCashPanel" style="display:none">
       <div class="cash-summary">
         <div class="cash-card ceymora">
-          <div class="cash-card-label"><span data-pettyname="ceymora">Ceymora Petty Cash</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-pettyname="ceymora">Ceymora Card Petty Cash</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="ceymoraBalance">LKR 0</div>
         </div>
         <div class="cash-card kalava">
@@ -1396,6 +1396,11 @@
           <div class="cash-card-label">Direct Villa Purchases — via <span data-cardname="ceymora">Ceymora Card</span></div>
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
           <div class="cash-card-sub" id="directCeymoraSub"></div>
+        </div>
+        <div class="cash-card" id="bossSpendCard" style="background:linear-gradient(135deg, #c2255c, #8a1a42); cursor:pointer;" title="Click to see everything spent for Sharon">
+          <div class="cash-card-label">Spent for Sharon (boss)</div>
+          <div class="cash-card-balance" id="bossSpendMonth">LKR 0</div>
+          <div class="cash-card-sub" id="bossSpendSub"></div>
         </div>
       </div>
       <div class="card-tools no-print">
@@ -2205,7 +2210,7 @@
     <input type="date" id="incDate">
     <label>Received into</label>
     <select id="incCard">
-      <option value="ceymora" data-pettyopt="ceymora">Ceymora Petty Cash</option>
+      <option value="ceymora" data-pettyopt="ceymora">Ceymora Card Petty Cash</option>
       <option value="kalava_card" data-pettyopt="kalava_card">Kalava Villa Petty Cash</option>
     </select>
     <label>Amount (LKR)</label>
@@ -2233,18 +2238,19 @@
     <input type="date" id="expDate">
     <label>Paid from</label>
     <select id="expCard">
-      <option value="ceymora">Ceymora Petty Cash</option>
+      <option value="ceymora">Ceymora Card Petty Cash</option>
       <option value="kalava_card">Kalava Villa Petty Cash</option>
       <option value="bank:ceymora">Bank transfer from Ceymora</option>
       <option value="bank:kalava">Bank transfer from Kalava Villa</option>
       <option value="bank" hidden disabled>Bank transfer (account not stated)</option>
       <option value="sharon">Sharon paid personally (not petty cash)</option>
     </select>
-    <div class="field-hint" id="expCardHint">Ceymora Petty Cash can be used for any villa or the office.</div>
+    <div class="field-hint" id="expCardHint">Ceymora Card Petty Cash can be used for any villa or the office.</div>
     <label>For</label>
     <select id="expFor">
       <option value="office">Office</option>
       <option value="store">Store</option>
+      <option value="boss">For Sharon (boss) — personal</option>
     </select>
     <label>What was it for</label>
     <input type="text" id="expPurpose" placeholder="e.g. Cleaning supplies">
@@ -2317,7 +2323,7 @@
     <datalist id="staffNameList"></datalist>
     <label>How was the money given?</label>
     <select id="advGiveMode">
-      <option value="ceymora" data-pettyopt="ceymora" data-pettyopt-prefix="Cash — from ">Cash — from Ceymora Petty Cash</option>
+      <option value="ceymora" data-pettyopt="ceymora" data-pettyopt-prefix="Cash — from ">Cash — from Ceymora Card Petty Cash</option>
       <option value="kalava_card" data-pettyopt="kalava_card" data-pettyopt-prefix="Cash — from ">Cash — from Kalava Villa Petty Cash</option>
       <option value="bank:ceymora">Bank transfer from Ceymora</option>
       <option value="bank:kalava">Bank transfer from Kalava Villa</option>
@@ -2569,7 +2575,7 @@
     <label>Paid from</label>
     <select id="mpCard">
       <option value="sharon">Sharon paid personally (not petty cash)</option>
-      <option value="ceymora" data-pettyopt="ceymora">Ceymora Petty Cash</option>
+      <option value="ceymora" data-pettyopt="ceymora">Ceymora Card Petty Cash</option>
       <option value="kalava_card" data-pettyopt="kalava_card">Kalava Villa Petty Cash</option>
       <option value="bank:ceymora">Bank transfer from Ceymora</option>
       <option value="bank:kalava">Bank transfer from Kalava Villa</option>
@@ -2712,7 +2718,7 @@
       <option value="bank:ceymora">Bank — Ceymora account</option>
       <option value="bank:kalava">Bank — Kalava Villa account</option>
       <option value="bank" hidden disabled>Bank account (not stated)</option>
-      <option value="ceymora" data-pettyopt="ceymora">Ceymora Petty Cash</option>
+      <option value="ceymora" data-pettyopt="ceymora">Ceymora Card Petty Cash</option>
       <option value="kalava_card" data-pettyopt="kalava_card">Kalava Villa Petty Cash</option>
     </select>
     <div class="field-hint" id="dpCardHint"></div>
@@ -3127,7 +3133,7 @@ const VR_VILLAS  = [];   // {id,name,color}          — villa report, summary c
 const VILLA_IDS  = [];   // ids only
 const INV_VILLAS = [];   // ids, for inventory
 const INV_LOCATIONS = [];        // 'office' + every villa
-const FOR_LABELS = { office:'Office', store:'Store' };
+const FOR_LABELS = { office:'Office', store:'Store', boss:'For Sharon (boss)' };
 const INV_LOCATION_LABELS = { office:'Office', store:'Store' };
 
 // A villa row as the rest of the app wants it, whatever the database gave us.
@@ -3147,7 +3153,7 @@ function villasNow(){ return (VILLAS && VILLAS.length) ? VILLAS : DEFAULT_VILLAS
 function rebuildVillaLists(){
   const rows = villasNow();
   [CAL_VILLAS, VR_VILLAS, VILLA_IDS, INV_VILLAS, INV_LOCATIONS].forEach(a => { a.length = 0; });
-  Object.keys(FOR_LABELS).forEach(k => { if(k !== 'office' && k !== 'store') delete FOR_LABELS[k]; });
+  Object.keys(FOR_LABELS).forEach(k => { if(k !== 'office' && k !== 'store' && k !== 'boss') delete FOR_LABELS[k]; });
   Object.keys(INV_LOCATION_LABELS).forEach(k => { if(k !== 'office' && k !== 'store') delete INV_LOCATION_LABELS[k]; });
 
   INV_LOCATIONS.push('office');
@@ -3190,6 +3196,7 @@ function fillVillaSelect(sel, opts){
   let html = VR_VILLAS.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
   if(opts.office) html += '<option value="office">Office</option>';
   if(opts.store)  html += '<option value="store">Store</option>';
+  if(opts.boss)   html += '<option value="boss">For Sharon (boss) — personal</option>';
   sel.innerHTML = html;
   if(keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
@@ -3197,7 +3204,7 @@ function fillVillaSelect(sel, opts){
 // Every villa-driven <select> in the page, refreshed together after a villa is
 // added, renamed or removed.
 function refreshVillaSelects(){
-  fillVillaSelect(document.getElementById('expFor'),   { office:true, store:true });
+  fillVillaSelect(document.getElementById('expFor'),   { office:true, store:true, boss:true });
   fillVillaSelect(document.getElementById('distVilla'),{ office:true });
   fillVillaSelect(document.getElementById('repLocationSelect'), { office:true, store:true });
   fillVillaSelect(document.getElementById('mpVilla'));
@@ -3241,7 +3248,7 @@ const SETTINGS_DEFAULTS = {
   // names change — every record stays attached to the same card.
   cardNames: { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' },
   // The same two floats when cash is spent from them (not paid by card).
-  cashNames: { ceymora: 'Ceymora Petty Cash', kalava_card: 'Kalava Villa Petty Cash' },
+  cashNames: { ceymora: 'Ceymora Card Petty Cash', kalava_card: 'Kalava Villa Petty Cash' },
   depositPercent: 25,
   reminderDays: 30,
   reminderStaffNumbers: '',
@@ -3281,10 +3288,11 @@ async function fetchSettings(){
     const { data, error } = await sb.from('app_settings').select('*').eq('key','main').maybeSingle();
     if(error) throw error;
     if(data && data.value) APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, data.value);
-    // Names saved before petty cash and cards had separate names were meant for the
-    // petty cash floats. Move them there and give the cards their own names back.
+    // Names saved before petty cash and cards had separate names: the cards get their
+    // own names back and the floats start from "Ceymora Card Petty Cash" /
+    // "Kalava Villa Petty Cash". Either can be changed with ✏️ Rename.
     if(data && data.value && data.value.cardNames && !data.value.cashNames){
-      APP_SETTINGS.cashNames = Object.assign({}, SETTINGS_DEFAULTS.cashNames, data.value.cardNames);
+      APP_SETTINGS.cashNames = Object.assign({}, SETTINGS_DEFAULTS.cashNames);
       APP_SETTINGS.cardNames = Object.assign({}, SETTINGS_DEFAULTS.cardNames);
       if(typeof canChange === 'function' && currentUser && canChange('settings')) saveSettings().catch(()=>{});
     }
@@ -3694,7 +3702,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.29-store';
+const APP_VERSION = 'v2026.09.29-boss';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4194,6 +4202,7 @@ const EX_PLACES = () => ([
   ...VR_VILLAS.map(v => ({ id:v.id, name:v.name, color:v.color })),
   { id:'office', name:'Office', color:'#495057' },
   { id:'store',  name:'Store',  color:'#a06800' },
+  { id:'boss',   name:'For Sharon (boss)', color:'#c2255c' },
 ]);
 
 // The rows the current filters select. Advances are deliberately absent: an advance is
@@ -6227,7 +6236,7 @@ async function restoreBooking(b){
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', bank: 'Bank transfer', sharon: 'Paid by Sharon personally' };
 const CARD_DEFAULT_NAMES = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
-const CASH_DEFAULT_NAMES = { ceymora: 'Ceymora Petty Cash', kalava_card: 'Kalava Villa Petty Cash' };
+const CASH_DEFAULT_NAMES = { ceymora: 'Ceymora Card Petty Cash', kalava_card: 'Kalava Villa Petty Cash' };
 // Which bank account a bank transfer went from (or into).
 const BANK_ACCOUNTS = { ceymora: 'Ceymora', kalava: 'Kalava Villa' };
 function pettyName(k){
@@ -6781,7 +6790,55 @@ function renderCashMonth(){
   return shown;
 }
 
+/* ---- Money spent for Sharon personally ---- */
+function bossRows(){ return allCashTxns.filter(t => t.type === 'expense' && t.for === 'boss'); }
+function renderBossBox(){
+  const el = document.getElementById('bossSpendMonth');
+  if(!el) return;
+  const r = cashRange();
+  const rows = bossRows();
+  const inRange = rows.filter(t => t.date >= r.from && t.date < r.to);
+  const sum = a => a.reduce((n, t) => n + t.amount, 0);
+  el.textContent = 'LKR ' + Math.round(sum(inRange)).toLocaleString();
+  document.getElementById('bossSpendSub').innerHTML = `${esc(r.label)} · ${inRange.length} item${inRange.length === 1 ? '' : 's'}<br>All time: <b>LKR ${Math.round(sum(rows)).toLocaleString()}</b> · tap for the list`;
+}
+function openBossDetail(){
+  const rows = bossRows().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  document.getElementById('villaDetailTitle').textContent = 'Spent for Sharon (boss)';
+  if(!rows.length){
+    document.getElementById('villaDetailBody').innerHTML = '<div class="manage-empty">Nothing recorded yet. When recording an expense, choose “For Sharon (boss) — personal” under “For”.</div>';
+  } else {
+    const byMonth = {};
+    rows.forEach(t => { const m = (t.date || '').slice(0, 7); (byMonth[m] = byMonth[m] || []).push(t); });
+    let total = 0, html = '<div class="manage-list" style="margin-top:6px; max-height:none;">';
+    for(const m of Object.keys(byMonth).sort().reverse()){
+      const list = byMonth[m], sub = list.reduce((n, t) => n + t.amount, 0); total += sub;
+      const label = m ? new Date(m + '-01T00:00:00').toLocaleDateString('en-GB', { month:'long', year:'numeric' }) : 'No date';
+      html += `<div style="font-weight:700; font-size:13px; margin:10px 0 2px; display:flex; justify-content:space-between;"><span>${esc(label)}</span><span>LKR ${Math.round(sub).toLocaleString()}</span></div>`;
+      for(const t of list){
+        const links = invoiceLinksHTML(t);
+        html += `<div class="txn-row"><span class="txn-badge expense">expense</span>
+          <span class="txn-main"><div class="txn-title">${esc(t.purpose || 'Expense')}${links ? ' ' + links : ''}${docNosHTML(t)}</div>
+          <div class="txn-sub">${esc(t.date)} · ${esc(payLabel(t))}${t.employeeName ? ' · out of ' + esc(t.employeeName) + "'s advance" : ''}${t.note ? ' · ' + esc(t.note) : ''}</div></span>
+          <span class="txn-amount expense">LKR ${Math.round(t.amount).toLocaleString()}</span></div>`;
+      }
+    }
+    html += `</div><div style="text-align:right; font-weight:700; margin-top:10px; font-size:14px;">Total, all time: LKR ${Math.round(total).toLocaleString()}</div>
+      <div style="text-align:right; margin-top:8px;"><button class="add-booking-btn" id="bossDownload">⬇ Download</button></div>`;
+    document.getElementById('villaDetailBody').innerHTML = html;
+    document.getElementById('bossDownload').addEventListener('click', ()=>{
+      const out = [['Date','What it was for','Paid from','Out of advance of','Invoice no.','Payment voucher no.','Note','Amount LKR']];
+      rows.slice().reverse().forEach(t => out.push([t.date, t.purpose || '', payLabel(t), t.employeeName || '', t.invoiceNo || '', t.voucherNo || '', t.note || '', t.amount]));
+      out.push([]); out.push(['', '', '', '', '', '', 'Total', total]);
+      downloadCSV('spent-for-sharon.csv', out);
+    });
+  }
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+}
+document.getElementById('bossSpendCard').addEventListener('click', openBossDetail);
+
 function renderCash(){
+  try{ renderBossBox(); }catch(e){ console.error(e); }
   let ceymoraBal = 0, kalavaBal = 0, directKalava = 0, directCeymora = 0;
   for(const t of allCashTxns){
     if(t.card === 'ceymora') ceymoraBal += cardEffect(t);
@@ -11571,6 +11628,9 @@ const CO_GROUPS = [
     ['penalty','Penalty & Surcharge'], ['exchange_loss','Exchange Loss'],
     ['bank_charges','Bank Service Charges'], ['dog_food','Dog Food'],
   ]},
+  { key:'owner', label:'Spent for Sharon (boss)', items:[
+    ['owner_drawings','Spent for Sharon — personal'],
+  ]},
 ];
 const CO_ANNUAL = [
   ['annual_audit','Annual Accounts and Audit Fee'],
@@ -11579,7 +11639,7 @@ const CO_ANNUAL = [
 ];
 const CO_GROUP_COLORS = {
   staff:'#e8590c', utilities:'#f2c94c', professional:'#4d5bd1',
-  admin:'#adb5bd', selling:'#2f9e44', financial:'#0c8599', net:'#7048e8',
+  admin:'#adb5bd', selling:'#2f9e44', financial:'#0c8599', owner:'#c2255c', net:'#7048e8',
 };
 // Flat lookup: category key -> [groupKey, label]
 const CO_CAT_INDEX = (()=>{
@@ -12571,6 +12631,7 @@ function expAccountAutoValue(){
   const forWhom = document.getElementById('expFor').value;
   const txt = document.getElementById('expPurpose').value + ' ' + document.getElementById('expNote').value;
   if(forWhom === 'store') return 'store';
+  if(forWhom === 'boss') return 'owner_drawings';
   if(forWhom !== 'office') return suggestVillaAccount(txt);
   return suggestAccount(txt) || '';
 }
@@ -12608,6 +12669,7 @@ function updateExpenseAccountHint(auto){
   const hint = document.getElementById('expAccountHint');
   let msg;
   if(!code) msg = 'Pick the company account this belongs to — it decides where it lands in Company Accounts.';
+  else if(forWhom === 'boss') msg = 'Spent for Sharon personally — counted under "Spent for Sharon" on Petty Cash and in Company Accounts, never charged to a villa.';
   else if(isVillaAcct(code)) msg = `${acctLabel(code)}, charged to ${FOR_LABELS[forWhom] || 'the villa'} — shows in that villa's report, not in the company's profit & loss.`;
   else if(code === 'store') msg = 'Store stock — charged to the villas as items are distributed, not a company expense.';
   else msg = `Company expense → Company Accounts › ${acctGroupLabel(code)} › ${acctLabel(code)}.`;
