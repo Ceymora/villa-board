@@ -3333,18 +3333,46 @@ async function signedReceiptUrl(stored){
   return data && data.signedUrl ? data.signedUrl : null;
 }
 
-/* Opening one. The blank tab is opened first, while the click is still being
-   handled, because a tab opened after an await is treated as a pop-up and
-   blocked. */
+/* Opening one. The new tab has to be opened at the moment of the click — a tab
+   opened after waiting for the database counts as a pop-up and is blocked. It is
+   opened with a handle we keep (asking for "noopener" gives no handle back, and
+   the tab then stays blank), then cut loose from this page and sent to the file. */
+function showFileLinkFallback(url){
+  let box = document.getElementById('fileLinkToast');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'fileLinkToast';
+    box.style.cssText = 'position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:300; background:#26231f; color:#fff; padding:14px 18px; border-radius:14px; box-shadow:0 12px 30px rgba(0,0,0,.3); font-size:14px; display:flex; gap:14px; align-items:center;';
+    document.body.appendChild(box);
+  }
+  box.innerHTML = '';
+  const t = document.createElement('span'); t.textContent = 'Your browser held the attachment back.';
+  const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  a.textContent = 'Open it'; a.style.cssText = 'color:#fff; font-weight:700; background:#7a5236; padding:8px 14px; border-radius:10px; text-decoration:none;';
+  const x = document.createElement('button'); x.textContent = '✕'; x.style.cssText = 'background:none; border:none; color:#fff; font-size:16px; cursor:pointer;';
+  a.addEventListener('click', ()=> setTimeout(()=> box.remove(), 100));
+  x.addEventListener('click', ()=> box.remove());
+  box.append(t, a, x);
+  setTimeout(()=>{ if(box.isConnected) box.remove(); }, 60000);   // the link itself lasts an hour
+}
 async function openStoredFile(stored){
-  const tab = window.open('', '_blank', 'noopener,noreferrer');
+  let tab = null;
+  try{ tab = window.open('about:blank', '_blank'); }catch(e){ tab = null; }
+  if(tab){
+    try{
+      tab.document.title = 'Opening…';
+      tab.document.body.innerHTML = '<p style="font-family:system-ui,sans-serif;padding:32px;color:#555">Opening the attachment…</p>';
+      tab.opener = null;
+    }catch(e){}
+  }
   const url = await signedReceiptUrl(stored);
   if(!url){
     if(tab) tab.close();
     alert('That attachment could not be opened. It may have been removed, or you may not have permission to view it.');
     return;
   }
-  if(tab) tab.location.href = url; else window.open(url, '_blank', 'noopener,noreferrer');
+  if(tab && !tab.closed){ tab.location.href = url; return; }
+  showFileLinkFallback(url);
 }
 
 // One delegated handler for every attachment link in the page.
@@ -3553,7 +3581,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.28-reset';
+const APP_VERSION = 'v2026.09.29-files';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
