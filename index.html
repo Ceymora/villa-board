@@ -460,6 +460,19 @@
   .cmp-modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
   .cmp-open-btn{ white-space:nowrap; }
 
+  .card-tools{ display:flex; gap:8px; justify-content:flex-end; margin:-6px 0 14px; }
+  .bin-modal{ width:min(860px, 96vw) !important; max-width:860px; }
+  .bin-row{ display:flex; gap:14px; align-items:flex-start; justify-content:space-between; background:#fff; border:1px solid var(--board-line);
+    border-radius:14px; padding:14px 16px; margin-bottom:10px; }
+  .bin-row.restored{ opacity:.65; background:#faf8f3; }
+  .bin-main{ flex:1; min-width:0; }
+  .bin-where{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:4px; }
+  .bin-where .dim{ text-transform:none; letter-spacing:0; font-weight:400; }
+  .bin-what{ font-size:14px; font-weight:600; margin:2px 0; overflow-wrap:anywhere; }
+  .bin-done{ font-size:12.5px; color:var(--green); font-weight:600; margin-top:4px; }
+  .bin-acts{ display:flex; flex-direction:column; gap:6px; align-items:stretch; flex-shrink:0; }
+  .bin-count:not(:empty){ display:inline-block; min-width:20px; padding:0 6px; margin-left:4px; border-radius:10px; background:var(--red); color:#fff; font-size:11px; line-height:18px; text-align:center; }
+
   /* ---- The permission grid ---- */
   #userModalOverlay .modal{ width:min(560px, 100%); max-width:560px; }
   .perm-grid{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
@@ -1228,6 +1241,7 @@
         <button class="add-booking-btn" id="exExportBtn">⬇️ Export CSV</button>
         <button class="add-booking-btn" id="exPrintBtn">🖨️ Print / PDF</button>
         <button class="add-booking-btn cmp-open-btn" data-cmp-open="costs">📈 Compare</button>
+        <button class="add-booking-btn" data-bin-open="pettycash" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
       </div>
 
       <div id="exSummary" class="cash-summary"></div>
@@ -1290,6 +1304,7 @@
           <span><span class="swatch" style="background:var(--airbnb)"></span>Airbnb</span>
           <span><span class="swatch" style="background:var(--direct)"></span>Direct booking</span>
         </div>
+        <button class="add-booking-btn" data-bin-open="bookings" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
         <button class="add-booking-btn" id="addBookingBtn">+ Add booking</button>
       </div>
 
@@ -1364,23 +1379,27 @@
     <div id="pettyCashPanel" style="display:none">
       <div class="cash-summary">
         <div class="cash-card ceymora">
-          <div class="cash-card-label">Ceymora Card <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-cardname="ceymora">Ceymora Card</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="ceymoraBalance">LKR 0</div>
         </div>
         <div class="cash-card kalava">
-          <div class="cash-card-label">Kalava Villa Card <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-cardname="kalava_card">Kalava Villa Card</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
         <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
-          <div class="cash-card-label">Direct Villa Purchases — via Kalava Card</div>
+          <div class="cash-card-label">Direct Villa Purchases — via <span data-cardname="kalava_card">Kalava Villa Card</span></div>
           <div class="cash-card-balance" id="directPurchasesKalava">LKR 0</div>
           <div class="cash-card-sub" id="directKalavaSub"></div>
         </div>
         <div class="cash-card" id="directPurchasesCeymoraCard" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91); cursor:pointer;" title="Click to see which transactions make up this total">
-          <div class="cash-card-label">Direct Villa Purchases — via Ceymora Card</div>
+          <div class="cash-card-label">Direct Villa Purchases — via <span data-cardname="ceymora">Ceymora Card</span></div>
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
           <div class="cash-card-sub" id="directCeymoraSub"></div>
         </div>
+      </div>
+      <div class="card-tools no-print">
+        <button class="rpt-quick" id="renameCardsBtn" style="display:none;">✏️ Rename the cards</button>
+        <button class="rpt-quick" data-bin-open="pettycash" style="display:none;">🗑 Deleted items <span class="bin-count"></span></button>
       </div>
       <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the petty cash float on each card: top-ups and returned cash in, advances and day-to-day bills out. "Direct" = bought straight for a villa (bypassing Store) — charged to that villa and settled separately, so it is shown here but NOT taken off the card float.</div>
 
@@ -1478,6 +1497,7 @@
           <button class="add-booking-btn" id="addPurchaseBtn">+ Purchase item</button>
           <button class="add-booking-btn" id="addDistributeBtn">+ Distribute</button>
           <button class="add-booking-btn cmp-open-btn" data-cmp-open="inventory">📈 Compare</button>
+          <button class="add-booking-btn" data-bin-open="inventory" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
         </div>
       </div>
 
@@ -1507,6 +1527,7 @@
     <div id="activityLogPanel" style="display:none">
       <div class="toolbar">
         <div class="status-msg" id="logStatusMsg">Loading…</div>
+        <button class="add-booking-btn" data-bin-open="all" style="display:none;">🗑 Deleted items <span class="bin-count"></span></button>
       </div>
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div id="activityLogList" class="manage-list" style="max-height:520px;"></div>
@@ -1615,6 +1636,7 @@
         <button class="add-booking-btn" id="vrOwnerPayBtn">+ Record owner payment</button>
         <button class="add-booking-btn" id="vrDirectPayBtn">+ Direct payment received</button>
         <button class="add-booking-btn" id="vrPrintBtn">🖨️ Print / PDF</button>
+        <button class="add-booking-btn" data-bin-open="villareport" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
         <button class="allowed-action-btn no-print" id="myPurchaseBtn" style="display:none;">+ Record my purchase</button>
       </div>
 
@@ -2181,8 +2203,8 @@
     <input type="date" id="incDate">
     <label>Received into</label>
     <select id="incCard">
-      <option value="ceymora">Ceymora Card</option>
-      <option value="kalava_card">Kalava Villa Card</option>
+      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
+      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
     </select>
     <label>Amount (LKR)</label>
     <input type="number" id="incAmount" min="0" step="1" placeholder="e.g. 50000">
@@ -2209,8 +2231,8 @@
     <input type="date" id="expDate">
     <label>Paid from</label>
     <select id="expCard">
-      <option value="ceymora">Ceymora Card</option>
-      <option value="kalava_card">Kalava Villa Card</option>
+      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
+      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
       <option value="bank">Bank transfer (not petty cash)</option>
       <option value="sharon">Sharon paid personally (not petty cash)</option>
     </select>
@@ -2280,8 +2302,8 @@
     <datalist id="staffNameList"></datalist>
     <label>How was the money given?</label>
     <select id="advGiveMode">
-      <option value="ceymora">Cash — from the Ceymora Card</option>
-      <option value="kalava_card">Cash — from the Kalava Villa Card</option>
+      <option value="ceymora" data-cardopt="ceymora" data-cardopt-prefix="Cash — from the ">Cash — from the Ceymora Card</option>
+      <option value="kalava_card" data-cardopt="kalava_card" data-cardopt-prefix="Cash — from the ">Cash — from the Kalava Villa Card</option>
       <option value="bank">Bank transfer — sent from the bank</option>
     </select>
     <div class="field-hint" id="advGiveModeHint"></div>
@@ -2528,8 +2550,8 @@
     <label>Paid from</label>
     <select id="mpCard">
       <option value="sharon">Sharon paid personally (not petty cash)</option>
-      <option value="ceymora">Ceymora Card</option>
-      <option value="kalava_card">Kalava Villa Card</option>
+      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
+      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
       <option value="bank">Bank transfer (not petty cash)</option>
     </select>
     <div class="field-hint" id="mpCardHint"></div>
@@ -2560,6 +2582,36 @@
       <button class="btn btn-cancel" id="cmpModalClose">Close</button>
     </div>
     <div id="cmpModalHost"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cardNameModalOverlay">
+  <div class="modal">
+    <h3>✏️ Rename the petty cash cards</h3>
+    <div class="field-hint">Only the names change. Every balance, expense and report stays exactly as it is — they just show the new name.</div>
+    <label>First card (used for any villa or the office)</label>
+    <input type="text" id="cardName1" maxlength="40">
+    <label>Second card (Kalava Villa only)</label>
+    <input type="text" id="cardName2" maxlength="40">
+    <div class="modal-error" id="cardNameError"></div>
+    <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
+      <button class="btn btn-cancel" id="cardNameCancel">Cancel</button>
+      <button class="btn btn-save" id="cardNameSave">Save names</button></div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="binModalOverlay">
+  <div class="modal bin-modal">
+    <div class="cmp-modal-head">
+      <h3 style="margin:0;">🗑 Deleted items</h3>
+      <button class="btn btn-cancel" id="binClose">Close</button>
+    </div>
+    <div class="field-hint" style="margin-bottom:12px;">Everything deleted is kept here. Press <b>Restore</b> to put it back exactly where it was — same amounts, dates and attachments.</div>
+    <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600;">Show <select id="binFilter" class="acct-select"></select></label>
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="binShowRestored"> Also show ones already put back</label>
+    </div>
+    <div id="binBody"></div>
   </div>
 </div>
 
@@ -2613,8 +2665,8 @@
     <label>Received into</label>
     <select id="dpCard">
       <option value="bank">Bank account</option>
-      <option value="ceymora">Ceymora Card</option>
-      <option value="kalava_card">Kalava Villa Card</option>
+      <option value="ceymora" data-cardopt="ceymora">Ceymora Card</option>
+      <option value="kalava_card" data-cardopt="kalava_card">Kalava Villa Card</option>
     </select>
     <div class="field-hint" id="dpCardHint"></div>
     <div class="modal-checkbox-row" style="margin-top:10px;">
@@ -2955,7 +3007,7 @@ if (CONFIGURED) {
 // careless click and nobody else while looking like real protection. Typing the
 // word is the honest version of the same pause.
 function checkDeletePassword(){
-  const typed = prompt('This cannot be undone.\n\nType  DELETE  to confirm:');
+  const typed = prompt('It will be kept under "Deleted items", where Makky can put it back.\n\nType  DELETE  to confirm:');
   if(typed === null) return false;                       // cancelled
   if(typed.trim().toUpperCase() !== 'DELETE'){
     alert('Not deleted — the confirmation did not match.');
@@ -3138,6 +3190,9 @@ const SETTINGS_DEFAULTS = {
   taxInclusive: false,
   villaCodes: { kalava: 'KAL', noelia: 'NOE', brisa: 'BRI' },
   damageDeposits: { kalava: 250, noelia: 250, brisa: 400 },
+  // What the two petty cash cards are called everywhere in the app. Only the
+  // names change — every record stays attached to the same card.
+  cardNames: { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' },
   depositPercent: 25,
   reminderDays: 30,
   reminderStaffNumbers: '',
@@ -3178,6 +3233,7 @@ async function fetchSettings(){
     if(error) throw error;
     if(data && data.value) APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, data.value);
     settingsLoaded = true;
+    applyCardNames();
     renderPrintHeader();   // the letterhead can only be drawn once the settings arrive
   }catch(e){
     console.error('Could not load app_settings — using built-in defaults. Run the setup SQL to enable saving.', e);
@@ -3526,6 +3582,7 @@ const TRUSTED_PERMS = [
   { key:'approve_undo',   label:'Approve an undo on a settled advance' },
   { key:'delete_records', label:'Delete records' },
   { key:'backup',         label:'Download a full backup of everything' },
+  { key:'restore_deleted', label:'See deleted records and restore them' },
   { key:'admin',          label:'Full admin — everything, always', master:true },
 ];
 // Kept in the old shape for the summaries elsewhere in the app.
@@ -3581,7 +3638,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.29-files';
+const APP_VERSION = 'v2026.09.29-restore';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3592,6 +3649,8 @@ async function logActivity(action, tableName, description){
       username: currentUser.username, role: currentUser.role, action, table_name: tableName, description
     });
   }catch(e){ console.error('activity log failed', e); }
+  // Something was deleted: the "Deleted items" count goes up for whoever can restore it.
+  if(action === 'delete' && typeof applyBinButtons === 'function') setTimeout(applyBinButtons, 400);
 }
 
 if(sb) fetchSettings();
@@ -3876,6 +3935,9 @@ const DB_CHECKS = [
   { file:'9-supabase-section-permissions.sql', what:'The database obeys each person\'s "Can see / Can change" ticks',
     critical:true,
     test: async () => { const { data, error } = await sb.rpc('section_perms_ready'); return !error && data === true; } },
+  { file:'13-supabase-deleted-items.sql', what:'Anything deleted can be put back from "Deleted items"',
+    critical:false,
+    test: async () => { const { data, error } = await sb.rpc('bin_ready'); return !error && data === true; } },
   { file:'10-supabase-booking-exchange-rate.sql', what:'Direct bookings keep the exchange rate agreed on the booking day',
     critical:false,
     test: async () => { HAS_FX_COLS = null; return await fxColsReady(); } },
@@ -3946,6 +4008,8 @@ function applyRolePermissions(){
   }
   // The old all-or-nothing read-only switch is replaced by the per-section one.
   document.body.classList.remove('viewer-mode');
+  if(typeof applyBinButtons === 'function') applyBinButtons();
+  const rc = document.getElementById('renameCardsBtn'); if(rc) rc.style.display = canChange('settings') ? '' : 'none';
 
   // Land on the first tab they actually have, whichever that is.
   const PANELS = {
@@ -4128,8 +4192,8 @@ function renderExPickers(){
   const kt = document.getElementById('exKindTabs');
   kt.innerHTML = '';
   // Short names here: the full wording is on the summary card and the section heading.
-  const SHORT = { staff:'Petty cash', direct_ceymora:'Direct — Ceymora Card',
-    direct_kalava:'Direct — Kalava Card', bank:'Bank transfers', sharon:"Sharon's" };
+  const SHORT = { staff:'Petty cash', direct_ceymora:'Direct — ' + cardName('ceymora'),
+    direct_kalava:'Direct — ' + cardName('kalava_card'), bank:'Bank transfers', sharon:"Sharon's" };
   [{ key:'all', label:'Everything' }, ...PETTY_GROUPS.map(g=>({ key:g.key, label:SHORT[g.key] || g.pl }))].forEach(k=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn';
@@ -6103,6 +6167,54 @@ async function restoreBooking(b){
 
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', bank: 'Bank transfer', sharon: 'Paid by Sharon personally' };
+const CARD_DEFAULT_NAMES = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
+function cardName(k){
+  const n = ((APP_SETTINGS && APP_SETTINGS.cardNames) || {})[k];
+  return (n && String(n).trim()) || CARD_DEFAULT_NAMES[k] || k;
+}
+/* Puts the current card names everywhere they are shown. Only labels change;
+   the records keep pointing at the same card underneath. */
+function applyCardNames(){
+  if(typeof CARD_LABELS === 'undefined') return;
+  CARD_LABELS.ceymora = cardName('ceymora');
+  CARD_LABELS.kalava_card = cardName('kalava_card');
+  if(typeof PETTY_GROUPS !== 'undefined'){
+    for(const g of PETTY_GROUPS){
+      if(g.key === 'direct_ceymora'){ g.label = '2. Direct purchases for the villa — ' + cardName('ceymora'); g.pl = `Direct purchases for the villa (${cardName('ceymora')})`; }
+      if(g.key === 'direct_kalava'){ g.label = '2. Direct purchases for the villa — ' + cardName('kalava_card'); g.pl = `Direct purchases for the villa (${cardName('kalava_card')})`; }
+    }
+  }
+  document.querySelectorAll('[data-cardname]').forEach(el => el.textContent = cardName(el.dataset.cardname));
+  document.querySelectorAll('[data-cardopt]').forEach(el => el.textContent = (el.dataset.cardoptPrefix || '') + cardName(el.dataset.cardopt));
+  const hint = document.getElementById('expCardHint');
+  if(hint && /can be used for any villa/.test(hint.textContent)) hint.textContent = `${cardName('ceymora')} can be used for any villa or the office.`;
+  if(typeof cashInited !== 'undefined' && cashInited && typeof renderCash === 'function') renderCash();
+}
+function openRenameCards(){
+  if(!canChange('settings')){ alert('Only someone who can change Invoices & Setup can rename the cards.'); return; }
+  const o = document.getElementById('cardNameModalOverlay');
+  document.getElementById('cardName1').value = cardName('ceymora');
+  document.getElementById('cardName2').value = cardName('kalava_card');
+  document.getElementById('cardNameError').style.display = 'none';
+  o.classList.add('open');
+}
+document.getElementById('renameCardsBtn').addEventListener('click', openRenameCards);
+document.getElementById('cardNameCancel').addEventListener('click', ()=> document.getElementById('cardNameModalOverlay').classList.remove('open'));
+document.getElementById('cardNameSave').addEventListener('click', async ()=>{
+  const a = document.getElementById('cardName1').value.trim(), b = document.getElementById('cardName2').value.trim();
+  const err = document.getElementById('cardNameError');
+  const fail = t => { err.textContent = t; err.style.display = 'block'; };
+  if(!a || !b) return fail('Both cards need a name.');
+  if(a.length > 40 || b.length > 40) return fail('Keep each name under 40 characters.');
+  if(a.toLowerCase() === b.toLowerCase()) return fail('The two cards need different names, or nobody can tell them apart.');
+  const before = [cardName('ceymora'), cardName('kalava_card')];
+  APP_SETTINGS.cardNames = { ceymora: a, kalava_card: b };
+  try{ await saveSettings(); }
+  catch(e){ APP_SETTINGS.cardNames = { ceymora: before[0], kalava_card: before[1] }; return fail('Could not save — check the connection and try again.'); }
+  applyCardNames();
+  logActivity('update', 'app_settings', `Renamed the petty cash cards: "${before[0]}" → "${a}", "${before[1]}" → "${b}"`);
+  document.getElementById('cardNameModalOverlay').classList.remove('open');
+});
 
 // Paid straight from the bank, not out of either card's petty cash. Charged to the
 // villa or office it was for, and kept in its own "Bank transfers" total.
@@ -6344,7 +6456,7 @@ function updateExpenseCardLock(){
   if(card === 'kalava_card'){
     forSelect.value = 'kalava';
     forSelect.disabled = true;
-    hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa expenses.';
+    hint.textContent = `${cardName('kalava_card')} can only be used for Kalava Villa expenses.`;
   } else if(card === 'bank'){
     forSelect.disabled = false;
     hint.textContent = 'Paid by bank transfer — charged to the villa/office below, but nothing comes out of either card.';
@@ -6353,7 +6465,7 @@ function updateExpenseCardLock(){
     hint.textContent = 'Sharon paid with his own money — charged to the villa/office below, but nothing comes out of petty cash.';
   } else {
     forSelect.disabled = false;
-    hint.textContent = 'Ceymora Card can be used for any villa or the office.';
+    hint.textContent = `${cardName('ceymora')} can be used for any villa or the office.`;
   }
   updateExpenseStockLabel();
 }
@@ -6375,7 +6487,7 @@ function updateExpenseStockLabel(){
     const name = FOR_LABELS[forWhom] || forWhom;
     label.textContent = `This is a stock item — direct purchase for ${name} (skips Store)`;
     hint.textContent = card === 'ceymora'
-      ? `Goes straight into ${name}'s stock without passing through Store. Charged to ${name} and shown under "Direct Villa Purchases — via Ceymora Card".`
+      ? `Goes straight into ${name}'s stock without passing through Store. Charged to ${name} and shown under "Direct Villa Purchases — via ${cardName('ceymora')}".`
       : `Goes straight into ${name}'s stock without passing through Store.`;
   }
 }
@@ -6511,7 +6623,7 @@ function renderCashMonth(){
   const forRows = Object.keys(byFor).sort((a,b)=> byFor[b]-byFor[a])
     .map(k=>`<tr><td>${esc(FOR_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byFor[k]).toLocaleString()}</td><td class="r dim">${pct(byFor[k], spent)}</td></tr>`).join('');
   const cardRows = Object.keys(byCard).sort((a,b)=> byCard[b]-byCard[a])
-    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchases — Ceymora Card' : k==='direct_kalava' ? 'Direct villa purchases — Kalava Villa Card' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
+    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchases — ' + cardName('ceymora') : k==='direct_kalava' ? 'Direct villa purchases — ' + cardName('kalava_card') : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
 
   document.getElementById('cashMonthBreakdown').innerHTML = (spent === 0 && advanced === 0)
     ? ''
@@ -6659,7 +6771,7 @@ function renderCash(){
       if(!checkDeletePassword()) return;
       if(confirm('Delete this transaction?')){
         try{
-          await deleteReceiptFiles(getInvoiceLinks(t));
+          // The bill stays in storage: the record can be restored from Deleted items.
           await sb.from('petty_cash_transactions').delete().eq('id', t.id);
           const label = t.type==='income' ? CARD_LABELS[t.card] : (t.type==='advance' ? `Advance to ${t.employeeName||''}` : t.purpose);
           logActivity('delete', 'petty_cash_transactions', `Deleted ${t.type}: ${label} — LKR ${t.amount.toLocaleString()}`);
@@ -6773,7 +6885,7 @@ function applyDirectExpenseUI(){
 
   const hint = g('expCardHint');
   if(on){
-    hint.innerHTML = '<b>Kalava Villa Card</b> → Direct Kalava Villa Purchases. &nbsp;<b>Ceymora Card</b> → Direct Ceymora Card Expenses. Either way the cost still counts toward that villa\'s petty cash.';
+    hint.innerHTML = `<b>${esc(cardName('kalava_card'))}</b> → Direct Kalava Villa Purchases. &nbsp;<b>${esc(cardName('ceymora'))}</b> → Direct ${esc(cardName('ceymora'))} Expenses.`+' Either way the cost still counts toward that villa\'s petty cash.';
   }
   document.querySelector('#expenseModalOverlay h3').textContent = expBankMode
     ? (editingCashId ? 'Edit bank transfer' : 'Record a bank transfer')
@@ -6889,7 +7001,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const files = expFileHandler.getFiles();
 
   if(!date || !amount || amount <= 0 || !purpose){ errEl.textContent='Fill in date, purpose, and a valid amount.'; errEl.style.display='block'; return; }
-  if(card === 'kalava_card' && forWhom !== 'kalava'){ errEl.textContent='Kalava Villa Card can only be used for Kalava Villa.'; errEl.style.display='block'; return; }
+  if(card === 'kalava_card' && forWhom !== 'kalava'){ errEl.textContent=`${cardName('kalava_card')} can only be used for Kalava Villa.`; errEl.style.display='block'; return; }
   if(isStock && !itemName){ errEl.textContent='Enter an item name for the stock item.'; errEl.style.display='block'; return; }
   const accountCode = document.getElementById('expAccount').value || null;
   // Which advance this bill is paid out of: the one it was opened from, the one it was
@@ -8840,7 +8952,6 @@ document.getElementById('dpDeleteBtn').addEventListener('click', async ()=>{
   if(!confirm('Delete this direct payment?')) return;
   try{
     const existing = allCashTxns.find(t => String(t.id) === String(editingDirectPayId));
-    if(existing) await deleteReceiptFiles(existing.invoiceUrls);
     await sb.from('petty_cash_transactions').delete().eq('id', editingDirectPayId);
     logActivity('delete', 'petty_cash_transactions', 'Deleted a direct payment');
     document.getElementById('dpModalOverlay').classList.remove('open');
@@ -8887,7 +8998,6 @@ async function renderVillaReport(){
       if(confirm('Delete this expense?')){
         try{
           const opExRecord = allOpEx.find(o => o.id === btn.dataset.opexId);
-          if(opExRecord) await deleteReceiptFiles(opExRecord.invoiceUrls);
           await sb.from('villa_operating_expenses').delete().eq('id', btn.dataset.opexId);
           logActivity('delete', 'villa_operating_expenses', 'Deleted an operating expense entry');
         }catch(e){ console.error(e); }
@@ -9718,7 +9828,7 @@ function updateMpCardHint(){
   const hint = document.getElementById('mpCardHint');
   if(card === 'kalava_card'){
     villaSel.value = 'kalava'; villaSel.disabled = true;
-    hint.textContent = 'Kalava Villa Card can only be used for Kalava Villa.';
+    hint.textContent = `${cardName('kalava_card')} can only be used for Kalava Villa.`;
   } else if(card === 'bank'){
     villaSel.disabled = false;
     hint.textContent = 'Paid by bank transfer — charged to the villa, but nothing comes out of either card.';
@@ -9727,7 +9837,7 @@ function updateMpCardHint(){
     hint.textContent = 'Paid with Sharon\'s own money — charged to the villa, but nothing comes out of petty cash.';
   } else {
     villaSel.disabled = false;
-    hint.textContent = 'Ceymora Card can be used for any villa.';
+    hint.textContent = `${cardName('ceymora')} can be used for any villa.`;
   }
 }
 document.getElementById('mpCard').addEventListener('change', updateMpCardHint);
@@ -9929,6 +10039,192 @@ document.getElementById('distSave').addEventListener('click', async ()=>{
 /* ============================= ACTIVITY LOG ============================= */
 let logInited = false;
 const logStatusMsg = document.getElementById('logStatusMsg');
+
+
+/* ===========================================================================
+   DELETED ITEMS — put back anything that was deleted (file 13)
+   The database keeps a full copy of every deleted record. Makky (or anyone with
+   the "Restore deleted records" tick) can see them here and restore any one to
+   the exact place it came from. Records removed together in one go (an expense
+   and the stock lines it made, say) are shown and restored together.
+=========================================================================== */
+function canRestore(){ return hasPerm('admin') || hasPerm('restore_deleted'); }
+const BIN_SECTIONS = {
+  petty_cash_transactions:  { label:'Petty Cash',               area:'pettycash' },
+  inventory_transactions:   { label:'Inventory',                area:'inventory' },
+  villa_bookings:           { label:'Bookings',                 area:'bookings' },
+  villa_operating_expenses: { label:'Villa Report — villa bills', area:'villareport' },
+  owner_payments:           { label:'Villa Report — owner payments', area:'villareport' },
+  company_entries:          { label:'Company Accounts',         area:'company' },
+  company_monthly_accounts: { label:'Company Accounts — month', area:'company' },
+  payroll_entries:          { label:'Staff & Payroll — pay',    area:'payroll' },
+  staff_profiles:           { label:'Staff & Payroll — staff',  area:'payroll' },
+  staff:                    { label:'Housekeeping — staff',     area:'housekeeping' },
+  villas:                   { label:'Villas',                   area:'housekeeping' },
+};
+const BIN_TAB_OF = { pettycash:['petty_cash_transactions'], expenses:['petty_cash_transactions'], inventory:['inventory_transactions'],
+  bookings:['villa_bookings'], villareport:['villa_operating_expenses','owner_payments','petty_cash_transactions'] };
+function binMoney(v){ const n = Number(v); return isFinite(n) ? 'LKR ' + Math.round(n).toLocaleString() : ''; }
+// One readable line for a deleted record.
+function binSummary(table, r){
+  r = r || {};
+  const place = x => x ? (FOR_LABELS[x] || villaName(x) || x) : '';
+  switch(table){
+    case 'petty_cash_transactions': {
+      const kind = r.type === 'income' ? 'Money received' : r.type === 'advance' ? `Advance to ${r.employee_name || 'staff'}` : 'Expense';
+      return `${kind}${r.purpose ? ': ' + r.purpose : ''} — ${binMoney(r.amount)}${r.for ? ' · ' + place(r.for) : ''}${r.card ? ' · ' + (CARD_LABELS[r.card] || r.card) : ''}${r.date ? ' · ' + r.date : ''}`;
+    }
+    case 'inventory_transactions':
+      return `${r.type === 'distribute' ? 'Sent to ' + place(r.to_villa) : 'Purchase'}: ${r.item || ''} × ${r.qty || ''}${r.amount ? ' — ' + binMoney(r.amount) : ''}${r.date ? ' · ' + r.date : ''}`;
+    case 'villa_bookings':
+      return `${r.type === 'airbnb' ? 'Airbnb' : 'Direct'} booking: ${r.guest || r.guest_full_name || 'guest'} · ${place(r.villa)} · ${r.check_in} → ${r.check_out}`;
+    case 'villa_operating_expenses':
+      return `${OPEX_LABELS[r.category] || r.category || 'Villa bill'} — ${binMoney(r.amount)} · ${place(r.villa_id)}${r.date ? ' · ' + r.date : ''}`;
+    case 'owner_payments':
+      return `Owner payment — ${binMoney(r.amount)} · ${place(r.villa)} · ${r.period || ''}`;
+    case 'company_entries':
+      return `${r.kind || 'Entry'}: ${r.description || ''} — ${binMoney(r.amount)}${r.date ? ' · ' + r.date : ''}`;
+    case 'company_monthly_accounts':
+      return `Company month ${r.period || ''}`;
+    case 'payroll_entries':
+      return `Pay for ${r.name || ''} · ${r.period || ''}${r.net_pay ? ' — ' + binMoney(r.net_pay) : ''}`;
+    case 'staff_profiles':
+      return `Staff profile: ${r.full_name || ''}`;
+    case 'staff':
+      return `Housekeeping staff: ${r.name || ''}`;
+    case 'villas':
+      return `Villa: ${r.name || r.id || ''}`;
+  }
+  return table;
+}
+function binAttachments(r){
+  const out = [];
+  if(r && r.invoice_url) out.push(r.invoice_url);
+  if(r && Array.isArray(r.invoice_urls)) out.push(...r.invoice_urls);
+  if(r && Array.isArray(r.settled_invoice_urls)) out.push(...r.settled_invoice_urls);
+  return out.filter(Boolean);
+}
+
+let binRows = [], binFilter = 'all', binShowRestored = false;
+async function fetchBin(){
+  const { data, error } = await sb.from('deleted_records').select('*').order('deleted_at', { ascending:false }).limit(500);
+  if(error){ binRows = []; return error; }
+  binRows = data || [];
+  return null;
+}
+// Records removed by the same person within a few seconds belong to one delete.
+function binGroups(rows){
+  const groups = [];
+  for(const r of rows){
+    const t = new Date(r.deleted_at).getTime();
+    const g = groups[groups.length - 1];
+    if(g && g.by === (r.deleted_by_email || '') && Math.abs(g.t - t) < 8000 && !!g.restored === !!r.restored_at){ g.rows.push(r); g.t = t; continue; }
+    groups.push({ by: r.deleted_by_email || '', t, restored: r.restored_at, rows:[r] });
+  }
+  return groups;
+}
+async function refreshAfterRestore(tables){
+  const jobs = [];
+  if(tables.has('petty_cash_transactions') && typeof fetchCash === 'function') jobs.push(fetchCash());
+  if(tables.has('inventory_transactions') && typeof fetchInv === 'function') jobs.push(fetchInv());
+  if(tables.has('villa_bookings') && typeof fetchBookings === 'function') jobs.push(fetchBookings());
+  if(tables.has('villa_operating_expenses') && typeof fetchOpEx === 'function') jobs.push(fetchOpEx());
+  if(tables.has('owner_payments') && typeof fetchOwnerPayments === 'function') jobs.push(fetchOwnerPayments());
+  if(tables.has('company_entries') && typeof fetchCoEntries === 'function') jobs.push(fetchCoEntries());
+  if(tables.has('company_monthly_accounts') && typeof fetchCompany === 'function') jobs.push(fetchCompany());
+  if(tables.has('payroll_entries') && typeof fetchPayroll === 'function') jobs.push(fetchPayroll());
+  if(tables.has('staff_profiles') && typeof fetchStaffProfiles === 'function') jobs.push(fetchStaffProfiles());
+  if((tables.has('staff') || tables.has('villas')) && typeof fetchVillasAndStaff === 'function') jobs.push(fetchVillasAndStaff());
+  try{ await Promise.all(jobs); }catch(e){ console.error('refresh after restore', e); }
+  if(typeof onAcctDataChanged === 'function' && typeof companyInited !== 'undefined' && companyInited) onAcctDataChanged();
+}
+async function renderBin(){
+  const body = document.getElementById('binBody');
+  if(!body) return;
+  body.innerHTML = '<div class="manage-empty">Loading…</div>';
+  const err = await fetchBin();
+  if(err){
+    body.innerHTML = `<div class="adv-status warn">Deleted items are not being kept yet. Run <b>13-supabase-deleted-items.sql</b> in Supabase once — from then on, everything deleted can be put back from here.</div>`;
+    return;
+  }
+  const allow = binFilter === 'all' ? null : new Set(BIN_TAB_OF[binFilter] || [binFilter]);
+  const rows = binRows.filter(r => (binShowRestored || !r.restored_at) && (!allow || allow.has(r.table_name)));
+  const waiting = binRows.filter(r => !r.restored_at).length;
+  document.querySelectorAll('.bin-count').forEach(el => el.textContent = waiting ? String(waiting) : '');
+  if(!rows.length){ body.innerHTML = `<div class="manage-empty">${binShowRestored ? 'Nothing here.' : 'Nothing deleted that is waiting to be put back.'}</div>`; return; }
+  body.innerHTML = binGroups(rows).map((g, gi) => {
+    const when = new Date(g.t).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    const sections = [...new Set(g.rows.map(r => (BIN_SECTIONS[r.table_name] || {}).label || r.table_name))].join(', ');
+    const files = g.rows.reduce((n, r) => n + binAttachments(r.row_data).length, 0);
+    return `<div class="bin-row${g.restored ? ' restored' : ''}">
+      <div class="bin-main">
+        <div class="bin-where">${esc(sections)} · <span class="dim">deleted ${esc(when)}${g.by ? ' by ' + esc(g.by) : ''}</span></div>
+        ${g.rows.map(r => `<div class="bin-what">${esc(binSummary(r.table_name, r.row_data))}</div>`).join('')}
+        ${files ? `<div class="dim" style="font-size:12px;">📎 ${files} attachment${files === 1 ? '' : 's'} kept with it</div>` : ''}
+        ${g.restored ? `<div class="bin-done">✓ Put back ${esc(new Date(g.restored).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }))}${g.rows[0].restored_by ? ' by ' + esc(g.rows[0].restored_by) : ''}</div>` : ''}
+      </div>
+      ${g.restored ? '' : `<div class="bin-acts">
+        <button class="btn btn-save" data-bin-restore="${gi}">↩ Restore${g.rows.length > 1 ? ' all ' + g.rows.length : ''}</button>
+        ${isAdmin() ? `<button class="manage-del" data-bin-forever="${gi}">Delete for good</button>` : ''}
+      </div>`}
+    </div>`;
+  }).join('');
+  const groups = binGroups(rows);
+  body.querySelectorAll('[data-bin-restore]').forEach(b => b.addEventListener('click', async ()=>{
+    const g = groups[Number(b.dataset.binRestore)];
+    const what = g.rows.map(r => '• ' + binSummary(r.table_name, r.row_data)).join('\n');
+    if(!confirm(`Put this back where it was?\n\n${what}`)) return;
+    b.disabled = true;
+    const done = new Set(), problems = [];
+    for(const r of g.rows){
+      const { error } = await sb.rpc('restore_deleted', { p_id: r.id });
+      if(error) problems.push(error.message || 'could not restore');
+      else { done.add(r.table_name); logActivity('restore', r.table_name, 'Restored: ' + binSummary(r.table_name, r.row_data)); }
+    }
+    await refreshAfterRestore(done);
+    if(problems.length) alert('Some of it could not be put back:\n\n' + problems.join('\n'));
+    renderBin();
+  }));
+  body.querySelectorAll('[data-bin-forever]').forEach(b => b.addEventListener('click', async ()=>{
+    const g = groups[Number(b.dataset.binForever)];
+    if(!confirm('Delete this for good? It can never be put back, and its attachments are removed too.')) return;
+    for(const r of g.rows){
+      const { error } = await sb.from('deleted_records').delete().eq('id', r.id);
+      if(!error){ await deleteReceiptFiles(binAttachments(r.row_data)); logActivity('delete', 'deleted_records', 'Deleted for good: ' + binSummary(r.table_name, r.row_data)); }
+    }
+    renderBin();
+  }));
+}
+function openBin(filter){
+  if(!canRestore()) return;
+  binFilter = filter && (BIN_TAB_OF[filter] || BIN_SECTIONS[filter]) ? filter : 'all';
+  document.getElementById('binFilter').value = binFilter;
+  document.getElementById('binModalOverlay').classList.add('open');
+  renderBin();
+}
+(function wireBin(){
+  const sel = document.getElementById('binFilter');
+  if(!sel) return;
+  sel.innerHTML = '<option value="all">Everything</option>' + [
+    ['pettycash','Petty Cash'], ['inventory','Inventory'], ['bookings','Bookings'], ['villareport','Villa Report'],
+    ['company_entries','Company Accounts'], ['payroll_entries','Staff & Payroll — pay'], ['staff_profiles','Staff & Payroll — staff'],
+    ['staff','Housekeeping staff'], ['villas','Villas'],
+  ].map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('');
+  sel.addEventListener('change', ()=>{ binFilter = sel.value; renderBin(); });
+  document.getElementById('binShowRestored').addEventListener('change', e => { binShowRestored = e.target.checked; renderBin(); });
+  document.getElementById('binClose').addEventListener('click', ()=> document.getElementById('binModalOverlay').classList.remove('open'));
+  document.getElementById('binModalOverlay').addEventListener('click', e => { if(e.target.id === 'binModalOverlay') e.currentTarget.classList.remove('open'); });
+  document.querySelectorAll('[data-bin-open]').forEach(b => b.addEventListener('click', ()=> openBin(b.dataset.binOpen)));
+})();
+function applyBinButtons(){
+  const on = canRestore();
+  document.querySelectorAll('[data-bin-open]').forEach(b => b.style.display = on ? '' : 'none');
+  if(on && sb) fetchBin().then(err => {
+    if(err) return;
+    const waiting = binRows.filter(r => !r.restored_at).length;
+    document.querySelectorAll('.bin-count').forEach(el => el.textContent = waiting ? String(waiting) : '');
+  });
+}
 
 function initActivityLog(){
   logInited = true;
@@ -12543,7 +12839,7 @@ function knownAccountNames(){
   const names = new Set(['Sampath Current Account']);
   allCoEntries.forEach(e=>{ if(e.kind === 'balance' && e.description) names.add(e.description); if(e.paidVia) names.add(e.paidVia); });
   allCoRows.filter(r => r.section === 'cash').forEach(r => names.add(r.category));
-  ['Cash', 'Ceymora Card', 'Cheque'].forEach(n => names.add(n));
+  ['Cash', cardName('ceymora'), 'Cheque'].forEach(n => names.add(n));
   return [...names];
 }
 
@@ -12565,7 +12861,7 @@ function openCeModal(kind, record){
 
   const names = knownAccountNames();
   g('ceViaList').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
-  g('ceDescList').innerHTML = kind === 'balance' ? names.filter(n => !['Cash','Ceymora Card','Cheque'].includes(n)).map(n=>`<option value="${esc(n)}">`).join('') : '';
+  g('ceDescList').innerHTML = kind === 'balance' ? names.filter(n => !['Cash',cardName('ceymora'),'Cheque'].includes(n)).map(n=>`<option value="${esc(n)}">`).join('') : '';
 
   const { start, end } = monthRangeLocal(coMonthDate);
   const today = localTodayISO();
