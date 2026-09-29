@@ -3261,6 +3261,13 @@ async function fetchSettings(){
     const { data, error } = await sb.from('app_settings').select('*').eq('key','main').maybeSingle();
     if(error) throw error;
     if(data && data.value) APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, data.value);
+    // Names saved before petty cash and cards had separate names were meant for the
+    // petty cash floats. Move them there and give the cards their own names back.
+    if(data && data.value && data.value.cardNames && !data.value.cashNames){
+      APP_SETTINGS.cashNames = Object.assign({}, SETTINGS_DEFAULTS.cashNames, data.value.cardNames);
+      APP_SETTINGS.cardNames = Object.assign({}, SETTINGS_DEFAULTS.cardNames);
+      if(typeof canChange === 'function' && currentUser && canChange('settings')) saveSettings().catch(()=>{});
+    }
     settingsLoaded = true;
     applyCardNames();
     renderPrintHeader();   // the letterhead can only be drawn once the settings arrive
@@ -3667,7 +3674,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.29-vouchers';
+const APP_VERSION = 'v2026.09.29-names';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
