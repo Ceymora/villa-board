@@ -1497,6 +1497,7 @@
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addPurchaseBtn">+ Purchase item</button>
           <button class="add-booking-btn" id="addDistributeBtn">+ Distribute</button>
+          <button class="add-booking-btn" id="storeIssuesBtn">📋 Store issues report</button>
           <button class="add-booking-btn cmp-open-btn" data-cmp-open="inventory">📈 Compare</button>
           <button class="add-booking-btn" data-bin-open="inventory" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
         </div>
@@ -2625,6 +2626,25 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="storeRptModalOverlay">
+  <div class="modal bin-modal">
+    <div class="cmp-modal-head">
+      <h3 style="margin:0;">📋 What Store issued to each place</h3>
+      <button class="btn btn-cancel" id="storeRptClose">Close</button>
+    </div>
+    <div class="field-hint" style="margin-bottom:12px;">Everything sent out of Store with "+ Distribute", sorted by the villa or office that received it. Direct purchases for a villa are not here — they never went through Store.</div>
+    <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Month <input type="month" id="storeRptMonth" class="acct-select" style="max-width:170px;"></label>
+      <label style="display:flex; gap:6px; align-items:center; margin:0;"><input type="checkbox" id="storeRptAll"> All time</label>
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Place <select id="storeRptPlace" class="acct-select"></select></label>
+      <span style="flex:1"></span>
+      <button class="add-booking-btn" id="storeRptDownload">⬇ Download</button>
+      <button class="add-booking-btn" id="storeRptPrint">🖨️ Print</button>
+    </div>
+    <div id="storeRptBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="binModalOverlay">
   <div class="modal bin-modal">
     <div class="cmp-modal-head">
@@ -3674,7 +3694,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.29-names';
+const APP_VERSION = 'v2026.09.29-store';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -6986,13 +7006,8 @@ function applyDirectExpenseUI(){
   // like any other bill — so the advance picker stays available here too. (Hiding it
   // used to charge the card a second time for bills paid from an advance.)
 
-  // Direct expenses always belong to a villa, never the office or the store.
-  Array.from(g('expFor').options).forEach(opt=>{
-    const villaOnly = (opt.value === 'office' || opt.value === 'store');
-    opt.hidden = on && villaOnly;
-    opt.disabled = on && villaOnly;
-  });
-  if(on && (g('expFor').value === 'office' || g('expFor').value === 'store')) g('expFor').value = firstVillaId();
+  // A card payment can be for a villa, the office or the store, like any other bill.
+  Array.from(g('expFor').options).forEach(opt=>{ opt.hidden = false; opt.disabled = false; });
 
   // Petty cash is spent from the floats; "Payment From Card" is paid with the cards.
   const cs = g('expCard');
@@ -10370,6 +10385,85 @@ function applyBinButtons(){
     document.querySelectorAll('.bin-count').forEach(el => el.textContent = waiting ? String(waiting) : '');
   });
 }
+
+/* ---- What Store issued, place by place ---- */
+function storeRptRange(){
+  if(document.getElementById('storeRptAll').checked) return { from:'0000-01-01', to:'9999-12-31', label:'All time' };
+  const v = document.getElementById('storeRptMonth').value || todayISO().slice(0, 7);
+  const [y, m] = v.split('-').map(Number);
+  return { from: toISO(new Date(y, m - 1, 1)), to: toISO(new Date(y, m, 1)),
+           label: new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month:'long', year:'numeric' }) };
+}
+function storeRptPlaces(){
+  const pick = document.getElementById('storeRptPlace').value;
+  const all = INV_LOCATIONS.filter(l => l !== 'store');
+  return pick === 'all' ? all : all.filter(l => l === pick);
+}
+function storeIssueLines(loc, from, to){
+  const avg = computeAvgUnitCost();
+  return allInvTxns
+    .filter(t => t.type === 'distribute' && t.toVilla === loc && t.date >= from && t.date < to && !isDirectPurchaseTransfer(t))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(t => {
+      const priced = t.amount !== null && t.amount !== undefined;
+      const value = priced ? t.amount : (avg[t.item] !== undefined ? Math.round(t.qty * avg[t.item]) : null);
+      return { t, value, estimated: !priced && value !== null };
+    });
+}
+function renderStoreRpt(){
+  const r = storeRptRange();
+  const places = storeRptPlaces();
+  let grand = 0, grandN = 0, summary = '', detail = '';
+  for(const loc of places){
+    const sec = buildSuppliesSection(loc, r.from, r.to);
+    const qty = storeIssueLines(loc, r.from, r.to).reduce((n, x) => n + (Number(x.t.qty) || 0), 0);
+    grand += sec.total; grandN += sec.count;
+    summary += `<tr><td><b>${esc(INV_LOCATION_LABELS[loc] || loc)}</b></td><td class="c">${sec.count}</td><td class="c">${qty}</td><td class="r">${Math.round(sec.total).toLocaleString()}</td></tr>`;
+    detail += `<div class="rpt-section"><div class="rpt-section-title">${esc(INV_LOCATION_LABELS[loc] || loc)}
+        <span class="rpt-section-count">${sec.count} transfer${sec.count === 1 ? '' : 's'} · LKR ${Math.round(sec.total).toLocaleString()}</span></div>${sec.html}</div>`;
+  }
+  document.getElementById('storeRptBody').innerHTML = `<div class="rpt-doc" id="storeRptDoc">
+    <div class="cmp-head">Store issues — ${esc(r.label)}</div>
+    <div class="cmp-sub">${places.length === 1 ? esc(INV_LOCATION_LABELS[places[0]] || places[0]) : 'All villas and the office'} · values in LKR</div>
+    <table class="rpt-table"><thead><tr><th>Place</th><th class="c">Transfers</th><th class="c">Items</th><th class="r">Value (LKR)</th></tr></thead>
+      <tbody>${summary}<tr class="subtotal"><td>Total</td><td class="c">${grandN}</td><td></td><td class="r">${Math.round(grand).toLocaleString()}</td></tr></tbody></table>
+    ${detail}
+  </div>`;
+}
+function openStoreRpt(){
+  const sel = document.getElementById('storeRptPlace');
+  sel.innerHTML = '<option value="all">All villas and the office</option>' +
+    INV_LOCATIONS.filter(l => l !== 'store').map(l => `<option value="${esc(l)}">${esc(INV_LOCATION_LABELS[l] || l)}</option>`).join('');
+  const m = document.getElementById('storeRptMonth');
+  if(!m.value) m.value = todayISO().slice(0, 7);
+  document.getElementById('storeRptModalOverlay').classList.add('open');
+  renderStoreRpt();
+}
+(function wireStoreRpt(){
+  const b = document.getElementById('storeIssuesBtn');
+  if(!b) return;
+  b.addEventListener('click', openStoreRpt);
+  ['storeRptMonth','storeRptAll','storeRptPlace'].forEach(id => document.getElementById(id).addEventListener('change', renderStoreRpt));
+  document.getElementById('storeRptClose').addEventListener('click', ()=> document.getElementById('storeRptModalOverlay').classList.remove('open'));
+  document.getElementById('storeRptModalOverlay').addEventListener('click', e => { if(e.target.id === 'storeRptModalOverlay') e.currentTarget.classList.remove('open'); });
+  document.getElementById('storeRptPrint').addEventListener('click', ()=>{
+    const doc = document.getElementById('storeRptDoc'); if(doc) printPiece('Ceymora — Store issues — ' + storeRptRange().label, doc.outerHTML);
+  });
+  document.getElementById('storeRptDownload').addEventListener('click', ()=>{
+    const r = storeRptRange();
+    const out = [['Date','Place','Item','Qty','Value LKR','Valued at average cost?','Note']];
+    let total = 0;
+    for(const loc of storeRptPlaces()){
+      for(const x of storeIssueLines(loc, r.from, r.to)){
+        out.push([x.t.date, INV_LOCATION_LABELS[loc] || loc, x.t.item, x.t.qty, x.value === null ? '' : x.value, x.estimated ? 'yes' : '', x.t.note || '']);
+        total += x.value || 0;
+      }
+    }
+    if(out.length === 1){ alert('Nothing was issued from Store in this period.'); return; }
+    out.push([]); out.push(['', '', '', 'Total', total]);
+    downloadCSV(`store-issues-${document.getElementById('storeRptAll').checked ? 'all-time' : document.getElementById('storeRptMonth').value}.csv`, out);
+  });
+})();
 
 function initActivityLog(){
   logInited = true;
