@@ -3702,7 +3702,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.29-boss';
+const APP_VERSION = 'v2026.09.30-settle';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7041,6 +7041,8 @@ document.getElementById('incSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('create', 'petty_cash_transactions', `Recorded money received: LKR ${amount.toLocaleString()} into ${pettyName(card)}`);
     }
+    // Show it straight away, even where live updates are not switched on.
+    try{ await fetchCash(); }catch(_e){ console.error(_e); }
     document.getElementById('incomeModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
@@ -7864,8 +7866,10 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
       payload.settled_invoice_urls = [...((original && original.settledInvoiceUrls) || []), ...urls];
     }
     if(original){
-      const { error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId);
+      // Ask for the row back: if the database quietly refused the change, nothing comes back.
+      const { data: changed, error } = await sb.from('petty_cash_transactions').update(payload).eq('id', editingCashId).select('id');
       if(error) throw error;
+      if(Array.isArray(changed) && changed.length === 0) throw new Error('the database did not accept the change — this login may not be allowed to change this advance. Ask Makky to check its "Petty Cash — can change" tick');
       // Cash handed back → a "money in" line on the same card.
       const ret = advReturnRow(original);
       if(f.returned > 0){
@@ -7896,6 +7900,8 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('create', 'petty_cash_transactions', `Gave advance: ${employeeName} — LKR ${amount.toLocaleString()} from ${payLabel({ card, bankAccount, type:'advance' })}${advVoucher ? ', voucher ' + advVoucher : ''}`);
     }
+    // Show it straight away, even where live updates are not switched on.
+    try{ await fetchCash(); }catch(_e){ console.error(_e); }
     g('advanceModalOverlay').classList.remove('open');
   }catch(e){
     fail('Save failed — ' + (e.message || 'check connection.') + ' (Has the latest SQL update been run?)'); console.error(e);
@@ -10086,6 +10092,8 @@ document.getElementById('mpSave').addEventListener('click', async ()=>{
     if(error) throw error;
     const byline = mpOnBehalfOf ? `${currentUser.username} recorded ${mpOnBehalfOf}'s expense` : `${currentUser.username} recorded a purchase`;
     logActivity('create', 'petty_cash_transactions', `${byline}: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[villaId]})`);
+    // Show it straight away, even where live updates are not switched on.
+    try{ await fetchCash(); }catch(_e){ console.error(_e); }
     document.getElementById('myPurchaseModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
@@ -10142,6 +10150,8 @@ document.getElementById('opExSave').addEventListener('click', async ()=>{
     });
     if(error) throw error;
     logActivity('create', 'villa_operating_expenses', `Added ${OPEX_LABELS[category]||category}: LKR ${amount.toLocaleString()} for ${villaId}`);
+    // Show it straight away, even where live updates are not switched on.
+    try{ await fetchOpEx(); }catch(_e){ console.error(_e); }
     overlay2.classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
@@ -10184,6 +10194,8 @@ document.getElementById('purSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('create', 'inventory_transactions', `Purchased ${item} → Store${qtyRaw ? ' (qty '+qty+')' : ''}`);
     }
+    // Show it straight away, even where live updates are not switched on.
+    try{ await fetchInv(); }catch(_e){ console.error(_e); }
     document.getElementById('purchaseModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
@@ -10249,6 +10261,8 @@ document.getElementById('distSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('create', 'inventory_transactions', `Distributed ${qty} × ${item} → ${INV_LOCATION_LABELS[toVilla]||toVilla}${amount!==null ? ` @ LKR ${amount.toLocaleString()}` : ''}`);
     }
+    // Show it straight away, even where live updates are not switched on.
+    try{ await fetchInv(); }catch(_e){ console.error(_e); }
     document.getElementById('distributeModalOverlay').classList.remove('open');
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
