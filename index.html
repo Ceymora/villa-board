@@ -2351,6 +2351,11 @@
           <div><label>What the invoice is for</label><input type="text" id="advBillPurpose" placeholder="e.g. Mosquito nets"></div>
           <div><label>For which villa / place</label><select id="advBillFor"></select></div>
         </div>
+        <div class="frm-row">
+          <div><label>Invoice date — when he spent it</label><input type="date" id="advBillDate"></div>
+          <div><label>Invoice / bill number (optional)</label><input type="text" id="advBillNo" maxlength="60" placeholder="From the shop's bill"></div>
+        </div>
+        <div class="field-hint" id="advBillDateHint" style="margin-top:-2px;">The date printed on the bill. The expense is recorded on that day, so reports show when the money was actually spent.</div>
         <div id="advBillAccountWrap" style="display:none;">
           <label id="advBillAccountLabel">What it was for</label>
           <select id="advBillAccount" class="acct-select" style="max-width:none;"></select>
@@ -3702,7 +3707,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.30-settle';
+const APP_VERSION = 'v2026.09.30-invdate';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7456,7 +7461,7 @@ function renderAdvSettlePanel(){
   const bills = advBillsFor(adv);
   document.getElementById('advBillsList').innerHTML = bills.length
     ? bills.map(b => `<div class="ce-row"><div class="ce-main"><b>${esc(b.purpose || 'Bill')}</b>
-        <div class="ce-sub">${fmtDay(b.date)} · ${esc(FOR_LABELS[b.for] || b.for || '')}${acctOf(b) && isCompanyAcct(acctOf(b)) ? ' · ' + esc(acctLabel(acctOf(b))) : ''}${b.linkedInventory ? ' · 📦' : ''}${getInvoiceLinks(b).length ? ' · 📎' : ''}</div></div>
+        <div class="ce-sub">Invoice date ${fmtDay(b.date)}${b.invoiceNo ? ' · No. ' + esc(b.invoiceNo) : ''} · ${esc(FOR_LABELS[b.for] || b.for || '')}${acctOf(b) && isCompanyAcct(acctOf(b)) ? ' · ' + esc(acctLabel(acctOf(b))) : ''}${b.linkedInventory ? ' · 📦' : ''}${getInvoiceLinks(b).length ? ' · 📎' : ''}</div></div>
         <div class="ce-amt">${Math.round(b.amount).toLocaleString()}</div>
         ${locked ? '' : `<button type="button" class="manage-edit" data-bill="${b.id}">Edit</button>`}</div>`).join('')
     : '<div class="co-empty-hint">No bills recorded against this advance yet.</div>';
@@ -7579,6 +7584,8 @@ const advBillFileHandler = createMultiFileHandler('advBillFile', 'advBillFileLis
 function advQuickReset(){
   const g = id => document.getElementById(id);
   g('advBillAmount').value = ''; g('advBillPurpose').value = '';
+  g('advBillDate').value = todayISO(); g('advBillDate').max = todayISO();
+  g('advBillNo').value = '';
   g('advBillDirect').checked = false;
   g('advBillError').style.display = 'none';
   advBillFileHandler.reset();
@@ -7651,6 +7658,15 @@ async function advAddDraftInvoice(){
   const account = forWhom === 'store' ? 'store' : (g('advBillAccount').value || (forWhom === 'office' ? null : 'villa'));
   if(!amount || amount <= 0) return fail('Enter the invoice amount.');
   if(!purpose) return fail('Say what the invoice is for.');
+  const billDate = g('advBillDate').value || todayISO();
+  if(billDate > todayISO()) return fail('The invoice date cannot be in the future.');
+  if(adv.date && billDate < adv.date && !confirm(`This invoice is dated ${fmtDay(billDate)}, before the advance was given (${fmtDay(adv.date)}).\n\nKeep that date?`)) return false;
+  const billNo = g('advBillNo').value.trim() || null;
+  if(billNo){
+    const twin = allCashTxns.find(t => t.invoiceNo && t.invoiceNo.trim().toLowerCase() === billNo.toLowerCase());
+    if(twin && !confirm(`Invoice ${billNo} is already recorded: ${twin.purpose || 'expense'} — LKR ${Number(twin.amount).toLocaleString()} on ${twin.date}.\n\nAdd this one as well?`)) return false;
+  }
+  const billCols = await pcColsReady();
   if(forWhom === 'office' && !account) return fail('Pick the company account for this office bill.');
   const btn = g('advBillAdd'); btn.disabled = true;
   let ok = false;
@@ -7658,12 +7674,13 @@ async function advAddDraftInvoice(){
     const urls = [];
     for(const fl of advBillFileHandler.getFiles()) urls.push(await uploadReceiptFile(fl));
     const { error } = await sb.from('petty_cash_transactions').insert({
-      type:'expense', date: todayISO(), card: adv.card, for: forWhom, purpose, amount,
+      type:'expense', date: billDate, card: adv.card, for: forWhom, purpose, amount,
       note:'', linked_inventory:false, invoice_urls: urls, employee_name: adv.employeeName,
       direct_expense: g('advBillDirect').checked, account_code: account, advance_id: String(adv.id),
+      ...(billCols ? { invoice_no: billNo, bank_account: adv.card === 'bank' ? (adv.bankAccount || null) : null } : {}),
     });
     if(error) throw error;
-    logActivity('create', 'petty_cash_transactions', `Invoice from ${adv.employeeName}'s advance: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom] || forWhom})`);
+    logActivity('create', 'petty_cash_transactions', `Invoice from ${adv.employeeName}'s advance: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom] || forWhom}), dated ${billDate}${billNo ? ', invoice ' + billNo : ''}`);
     await fetchCash();
     advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
     advQuickReset();
