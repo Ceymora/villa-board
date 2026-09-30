@@ -421,7 +421,7 @@
   body.ro-company :is(#ceSave,#ceDelete),
   body.ro-payroll #payrollPanel :is(#payPrepare,#payAddStaff,.manage-edit,.manage-del),
   body.ro-payroll :is(#spSave,#spDelete,#psSave,#psDelete),
-  body.ro-settings #settingsPanel :is(#setSaveBtn,[data-villa-photo],[data-villa-photo-remove],#setLogoFile,#setLogoRemove),
+  body.ro-settings #settingsPanel :is(#setSaveBtn,[data-villa-photo],[data-villa-photo-remove],[data-villa-photo-find],#setLogoFile,#setLogoRemove,#setLogoFind),
   body.ro-users #usersPanel :is(#addUserBtn,.manage-edit,[data-approve],[data-reject]),
   body.ro-users :is(#userSave,#userDeleteBtn){ display:none !important; }
   /* Clicks that would start an edit do nothing in a view-only section. */
@@ -480,6 +480,11 @@
   .stmt-open{ display:flex; gap:12px; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--board-line);
     border-radius:12px; padding:12px 14px; margin-top:8px; }
   .stmt-open-main{ min-width:0; flex:1; }
+  .brand-pick{ display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px; }
+  .brand-pick button{ border:1px solid var(--board-line); background:#fff; border-radius:12px; padding:6px; cursor:pointer; text-align:left; }
+  .brand-pick button:hover{ border-color:var(--accent,#7a5236); box-shadow:0 4px 12px rgba(0,0,0,.08); }
+  .brand-pick img{ width:100%; height:100px; object-fit:cover; border-radius:8px; display:block; background:#f3efe7; }
+  .brand-pick span{ display:block; font-size:11px; color:var(--muted); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .card-tools{ display:flex; gap:8px; justify-content:flex-end; margin:-6px 0 14px; }
   .bin-modal{ width:min(860px, 96vw) !important; max-width:860px; }
   .bin-row{ display:flex; gap:14px; align-items:flex-start; justify-content:space-between; background:#fff; border:1px solid var(--board-line);
@@ -1939,6 +1944,7 @@
             <input type="file" id="setLogoFile" accept="image/*" style="margin-top:8px; font-size:12px; max-width:180px;">
             <div style="margin-top:6px;">
               <button class="manage-invoice" id="setLogoRemove" style="display:none;">Remove logo</button>
+              <button class="manage-invoice" id="setLogoFind">Pick one uploaded before</button>
             </div>
             <div class="field-hint" id="setLogoHint" style="max-width:180px;"></div>
           </div>
@@ -2004,6 +2010,7 @@
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:22px;">
         <button class="add-booking-btn" id="setSaveBtn" style="background:var(--frame); color:#fff; border-color:var(--frame); font-size:14px; padding:9px 20px;">💾 Save setup</button>
         <button class="add-booking-btn" id="backupBtn" style="display:none; font-size:14px; padding:9px 20px;">🗄️ Download a full backup</button>
+        <button class="add-booking-btn" id="setHistoryBtn" style="display:none; font-size:14px; padding:9px 20px;">🕘 Earlier versions</button>
         <span class="field-hint" id="setSaveMsg"></span>
       </div>
 
@@ -3309,6 +3316,11 @@ let settingsLoaded = false;
 async function fetchSettings(){
   if(!sb) return;
   try{
+    // The setup can only be read once someone has signed in. Reading it before that
+    // returns nothing — and treating "nothing" as the setup is how the photos, logo
+    // and company details got overwritten with blanks on the next save.
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
     const { data, error } = await sb.from('app_settings').select('*').eq('key','main').maybeSingle();
     if(error) throw error;
     if(data && data.value) APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, data.value);
@@ -3330,6 +3342,20 @@ async function fetchSettings(){
 
 async function saveSettings(){
   if(!sb) throw new Error('Not connected');
+  // Never write the setup back unless it was really read first.
+  if(!settingsLoaded) await fetchSettings();
+  if(!settingsLoaded) throw new Error('the setup has not loaded yet — reload the page and try again');
+  // Photos saved by someone else in the meantime are kept: only a photo that was
+  // deliberately removed here (set to blank) is cleared.
+  try{
+    const { data: cur } = await sb.from('app_settings').select('value').eq('key','main').maybeSingle();
+    const curImgs = (cur && cur.value && cur.value.villaImages) || {};
+    const mine = APP_SETTINGS.villaImages || {};
+    const merged = Object.assign({}, curImgs);
+    Object.keys(mine).forEach(k => { merged[k] = mine[k]; });
+    APP_SETTINGS.villaImages = merged;
+    if(cur && cur.value && cur.value.logoUrl && APP_SETTINGS.logoUrl === undefined) APP_SETTINGS.logoUrl = cur.value.logoUrl;
+  }catch(e){ console.error('settings merge', e); }
   const { error } = await sb.from('app_settings')
     .upsert({ key:'main', value: APP_SETTINGS, updated_at: new Date().toISOString() }, { onConflict:'key' });
   if(error) throw error;
@@ -3726,7 +3752,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.30-simple';
+const APP_VERSION = 'v2026.09.30-photos';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3809,6 +3835,8 @@ async function loadMyProfile(){
 
 async function enterApp(profile){
   currentUser = profile;
+  // Read the setup as the signed-in person before anything can show or save it.
+  try{ await fetchSettings(); }catch(e){ console.error(e); }
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   startApp();
@@ -4026,6 +4054,9 @@ const DB_CHECKS = [
   { file:'14-supabase-invoice-and-voucher-numbers.sql', what:'Invoice numbers, payment voucher numbers and which bank account',
     critical:false,
     test: async () => { HAS_PC_COLS = null; return await pcColsReady(); } },
+  { file:'17-supabase-setup-history.sql', what:'Every earlier version of Invoices & Setup is kept and can be put back',
+    critical:false,
+    test: async () => { const { error } = await sb.from('app_settings_history').select('id').limit(1); return !error; } },
   { file:'13-supabase-deleted-items.sql', what:'Anything deleted can be put back from "Deleted items"',
     critical:false,
     test: async () => { const { data, error } = await sb.rpc('bin_ready'); return !error && data === true; } },
@@ -11386,7 +11417,52 @@ function printInvoiceList(){
 /* ============================= INVOICES & SETUP ============================= */
 let settingsInited = false;
 
+/* ---- Earlier versions of the setup (file 17) ---- */
+async function openSettingsHistory(){
+  document.getElementById('villaDetailTitle').textContent = 'Earlier versions of Invoices & Setup';
+  const body = document.getElementById('villaDetailBody');
+  body.innerHTML = '<div class="manage-empty">Loading…</div>';
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  const { data, error } = await sb.from('app_settings_history').select('*').eq('key','main').order('saved_at', { ascending:false }).limit(60);
+  if(error){ body.innerHTML = '<div class="adv-status warn">Earlier versions are not being kept yet. Run <b>17-supabase-setup-history.sql</b> in Supabase once — from then on every change can be undone here.</div>'; return; }
+  if(!data || !data.length){ body.innerHTML = '<div class="manage-empty">No earlier versions yet — one is kept each time the setup is saved from now on.</div>'; return; }
+  body.innerHTML = `<div class="field-hint" style="margin-bottom:10px;">Each line is the setup as it was <b>before</b> that save. Restoring one puts it back as the current setup (the current one is kept here too).</div>` +
+    data.map((h, i) => {
+      const v = h.value || {};
+      const photos = Object.values(v.villaImages || {}).filter(Boolean).length;
+      const when = new Date(h.saved_at).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      return `<div class="bin-row"><div class="bin-main">
+          <div class="bin-where">Replaced ${esc(when)}${h.replaced_by ? ' by ' + esc(h.replaced_by) : ''}</div>
+          <div class="bin-what">${esc((v.company || {}).name || 'No company name')} · logo ${v.logoUrl ? '✓' : '—'} · ${photos} villa photo${photos === 1 ? '' : 's'}</div>
+          <div class="dim" style="font-size:12px;">Deposit ${esc(String(v.depositPercent ?? ''))}% · card names: ${esc(Object.values(v.cardNames || {}).join(', ') || 'default')}</div>
+        </div>
+        <div class="bin-acts"><button class="btn btn-save" data-hist="${i}">↩ Restore</button></div></div>`;
+    }).join('');
+  body.querySelectorAll('[data-hist]').forEach(b => b.addEventListener('click', async ()=>{
+    const h = data[Number(b.dataset.hist)];
+    if(!confirm('Put this version of the setup back? Company details, logo, villa photos, tax and deposits all return to how they were then.')) return;
+    b.disabled = true;
+    try{
+      APP_SETTINGS = mergeSettings(SETTINGS_DEFAULTS, h.value || {});
+      settingsLoaded = true;
+      await saveSettings();
+      logActivity('restore', 'app_settings', 'Restored an earlier version of Invoices & Setup (' + new Date(h.saved_at).toLocaleString('en-GB') + ')');
+      if(typeof fillSettingsForm === 'function') fillSettingsForm();
+      renderVillaPhotos(); applyCardNames(); renderPrintHeader();
+      if(typeof renderGuestGroups === 'function') renderGuestGroups();
+      document.getElementById('villaDetailModalOverlay').classList.remove('open');
+      alert('Done — that version of the setup is back.');
+    }catch(e){ alert('Could not restore — ' + (e.message || 'try again.')); b.disabled = false; }
+  }));
+}
+
 function initSettings(){
+  const hb = document.getElementById('setHistoryBtn');
+  if(hb && !hb.dataset.wired){
+    hb.dataset.wired = '1';
+    hb.style.display = canChange('settings') ? '' : 'none';
+    hb.addEventListener('click', openSettingsHistory);
+  }
   const bb = document.getElementById('backupBtn');
   if(bb && !bb.dataset.wired){
     bb.dataset.wired = '1';
@@ -11432,6 +11508,16 @@ function initSettings(){
     e.target.value = '';
   });
 
+  document.getElementById('setLogoFind').addEventListener('click', ()=>{
+    if(!canChange('settings')){ alert('You do not have permission to change the logo.'); return; }
+    openBrandPicker('Logo', async url => {
+      APP_SETTINGS.logoUrl = url;
+      await saveSettings();
+      if(typeof fillSettingsForm === 'function') fillSettingsForm();
+      renderPrintHeader();
+      logActivity('update', 'app_settings', 'Put back the logo');
+    });
+  });
   document.getElementById('setLogoRemove').addEventListener('click', async ()=>{
     if(!confirm('Remove the logo from all invoices?')) return;
     const old = APP_SETTINGS.logoUrl;
@@ -11478,6 +11564,7 @@ function renderVillaPhotos(){
       <div class="shot">${url ? `<img src="${safeUrl(url)}" alt="${esc(v.name)}">` : 'No photo yet'}</div>
       <input type="file" accept="image/*" data-villa-photo="${esc(v.id)}" style="margin-top:6px; font-size:11.5px; max-width:190px;">
       ${url ? `<button class="manage-invoice" data-villa-photo-remove="${esc(v.id)}" style="margin-top:4px;">Remove</button>` : ''}
+      <button class="manage-invoice" data-villa-photo-find="${esc(v.id)}" style="margin-top:4px;">Pick one uploaded before</button>
       <div class="field-hint" data-villa-photo-hint="${esc(v.id)}"></div>
     </div>`;
   }).join('');
@@ -11500,6 +11587,19 @@ function renderVillaPhotos(){
       e.target.value = '';
     });
   });
+  wrap.querySelectorAll('[data-villa-photo-find]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!canChange('settings')){ alert('You do not have permission to change villa photos.'); return; }
+      const id = btn.dataset.villaPhotoFind;
+      openBrandPicker(`Photo for ${FOR_LABELS[id] || id}`, async url => {
+        APP_SETTINGS.villaImages = Object.assign({}, APP_SETTINGS.villaImages || {}, { [id]: url });
+        await saveSettings();
+        renderVillaPhotos();
+        if(typeof renderGuestGroups === 'function') renderGuestGroups();
+        logActivity('update', 'app_settings', `Put back the photo for ${FOR_LABELS[id] || id}`);
+      });
+    });
+  });
   wrap.querySelectorAll('[data-villa-photo-remove]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.dataset.villaPhotoRemove;
@@ -11510,6 +11610,39 @@ function renderVillaPhotos(){
     });
   });
 }
+/* Every picture ever uploaded for the logo or the villas is still in storage, even
+   if the setup lost track of it. This shows them all so one can be picked again. */
+async function listBrandImages(){
+  const out = [];
+  const walk = async (prefix, depth) => {
+    const { data, error } = await sb.storage.from('brand').list(prefix, { limit: 1000, sortBy: { column:'name', order:'desc' } });
+    if(error || !data) return;
+    for(const it of data){
+      const path = prefix ? `${prefix}/${it.name}` : it.name;
+      if(!it.id && depth < 3) await walk(path, depth + 1);          // a folder
+      else if(/\.(png|jpe?g|gif|webp|svg)$/i.test(it.name)) out.push(path);
+    }
+  };
+  await walk('', 0);
+  return out.map(p => ({ path: p, url: sb.storage.from('brand').getPublicUrl(p).data.publicUrl }));
+}
+async function openBrandPicker(title, onPick){
+  document.getElementById('villaDetailTitle').textContent = title + ' — pick a picture';
+  const body = document.getElementById('villaDetailBody');
+  body.innerHTML = '<div class="manage-empty">Looking for pictures uploaded before…</div>';
+  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  let pics = [];
+  try{ pics = await listBrandImages(); }catch(e){ console.error(e); }
+  if(!pics.length){ body.innerHTML = '<div class="manage-empty">No pictures found in storage. Upload the photo again with “Choose file”.</div>'; return; }
+  body.innerHTML = `<div class="field-hint" style="margin-bottom:10px;">Everything uploaded for the logo and the villas, newest first. Tap the right one.</div>
+    <div class="brand-pick">${pics.map((p, i) => `<button type="button" data-pick="${i}" title="${esc(p.path)}"><img src="${safeUrl(p.url)}" alt="" loading="lazy"><span>${esc(p.path.split('/').pop().replace(/^\d+_[a-z0-9]+_/, ''))}</span></button>`).join('')}</div>`;
+  body.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async ()=>{
+    b.disabled = true;
+    try{ await onPick(pics[Number(b.dataset.pick)].url); document.getElementById('villaDetailModalOverlay').classList.remove('open'); }
+    catch(e){ alert('Could not save — ' + (e.message || 'try again.')); b.disabled = false; }
+  }));
+}
+
 // Printed letterhead — shown only on paper, on whichever tab is being printed.
 function renderPrintHeader(){
   const el = document.getElementById('printHeader');
