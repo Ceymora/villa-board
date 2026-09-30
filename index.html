@@ -461,6 +461,12 @@
   .cmp-open-btn{ white-space:nowrap; }
 
   .doc-nos{ display:inline-block; margin-left:6px; font-size:11.5px; color:#6c665a; background:#f3efe7; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+  .adv-row-link{ cursor:pointer; }
+  .adv-row-link:hover{ border-color:#cdbfa6; background:#fffdf8; }
+  .adv-go{ font-size:12.5px; font-weight:600; color:var(--accent, #7a5236); white-space:nowrap; }
+  .stmt-open{ display:flex; gap:12px; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--board-line);
+    border-radius:12px; padding:12px 14px; margin-top:8px; }
+  .stmt-open-main{ min-width:0; flex:1; }
   .card-tools{ display:flex; gap:8px; justify-content:flex-end; margin:-6px 0 14px; }
   .bin-modal{ width:min(860px, 96vw) !important; max-width:860px; }
   .bin-row{ display:flex; gap:14px; align-items:flex-start; justify-content:space-between; background:#fff; border:1px solid var(--board-line);
@@ -1447,7 +1453,7 @@
           <div id="undoRequestsList" class="manage-list"></div>
         </div>
         <div class="manage-title">Advances to staff</div>
-        <div class="field-hint" style="margin:2px 0 8px;">Money handed to someone that they still need to account for. Open one with “Settle / Edit”, record each bill it paid for and any cash handed back — it can only be settled when those add up to the advance. It then moves to Settled advances below.</div>
+        <div class="field-hint" style="margin:2px 0 8px;">When each advance was given and what is still open — a record only. To settle, tap the person's card under <b>Staff advance balances</b> above: every open advance of theirs is there with a Settle button. Tapping a line here opens the same page.</div>
         <div id="advancesList" class="manage-list"></div>
       </div>
 
@@ -3707,7 +3713,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.30-invdate';
+const APP_VERSION = 'v2026.09.30-settlepage';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -6455,7 +6461,8 @@ function renderAdvanceWallets(){
       <div class="cash-card-label">${esc(defaultInfo ? defaultInfo.label : name)}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
-      <div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap for his statement</span></div>
+      <div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap to settle or see his statement</span></div>
+      ${openCount ? `<div style="font-size:11.5px; margin-top:6px; font-weight:700;">${openCount} advance${openCount === 1 ? '' : 's'} open — tap to settle</div>` : ''}
       ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} still to recover from settled advance${Math.abs(gap) && openCount ? 's' : 's'} — click to see</div>` : ''}
     `;
     card.style.cursor = 'pointer';
@@ -7445,6 +7452,7 @@ function advDraftPending(){
 document.getElementById('advCancel').addEventListener('click', ()=>{
   if(advDraftPending() && !confirm('The invoice you typed hasn\'t been added yet. Close anyway and lose it?')) return;
   document.getElementById('advanceModalOverlay').classList.remove('open');
+  backToStatement();
 });
 document.getElementById('advanceModalOverlay').addEventListener('click', (e)=>{
   if(e.target.id !== 'advanceModalOverlay') return;
@@ -7920,6 +7928,7 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
     // Show it straight away, even where live updates are not switched on.
     try{ await fetchCash(); }catch(_e){ console.error(_e); }
     g('advanceModalOverlay').classList.remove('open');
+    backToStatement();
   }catch(e){
     fail('Save failed — ' + (e.message || 'check connection.') + ' (Has the latest SQL update been run?)'); console.error(e);
   }finally{ btn.disabled = false; }
@@ -7958,13 +7967,12 @@ function renderAdvances(){
         <span class="manage-type-dot" style="background:var(--amber);"></span>
         <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— ${esc(payLabel(t))}</span></span>
         <span class="manage-dates">${t.date}${t.note ? ' · '+esc(t.note) : ''} · LKR ${t.amount.toLocaleString()} · bills LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}
-          · <b>${f.left === 0 ? 'ready to settle ✓' : 'LKR ' + Math.round(f.left).toLocaleString() + ' still to account for'}</b></span>`;
-      if(canEdit()){
-        const b = document.createElement('button');
-        b.className = 'manage-edit'; b.textContent = 'Settle / Edit';
-        b.addEventListener('click', ()=> openAdvanceModal(t));
-        row.appendChild(b);
-      }
+          · <b>${f.left === 0 ? 'ready to settle ✓' : 'LKR ' + Math.round(f.left).toLocaleString() + ' still to account for'}</b>${t.voucherNo ? ' · ' + esc(t.voucherNo) : ''}</span>
+        <span class="adv-go">${esc(t.employeeName || '')}'s page ›</span>`;
+      // A record only: settling happens from the person's page.
+      row.classList.add('adv-row-link');
+      row.title = `Open ${t.employeeName || 'this person'}'s advances to settle`;
+      row.addEventListener('click', ()=> openStaffAdvanceStatement(t.employeeName));
       wrap.appendChild(row);
     }
   }
@@ -9913,7 +9921,22 @@ function openStaffAdvanceStatement(name){
       <div style="text-align:right; font-weight:700; margin-top:6px; font-size:13px;">${sub}</div>`
     : '<div class="manage-empty">Nothing yet.</div>'}`;
 
-  let html = section(
+  // The advances still open, each with its own Settle button.
+  const open = advances.filter(t => isAdvanceParent(t) && !t.settled);
+  const mayChange = canChange('pettycash');
+  let html = `<div class="pay-block" style="margin-top:4px;">
+    <div class="direct-block-title">Open advances — settle here</div>
+    ${open.length ? open.map(t => { const f = advFigures(t); return `<div class="stmt-open">
+        <div class="stmt-open-main">
+          <div class="txn-title">${esc(fmtDay(t.date))} ${t.date ? esc(t.date.slice(0,4)) : ''} · ${money(t.amount)} · ${esc(src(t))}${t.voucherNo ? ' · ' + esc(t.voucherNo) : ''}</div>
+          <div class="txn-sub">${t.note ? esc(t.note) + ' · ' : ''}bills ${money(f.billed)}${f.returned ? ' · returned ' + money(f.returned) : ''} ·
+            <b>${Math.round(f.left) === 0 ? 'ready to settle ✓' : money(f.left) + ' still to account for'}</b></div>
+        </div>
+        ${mayChange ? `<button class="btn btn-save" data-stmt-settle="${esc(String(t.id))}">Settle / add bills</button>` : ''}
+      </div>`; }).join('')
+      : '<div class="manage-empty">Nothing open — every advance to ' + esc(name) + ' is settled.</div>'}
+  </div>`;
+  html += section(
     'Money given to ' + esc(name), 'Everything handed over or transferred to him, whatever the source.',
     advances.map(t => `<div class="txn-row">
         <span class="txn-badge advance">${t.card === 'bank' ? 'bank' : 'cash'}</span>
@@ -9927,7 +9950,7 @@ function openStaffAdvanceStatement(name){
     bills.map(t => `<div class="txn-row">
         <span class="txn-badge expense">${esc(FOR_LABELS[t.for] || t.for || '')}</span>
         <span class="txn-main"><div class="txn-title">${esc(t.purpose || 'Invoice')}${clip(t) ? ' ' + clip(t) : ''}</div>
-          <div class="txn-sub">${esc(t.date)} · ${esc(src(t))}${t.note ? ' · ' + esc(t.note) : ''}</div></span>
+          <div class="txn-sub">Invoice date ${esc(t.date)}${t.invoiceNo ? ' · No. ' + esc(t.invoiceNo) : ''} · ${esc(src(t))}${t.note ? ' · ' + esc(t.note) : ''}</div></span>
         <span class="txn-amount expense">${money(t.amount)}</span></div>`),
     `Total billed ${money(w.spent)}`);
 
@@ -9960,9 +9983,22 @@ function openStaffAdvanceStatement(name){
           : `Overspent by ${money(-bal)} — he has put in more of his own money than he was given.`}</div>
     </div>`;
 
-  document.getElementById('villaDetailTitle').textContent = `Advance statement — ${name}`;
+  document.getElementById('villaDetailTitle').textContent = `Advances — ${name}`;
   document.getElementById('villaDetailBody').innerHTML = html;
   document.getElementById('villaDetailModalOverlay').classList.add('open');
+  document.querySelectorAll('#villaDetailBody [data-stmt-settle]').forEach(b => b.addEventListener('click', ()=>{
+    const adv = allCashTxns.find(t => String(t.id) === b.dataset.stmtSettle);
+    if(!adv) return;
+    advReturnToStatement = name;
+    document.getElementById('villaDetailModalOverlay').classList.remove('open');
+    openAdvanceModal(adv);
+  }));
+}
+// After settling from someone's page, go back to that page.
+let advReturnToStatement = null;
+function backToStatement(){
+  const n = advReturnToStatement; advReturnToStatement = null;
+  if(n) setTimeout(()=> openStaffAdvanceStatement(n), 50);
 }
 
 function renderSharonExpensesSummary(){
