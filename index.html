@@ -461,6 +461,19 @@
   .cmp-open-btn{ white-space:nowrap; }
 
   .doc-nos{ display:inline-block; margin-left:6px; font-size:11.5px; color:#6c665a; background:#f3efe7; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+  .simple-adv{ display:flex; flex-direction:column; gap:14px; }
+  .sa-balance{ background:linear-gradient(135deg,#7048e8,#4425a1); color:#fff; border-radius:16px; padding:18px 22px; }
+  .sa-balance.neg{ background:linear-gradient(135deg,#e03131,#8a1f1f); }
+  .sa-label{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; opacity:.85; font-weight:700; }
+  .sa-amount{ font-family:'Fraunces',Georgia,serif; font-size:34px; font-weight:600; margin-top:4px; }
+  .sa-sub{ font-size:12.5px; opacity:.9; margin-top:4px; }
+  .sa-msg{ background:var(--green-bg); color:#1f6b33; border:1px solid #b7e4c4; border-radius:12px; padding:10px 14px; font-size:14px; }
+  .sa-form{ background:#fff; border:1px solid var(--board-line); border-radius:16px; padding:16px 18px; }
+  .sa-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px 14px; margin-top:8px; }
+  .sa-grid label{ display:block; font-size:12.5px; font-weight:600; color:#6c665a; margin:0 0 5px; }
+  .sa-grid input, .sa-grid select{ width:100%; padding:10px 12px; border:1px solid #ddd6c8; border-radius:10px; font-size:14px; font-family:inherit; background:#fff; }
+  .sa-details{ margin-top:16px; }
+  .sa-details > summary{ cursor:pointer; font-weight:700; font-size:14px; padding:10px 0; color:var(--accent,#7a5236); }
   .adv-row-link{ cursor:pointer; }
   .adv-row-link:hover{ border-color:#cdbfa6; background:#fffdf8; }
   .adv-go{ font-size:12.5px; font-weight:600; color:var(--accent, #7a5236); white-space:nowrap; }
@@ -3713,7 +3726,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.30-settlepage';
+const APP_VERSION = 'v2026.09.30-simple';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -9921,21 +9934,43 @@ function openStaffAdvanceStatement(name){
       <div style="text-align:right; font-weight:700; margin-top:6px; font-size:13px;">${sub}</div>`
     : '<div class="manage-empty">Nothing yet.</div>'}`;
 
-  // The advances still open, each with its own Settle button.
+  // ---- The simple way: his balance, and one form for each invoice he brings back ----
   const open = advances.filter(t => isAdvanceParent(t) && !t.settled);
   const mayChange = canChange('pettycash');
-  let html = `<div class="pay-block" style="margin-top:4px;">
-    <div class="direct-block-title">Open advances — settle here</div>
-    ${open.length ? open.map(t => { const f = advFigures(t); return `<div class="stmt-open">
-        <div class="stmt-open-main">
-          <div class="txn-title">${esc(fmtDay(t.date))} ${t.date ? esc(t.date.slice(0,4)) : ''} · ${money(t.amount)} · ${esc(src(t))}${t.voucherNo ? ' · ' + esc(t.voucherNo) : ''}</div>
-          <div class="txn-sub">${t.note ? esc(t.note) + ' · ' : ''}bills ${money(f.billed)}${f.returned ? ' · returned ' + money(f.returned) : ''} ·
-            <b>${Math.round(f.left) === 0 ? 'ready to settle ✓' : money(f.left) + ' still to account for'}</b></div>
+  const holding = open.reduce((n, t) => n + advFigures(t).left, 0);
+  const placeOpts = Object.keys(FOR_LABELS).map(k => `<option value="${esc(k)}"${k === advHomePlace(name) ? ' selected' : ''}>${esc(FOR_LABELS[k])}</option>`).join('');
+  let html = `<div class="simple-adv">
+    <div class="sa-balance ${holding < 0 ? 'neg' : ''}">
+      <div class="sa-label">${esc(name)} is holding</div>
+      <div class="sa-amount" id="saHolding">${money(holding)}</div>
+      <div class="sa-sub">${open.length ? `from ${open.length} open advance${open.length === 1 ? '' : 's'} (${open.map(t => money(t.amount) + ' on ' + esc(fmtDay(t.date))).join(', ')})` : 'No open advance.'}</div>
+    </div>
+    <div id="saMsg" class="sa-msg" style="display:none;"></div>
+    ${mayChange && open.length ? `<div class="sa-form" id="saForm">
+      <div class="direct-block-title">Add an invoice he brought back</div>
+      <div class="sa-grid">
+        <div><label>Invoice date</label><input type="date" id="saDate" value="${todayISO()}" max="${todayISO()}"></div>
+        <div><label>Bill amount (LKR)</label><input type="number" id="saAmount" min="0" step="0.01" placeholder="e.g. 4000"></div>
+        <div><label>What was it for</label><input type="text" id="saPurpose" placeholder="e.g. Vegetables"></div>
+        <div><label>For which villa / place</label><select id="saFor">${placeOpts}</select></div>
+        <div><label>Invoice number (optional)</label><input type="text" id="saNo" maxlength="60" placeholder="From the bill"></div>
+        <div><label>Attach the invoice</label><input type="file" id="saFile" accept="image/*,.pdf" multiple></div>
+      </div>
+      <div class="modal-error" id="saError"></div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn btn-save" id="saSave">Save invoice</button>
+        <button class="rpt-quick" id="saCashToggle">He handed back cash</button>
+      </div>
+      <div id="saCash" style="display:none; margin-top:12px;">
+        <div class="sa-grid">
+          <div><label>Date</label><input type="date" id="saCashDate" value="${todayISO()}" max="${todayISO()}"></div>
+          <div><label>Cash returned (LKR)</label><input type="number" id="saCashAmount" min="0" step="0.01"></div>
         </div>
-        ${mayChange ? `<button class="btn btn-save" data-stmt-settle="${esc(String(t.id))}">Settle / add bills</button>` : ''}
-      </div>`; }).join('')
-      : '<div class="manage-empty">Nothing open — every advance to ' + esc(name) + ' is settled.</div>'}
-  </div>`;
+        <button class="btn btn-save" id="saCashSave" style="margin-top:10px;">Save cash returned</button>
+      </div>
+    </div>` : ''}
+  </div>
+  <details class="sa-details"><summary>His full statement</summary>`;
   html += section(
     'Money given to ' + esc(name), 'Everything handed over or transferred to him, whatever the source.',
     advances.map(t => `<div class="txn-row">
@@ -9983,16 +10018,144 @@ function openStaffAdvanceStatement(name){
           : `Overspent by ${money(-bal)} — he has put in more of his own money than he was given.`}</div>
     </div>`;
 
+  html += '</details>';
   document.getElementById('villaDetailTitle').textContent = `Advances — ${name}`;
   document.getElementById('villaDetailBody').innerHTML = html;
   document.getElementById('villaDetailModalOverlay').classList.add('open');
-  document.querySelectorAll('#villaDetailBody [data-stmt-settle]').forEach(b => b.addEventListener('click', ()=>{
-    const adv = allCashTxns.find(t => String(t.id) === b.dataset.stmtSettle);
-    if(!adv) return;
-    advReturnToStatement = name;
-    document.getElementById('villaDetailModalOverlay').classList.remove('open');
-    openAdvanceModal(adv);
-  }));
+  wireSimpleAdvance(name);
+}
+
+// Where his bills usually go: his usual place, or the one on his card.
+function advHomePlace(name){
+  const counts = {};
+  allCashTxns.filter(t => t.type === 'expense' && t.employeeName === name && t.for).forEach(t => counts[t.for] = (counts[t.for] || 0) + 1);
+  const best = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  if(best) return best;
+  const d = ADVANCE_WALLET_DEFAULTS.find(x => x.name === name);
+  const m = d && /\(([^)]+)\)/.exec(d.label);
+  if(m){
+    if(/office/i.test(m[1])) return 'office';
+    const v = VR_VILLAS.find(v => v.name.toLowerCase() === m[1].toLowerCase());
+    if(v) return v.id;
+  }
+  return firstVillaId();
+}
+function advAccountFor(place, text){
+  if(place === 'store') return 'store';
+  if(place === 'boss') return 'owner_drawings';
+  if(place === 'office') return suggestAccount(text) || 'office_maintenance';
+  return suggestVillaAccount(text) || 'villa';
+}
+// Advances whose invoices and returned cash now add up are closed automatically.
+async function autoSettleAdvances(name){
+  const done = [];
+  for(const adv of allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name)){
+    const f = advFigures(adv);
+    if(Math.abs(f.left) >= 1) continue;
+    const log = [...(adv.settleLog || []), advStamp(`Settled — bills LKR ${Math.round(f.billed).toLocaleString()}, returned LKR ${Math.round(f.returned).toLocaleString()}`)];
+    const { error } = await sb.from('petty_cash_transactions').update({
+      settled:true, settled_date: todayISO(), settled_by: currentUser.username, settle_log: log,
+    }).eq('id', adv.id);
+    if(!error){ done.push(adv); logActivity('update', 'petty_cash_transactions', `Settled advance: ${name} — LKR ${adv.amount.toLocaleString()} (all invoices in)`); }
+  }
+  return done;
+}
+function wireSimpleAdvance(name){
+  const g = id => document.getElementById(id);
+  if(!g('saSave')) return;
+  const err = g('saError');
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  const say = m => { const el = g('saMsg'); el.innerHTML = m; el.style.display = 'block'; };
+  g('saCashToggle').addEventListener('click', ()=>{ const c = g('saCash'); c.style.display = c.style.display === 'none' ? '' : 'none'; });
+
+  g('saSave').addEventListener('click', async ()=>{
+    err.style.display = 'none';
+    const date = g('saDate').value || todayISO();
+    const amount = Math.round((parseFloat(g('saAmount').value) || 0) * 100) / 100;
+    const place = g('saFor').value;
+    const purpose = g('saPurpose').value.trim() || `Invoice from ${name}'s advance`;
+    const invNo = g('saNo').value.trim() || null;
+    if(!(amount > 0)) return fail('Enter the bill amount.');
+    if(date > todayISO()) return fail('The invoice date cannot be in the future.');
+    const open = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if(!open.length) return fail('He has no open advance to put this against.');
+    const holdingNow = open.reduce((n, t) => n + advFigures(t).left, 0);
+    if(amount > holdingNow + 0.5 && !confirm(`This bill is LKR ${Math.round(amount - holdingNow).toLocaleString()} more than he is holding (LKR ${Math.round(holdingNow).toLocaleString()}).\n\nSave it anyway? The company then owes him the difference.`)) return;
+    if(invNo){
+      const twin = allCashTxns.find(t => t.invoiceNo && t.invoiceNo.trim().toLowerCase() === invNo.toLowerCase());
+      if(twin && !confirm(`Invoice ${invNo} is already recorded: ${twin.purpose || 'expense'} — LKR ${Number(twin.amount).toLocaleString()} on ${twin.date}.\n\nSave this one as well?`)) return;
+    }
+    // One bill can cover what is left on more than one advance (oldest first).
+    const parts = [];
+    let rest = amount;
+    open.forEach((adv, i) => {
+      if(rest <= 0) return;
+      const left = Math.max(0, advFigures(adv).left);
+      const take = i === open.length - 1 ? rest : Math.min(rest, left);
+      if(take > 0){ parts.push({ adv, amount: Math.round(take * 100) / 100 }); rest = Math.round((rest - take) * 100) / 100; }
+    });
+    if(!parts.length) parts.push({ adv: open[open.length - 1], amount });
+    const btn = g('saSave'); btn.disabled = true; btn.textContent = 'Saving…';
+    try{
+      const files = [...(g('saFile').files || [])];
+      const urls = [];
+      for(const f of files) urls.push(await uploadReceiptFile(f));
+      const cols = await pcColsReady();
+      for(const [i, pt] of parts.entries()){
+        const { error } = await sb.from('petty_cash_transactions').insert({
+          type:'expense', date, card: pt.adv.card, for: place,
+          purpose: parts.length > 1 ? `${purpose} (part ${i + 1} of ${parts.length})` : purpose,
+          amount: pt.amount, note:'', linked_inventory:false, invoice_urls: urls,
+          employee_name: name, direct_expense:false, account_code: advAccountFor(place, purpose), advance_id: String(pt.adv.id),
+          ...(cols ? { invoice_no: invNo, bank_account: pt.adv.card === 'bank' ? (pt.adv.bankAccount || null) : null } : {}),
+        });
+        if(error) throw error;
+      }
+      logActivity('create', 'petty_cash_transactions', `Invoice from ${name}'s advance: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[place] || place}), dated ${date}${invNo ? ', invoice ' + invNo : ''}`);
+      await fetchCash();
+      const settled = await autoSettleAdvances(name);
+      if(settled.length) await fetchCash();
+      const nowHolding = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name).reduce((n, t) => n + advFigures(t).left, 0);
+      const more = confirm(`Saved — LKR ${amount.toLocaleString()} dated ${fmtDay(date)}.\n\n${name} is now holding LKR ${Math.round(nowHolding).toLocaleString()}.${settled.length ? '\nAn advance is fully accounted for and has been settled.' : ''}\n\nDoes he have another invoice to add?`);
+      openStaffAdvanceStatement(name);
+      const msg = `✓ Saved LKR ${amount.toLocaleString()} (${esc(fmtDay(date))}). ${esc(name)} is now holding <b>LKR ${Math.round(nowHolding).toLocaleString()}</b>.${settled.length ? ' Advance settled ✓' : ''}`;
+      const el = document.getElementById('saMsg'); if(el){ el.innerHTML = msg; el.style.display = 'block'; }
+      if(more){ const a = document.getElementById('saAmount'); if(a) a.focus(); }
+      else if(document.getElementById('saForm') && !settled.length){ /* stays open for later */ }
+    }catch(e){
+      console.error(e); fail('Could not save — ' + (e.message || 'check the connection.'));
+      btn.disabled = false; btn.textContent = 'Save invoice';
+    }
+  });
+
+  g('saCashSave').addEventListener('click', async ()=>{
+    err.style.display = 'none';
+    const amount = Math.round((parseFloat(g('saCashAmount').value) || 0) * 100) / 100;
+    const date = g('saCashDate').value || todayISO();
+    if(!(amount > 0)) return fail('Enter how much cash he handed back.');
+    const adv = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
+    if(!adv) return fail('He has no open advance.');
+    try{
+      const ret = advReturnRow(adv);
+      const cols = await pcColsReady();
+      const row = { type:'income', date, card: adv.card, amount: Math.round(((ret ? ret.amount : 0) + amount) * 100) / 100,
+        employee_name: name, advance_id: String(adv.id), note: `Unused cash returned from ${name}'s advance of ${adv.date}`,
+        ...(cols ? { bank_account: adv.card === 'bank' ? (adv.bankAccount || null) : null } : {}) };
+      const { error } = ret ? await sb.from('petty_cash_transactions').update(row).eq('id', ret.id)
+                            : await sb.from('petty_cash_transactions').insert(row);
+      if(error) throw error;
+      logActivity('create', 'petty_cash_transactions', `Cash returned by ${name}: LKR ${amount.toLocaleString()}`);
+      await fetchCash();
+      const settled = await autoSettleAdvances(name);
+      if(settled.length) await fetchCash();
+      openStaffAdvanceStatement(name);
+      const now = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name).reduce((n, t) => n + advFigures(t).left, 0);
+      const el = document.getElementById('saMsg');
+      if(el){ el.innerHTML = `✓ Cash returned LKR ${amount.toLocaleString()} saved. ${esc(name)} is now holding <b>LKR ${Math.round(now).toLocaleString()}</b>.${settled.length ? ' Advance settled ✓' : ''}`; el.style.display = 'block'; }
+    }catch(e){ console.error(e); fail('Could not save — ' + (e.message || 'check the connection.')); }
+  });
 }
 // After settling from someone's page, go back to that page.
 let advReturnToStatement = null;
