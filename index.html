@@ -3211,6 +3211,12 @@ function onVillasChanged(){
     if(typeof renderVillaCodeRows === 'function' && document.getElementById('setVillaCodes')) renderVillaCodeRows();
     if(typeof renderDepositRows === 'function' && document.getElementById('setDeposits')) renderDepositRows();
     if(typeof renderVillaReport === 'function' && typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
+    if(typeof bookingsInited !== 'undefined' && bookingsInited){
+      if(typeof renderCalendar === 'function') renderCalendar();
+      if(typeof renderHoldBanner === 'function') renderHoldBanner();
+    }
+    if(typeof cashInited !== 'undefined' && cashInited && typeof renderCash === 'function') renderCash();
+    if(typeof renderGroupsVillaTabs === 'function') renderGroupsVillaTabs();
   }catch(e){ console.error('villa list refresh', e); }
 }
 
@@ -3752,7 +3758,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.30-photos';
+const APP_VERSION = 'v2026.09.30-villas';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4631,17 +4637,20 @@ document.getElementById('villaDeleteBtn').addEventListener('click', async ()=>{
   if(!checkDeletePassword()) return;
   if(!confirm(`Delete ${villaName(editingVillaId)}?\n\nIts bookings, expenses and stock stay in the database but will no longer appear on any villa tab or report. Staff assigned to it need reassigning. This cannot be undone here.`)) return;
   try{
-    await sb.from('villas').delete().eq('id', editingVillaId);
+    const { error } = await sb.from('villas').delete().eq('id', editingVillaId);
+    if(error) throw error;
     logActivity('delete', 'villas', `Deleted villa: ${editingVillaId}`);
     document.getElementById('villaModalOverlay').classList.remove('open');
+    await fetchVillasAndStaff();
   }catch(e){ console.error(e); alert('Delete failed — this villa may still have staff assigned to it.'); }
 });
 
 let editingStaffId = null;
-function openEmployeeModal(staff){
+function openEmployeeModal(staff, villaId){
   editingStaffId = staff ? staff.id : null;
   const sel = document.getElementById('empVilla');
-  sel.innerHTML = VILLAS.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  sel.innerHTML = villasNow().map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  if(!staff && villaId && [...sel.options].some(o => o.value === villaId)) sel.value = villaId;
   document.getElementById('employeeModalOverlay').querySelector('h3').textContent = staff ? 'Edit employee' : 'Add employee';
   document.getElementById('empName').value = staff ? staff.name : '';
   if(staff) sel.value = staff.villa;
@@ -4754,10 +4763,25 @@ function renderHK(){
     th.classList.toggle('today-col', sameDay(d,today));
   }
   const tbody=document.getElementById('tbody'); tbody.innerHTML='';
-  let lastVilla=null;
-  for(const person of STAFF){
-    if(person.villa!==lastVilla){
-      const villa=VILLAS.find(v=>v.id===person.villa);
+  // Every villa gets its block — a new villa shows up here the moment it is
+  // added, before anyone is assigned to it. Staff whose villa no longer exists
+  // are kept visible under "No villa" so they can be moved.
+  const villaOrder = villasNow();
+  const known = new Set(villaOrder.map(v => v.id));
+  const lockedV = (typeof lockedVilla === 'function') ? lockedVilla() : null;
+  const blocks = villaOrder.filter(v => !lockedV || v.id === lockedV)
+    .map(v => ({ villa:v, people: STAFF.filter(p => p.villa === v.id) }));
+  const orphans = STAFF.filter(p => !known.has(p.villa));
+  if(orphans.length && !lockedV) blocks.push({ villa:{ id:'', name:'No villa — edit to reassign', color:'#868e96' }, people: orphans, orphan:true });
+  const rowsInOrder = [];
+  for(const blk of blocks){
+    rowsInOrder.push({ head: blk });
+    if(!blk.people.length) rowsInOrder.push({ empty: blk.villa });
+    blk.people.forEach(p => rowsInOrder.push({ person: p }));
+  }
+  for(const item of rowsInOrder){
+    if(item.head){
+      const villa = item.head.villa;
       const tr=document.createElement('tr'); tr.className='villa-row';
       const td=document.createElement('td'); td.colSpan=8;
       const tagSpan = document.createElement('span');
@@ -4765,14 +4789,32 @@ function renderHK(){
       tagSpan.style.background = `color-mix(in srgb, ${villa.color} 12%, white)`;
       tagSpan.style.color = villa.color;
       tagSpan.innerHTML = `${esc(villa.name)}<span class="villa-dot" style="background:${esc(villa.color)}"></span>`;
-      if(canChange('housekeeping')){
+      if(canChange('housekeeping') && !item.head.orphan){
         tagSpan.style.cursor = 'pointer';
         tagSpan.title = 'Click to edit this villa';
         tagSpan.addEventListener('click', ()=> openVillaModal(villa));
       }
       td.appendChild(tagSpan);
-      tr.appendChild(td); tbody.appendChild(tr); lastVilla=person.villa;
+      tr.appendChild(td); tbody.appendChild(tr);
+      continue;
     }
+    if(item.empty){
+      const tr=document.createElement('tr');
+      const td=document.createElement('td'); td.colSpan=8; td.className='hk-empty';
+      td.style.cssText='padding:10px 14px;color:var(--muted);font-size:13px';
+      td.textContent = 'No staff assigned to this villa yet. ';
+      if(canChange('housekeeping')){
+        const b=document.createElement('button'); b.type='button'; b.className='btn-link hk-add-emp';
+        b.style.cssText='background:none;border:0;color:var(--accent,#0c8599);font-weight:600;cursor:pointer;padding:0;text-decoration:underline';
+        b.textContent='+ Add an employee here';
+        const vid=item.empty.id;
+        b.addEventListener('click', ()=> openEmployeeModal(null, vid));
+        td.appendChild(b);
+      }
+      tr.appendChild(td); tbody.appendChild(tr);
+      continue;
+    }
+    const person = item.person;
     const tr=document.createElement('tr');
     const nameTd=document.createElement('td'); nameTd.className='staffcell';
     const nameSpan = document.createElement('span');
