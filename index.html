@@ -3758,7 +3758,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.01-delete';
+const APP_VERSION = 'v2026.10.02-logins';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -3823,8 +3823,19 @@ const loginMsg = (kind, text)=>{
 async function loadMyProfile(){
   const { data: { user } } = await sb.auth.getUser();
   if(!user) return null;
-  const { data, error } = await sb.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+  let { data, error } = await sb.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
   if(error){ console.error('profile lookup failed', error); return null; }
+  if(!data){
+    // Makky may have set this email up before (or after) the login was made — ask
+    // the database to join the two (file 19), then look again.
+    try{
+      const { error: cErr } = await sb.rpc('claim_my_profile');
+      if(!cErr){
+        const again = await sb.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+        if(!again.error) data = again.data;
+      }
+    }catch(e){ console.error('claim profile', e); }
+  }
   if(!data) return { blocked:true, email:user.email };
   if(data.status === 'pending') return { pending:true, email:user.email };
   if(data.active === false) return { blocked:true, suspended:true, email:user.email };
@@ -3851,7 +3862,7 @@ async function enterApp(profile){
 function showNoAccess(email, suspended){
   loginMsg('error', suspended
     ? `Access for ${email} has been switched off. Ask Makky to switch it back on under Users.`
-    : `${email} is signed in, but no access has been set up for this address yet. Ask Makky to add it under Users.`);
+    : `${email} has a login, but no access has been set up for this address yet. Ask Makky to add exactly this email under Users — then sign in again (no need to register again).`);
   sb.auth.signOut();
 }
 
@@ -11273,7 +11284,16 @@ document.getElementById('userSave').addEventListener('click', async ()=>{
       const { error } = await sb.from('profiles').insert({ email, ...payload });
       if(error) throw error;
       logActivity('create', 'profiles', `Gave ${email} access — ${perms.length} permission(s)`);
-      alert(`${email} is on the list.\n\nTell them to open the app, press "New here? Register for access", and use this same email with a password of their choosing. They will then show under "Waiting for approval" with the ticks you chose — press "Review & approve" once you know it is really them.`);
+      // The database joins this to their login straight away if they already have one.
+      let row = null;
+      try{ const r = await sb.from('profiles').select('user_id,status,active').eq('email', email).maybeSingle(); row = r.data; }catch(e){}
+      if(row && row.user_id && row.status !== 'pending'){
+        alert(`${email} already has a login, and it is now joined to this access.\n\nThey can sign in straight away with their own password.`);
+      } else if(row && row.user_id){
+        alert(`${email} already has a login, now joined to this access — but the email on that login was never confirmed from the link, so it could be anyone.\n\nThey are under "Waiting for approval" with the ticks you chose. Check it is really them (a call or WhatsApp), then press "Review & approve".`);
+      } else {
+        alert(`${email} is on the list.\n\nTell them to open the app, press "New here? Register for access", and use this same email with a password of their choosing. Once they confirm their email from the link Supabase sends, they are in with the ticks you chose. If no link is sent, they show under "Waiting for approval" — press "Review & approve" once you know it is them.`);
+      }
     }
     document.getElementById('userModalOverlay').classList.remove('open');
     fetchAppUsers();
