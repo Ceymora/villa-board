@@ -3758,7 +3758,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.01-forms';
+const APP_VERSION = 'v2026.10.01-delete';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4637,12 +4637,11 @@ document.getElementById('villaDeleteBtn').addEventListener('click', async ()=>{
   if(!checkDeletePassword()) return;
   if(!confirm(`Delete ${villaName(editingVillaId)}?\n\nIts bookings, expenses and stock stay in the database but will no longer appear on any villa tab or report. Staff assigned to it need reassigning. This cannot be undone here.`)) return;
   try{
-    const { error } = await sb.from('villas').delete().eq('id', editingVillaId);
-    if(error) throw error;
+    await delRows('villas', 'id', editingVillaId);
     logActivity('delete', 'villas', `Deleted villa: ${editingVillaId}`);
     document.getElementById('villaModalOverlay').classList.remove('open');
-    await fetchVillasAndStaff();
-  }catch(e){ console.error(e); alert('Delete failed — this villa may still have staff assigned to it.'); }
+    await afterDelete('villas');
+  }catch(e){ console.error(e); alert('Delete failed — this villa may still have staff assigned to it, or you may not have permission. ' + ((e && e.message) || '')); }
 });
 
 let editingStaffId = null;
@@ -4690,10 +4689,11 @@ document.getElementById('empDeleteBtn').addEventListener('click', async ()=>{
   if(!checkDeletePassword()) return;
   if(!confirm('Remove this employee from the board?')) return;
   try{
-    await sb.from('staff').delete().eq('id', editingStaffId);
+    await delRows('staff', 'id', editingStaffId);
     logActivity('delete', 'staff', `Removed employee: ${editingStaffId}`);
     document.getElementById('employeeModalOverlay').classList.remove('open');
-  }catch(e){ console.error(e); }
+    await afterDelete('staff');
+  }catch(e){ delFailed(e); }
 });
 
 const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -4751,6 +4751,7 @@ async function clearWeek(monday){
   const { error } = await sb.from('villa_board').delete().eq('week', weekId(monday));
   if(error) console.error(error);
   else logActivity('delete', 'villa_board', `Cleared all housekeeping marks for week of ${weekId(monday)}`);
+  await fetchWeek(monday);
 }
 function renderHK(){
   const sunday=new Date(currentMonday); sunday.setDate(sunday.getDate()+6);
@@ -6058,11 +6059,12 @@ btnDelete.addEventListener('click', async ()=>{
   if(!editingBookingId) return;
   if(confirm('Delete this booking?')){
     try{
-      await sb.from('villa_bookings').delete().eq('id', editingBookingId);
+      await delRows('villa_bookings', 'id', editingBookingId);
       logActivity('delete', 'villa_bookings', `Deleted booking (${fCheckIn.value} → ${fCheckOut.value})`);
       closeModal();
+      await afterDelete('villa_bookings');
     }
-    catch(e){ console.error(e); }
+    catch(e){ delFailed(e); }
   }
 });
 
@@ -7111,10 +7113,19 @@ function renderCash(){
       if(confirm('Delete this transaction?')){
         try{
           // The bill stays in storage: the record can be restored from Deleted items.
-          await sb.from('petty_cash_transactions').delete().eq('id', t.id);
+          await delRows('petty_cash_transactions', 'id', t.id);
+          // Stock this bill added goes with it (and comes back with it on restore).
+          const touched = ['petty_cash_transactions'];
+          if(t.linkedInventory){
+            for(const invId of [t.linkedDistributeId, t.linkedPurchaseId].filter(Boolean)){
+              try{ await delRows('inventory_transactions', 'id', invId); }catch(_e){ console.error(_e); }
+            }
+            touched.push('inventory_transactions');
+          }
           const label = t.type==='income' ? payLabel(t) : (t.type==='advance' ? `Advance to ${t.employeeName||''}` : t.purpose);
           logActivity('delete', 'petty_cash_transactions', `Deleted ${t.type}: ${label} — LKR ${t.amount.toLocaleString()}`);
-        }catch(e){ console.error(e); }
+          await afterDelete(...touched);
+        }catch(e){ delFailed(e); }
       }
     });
     actionTd.appendChild(delBtn);
@@ -8091,10 +8102,11 @@ document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
     if(ret) await sb.from('petty_cash_transactions').delete().eq('id', ret.id);
     if(top) await sb.from('petty_cash_transactions').delete().eq('id', top.id);
     await sb.from('petty_cash_transactions').update({ advance_id: null }).eq('advance_id', String(editingCashId));
-    await sb.from('petty_cash_transactions').delete().eq('id', editingCashId);
+    await delRows('petty_cash_transactions', 'id', editingCashId);
     logActivity('delete', 'petty_cash_transactions', `Deleted advance: ${adv ? adv.employeeName + ' — LKR ' + adv.amount.toLocaleString() : ''}`);
     document.getElementById('advanceModalOverlay').classList.remove('open');
-  }catch(e){ console.error(e); }
+    await afterDelete('petty_cash_transactions');
+  }catch(e){ delFailed(e); }
 });
 
 /* ---- the lists on the Petty Cash page ---- */
@@ -8366,10 +8378,10 @@ function renderInventory(){
         if(!checkDeletePassword()) return;
         if(!confirm(`Delete "${name}" completely? This removes all its purchase and distribution history.`)) return;
         try{
-          const { error } = await sb.from('inventory_transactions').delete().eq('item', name);
-          if(error) throw error;
+          await delRows('inventory_transactions', 'item', name);
           logActivity('delete', 'inventory_transactions', `Deleted item entirely: "${name}" (all purchase/distribution history removed)`);
-        }catch(e){ console.error(e); }
+          await afterDelete('inventory_transactions');
+        }catch(e){ delFailed(e); }
       });
       delTd.appendChild(delBtn);
       tr.appendChild(delTd);
@@ -8435,9 +8447,10 @@ function renderInventory(){
         if(!checkDeletePassword()) return;
         if(confirm('Delete this record?')){
           try{
-            await sb.from('inventory_transactions').delete().eq('id', t.id);
+            await delRows('inventory_transactions', 'id', t.id);
             logActivity('delete', 'inventory_transactions', `Deleted ${t.type} record: ${t.qty} × ${t.item}`);
-          }catch(e){ console.error(e); }
+            await afterDelete('inventory_transactions');
+          }catch(e){ delFailed(e); }
         }
       });
       actionTd.appendChild(delBtn);
@@ -9343,10 +9356,10 @@ document.getElementById('dpDeleteBtn').addEventListener('click', async ()=>{
   if(!confirm('Delete this direct payment?')) return;
   try{
     const existing = allCashTxns.find(t => String(t.id) === String(editingDirectPayId));
-    await sb.from('petty_cash_transactions').delete().eq('id', editingDirectPayId);
+    await delRows('petty_cash_transactions', 'id', editingDirectPayId);
     logActivity('delete', 'petty_cash_transactions', 'Deleted a direct payment');
     document.getElementById('dpModalOverlay').classList.remove('open');
-    await fetchCash();
+    await afterDelete('petty_cash_transactions');
     renderVillaReport();
   }catch(e){ alert('Could not delete — ' + (e.message || 'check the connection.')); }
 });
@@ -9389,9 +9402,11 @@ async function renderVillaReport(){
       if(confirm('Delete this expense?')){
         try{
           const opExRecord = allOpEx.find(o => o.id === btn.dataset.opexId);
-          await sb.from('villa_operating_expenses').delete().eq('id', btn.dataset.opexId);
+          await delRows('villa_operating_expenses', 'id', btn.dataset.opexId);
           logActivity('delete', 'villa_operating_expenses', 'Deleted an operating expense entry');
-        }catch(e){ console.error(e); }
+          await afterDelete('villa_operating_expenses');
+          if(typeof renderVillaReport === 'function' && villaReportInited) renderVillaReport();
+        }catch(e){ delFailed(e); }
       }
     });
   });
@@ -10690,16 +10705,72 @@ async function fetchBin(){
   binRows = data || [];
   return null;
 }
-// Records removed by the same person within a few seconds belong to one delete.
+/* What goes back together. Rows removed by one action share the exact same moment
+   (the database stamps a whole delete at once). On top of that, a bill brings the
+   stock it created, and an advance brings its cash-back and top-up entries — so a
+   restore puts back the whole thing, and "Delete for good" removes the whole thing.
+   Two separate deletes, however close together, stay separate. */
 function binGroups(rows){
   const groups = [];
+  const at = new Map();
+  const key = (t, id) => t + ':' + id;
+  const same = (a, b) => !!a.restored === !!b.restored;
   for(const r of rows){
-    const t = new Date(r.deleted_at).getTime();
-    const g = groups[groups.length - 1];
-    if(g && g.by === (r.deleted_by_email || '') && Math.abs(g.t - t) < 8000 && !!g.restored === !!r.restored_at){ g.rows.push(r); g.t = t; continue; }
-    groups.push({ by: r.deleted_by_email || '', t, restored: r.restored_at, rows:[r] });
+    const restored = r.restored_at || null;
+    let g = groups.find(x => x.stamp === r.deleted_at && x.table === r.table_name && !!x.restored === !!restored);
+    if(!g){
+      g = { by: r.deleted_by_email || '', t: new Date(r.deleted_at).getTime(), stamp: r.deleted_at, table: r.table_name, restored, rows: [] };
+      groups.push(g);
+    }
+    g.rows.push(r);
+    at.set(key(r.table_name, r.row_id), g);
   }
-  return groups;
+  const merge = (into, from) => {
+    if(!from || from === into || !same(into, from)) return;
+    from.rows.forEach(r => { into.rows.push(r); at.set(key(r.table_name, r.row_id), into); });
+    from.rows = [];
+  };
+  for(const g of groups){
+    for(const r of [...g.rows]){
+      if(r.table_name !== 'petty_cash_transactions') continue;
+      const d = r.row_data || {};
+      merge(at.get(key(r.table_name, r.row_id)), at.get(key('inventory_transactions', d.linked_purchase_id)));
+      merge(at.get(key(r.table_name, r.row_id)), at.get(key('inventory_transactions', d.linked_distribute_id)));
+      // cash handed back / extra paid, deleted along with their advance
+      if(d.advance_id != null && (d.type === 'income' || d.type === 'advance')){
+        const parent = at.get(key('petty_cash_transactions', d.advance_id));
+        if(parent && Math.abs(parent.t - new Date(r.deleted_at).getTime()) < 60000) merge(parent, at.get(key(r.table_name, r.row_id)));
+      }
+    }
+  }
+  return groups.filter(g => g.rows.length);
+}
+/* Deleting. The database answers "done" even when a permission rule quietly kept the
+   row, so ask it to return what it removed and treat nothing-removed as a failure.
+   Then reload what changed straight away, so every total moves at once — live
+   updates may be switched off. */
+async function delRows(table, col, val){
+  const { data, error } = await sb.from(table).delete().eq(col, val).select('id');
+  if(error) throw error;
+  if(!data || !data.length) throw new Error('Nothing was deleted — you may not have permission to delete this.');
+  return data.length;
+}
+async function afterDelete(...tables){
+  await refreshAfterRestore(new Set(tables));
+  refreshBinCount();
+}
+function delFailed(e){
+  console.error(e);
+  alert('Could not delete. ' + ((e && e.message) || 'Check the connection and try again.'));
+}
+async function refreshBinCount(){
+  if(typeof canRestore !== 'function' || !canRestore()) return;
+  try{
+    const err = await fetchBin();
+    if(err) return;
+    const waiting = binRows.filter(r => !r.restored_at).length;
+    document.querySelectorAll('.bin-count').forEach(el => el.textContent = waiting ? String(waiting) : '');
+  }catch(e){ console.error(e); }
 }
 async function refreshAfterRestore(tables){
   const jobs = [];
@@ -10726,11 +10797,13 @@ async function renderBin(){
     return;
   }
   const allow = binFilter === 'all' ? null : new Set(BIN_TAB_OF[binFilter] || [binFilter]);
-  const rows = binRows.filter(r => (binShowRestored || !r.restored_at) && (!allow || allow.has(r.table_name)));
+  const groupsAll = binGroups(binRows.filter(r => binShowRestored || !r.restored_at))
+    .filter(g => !allow || g.rows.some(r => allow.has(r.table_name)));
+  const rows = groupsAll.flatMap(g => g.rows);
   const waiting = binRows.filter(r => !r.restored_at).length;
   document.querySelectorAll('.bin-count').forEach(el => el.textContent = waiting ? String(waiting) : '');
   if(!rows.length){ body.innerHTML = `<div class="manage-empty">${binShowRestored ? 'Nothing here.' : 'Nothing deleted that is waiting to be put back.'}</div>`; return; }
-  body.innerHTML = binGroups(rows).map((g, gi) => {
+  body.innerHTML = groupsAll.map((g, gi) => {
     const when = new Date(g.t).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
     const sections = [...new Set(g.rows.map(r => (BIN_SECTIONS[r.table_name] || {}).label || r.table_name))].join(', ');
     const files = g.rows.reduce((n, r) => n + binAttachments(r.row_data).length, 0);
@@ -10747,7 +10820,7 @@ async function renderBin(){
       </div>`}
     </div>`;
   }).join('');
-  const groups = binGroups(rows);
+  const groups = groupsAll;
   body.querySelectorAll('[data-bin-restore]').forEach(b => b.addEventListener('click', async ()=>{
     const g = groups[Number(b.dataset.binRestore)];
     const what = g.rows.map(r => '• ' + binSummary(r.table_name, r.row_data)).join('\n');
@@ -10761,16 +10834,23 @@ async function renderBin(){
     }
     await refreshAfterRestore(done);
     if(problems.length) alert('Some of it could not be put back:\n\n' + problems.join('\n'));
-    renderBin();
+    await renderBin();
+    refreshBinCount();
   }));
   body.querySelectorAll('[data-bin-forever]').forEach(b => b.addEventListener('click', async ()=>{
     const g = groups[Number(b.dataset.binForever)];
     if(!confirm('Delete this for good? It can never be put back, and its attachments are removed too.')) return;
+    const failed = [];
     for(const r of g.rows){
-      const { error } = await sb.from('deleted_records').delete().eq('id', r.id);
-      if(!error){ await deleteReceiptFiles(binAttachments(r.row_data)); logActivity('delete', 'deleted_records', 'Deleted for good: ' + binSummary(r.table_name, r.row_data)); }
+      try{
+        await delRows('deleted_records', 'id', r.id);
+        await deleteReceiptFiles(binAttachments(r.row_data));
+        logActivity('delete', 'deleted_records', 'Deleted for good: ' + binSummary(r.table_name, r.row_data));
+      }catch(e){ console.error(e); failed.push(binSummary(r.table_name, r.row_data)); }
     }
-    renderBin();
+    if(failed.length) alert('These could not be deleted for good (only Makky can):\n\n' + failed.join('\n'));
+    await renderBin();
+    refreshBinCount();
   }));
 }
 function openBin(filter){
@@ -13712,8 +13792,8 @@ document.getElementById('ceSave').addEventListener('click', async ()=>{
 });
 document.getElementById('ceDelete').addEventListener('click', async ()=>{
   if(!editingCe || !checkDeletePassword()) return;
-  const { error } = await sb.from('company_entries').delete().eq('id', editingCe.id);
-  if(error){ alert('Could not delete.'); return; }
+  try{ await delRows('company_entries', 'id', editingCe.id); }catch(e){ return delFailed(e); }
+  refreshBinCount();
   logActivity('delete', 'company_entries', `Deleted ${editingCe.kind}: ${editingCe.description}`);
   document.getElementById('ceModalOverlay').classList.remove('open');
   await fetchCoEntries(); onAcctDataChanged();
@@ -14001,8 +14081,8 @@ document.getElementById('spDelete').addEventListener('click', async ()=>{
   const used = allPayroll.some(p => p.profileId === editingSp.id);
   if(used && !confirm(`${editingSp.fullName} has past salary sheets. If they've left, untick “Currently working here” instead — that keeps their details on the old sheets.\n\nDelete the profile anyway?`)) return;
   if(!checkDeletePassword()) return;
-  const { error } = await sb.from('staff_profiles').delete().eq('id', editingSp.id);
-  if(error){ alert('Could not delete.'); return; }
+  try{ await delRows('staff_profiles', 'id', editingSp.id); }catch(e){ return delFailed(e); }
+  refreshBinCount();
   logActivity('delete', 'staff_profiles', `Deleted staff profile: ${editingSp.fullName}`);
   document.getElementById('spModalOverlay').classList.remove('open');
   await fetchStaffProfiles(); onAcctDataChanged();
@@ -14076,8 +14156,8 @@ document.getElementById('psSave').addEventListener('click', async ()=>{
 });
 document.getElementById('psDelete').addEventListener('click', async ()=>{
   if(!editingPs || !confirm(`Take ${editingPs.name} off the ${monthLabel(payMonthDate)} payroll?`)) return;
-  const { error } = await sb.from('payroll_entries').delete().eq('id', editingPs.id);
-  if(error){ alert('Could not remove.'); return; }
+  try{ await delRows('payroll_entries', 'id', editingPs.id); }catch(e){ return delFailed(e); }
+  refreshBinCount();
   logActivity('delete', 'payroll_entries', `Removed ${editingPs.name} from ${monthLabel(payMonthDate)} payroll`);
   document.getElementById('psModalOverlay').classList.remove('open');
   await fetchPayroll(); onAcctDataChanged();
@@ -14707,8 +14787,8 @@ function openOwnerPayModal(villaId, monthDate){
   g('opExisting').querySelectorAll('[data-op-del]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!checkDeletePassword()) return;
-      const { error } = await sb.from('owner_payments').delete().eq('id', btn.dataset.opDel);
-      if(error){ alert('Could not delete.'); return; }
+      try{ await delRows('owner_payments', 'id', btn.dataset.opDel); }catch(e){ return delFailed(e); }
+      refreshBinCount();
       await fetchOwnerPayments();
       openOwnerPayModal(villaId, monthDate);
       if(typeof renderVillaReport === 'function') renderVillaReport();
