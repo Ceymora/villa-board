@@ -1265,6 +1265,9 @@
         <span class="rpt-picker-label">Group by:</span>
         <div id="exGroupTabs" class="villatabs" style="margin:0; display:inline-flex;"></div>
         <span class="sep"></span>
+        <span class="rpt-picker-label">Show in:</span>
+        <span id="exCurWrap"></span>
+        <span class="sep"></span>
         <button class="add-booking-btn" id="exExportBtn">⬇️ Export CSV</button>
         <button class="add-booking-btn" id="exPrintBtn">🖨️ Print / PDF</button>
         <button class="add-booking-btn cmp-open-btn" data-cmp-open="costs">📈 Compare</button>
@@ -1406,20 +1409,20 @@
     <div id="pettyCashPanel" style="display:none">
       <div class="cash-summary">
         <div class="cash-card ceymora">
-          <div class="cash-card-label"><span data-pettyname="ceymora">Ceymora Card Petty Cash</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-pettyname="ceymora">Petty Cash Ceymora</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="ceymoraBalance">LKR 0</div>
         </div>
         <div class="cash-card kalava">
-          <div class="cash-card-label"><span data-pettyname="kalava_card">Kalava Villa Petty Cash</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
+          <div class="cash-card-label"><span data-pettyname="kalava_card">Petty Cash Kalava</span> <span style="opacity:.75; font-weight:400;">· tap to explain</span></div>
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
         <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
-          <div class="cash-card-label">Direct Villa Purchases — via <span data-cardname="kalava_card">Kalava Villa Card</span></div>
+          <div class="cash-card-label"><span data-cardname="kalava_card">Direct Villa Purchases Kalava</span></div>
           <div class="cash-card-balance" id="directPurchasesKalava">LKR 0</div>
           <div class="cash-card-sub" id="directKalavaSub"></div>
         </div>
         <div class="cash-card" id="directPurchasesCeymoraCard" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91); cursor:pointer;" title="Click to see which transactions make up this total">
-          <div class="cash-card-label">Direct Villa Purchases — via <span data-cardname="ceymora">Ceymora Card</span></div>
+          <div class="cash-card-label"><span data-cardname="ceymora">Direct Villa Purchases Ceymora</span></div>
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
           <div class="cash-card-sub" id="directCeymoraSub"></div>
         </div>
@@ -1430,14 +1433,17 @@
         </div>
       </div>
       <div class="card-tools no-print">
-        <button class="rpt-quick" id="renameCardsBtn" style="display:none;">✏️ Rename the cards</button>
+        <button class="rpt-quick" id="renameCardsBtn" style="display:none;">✏️ Rename the boxes</button>
         <button class="rpt-quick" data-bin-open="pettycash" style="display:none;">🗑 Deleted items <span class="bin-count"></span></button>
       </div>
-      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the petty cash float on each card: top-ups and returned cash in, advances and petty cash expenses out. "Direct" = recorded with <b>+ Payment From Card</b> — paid with the card straight for a villa, so it is shown here but NOT taken off the petty cash float. Sharon's own-money payments are kept apart under Sharon Expenses.</div>
+      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Petty Cash Ceymora and Petty Cash Kalava are the cash on each card: top-ups and returned cash in, advances and petty cash expenses out. Direct Villa Purchases are paid with the card straight for a villa, so they are shown here but NOT taken off petty cash. Bank transfers and Sharon's own-money payments are kept apart too. Record any of them with <b>+ Expenses</b>.</div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
-        <div class="manage-title">Staff advance balances</div>
-        <div class="field-hint" style="margin:2px 0 8px;">How much cash each person is still holding: advances given, minus bills recorded and cash handed back. Ticking an advance as settled doesn't change this — only recorded bills and returned cash do, so a balance here means money not yet accounted for.</div>
+        <div class="manage-header" style="border-top:none; padding-top:0;">
+          <span class="manage-title">Staff advance balances</span>
+          <button class="add-booking-btn" id="advReportBtn">📋 Staff advances report</button>
+        </div>
+        <div class="field-hint" style="margin:2px 0 8px;">How much cash each person is still holding: advances given, minus bills recorded and cash handed back. Tap a person to record their bills or settle. The report shows every advance — when it was given, when it was settled, and what is still held.</div>
         <div id="advanceWalletsSummary" class="cash-summary"></div>
       </div>
 
@@ -1445,10 +1451,8 @@
         <div class="status-msg" id="cashStatusMsg">Loading…</div>
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addIncomeBtn">+ Petty Cash Money Received</button>
-          <button class="add-booking-btn" id="addExpenseBtn">+ Petty Cash Expenses</button>
+          <button class="add-booking-btn" id="addExpenseBtn">+ Expenses</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
-          <button class="add-booking-btn" id="addDirectExpenseBtn">+ Payment From Card</button>
-          <button class="add-booking-btn" id="addSharonExpenseBtn">+ Record Sharon's expense</button>
         </div>
       </div>
 
@@ -1471,19 +1475,6 @@
           <div class="field-hint" style="margin:2px 0 8px;">Someone asked to reopen a settled advance. Nothing changes until it's approved here.</div>
           <div id="undoRequestsList" class="manage-list"></div>
         </div>
-        <div class="manage-title">Advances to staff</div>
-        <div class="field-hint" style="margin:2px 0 8px;">When each advance was given and what is still open — a record only. To settle, tap the person's card under <b>Staff advance balances</b> above: every open advance of theirs is there with a Settle button. Tapping a line here opens the same page.</div>
-        <div id="advancesList" class="manage-list"></div>
-      </div>
-
-      <div class="manage-section" id="settledAdvancesSection">
-        <div class="manage-header">
-          <span class="manage-title">Settled advances</span>
-          <select id="settledFilter" class="acct-select" style="max-width:200px;"></select>
-        </div>
-        <div class="field-hint" style="margin:2px 0 8px;">Every advance that's been closed — who settled it, the bills it paid for and the cash that came back. To reopen one, request an undo; Makky approves it.</div>
-        <div id="settledAdvancesTotals" class="acct-summary"></div>
-        <div id="settledAdvancesList" class="manage-list" style="max-height:380px;"></div>
       </div>
 
       <div class="manage-section">
@@ -1509,7 +1500,8 @@
             <button class="villatab-btn active" data-cashkind="all">Everything</button>
             <button class="villatab-btn" data-cashkind="income">💰 Money received</button>
             <button class="villatab-btn" data-cashkind="expense">Petty cash expenses</button>
-            <button class="villatab-btn" data-cashkind="direct">Direct expenses</button>
+            <button class="villatab-btn" data-cashkind="direct">Direct villa purchases</button>
+            <button class="villatab-btn" data-cashkind="bank">Bank transfers</button>
             <button class="villatab-btn" data-cashkind="sharon">Sharon expenses</button>
             <button class="villatab-btn" data-cashkind="advance">Advances</button>
           </div>
@@ -2259,22 +2251,21 @@
   </div>
 </div>
 
-<!-- Expense modal: "Petty Cash Expenses" and "Payment From Card" share it -->
+<!-- Expense modal: one form for all seven kinds of expense -->
 <div class="modal-overlay" id="expenseModalOverlay">
   <div class="modal modal-wide">
-    <h3>Record expense</h3>
-    <div class="field-hint" id="expModeHint" style="margin:-4px 0 10px;"></div>
-    <label>Date</label>
-    <input type="date" id="expDate">
-    <label>Paid from</label>
+    <h3>Expenses</h3>
+    <label>What is the expense</label>
     <select id="expCard"></select>
     <div class="field-hint" id="expCardHint"></div>
-    <div id="expAdvWrap" style="display:none;">
-      <label>Whose advance <span id="expAdvanceBalanceHint" style="font-weight:400; color:var(--muted);"></span></label>
-      <select id="expFundedByAdvance"></select>
-    </div>
+    <div id="expAdvInfo" class="adv-status" style="display:none; margin:4px 0 6px;"></div>
     <div class="field-hint" id="expAdvanceWarn" style="display:none; color:#a06800; font-weight:600;"></div>
-    <div id="expForSlotDirect"></div>
+    <div id="expForWrap">
+      <label id="expForLabel">For which villa / place</label>
+      <select id="expFor"></select>
+    </div>
+    <label>Date paid</label>
+    <input type="date" id="expDate">
     <label>What was it for</label>
     <input type="text" id="expPurpose" placeholder="e.g. Cleaning supplies">
     <label>Amount (LKR)</label>
@@ -2290,11 +2281,6 @@
     <div id="expWhoseWrap" style="display:none;">
       <label>Whose mobile is it</label>
       <select id="expWhose"></select>
-    </div>
-    <div id="expForSlotPetty"></div>
-    <div id="expForWrap">
-      <label id="expForLabel">For</label>
-      <select id="expFor"></select>
     </div>
     <div class="modal-checkbox-row" id="expStockRow">
       <input type="checkbox" id="expIsStock">
@@ -2335,6 +2321,30 @@
       <button class="btn btn-cancel" id="expCancel">Cancel</button>
       <button class="btn btn-save" id="expSave">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- Staff advances report -->
+<div class="modal-overlay" id="advRptModalOverlay">
+  <div class="modal bin-modal" style="max-width:1100px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h3 style="margin:0;">📋 Staff advances report</h3>
+      <div style="display:flex; gap:8px;">
+        <button class="add-booking-btn" id="advRptPrint">🖨️ Print / PDF</button>
+        <button class="add-booking-btn" id="advRptCsv">⬇ Download CSV</button>
+        <button class="btn btn-cancel" id="advRptClose">Close</button>
+      </div>
+    </div>
+    <div class="rpt-picker no-print" style="margin-top:10px; flex-wrap:wrap;">
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Person <select id="advRptWho" class="acct-select"></select></label>
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Given <select id="advRptPeriod" class="acct-select">
+        <option value="all">All time</option><option value="month">This month</option><option value="last">Last month</option><option value="year">This year</option><option value="range">Between dates…</option></select></label>
+      <span id="advRptRange" style="display:none; gap:6px; align-items:center;">
+        <input type="date" id="advRptFrom" class="acct-select"> – <input type="date" id="advRptTo" class="acct-select"></span>
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Show <select id="advRptState" class="acct-select">
+        <option value="all">Open and settled</option><option value="open">Still open</option><option value="settled">Settled</option></select></label>
+    </div>
+    <div id="advRptBody" class="rpt-doc" style="margin-top:10px; overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -2644,17 +2654,17 @@
 
 <div class="modal-overlay" id="cardNameModalOverlay">
   <div class="modal">
-    <h3>✏️ Rename the petty cash cards</h3>
+    <h3>✏️ Rename the boxes</h3>
     <div class="field-hint">Only the names change. Every balance, expense and report stays exactly as it is — they just show the new name.</div>
-    <div class="direct-block-title" style="margin-top:12px;">When cash is spent from them</div>
-    <label>First float (used for any villa or the office)</label>
+    <div class="direct-block-title" style="margin-top:12px;">Petty cash</div>
+    <label>Ceymora's (any villa, the office or the store)</label>
     <input type="text" id="cashName1" maxlength="40">
-    <label>Second float (Kalava Villa only)</label>
+    <label>Kalava's (Kalava Villa only)</label>
     <input type="text" id="cashName2" maxlength="40">
-    <div class="direct-block-title" style="margin-top:14px;">When paid by card ("Payment From Card")</div>
-    <label>First card</label>
+    <div class="direct-block-title" style="margin-top:14px;">Direct villa purchases (paid by card)</div>
+    <label>Ceymora's</label>
     <input type="text" id="cardName1" maxlength="40">
-    <label>Second card</label>
+    <label>Kalava's</label>
     <input type="text" id="cardName2" maxlength="40">
     <div class="modal-error" id="cardNameError"></div>
     <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
@@ -3758,7 +3768,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.02-logins';
+const APP_VERSION = 'v2026.10.02-expenses';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4268,6 +4278,15 @@ let exKind = 'all';              // one of PETTY_GROUPS' keys, or 'all'
 let exAllTime = false;
 let exGroupBy = 'paid';          // 'paid' = how it was paid, 'account' = what it was for
 let exMonthDate = new Date();
+// Shown in another currency: every rupee amount is divided by one rate — the rate on
+// the last day of the month shown, or today's while that month is still running.
+let exShowCur = recallCur('exShowCur');
+const exRateCache = {};
+function exRateDay(){
+  if(exAllTime) return todayISO();
+  const last = toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth() + 1, 0));
+  return last > todayISO() ? todayISO() : last;
+}
 
 const EX_PLACES = () => ([
   { id:'all', name:'All places', color:'#495057' },
@@ -4332,7 +4351,7 @@ function renderExPickers(){
   const kt = document.getElementById('exKindTabs');
   kt.innerHTML = '';
   // Short names here: the full wording is on the summary card and the section heading.
-  const SHORT = { staff:'Petty cash', direct:'Direct', sharon:"Sharon's" };
+  const SHORT = { staff:'Petty cash', direct:'Direct', bank:'Bank', sharon:"Sharon's" };
   if(!PETTY_GROUPS.some(g => g.key === exKind)) exKind = 'all';
   [{ key:'all', label:'Everything' }, ...PETTY_GROUPS.map(g=>({ key:g.key, label:SHORT[g.key] || g.pl }))].forEach(k=>{
     const b = document.createElement('button');
@@ -4376,22 +4395,40 @@ function renderExSummary(rows){
   const totals = {}; PETTY_GROUPS.forEach(g => totals[g.key] = 0);
   let grand = 0;
   for(const r of rows){ totals[pettyGroupOf(r)] += r.amount; grand += r.amount; }
-  const colors = { staff:'#0c8599', direct:'#3b5bdb', sharon:'#e64980' };
+  const colors = { staff:'#0c8599', direct:'#3b5bdb', bank:'#f08c00', sharon:'#e64980' };
   const shown = PETTY_GROUPS.filter(g => exKind === 'all' || g.key === exKind);
   wrap.innerHTML = `
     <div class="cash-card" style="background:linear-gradient(135deg, #343a40, #14161a);">
       <div class="cash-card-label">${esc(exKind === 'all' ? 'Total spending' : (PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || 'Total')}</div>
-      <div class="cash-card-balance">LKR ${Math.round(grand).toLocaleString()}</div>
+      <div class="cash-card-balance">${lkr(grand)}</div>
       <div class="cash-card-sub">${esc(EX_PLACES().find(v=>v.id===exPlace).name)} · ${esc(exPeriodLabel())} · ${rows.length} item${rows.length===1?'':'s'}</div>
     </div>` + shown.map(g => `
     <div class="cash-card" style="background:linear-gradient(135deg, ${colors[g.key]}, ${colors[g.key]}bb);">
       <div class="cash-card-label">${esc(g.pl)}</div>
-      <div class="cash-card-balance">LKR ${Math.round(totals[g.key]).toLocaleString()}</div>
+      <div class="cash-card-balance">${lkr(totals[g.key])}</div>
     </div>`).join('');
 }
 
 function renderVillaExpenses(){
   if(!document.getElementById('exBody')) return;
+  const cur = exShowCur || 'LKR';
+  let rate = 1, curNote = '';
+  if(cur !== 'LKR'){
+    const key = cur + '|' + exRateDay();
+    if(!(key in exRateCache)){
+      exRateCache[key] = undefined;
+      reportRateFor(cur, exRateDay()).then(r => { exRateCache[key] = r || null; renderVillaExpenses(); })
+        .catch(() => { exRateCache[key] = null; renderVillaExpenses(); });
+    }
+    const r = exRateCache[key];
+    if(r === undefined){ curNote = `Getting the ${cur} rate… shown in LKR until it arrives.`; }
+    else if(!r){ curNote = `No ${cur} rate could be found for ${fmtDayY(exRateDay())} — shown in LKR.`; }
+    else { rate = r; curNote = `Shown in ${cur} at 1 ${cur} = LKR ${r.toLocaleString(undefined, { maximumFractionDigits:2 })} (rate on ${fmtDayY(exRateDay())}). The expenses themselves stay recorded in LKR.`; }
+  }
+  RPT_CUR = { cur: rate === 1 ? 'LKR' : cur, rate };
+  try{ renderVillaExpensesIn(curNote); } finally { RPT_CUR = { cur:'LKR', rate:1 }; }
+}
+function renderVillaExpensesIn(curNote){
   renderExPickers();
   const rows = exRows();
   renderExSummary(rows);
@@ -4428,7 +4465,8 @@ function renderVillaExpenses(){
   }
   const place = EX_PLACES().find(v=>v.id===exPlace).name;
   let html = `<div class="rpt-head"><div class="rpt-title">Villa expenses — ${esc(place)}</div>
-    <div class="rpt-sub">${esc(exPeriodLabel())}${exKind === 'all' ? '' : ' · ' + esc((PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || '')}</div></div>`;
+    <div class="rpt-sub">${esc(exPeriodLabel())}${exKind === 'all' ? '' : ' · ' + esc((PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || '')} · amounts in ${esc(RPT_CUR.cur)}</div></div>`
+    + (curNote ? `<div class="rpt-note" style="margin-bottom:8px;">${esc(curNote)}</div>` : '');
 
   if(exGroupBy === 'account'){
     html += accountGroupsBlock(rows, exPlace === 'all');
@@ -4459,7 +4497,7 @@ function renderVillaExpenses(){
       const grand = rows.reduce((t,r)=>t+r.amount,0);
       html += `<table class="rpt-table" style="margin-top:14px;"><tbody><tr class="subtotal">
         <td><b>Everything, all places${orphans.length ? ' (including unassigned)' : ''}</b></td>
-        <td class="r"><b>${Math.round(grand).toLocaleString()}</b></td></tr></tbody></table>`;
+        <td class="r"><b>${rn(grand)}</b></td></tr></tbody></table>`;
     }
   } else {
     html += pettyGroupsBlock(rows).html;
@@ -4496,20 +4534,20 @@ function accountGroupsBlock(rows, showPlace){
       <div class="rpt-section-title" style="font-size:13.5px; margin-top:12px;${k === '__none' ? ' color:var(--amber);' : ''}">${esc(title)}
         <span class="rpt-section-count">${esc(where)}${where ? ' · ' : ''}${list.length} item${list.length===1?'':'s'} · ${lkr(total)}</span></div>
       <table class="rpt-table">
-        <thead><tr><th>Date</th><th>Description</th>${showPlace ? '<th>Place</th>' : ''}<th>How it was paid</th><th class="r">Amount (LKR)</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th>${showPlace ? '<th>Place</th>' : ''}<th>How it was paid</th><th class="r">Amount (${esc(RPT_CUR.cur)})</th></tr></thead>
         <tbody>${list.map(t => `<tr>
           <td class="dim">${fmtDay(t.date)}</td>
           <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''} ${invoiceLinksHTML(t)}${docNosHTML(t)}</td>
           ${showPlace ? `<td class="dim">${esc(FOR_LABELS[t.for] || t.for || '—')}</td>` : ''}
           <td class="dim">${paidFrom(t)}</td>
-          <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
+          <td class="r rpt-money-out">${rn(t.amount)}</td>
         </tr>`).join('')}
-          <tr class="subtotal"><td colspan="${showPlace ? 4 : 3}">Subtotal — ${esc(title)}</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
+          <tr class="subtotal"><td colspan="${showPlace ? 4 : 3}">Subtotal — ${esc(title)}</td><td class="r">${rn(total)}</td></tr>
         </tbody>
       </table>`;
   }
   html += `<table class="rpt-table" style="margin-top:14px;"><tbody><tr class="subtotal">
-    <td><b>Total</b></td><td class="r"><b>${Math.round(grand).toLocaleString()}</b></td></tr></tbody></table>`;
+    <td><b>Total</b></td><td class="r"><b>${rn(grand)}</b></td></tr></tbody></table>`;
   return html;
 }
 
@@ -4517,7 +4555,9 @@ function exportVillaExpensesCSV(){
   const rows = exRows();
   if(!rows.length){ alert('Nothing to export for these filters.'); return; }
   const groupName = k => (PETTY_GROUPS.find(g=>g.key===k)||{}).pl || k;
-  const out = [['Date','Place','Section','Description','Paid from','Paid by staff advance of','Account','Stock item','Note','Invoice no.','Payment voucher no.','Attachments','Amount LKR']];
+  const key = (exShowCur || 'LKR') + '|' + exRateDay();
+  const rate = exShowCur && exShowCur !== 'LKR' ? exRateCache[key] : null;
+  const out = [['Date','Place','Section','Description','Paid from','Paid by staff advance of','Account','Stock item','Note','Invoice no.','Invoice date','Payment voucher no.','Attachments','Amount LKR', ...(rate ? [`Amount ${exShowCur} (at ${rate})`] : [])]];
   for(const t of rows){
     const pur = t.linkedInventory && t.linkedPurchaseId
       ? allInvTxns.find(x => String(x.id) === String(t.linkedPurchaseId)) : null;
@@ -4525,11 +4565,12 @@ function exportVillaExpensesCSV(){
       t.date, FOR_LABELS[t.for] || t.for || '', groupName(pettyGroupOf(t)),
       t.purpose || 'Expense', payLabel(t), t.employeeName || '',
       acctLabel(acctOf(t)) || '', pur ? `${pur.item} x ${pur.qty}` : (t.linkedInventory ? 'stock item' : ''),
-      t.note || '', t.invoiceNo || '', t.voucherNo || '', getInvoiceLinks(t).join(' '), t.amount,
+      t.note || '', t.invoiceNo || '', t.invoiceDate || '', t.voucherNo || '', getInvoiceLinks(t).join(' '), t.amount,
+      ...(rate ? [Math.round(t.amount / rate * 100) / 100] : []),
     ]);
   }
   const total = rows.reduce((s2,t)=>s2+t.amount,0);
-  out.push([]); out.push(['', '', '', '', '', '', '', '', '', '', '', 'Total', total]);
+  out.push([]); out.push(['', '', '', '', '', '', '', '', '', '', '', '', 'Total', total, ...(rate ? [Math.round(total / rate * 100) / 100] : [])]);
   const when = exAllTime ? 'all-time' : ymKey(exMonthDate);
   downloadCSV(`villa-expenses-${exPlace}-${exKind === 'all' ? 'all' : exKind}-${when}.csv`, out);
 }
@@ -4537,6 +4578,11 @@ function exportVillaExpensesCSV(){
 function initVillaExpenses(){
   if(!exInited){
     exInited = true;
+    const cw = document.getElementById('exCurWrap');
+    if(cw){
+      cw.innerHTML = curPickerHTML('exShowCur', exShowCur);
+      document.getElementById('exShowCur').addEventListener('change', e => { exShowCur = e.target.value; rememberCur('exShowCur', exShowCur); renderVillaExpenses(); });
+    }
     document.getElementById('exPrevMonth').addEventListener('click', ()=>{
       exMonthDate = new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()-1, 1); renderVillaExpenses();
     });
@@ -6345,13 +6391,16 @@ async function restoreBooking(b){
 
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', bank: 'Bank transfer', sharon: 'Paid by Sharon personally' };
-const CARD_DEFAULT_NAMES = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card' };
-const CASH_DEFAULT_NAMES = { ceymora: 'Ceymora Card Petty Cash', kalava_card: 'Kalava Villa Petty Cash' };
+const CARD_DEFAULT_NAMES = { ceymora: 'Direct Villa Purchases Ceymora', kalava_card: 'Direct Villa Purchases Kalava' };
+const CASH_DEFAULT_NAMES = { ceymora: 'Petty Cash Ceymora', kalava_card: 'Petty Cash Kalava' };
+// Names that were only ever the old defaults move to the new ones by themselves.
+const OLD_DEFAULT_NAMES = ['ceymora card', 'kalava villa card', 'kalava card', 'ceymora card petty cash', 'kalava villa petty cash'];
+const isOldDefaultName = n => OLD_DEFAULT_NAMES.includes(String(n || '').trim().toLowerCase());
 // Which bank account a bank transfer went from (or into).
 const BANK_ACCOUNTS = { ceymora: 'Ceymora', kalava: 'Kalava Villa' };
 function pettyName(k){
   const n = ((APP_SETTINGS && APP_SETTINGS.cashNames) || {})[k];
-  return (n && String(n).trim()) || CASH_DEFAULT_NAMES[k] || cardName(k);
+  return (n && String(n).trim() && !isOldDefaultName(n) && String(n).trim()) || CASH_DEFAULT_NAMES[k] || cardName(k);
 }
 function bankLabel(acct){ return acct && BANK_ACCOUNTS[acct] ? `Bank transfer from ${BANK_ACCOUNTS[acct]}` : 'Bank transfer'; }
 /* How a line was paid, in words: petty cash, a card payment, which bank account,
@@ -6423,7 +6472,7 @@ function docNosText(t){
 }
 function cardName(k){
   const n = ((APP_SETTINGS && APP_SETTINGS.cardNames) || {})[k];
-  return (n && String(n).trim()) || CARD_DEFAULT_NAMES[k] || k;
+  return (n && String(n).trim() && !isOldDefaultName(n) && String(n).trim()) || CARD_DEFAULT_NAMES[k] || k;
 }
 /* Puts the current card names everywhere they are shown. Only labels change;
    the records keep pointing at the same card underneath. */
@@ -6579,63 +6628,80 @@ function renderAdvanceWallets(){
 
 // Populates the "Funded from a staff advance?" dropdown in the expense form with every
 // known wallet holder, and keeps the balance hint next to it up to date.
-// "Whose advance" — everyone who has been given cash, those still holding some first.
-function updateExpenseAdvanceOptions(){
-  const sel = document.getElementById('expFundedByAdvance');
-  if(!sel) return;
-  const wallets = computeAdvanceWallets();
-  const names = new Set(ADVANCE_WALLET_DEFAULTS.map(d=>d.name));
-  Object.keys(wallets).forEach(n=>names.add(n));
-  const bal = n => (wallets[n] && wallets[n].balance) || 0;
-  const list = [...names].sort((a,b)=> (bal(b) > 0) - (bal(a) > 0) || a.localeCompare(b));
-  const current = sel.value;
-  sel.innerHTML = '<option value="">— Whose advance? —</option>'
-    + list.map(n=>`<option value="${esc(n)}">${esc(n)}${bal(n) > 0 ? ' — holding LKR ' + Math.round(bal(n)).toLocaleString() : ''}</option>`).join('');
-  sel.value = names.has(current) ? current : '';
-  updateExpenseAdvanceHint();
+/* THE SEVEN KINDS OF EXPENSE. Picking one settles everything else: which box the
+   money comes out of, which group it is reported in, and where it can be spent.
+   Each kind is stored the same way as before (card + bank account + direct flag),
+   so older records read straight into the right kind. */
+function expKinds(){
+  return [
+    ['petty:ceymora',      pettyName('ceymora')],
+    ['petty:kalava_card',  pettyName('kalava_card')],
+    ['direct:ceymora',     cardName('ceymora')],
+    ['direct:kalava_card', cardName('kalava_card')],
+    ['bank:ceymora',       'Bank Transfer Ceymora'],
+    ['bank:kalava',        'Bank Transfer Kalava'],
+    ['sharon',             'Sharon Expenses'],
+  ];
 }
+function kindOfRecord(t){
+  if(!t) return 'petty:ceymora';
+  if(t.card === 'sharon') return 'sharon';
+  if(t.card === 'bank') return t.bankAccount ? 'bank:' + t.bankAccount : 'bank';
+  if(t.card === 'ceymora' || t.card === 'kalava_card') return (t.directExpense ? 'direct:' : 'petty:') + t.card;
+  return 'petty:ceymora';
+}
+function kindFields(k){
+  if(k === 'sharon') return { card:'sharon', bankAccount:null, direct:false };
+  if(k === 'bank')   return { card:'bank',   bankAccount:null, direct:false };
+  const [a, b] = String(k || '').split(':');
+  if(a === 'bank') return { card:'bank', bankAccount:b || null, direct:false };
+  return { card: b || 'ceymora', bankAccount:null, direct: a === 'direct' };
+}
+// Where each kind can be spent. Kalava's petty cash and card are Kalava Villa's
+// alone; direct purchases go straight to a villa (or the office), never via Store.
+function kindPlaces(k){
+  const villas = VR_VILLAS.map(v => v.id);
+  if(k === 'petty:kalava_card' || k === 'direct:kalava_card') return ['kalava'];
+  if(k === 'petty:ceymora')  return ['store', 'office', ...villas, 'boss'];
+  if(k === 'direct:ceymora') return [...villas, 'office'];
+  if(k === 'sharon')         return [...villas, 'office', 'boss'];
+  return [...villas, 'office', 'store', 'boss'];       // bank transfers
+}
+function placeName(id){
+  return id === 'boss' ? 'For Sharon (boss) — personal' : (FOR_LABELS[id] || id);
+}
+let expFundedBy = null;     // a bill paid out of someone's advance keeps that link
+let expKeepPlace = null;    // an older record's place, kept even if the kind would not offer it
+
+function updateExpenseAdvanceOptions(){ /* advance bills are entered on the person's balance card */ }
 function updateExpenseAdvanceHint(){
-  const sel = document.getElementById('expFundedByAdvance');
-  const hint = document.getElementById('expAdvanceBalanceHint');
-  if(!sel || !hint) return;
-  const pay = (document.getElementById('expCard') || {}).value;
-  const name = pay === 'advance' ? sel.value : '';
   const warn = document.getElementById('expAdvanceWarn');
-  if(warn){
-    const holders = [...new Set(allCashTxns.filter(t => t.type === 'advance' && !t.advanceId && !t.settled).map(t => t.employeeName).filter(Boolean))];
-    warn.style.display = (pay !== 'advance' && pay !== 'sharon' && holders.length) ? '' : 'none';
-    warn.innerHTML = `⚠ ${holders.map(esc).join(', ')} ${holders.length === 1 ? 'is' : 'are'} holding advance cash. If this bill was paid from that cash, choose <b>From a staff advance</b> under Paid from.`;
-  }
-  if(!name){ hint.textContent = ''; return; }
-  const wallets = computeAdvanceWallets();
-  const balance = wallets[name] ? wallets[name].balance : 0;
-  hint.textContent = `(${name} is holding LKR ${Math.round(balance).toLocaleString()})`;
+  if(!warn) return;
+  const holders = [...new Set(allCashTxns.filter(t => t.type === 'advance' && !t.advanceId && !t.settled).map(t => t.employeeName).filter(Boolean))];
+  if(expFundedBy || !holders.length || editingCashId){ warn.style.display = 'none'; return; }
+  warn.style.display = '';
+  warn.innerHTML = `⚠ ${holders.map(esc).join(', ')} ${holders.length === 1 ? 'is' : 'are'} holding advance cash. A bill paid from that cash goes on their balance card instead — tap their box under <b>Staff advance balances</b>.`;
 }
-// The "Paid from" list for the form that is open.
 function buildExpPayOptions(){
   const sel = document.getElementById('expCard');
-  const nm = k => expDirectMode ? cardName(k) : pettyName(k);
-  sel.innerHTML = [
-    ['ceymora', nm('ceymora')],
-    ['kalava_card', nm('kalava_card')],
-    ['bank:ceymora', 'Bank transfer from Ceymora'],
-    ['bank:kalava', 'Bank transfer from Kalava Villa'],
-    ['sharon', 'Sharon paid personally (goes to Sharon Expenses)'],
-    ['advance', 'From a staff advance'],
-  ].map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join('')
+  sel.innerHTML = expKinds().map(([v, l], i) => `<option value="${v}">${i + 1}. ${esc(l)}</option>`).join('')
     + '<option value="bank" hidden disabled>Bank transfer (account not stated)</option>';
 }
-// The "For" list: villas first on a card payment, Store and Office first on petty cash.
 function fillExpFor(){
   const sel = document.getElementById('expFor');
   if(!sel) return;
+  const kindSel = document.getElementById('expCard');
+  const kind = kindSel && kindSel.value ? kindSel.value : 'petty:ceymora';
   const keep = sel.value;
-  const villas = VR_VILLAS.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
-  const places = '<option value="store">Store</option><option value="office">Office</option>';
-  sel.innerHTML = `<option value="">${expDirectMode ? '— Choose the villa —' : '— Where was it bought for? —'}</option>`
-    + (expDirectMode ? villas + places : places + villas)
-    + '<option value="boss">For Sharon (boss) — personal</option>';
-  if(keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+  const ids = kindPlaces(kind);
+  if(expKeepPlace && !ids.includes(expKeepPlace)) ids.push(expKeepPlace);
+  sel.innerHTML = (ids.length > 1 ? '<option value="">— Choose —</option>' : '')
+    + ids.map(id => `<option value="${esc(id)}">${esc(placeName(id))}</option>`).join('');
+  if(ids.length === 1) sel.value = ids[0];
+  else if(keep && ids.includes(keep)) sel.value = keep;
+  else if(kind === 'bank:kalava' && ids.includes('kalava')) sel.value = 'kalava';
+  else sel.value = '';
+  sel.disabled = ids.length === 1;
 }
 
 let cashInited = false;
@@ -6655,15 +6721,12 @@ function initPettyCash(){
   document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
   document.getElementById('addAdvanceBtn').addEventListener('click', ()=> openAdvanceModal());
   document.getElementById('advGiveMode').addEventListener('change', advApplyGiveMode);
-  document.getElementById('addDirectExpenseBtn').addEventListener('click', ()=> openExpenseModal(null, true));
-  document.getElementById('addSharonExpenseBtn').addEventListener('click', ()=> openMyPurchaseModal('Sharon'));
 
   document.getElementById('expCard').addEventListener('change', updateExpenseCardLock);
   document.getElementById('expFor').addEventListener('change', updateExpenseStockLabel);
   document.getElementById('expIsStock').addEventListener('change', (e)=>{
     document.getElementById('expStockFields').style.display = e.target.checked ? '' : 'none';
   });
-  document.getElementById('expFundedByAdvance').addEventListener('change', updateExpenseAdvanceHint);
   document.getElementById('expCard').addEventListener('change', updateExpenseAdvanceHint);
   document.getElementById('advSettled').addEventListener('change', (e)=>{
     document.getElementById('advSettledNoteWrap').style.display = e.target.checked ? '' : 'none';
@@ -6734,29 +6797,27 @@ async function fetchCash(){
   if(companyInited) onAcctDataChanged();
 }
 
-let expForAuto = false;   // Kalava Villa was filled in because of the Kalava card
+let expForAuto = false;
 function updateExpenseCardLock(){
-  const pay = document.getElementById('expCard').value;
-  const forSelect = document.getElementById('expFor');
-  const hint = document.getElementById('expCardHint');
-  const nm = k => expDirectMode ? cardName(k) : pettyName(k);
-  document.getElementById('expAdvWrap').style.display = pay === 'advance' ? '' : 'none';
-  if(pay === 'kalava_card'){
-    if(forSelect.value !== 'kalava'){ forSelect.value = 'kalava'; expForAuto = true; }
-    forSelect.disabled = true;
-    hint.textContent = `${nm('kalava_card')} is only for Kalava Villa — Kalava Villa is filled in for you.`;
-  } else {
-    forSelect.disabled = false;
-    if(expForAuto && forSelect.value === 'kalava') forSelect.value = '';
-    expForAuto = false;
-    hint.textContent = isBankVal(pay) ? `${bankLabel(splitPay(pay).bankAccount)} — no petty cash is touched.`
-      : pay === 'sharon' ? 'Sharon paid with his own money — kept under Sharon Expenses, not petty cash.'
-      : pay === 'advance' ? 'Paid out of cash a staff member is holding — it comes off their balance, not the card.'
-      : expDirectMode ? `${cardName('ceymora')} can pay for any villa — choose which one.`
-      : `${pettyName('ceymora')} can be used for any villa, the office or the store.`;
-  }
+  const kind = document.getElementById('expCard').value;
+  expDirectMode = kind.startsWith('direct:');
+  fillExpFor();
+  const one = kindPlaces(kind).length === 1;
+  document.getElementById('expForLabel').textContent = one ? 'For' : (expDirectMode ? 'For which villa (or the office)' : 'For which villa / place');
+  const H = {
+    'petty:ceymora':      `Comes out of ${pettyName('ceymora')}. For a villa, the office, the store, or Sharon.`,
+    'petty:kalava_card':  `Comes out of ${pettyName('kalava_card')} — for Kalava Villa only.`,
+    'direct:ceymora':     `Paid straight for a villa — shown under ${cardName('ceymora')}, not taken off petty cash.`,
+    'direct:kalava_card': `Paid straight for Kalava Villa — shown under ${cardName('kalava_card')}, not taken off petty cash.`,
+    'bank:ceymora':       'Paid from the Ceymora bank account — no petty cash is touched.',
+    'bank:kalava':        'Paid from the Kalava Villa bank account — no petty cash is touched.',
+    'bank':               'Bank transfer recorded before the account was asked for.',
+    'sharon':             'Sharon paid with his own money — kept under Sharon Expenses, not petty cash.',
+  };
+  document.getElementById('expCardHint').textContent = H[kind] || '';
   updateExpenseAdvanceHint();
   updateExpenseStockLabel();
+  applyDirectExpenseUI();
 }
 
 // Spells out, in the checkbox itself, whether ticking it will go into Store (needing a
@@ -6778,9 +6839,7 @@ function updateExpenseStockLabel(){
   } else {
     const name = FOR_LABELS[forWhom] || forWhom;
     label.textContent = `This is a stock item — direct purchase for ${name} (skips Store)`;
-    hint.textContent = card === 'ceymora'
-      ? `Goes straight into ${name}'s stock without passing through Store. Charged to ${name} and shown under "Direct Villa Purchases — via ${cardName('ceymora')}".`
-      : `Goes straight into ${name}'s stock without passing through Store.`;
+    hint.textContent = `Goes straight into ${name}'s stock without passing through Store.`;
   }
 }
 
@@ -6809,7 +6868,8 @@ let cashKind = 'all';
 const CASH_KIND_WORDS = {
   income:  ['receipt', 'money received', 'Total money received'],
   expense: ['petty cash expense', 'petty cash expenses', 'Total petty cash expenses'],
-  direct:  ['direct expense', 'direct expenses', 'Total direct expenses'],
+  direct:  ['direct villa purchase', 'direct villa purchases', 'Total direct villa purchases'],
+  bank:    ['bank transfer', 'bank transfers', 'Total bank transfers'],
   sharon:  ['Sharon expense', 'Sharon expenses', 'Total Sharon expenses'],
   advance: ['advance', 'advances', 'Total advances given'],
 };
@@ -7229,22 +7289,15 @@ let expDirectMode = false;
 
 function applyDirectExpenseUI(){
   const g = id => document.getElementById(id);
-  const on = expDirectMode;
-  const name = on ? 'Payment From Card' : 'Petty Cash Expenses';
-  document.querySelector('#expenseModalOverlay h3').textContent = (editingCashId ? 'Edit — ' : '') + name;
-  g('expModeHint').innerHTML = on
-    ? 'Paid straight for a villa. Recorded under <b>Direct Expenses</b> and charged to that villa.'
-    : 'Bought out of petty cash. Recorded under <b>Petty Cash Expenses</b>.';
-  // The villa is asked right after "Paid from" on a card payment; on petty cash,
-  // where it was bought for comes after the account.
-  (on ? g('expForSlotDirect') : g('expForSlotPetty')).appendChild(g('expForWrap'));
-  g('expForLabel').textContent = on ? 'For which villa' : 'Where was it bought for';
-  // A card payment goes straight to the villa — no stock tick. An older one that
-  // already has stock linked keeps the box so the link can still be changed.
-  const keepStock = !on || g('expIsStock').checked;
-  g('expStockRow').style.display = keepStock ? '' : 'none';
-  g('expIsStockHint').style.display = keepStock ? '' : 'none';
-  if(!keepStock) g('expStockFields').style.display = 'none';
+  document.querySelector('#expenseModalOverlay h3').textContent = editingCashId ? 'Edit expense' : 'Expenses';
+  // Stock is bought out of petty cash or by bank transfer. A direct purchase or one
+  // of Sharon's goes straight to the place — no stock box, unless an older record
+  // already has stock linked to it.
+  const kind = g('expCard').value;
+  const canStock = kind.startsWith('petty:') || kind.startsWith('bank') || g('expIsStock').checked;
+  g('expStockRow').style.display = canStock ? '' : 'none';
+  g('expIsStockHint').style.display = canStock ? '' : 'none';
+  if(!canStock) g('expStockFields').style.display = 'none';
 }
 
 let expLinkAdvanceId = null, expReturnToAdvance = null;
@@ -7260,37 +7313,42 @@ function billLockedBySettledAdvance(t){
 function openExpenseModal(record, forceDirect, opts){
   opts = opts || {};
   if(billLockedBySettledAdvance(record)){
-    alert(`This bill belongs to ${record.employeeName || 'a staff'}'s settled advance, so it's locked.\n\nTo change it, request an undo on that advance (Petty Cash → Settled advances) — Makky approves it.`);
+    alert(`This bill belongs to ${record.employeeName || 'a staff'}'s settled advance, so it's locked.\n\nTo change it, request an undo on that advance (Petty Cash → 📋 Staff advances report) — Makky approves it.`);
     return;
   }
   editingCashId = record ? record.id : null;
   expLinkAdvanceId = opts.advanceId != null ? String(opts.advanceId) : (record && record.advanceId) || null;
   expReturnToAdvance = opts.returnToAdvance != null ? opts.returnToAdvance : null;
-  expDirectMode = (forceDirect !== undefined) ? !!forceDirect : (record ? !!record.directExpense : false);
   expBankMode = false;
   expForAuto = false;
+  expFundedBy = record ? (record.employeeName || null) : (opts.fundedBy || null);
+  expKeepPlace = record ? (record.for || null) : null;
   try{
     buildExpPayOptions();
+    const kSel = document.getElementById('expCard');
+    let kind = record ? kindOfRecord(record) : (forceDirect ? 'direct:ceymora' : 'petty:ceymora');
+    if(!record && opts.card) kind = kindOfRecord({ card: opts.card, bankAccount: opts.card === 'bank' ? 'ceymora' : null });
+    const legacy = kSel.querySelector('option[value="bank"]');
+    if(legacy){ legacy.hidden = kind !== 'bank'; legacy.disabled = kind !== 'bank'; }
+    kSel.value = kind;
+    expDirectMode = kind.startsWith('direct:');
+    document.getElementById('expFor').innerHTML = '';
     fillExpFor();
     document.getElementById('expDate').value = record ? record.date : todayISO();
-    setPaySelect('expCard', record ? record.card : 'ceymora', record ? record.bankAccount : null);
     document.getElementById('expInvoiceNo').value = record ? (record.invoiceNo || '') : '';
     document.getElementById('expInvoiceDate').value = record ? (record.invoiceDate || '') : '';
     document.getElementById('expVoucherNo').value = record ? (record.voucherNo || '') : '';
-    document.getElementById('expFor').value = record ? (record.for || '') : (opts.for || '');
-    document.getElementById('expFor').disabled = false;
+    if(record && record.for) document.getElementById('expFor').value = record.for;
+    else if(opts.for) document.getElementById('expFor').value = opts.for;
     document.getElementById('expPurpose').value = record ? record.purpose : '';
     document.getElementById('expAmount').value = record ? record.amount : '';
 
-    updateExpenseAdvanceOptions();
-    const fundedName = record ? (record.employeeName || '') : (opts.fundedBy || '');
-    const advSel = document.getElementById('expFundedByAdvance');
-    if(fundedName && ![...advSel.options].some(o => o.value === fundedName)){
-      advSel.insertAdjacentHTML('beforeend', `<option value="${esc(fundedName)}">${esc(fundedName)}</option>`);
-    }
-    advSel.value = fundedName;
-    if(fundedName) document.getElementById('expCard').value = 'advance';
-    else if(!record && opts.card) setPaySelect('expCard', opts.card, opts.card === 'bank' ? 'ceymora' : null);
+    // A bill paid out of someone's advance stays tied to it; the money source is the
+    // advance, so the kind cannot be switched here.
+    const info = document.getElementById('expAdvInfo');
+    kSel.disabled = !!expFundedBy;
+    info.style.display = expFundedBy ? '' : 'none';
+    info.innerHTML = expFundedBy ? `Paid out of <b>${esc(expFundedBy)}</b>'s advance — it comes off their balance. To change who paid, delete this bill and enter it again.` : '';
     updateExpenseAdvanceHint();
 
     const wasStock = record ? !!record.linkedInventory : false;
@@ -7313,7 +7371,7 @@ function openExpenseModal(record, forceDirect, opts){
     document.getElementById('expFileHint').textContent = existing.length ? `${existing.length} file(s) already attached. New files you add here will be added alongside them.` : '';
     document.getElementById('expError').style.display = 'none';
     updateExpenseCardLock(); // also refreshes the stock checkbox's label/hint for the current "For"
-    applyDirectExpenseUI();
+    if(record && record.for) document.getElementById('expFor').value = record.for;
     initExpenseAccountField(record);
     document.getElementById('expenseModalOverlay').classList.add('open');
   }catch(e){ alert('Error opening form: ' + e.message); console.error(e); }
@@ -7342,7 +7400,9 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
   const date = document.getElementById('expDate').value;
   const payRaw = document.getElementById('expCard').value;
-  let { card, bankAccount } = splitPay(payRaw);
+  const kf = kindFields(payRaw);
+  let { card, bankAccount } = kf;
+  expDirectMode = kf.direct;
   const invoiceNo = document.getElementById('expInvoiceNo').value.trim() || null;
   const invoiceDate = document.getElementById('expInvoiceDate').value || null;
   let voucherNo = document.getElementById('expVoucherNo').value.trim() || null;
@@ -7351,7 +7411,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('expAmount').value);
   const note = document.getElementById('expNote').value.trim();
   const isStock = document.getElementById('expIsStock').checked;
-  const fundedByEmployee = payRaw === 'advance' ? (document.getElementById('expFundedByAdvance').value || null) : null;
+  const fundedByEmployee = expFundedBy || null;
   const itemName = document.getElementById('expItemName').value.trim();
   const itemQtyRaw = document.getElementById('expItemQty').value;
   const itemQty = itemQtyRaw ? parseFloat(itemQtyRaw) : 1;
@@ -7359,10 +7419,9 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
 
   const stop = m => { errEl.textContent = m; errEl.style.display = 'block'; };
   if(!date || !amount || amount <= 0 || !purpose) return stop('Fill in date, what it was for, and a valid amount.');
-  if(!forWhom) return stop(expDirectMode ? 'Choose which villa this was for.' : 'Choose where it was bought for — Store, Office or a villa.');
-  if(payRaw === 'kalava_card' && forWhom !== 'kalava') return stop(`${expDirectMode ? cardName('kalava_card') : pettyName('kalava_card')} can only be used for Kalava Villa.`);
-  if(payRaw === 'advance'){
-    if(!fundedByEmployee) return stop('Choose whose advance this was paid from.');
+  if(!forWhom) return stop(expDirectMode ? 'Choose which villa this was for.' : 'Choose which villa or place this was for.');
+  if(card === 'kalava_card' && !fundedByEmployee && forWhom !== 'kalava') return stop(`${expDirectMode ? cardName('kalava_card') : pettyName('kalava_card')} can only be used for Kalava Villa.`);
+  if(fundedByEmployee){
     // The bill carries the card (or bank account) the advance itself came from.
     const orig = editingCashId ? allCashTxns.find(t => t.id === editingCashId) : null;
     const linked = expLinkAdvanceId ? allCashTxns.find(t => String(t.id) === String(expLinkAdvanceId)) : null;
@@ -8122,93 +8181,137 @@ document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
 
 /* ---- the lists on the Petty Cash page ---- */
 function renderAdvances(){
-  const wrap = document.getElementById('advancesList');
-  if(!wrap) return;
-  const outstanding = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled)
-    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-  if(outstanding.length === 0) wrap.innerHTML = '<div class="manage-empty">No outstanding advances.</div>';
-  else {
-    wrap.innerHTML = '';
-    for(const t of outstanding){
-      const f = advFigures(t);
-      const row = document.createElement('div');
-      row.className = 'manage-row';
-      row.innerHTML = `
-        <span class="manage-type-dot" style="background:var(--amber);"></span>
-        <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— ${esc(payLabel(t))}</span></span>
-        <span class="manage-dates">${t.date}${t.note ? ' · '+esc(t.note) : ''} · LKR ${t.amount.toLocaleString()} · bills LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}
-          · <b>${f.left === 0 ? 'ready to settle ✓' : 'LKR ' + Math.round(f.left).toLocaleString() + ' still to account for'}</b>${t.voucherNo ? ' · ' + esc(t.voucherNo) : ''}</span>
-        <span class="adv-go">${esc(t.employeeName || '')}'s page ›</span>`;
-      // A record only: settling happens from the person's page.
-      row.classList.add('adv-row-link');
-      row.title = `Open ${t.employeeName || 'this person'}'s advances to settle`;
-      row.addEventListener('click', ()=> openStaffAdvanceStatement(t.employeeName));
-      wrap.appendChild(row);
-    }
-  }
-  renderSettledAdvances();
   renderUndoRequests();
   renderUnsortedNotice();
+  if(document.getElementById('advRptModalOverlay').classList.contains('open')) renderAdvReport();
 }
+function renderSettledAdvances(){ renderAdvances(); }
 
-function renderSettledAdvances(){
-  const wrap = document.getElementById('settledAdvancesList');
-  const sel = document.getElementById('settledFilter');
-  if(!wrap || !sel) return;
-  const settled = allCashTxns.filter(t => isAdvanceParent(t) && t.settled)
-    .sort((a,b)=> (b.settledDate || b.date || '').localeCompare(a.settledDate || a.date || ''));
-  const names = [...new Set(settled.map(t => t.employeeName).filter(Boolean))].sort();
-  const cur = sel.value || '';
-  sel.innerHTML = '<option value="">Everyone</option><option value="__problem">Only ones that don’t balance</option>'
-    + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  sel.value = [...sel.options].some(o => o.value === cur) ? cur : '';
-  if(!sel.dataset.wired){ sel.dataset.wired = '1'; sel.addEventListener('change', renderSettledAdvances); }
-
-  const rows = settled.filter(t => !sel.value || (sel.value === '__problem' ? Math.abs(advFigures(t).left) >= 1 : t.employeeName === sel.value));
-  const tot = rows.reduce((a,t)=>{ const f = advFigures(t); a.given += t.amount; a.billed += f.billed; a.returned += f.returned; a.left += f.left > 0 ? f.left : 0; return a; },
-    { given:0, billed:0, returned:0, left:0 });
-  const sum = document.getElementById('settledAdvancesTotals');
-  if(sum) sum.innerHTML = rows.length ? `
-    <div><div class="k">Advances settled</div><div class="v">${rows.length}</div></div>
-    <div><div class="k">Total given</div><div class="v">${lkr(tot.given)}</div></div>
-    <div><div class="k">Bills submitted</div><div class="v">${lkr(tot.billed)}</div></div>
-    <div><div class="k">Cash returned</div><div class="v">${lkr(tot.returned)}</div></div>
-    <div><div class="k">Still to recover</div><div class="v ${tot.left >= 1 ? 'warn' : 'good'}">${tot.left >= 1 ? lkr(tot.left) : 'nothing ✓'}</div></div>` : '';
-  if(!rows.length){ wrap.innerHTML = `<div class="manage-empty">${settled.length ? 'Nothing matches this filter.' : 'No settled advances yet.'}</div>`; return; }
-  wrap.innerHTML = '';
+/* ---------------------------------------------------------------------------
+   STAFF ADVANCES REPORT — every advance: to whom, when, from which money, the
+   bills and cash that came back, when it was settled and by whom, and what the
+   person is still holding. Replaces the two lists that used to sit on the page.
+--------------------------------------------------------------------------- */
+function advRptRange(){
+  const per = document.getElementById('advRptPeriod').value;
+  const now = new Date();
+  const m0 = new Date(now.getFullYear(), now.getMonth(), 1);
+  if(per === 'month') return { from: toISO(m0), to: toISO(new Date(now.getFullYear(), now.getMonth() + 1, 1)), label: m0.toLocaleDateString('en-GB', { month:'long', year:'numeric' }) };
+  if(per === 'last'){ const l = new Date(now.getFullYear(), now.getMonth() - 1, 1); return { from: toISO(l), to: toISO(m0), label: l.toLocaleDateString('en-GB', { month:'long', year:'numeric' }) }; }
+  if(per === 'year') return { from: now.getFullYear() + '-01-01', to: (now.getFullYear() + 1) + '-01-01', label: String(now.getFullYear()) };
+  if(per === 'range'){
+    const f = document.getElementById('advRptFrom').value || '0000-01-01';
+    const tRaw = document.getElementById('advRptTo').value;
+    const t = tRaw ? toISO(new Date(parseISO(tRaw).getTime() + 86400000)) : '9999-12-31';
+    return { from: f, to: t, label: `${tRaw || f ? (document.getElementById('advRptFrom').value ? fmtDayY(f) : 'start') + ' – ' + (tRaw ? fmtDayY(tRaw) : 'today') : 'All time'}` };
+  }
+  return { from: '0000-01-01', to: '9999-12-31', label: 'All time' };
+}
+function advRptRows(){
+  const who = document.getElementById('advRptWho').value;
+  const state = document.getElementById('advRptState').value;
+  const r = advRptRange();
+  return allCashTxns.filter(t => isAdvanceParent(t))
+    .filter(t => !who || t.employeeName === who)
+    .filter(t => (t.date || '') >= r.from && (t.date || '') < r.to)
+    .filter(t => state === 'all' || (state === 'open' ? !t.settled : t.settled))
+    .sort((a,b)=> (a.employeeName || '').localeCompare(b.employeeName || '') || (a.date || '').localeCompare(b.date || ''));
+}
+function openAdvReport(name){
+  const sel = document.getElementById('advRptWho');
+  const names = [...new Set(allCashTxns.filter(t => isAdvanceParent(t)).map(t => t.employeeName).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Everyone</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = name && names.includes(name) ? name : '';
+  document.getElementById('advRptModalOverlay').classList.add('open');
+  renderAdvReport();
+}
+function renderAdvReport(){
+  const body = document.getElementById('advRptBody');
+  const r = advRptRange();
+  document.getElementById('advRptRange').style.display = document.getElementById('advRptPeriod').value === 'range' ? 'inline-flex' : 'none';
+  const rows = advRptRows();
+  const who = document.getElementById('advRptWho').value;
+  if(!rows.length){ body.innerHTML = `<div class="rpt-empty">No advances ${who ? 'for ' + esc(who) + ' ' : ''}in this period.</div>`; return; }
+  const per = {};
+  const tot = { n:0, given:0, billed:0, returned:0, paidOut:0, holding:0 };
   for(const t of rows){
     const f = advFigures(t);
-    const bad = Math.abs(f.left) >= 1;
-    const row = document.createElement('div');
-    row.className = 'manage-row';
-    row.style.flexWrap = 'wrap';
-    const chips = [
-      bad ? `<span class="adv-chip bad">${f.left > 0 ? 'LKR ' + Math.round(f.left).toLocaleString() + ' still to recover' : 'bills exceed advance'}</span>` : '<span class="adv-chip ok">balanced ✓</span>',
-      t.undoRequestedBy ? `<span class="adv-chip wait">undo requested by ${esc(t.undoRequestedBy)} — waiting for Makky</span>` : '',
-    ].join(' ');
-    row.innerHTML = `
-      <span class="manage-type-dot" style="background:${bad ? 'var(--red)' : 'var(--green)'};"></span>
-      <span class="manage-guest">${esc(t.employeeName || 'Unknown')} <span style="color:var(--muted); font-weight:400;">— LKR ${t.amount.toLocaleString()} given ${fmtDay(t.date)}</span></span>
-      <span class="manage-dates">settled ${t.settledDate ? fmtDay(t.settledDate) : '—'}${t.settledBy ? ' by ' + esc(t.settledBy) : ''}
-        · ${advBillsFor(t).length} bill${advBillsFor(t).length===1?'':'s'} LKR ${Math.round(f.billed).toLocaleString()}${f.returned ? ' · returned LKR ' + Math.round(f.returned).toLocaleString() : ''}${f.paidOut ? ' · extra paid LKR ' + Math.round(f.paidOut).toLocaleString() : ''}${advSettleInvoiceHTML(t)}
-        ${chips}</span>`;
-    const view = document.createElement('button');
-    view.className = 'manage-invoice'; view.textContent = 'View details';
-    view.addEventListener('click', ()=> openAdvanceModal(t));
-    row.appendChild(view);
-    if(canApproveUndo() && t.undoRequestedBy){
-      const ap = document.createElement('button'); ap.className = 'adv-undo-btn'; ap.textContent = '↩ Approve undo';
-      ap.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(ap);
-    } else if(canApproveUndo()){
-      const un = document.createElement('button'); un.className = 'adv-undo-btn'; un.textContent = '↩ Undo settlement';
-      un.addEventListener('click', ()=> advApproveUndo(t)); row.appendChild(un);
-    } else if(canEdit() && !t.undoRequestedBy){
-      const rq = document.createElement('button'); rq.className = 'adv-undo-btn'; rq.textContent = '↩ Request undo';
-      rq.addEventListener('click', ()=> advRequestUndo(t)); row.appendChild(rq);
-    }
-    wrap.appendChild(row);
+    const p = per[t.employeeName || '—'] || (per[t.employeeName || '—'] = { n:0, given:0, billed:0, returned:0, paidOut:0, holding:0, open:0 });
+    const hold = t.settled ? 0 : Math.max(0, f.left);
+    for(const o of [p, tot]){ o.n++; o.given += t.amount; o.billed += f.billed; o.returned += f.returned; o.paidOut += f.paidOut; o.holding += hold; }
+    if(!t.settled) p.open++;
   }
+  const L = n => Math.round(n).toLocaleString();
+  const summary = Object.keys(per).sort().map(n => { const p = per[n]; return `<tr>
+      <td><b>${esc(n)}</b></td><td class="c">${p.n}${p.open ? ` <span class="dim">(${p.open} open)</span>` : ''}</td>
+      <td class="r">${L(p.given)}</td><td class="r">${L(p.billed)}</td><td class="r">${L(p.returned)}</td><td class="r">${L(p.paidOut)}</td>
+      <td class="r"><b style="color:${p.holding >= 1 ? 'var(--amber)' : 'var(--green)'};">${p.holding >= 1 ? L(p.holding) : '0 ✓'}</b></td></tr>`; }).join('');
+  const detail = rows.map(t => {
+    const f = advFigures(t);
+    const bills = advBillsFor(t);
+    const hold = t.settled ? 0 : f.left;
+    const status = t.settled
+      ? `<span class="adv-chip ok">settled ${t.settledDate ? fmtDay(t.settledDate) : ''}${t.settledBy ? ' · ' + esc(t.settledBy) : ''}</span>`
+        + (Math.abs(f.left) >= 1 ? ` <span class="adv-chip bad">${f.left > 0 ? 'LKR ' + L(f.left) + ' not accounted for' : 'bills exceed advance'}</span>` : '')
+        + (t.undoRequestedBy ? ` <span class="adv-chip wait">undo asked by ${esc(t.undoRequestedBy)}</span>` : '')
+      : `<span class="adv-chip wait">open</span>`;
+    return `<tr>
+      <td class="dim">${fmtDayY(t.date)}</td>
+      <td><b>${esc(t.employeeName || '—')}</b>${t.voucherNo ? `<div class="dim">${esc(t.voucherNo)}</div>` : ''}${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''}</td>
+      <td class="dim">${esc(payLabel(t))}</td>
+      <td class="r">${L(t.amount)}</td>
+      <td class="r">${L(f.billed)}<div class="dim">${bills.length} bill${bills.length === 1 ? '' : 's'}</div></td>
+      <td class="r">${f.returned ? L(f.returned) : '—'}</td>
+      <td class="r">${f.paidOut ? L(f.paidOut) : '—'}</td>
+      <td>${status}</td>
+      <td class="r"><b style="color:${hold >= 1 ? 'var(--amber)' : 'var(--green)'};">${hold >= 1 ? L(hold) : '0'}</b></td>
+      <td class="no-print" style="white-space:nowrap;">
+        <button class="manage-invoice" data-adv-open="${esc(String(t.id))}">${t.settled ? 'Details' : 'Settle / bills'}</button>
+        ${t.settled && canApproveUndo() ? `<button class="adv-undo-btn" data-adv-undo="${esc(String(t.id))}">${t.undoRequestedBy ? '↩ Approve undo' : '↩ Undo'}</button>`
+          : t.settled && canEdit() && !t.undoRequestedBy ? `<button class="adv-undo-btn" data-adv-askundo="${esc(String(t.id))}">↩ Request undo</button>` : ''}
+      </td></tr>`;
+  }).join('');
+  body.innerHTML = `
+    <div class="rpt-head"><div class="rpt-title">Staff advances${who ? ' — ' + esc(who) : ''}</div>
+      <div class="rpt-sub">Given: ${esc(r.label)} · ${rows.length} advance${rows.length === 1 ? '' : 's'} · amounts in LKR</div></div>
+    <div class="rpt-section-title">By person</div>
+    <table class="rpt-table">
+      <thead><tr><th>Person</th><th class="c">Advances</th><th class="r">Given</th><th class="r">Bills</th><th class="r">Cash returned</th><th class="r">Extra paid</th><th class="r">Still holding</th></tr></thead>
+      <tbody>${summary}
+        <tr class="subtotal"><td>Total</td><td class="c">${tot.n}</td><td class="r">${L(tot.given)}</td><td class="r">${L(tot.billed)}</td><td class="r">${L(tot.returned)}</td><td class="r">${L(tot.paidOut)}</td><td class="r">${L(tot.holding)}</td></tr>
+      </tbody></table>
+    <div class="rpt-section-title" style="margin-top:14px;">Every advance</div>
+    <table class="rpt-table">
+      <thead><tr><th>Given on</th><th>Person</th><th>From</th><th class="r">Given</th><th class="r">Bills</th><th class="r">Returned</th><th class="r">Extra paid</th><th>Settled</th><th class="r">Still holding</th><th class="no-print"></th></tr></thead>
+      <tbody>${detail}</tbody></table>
+    <div class="rpt-note">Still holding = given + extra paid − bills − cash returned, for advances not yet settled. A settled advance that does not balance is flagged in red.</div>`;
+  const find = id => allCashTxns.find(t => String(t.id) === String(id));
+  body.querySelectorAll('[data-adv-open]').forEach(b => b.addEventListener('click', ()=>{
+    const t = find(b.dataset.advOpen); if(!t) return;
+    document.getElementById('advRptModalOverlay').classList.remove('open');
+    if(t.settled) openAdvanceModal(t); else openStaffAdvanceStatement(t.employeeName);
+  }));
+  body.querySelectorAll('[data-adv-undo]').forEach(b => b.addEventListener('click', ()=>{ const t = find(b.dataset.advUndo); if(t) advApproveUndo(t); }));
+  body.querySelectorAll('[data-adv-askundo]').forEach(b => b.addEventListener('click', ()=>{ const t = find(b.dataset.advAskundo); if(t) advRequestUndo(t); }));
 }
+function exportAdvReportCSV(){
+  const rows = advRptRows();
+  if(!rows.length){ alert('Nothing to download for these filters.'); return; }
+  const out = [['Given on','Person','From','Voucher','Given LKR','Bills LKR','Bills count','Cash returned LKR','Extra paid LKR','Settled on','Settled by','Still holding LKR','Note']];
+  for(const t of rows){
+    const f = advFigures(t);
+    out.push([t.date, t.employeeName || '', payLabel(t), t.voucherNo || '', t.amount, Math.round(f.billed), advBillsFor(t).length,
+      Math.round(f.returned), Math.round(f.paidOut), t.settled ? (t.settledDate || '') : '', t.settledBy || '', t.settled ? 0 : Math.round(f.left), t.note || '']);
+  }
+  const who = document.getElementById('advRptWho').value;
+  downloadCSV(`staff-advances-${who ? who.toLowerCase() + '-' : ''}${document.getElementById('advRptPeriod').value}.csv`, out);
+}
+document.getElementById('advReportBtn').addEventListener('click', ()=> openAdvReport());
+['advRptWho','advRptPeriod','advRptState','advRptFrom','advRptTo'].forEach(id => document.getElementById(id).addEventListener('change', renderAdvReport));
+document.getElementById('advRptClose').addEventListener('click', ()=> document.getElementById('advRptModalOverlay').classList.remove('open'));
+document.getElementById('advRptModalOverlay').addEventListener('click', e => { if(e.target.id === 'advRptModalOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('advRptCsv').addEventListener('click', exportAdvReportCSV);
+document.getElementById('advRptPrint').addEventListener('click', ()=> printPiece('Staff advances', document.getElementById('advRptBody').innerHTML));
 
 // Receipts for a settlement: the ones attached when settling, plus the ones on its bills.
 function advSettleInvoiceHTML(adv){
@@ -8571,14 +8674,16 @@ function computeAvgUnitCost(){
      3. Bank transfers           — paid from the bank, not from a card
      4. Sharon's expenditure     — anything Sharon bought for the villa          */
 const PETTY_GROUPS = [
-  { key:'staff',  label:'1. Petty Cash Expenses', pl:'Petty Cash Expenses', always:true },
-  { key:'direct', label:'2. Direct Expenses',     pl:'Direct Expenses',     always:true },
-  { key:'sharon', label:'3. Sharon Expenses',     pl:'Sharon Expenses',     always:true },
+  { key:'staff',  label:'1. Petty Cash Expenses',    pl:'Petty Cash Expenses',    always:true },
+  { key:'direct', label:'2. Direct Villa Purchases', pl:'Direct Villa Purchases', always:true },
+  { key:'bank',   label:'3. Bank Transfers',         pl:'Bank Transfers',         always:true },
+  { key:'sharon', label:'4. Sharon Expenses',        pl:'Sharon Expenses',        always:true },
 ];
 // Which of the three an expense belongs to. Sharon's own money comes first, whichever
 // form it was entered on; then anything entered with "+ Payment From Card".
 function pettyGroupOf(e){
   if(isSharonCost(e)) return 'sharon';
+  if(e.card === 'bank') return 'bank';
   if(e.directExpense) return 'direct';
   return 'staff';
 }
@@ -8696,7 +8801,7 @@ function buildVillaReportHTML(loc, monthDate){
     </div>
 
     <div class="rpt-section" data-rpt-section="pettycash">
-      <div class="rpt-section-title">1. Expenses — Petty Cash, Direct and Sharon <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyTotal)}</span></div>
+      <div class="rpt-section-title">1. Expenses — Petty Cash, Direct, Bank and Sharon <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyTotal)}</span></div>
       ${pettyHtml}
     </div>
 
@@ -9883,7 +9988,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     </div>
 
     <div class="rpt-section" data-rpt-section="pettycash">
-      <div class="rpt-section-title">2. Expenses — Petty Cash, Direct and Sharon <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyCashTotal)}</span></div>
+      <div class="rpt-section-title">2. Expenses — Petty Cash, Direct, Bank and Sharon <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyCashTotal)}</span></div>
       ${pettyHtml}
     </div>
 
@@ -12918,7 +13023,7 @@ function coPettyCashHTML(){
 
   if(rows.length === 0){
     return `<div class="rpt-section">
-      <div class="rpt-section-title">Expenses — Petty Cash, Direct and Sharon</div>
+      <div class="rpt-section-title">Expenses — Petty Cash, Direct, Bank and Sharon</div>
       <div class="rpt-empty">No expenses recorded for this period.</div>
     </div>`;
   }
@@ -12954,11 +13059,11 @@ function coPettyCashHTML(){
   }).join('');
 
   return `<div class="rpt-section">
-    <div class="rpt-section-title">Expenses — Petty Cash, Direct and Sharon <span class="rpt-section-count">${rows.length} item${rows.length===1?'':'s'} · ${lkr(grand)}</span></div>
+    <div class="rpt-section-title">Expenses — Petty Cash, Direct, Bank and Sharon <span class="rpt-section-count">${rows.length} item${rows.length===1?'':'s'} · ${lkr(grand)}</span></div>
     ${parts}
     <table class="rpt-table" style="margin-top:10px;"><tbody>
       ${PETTY_GROUPS.map(g => `<tr><td>${esc(g.pl)}</td><td class="r">${Math.round(rows.filter(t => pettyGroupOf(t) === g.key).reduce((a,t)=> a + t.amount, 0)).toLocaleString()}</td></tr>`).join('')}
-      <tr class="subtotal"><td>All three together</td><td class="r">${Math.round(grand).toLocaleString()}</td></tr>
+      <tr class="subtotal"><td>All four together</td><td class="r">${Math.round(grand).toLocaleString()}</td></tr>
     </tbody></table>
     <div class="rpt-note">Sourced directly from the Petty Cash tab. Only lines sorted to a company account count toward the company's own expenses; villa costs and Store stock are charged to the villas.</div>
   </div>`;
