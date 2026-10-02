@@ -750,6 +750,8 @@
   .modal-scroll{ max-height:74vh; overflow-y:auto; padding-right:4px; }
   .frm-row{ display:flex; gap:10px; }
   .frm-row > div{ flex:1; min-width:0; }
+  .frm-row.frm-wrap{ flex-wrap:wrap; }
+  .frm-row.frm-wrap > div{ min-width:150px; }
   .direct-block{
     margin-top:14px; border:1.5px dashed var(--direct); background:var(--direct-bg);
     border-radius:10px; padding:10px 12px 14px;
@@ -1431,7 +1433,7 @@
         <button class="rpt-quick" id="renameCardsBtn" style="display:none;">✏️ Rename the cards</button>
         <button class="rpt-quick" data-bin-open="pettycash" style="display:none;">🗑 Deleted items <span class="bin-count"></span></button>
       </div>
-      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the petty cash float on each card: top-ups and returned cash in, advances and day-to-day bills out. "Direct" = bought straight for a villa (bypassing Store) — charged to that villa and settled separately, so it is shown here but NOT taken off the card float.</div>
+      <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Card balances are the petty cash float on each card: top-ups and returned cash in, advances and petty cash expenses out. "Direct" = recorded with <b>+ Payment From Card</b> — paid with the card straight for a villa, so it is shown here but NOT taken off the petty cash float. Sharon's own-money payments are kept apart under Sharon Expenses.</div>
 
       <div class="manage-section" style="margin-top:0;border-top:none;padding-top:0;">
         <div class="manage-title">Staff advance balances</div>
@@ -1443,10 +1445,9 @@
         <div class="status-msg" id="cashStatusMsg">Loading…</div>
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addIncomeBtn">+ Petty Cash Money Received</button>
-          <button class="add-booking-btn" id="addExpenseBtn">+ Petty Cash Expenses Cash</button>
+          <button class="add-booking-btn" id="addExpenseBtn">+ Petty Cash Expenses</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
           <button class="add-booking-btn" id="addDirectExpenseBtn">+ Payment From Card</button>
-          <button class="add-booking-btn" id="addBankTransferBtn">+ Bank transfer</button>
           <button class="add-booking-btn" id="addSharonExpenseBtn">+ Record Sharon's expense</button>
         </div>
       </div>
@@ -1507,7 +1508,9 @@
           <div class="villatabs" id="cashKindTabs" style="margin:0;">
             <button class="villatab-btn active" data-cashkind="all">Everything</button>
             <button class="villatab-btn" data-cashkind="income">💰 Money received</button>
-            <button class="villatab-btn" data-cashkind="expense">Expenses</button>
+            <button class="villatab-btn" data-cashkind="expense">Petty cash expenses</button>
+            <button class="villatab-btn" data-cashkind="direct">Direct expenses</button>
+            <button class="villatab-btn" data-cashkind="sharon">Sharon expenses</button>
             <button class="villatab-btn" data-cashkind="advance">Advances</button>
           </div>
           <span class="field-hint" id="cashKindTotal"></span>
@@ -2256,28 +2259,22 @@
   </div>
 </div>
 
-<!-- Expense modal (record purchase / expense) -->
+<!-- Expense modal: "Petty Cash Expenses" and "Payment From Card" share it -->
 <div class="modal-overlay" id="expenseModalOverlay">
   <div class="modal modal-wide">
     <h3>Record expense</h3>
+    <div class="field-hint" id="expModeHint" style="margin:-4px 0 10px;"></div>
     <label>Date</label>
     <input type="date" id="expDate">
     <label>Paid from</label>
-    <select id="expCard">
-      <option value="ceymora">Ceymora Card Petty Cash</option>
-      <option value="kalava_card">Kalava Villa Petty Cash</option>
-      <option value="bank:ceymora">Bank transfer from Ceymora</option>
-      <option value="bank:kalava">Bank transfer from Kalava Villa</option>
-      <option value="bank" hidden disabled>Bank transfer (account not stated)</option>
-      <option value="sharon">Sharon paid personally (not petty cash)</option>
-    </select>
-    <div class="field-hint" id="expCardHint">Ceymora Card Petty Cash can be used for any villa or the office.</div>
-    <label>For</label>
-    <select id="expFor">
-      <option value="office">Office</option>
-      <option value="store">Store</option>
-      <option value="boss">For Sharon (boss) — personal</option>
-    </select>
+    <select id="expCard"></select>
+    <div class="field-hint" id="expCardHint"></div>
+    <div id="expAdvWrap" style="display:none;">
+      <label>Whose advance <span id="expAdvanceBalanceHint" style="font-weight:400; color:var(--muted);"></span></label>
+      <select id="expFundedByAdvance"></select>
+    </div>
+    <div class="field-hint" id="expAdvanceWarn" style="display:none; color:#a06800; font-weight:600;"></div>
+    <div id="expForSlotDirect"></div>
     <label>What was it for</label>
     <input type="text" id="expPurpose" placeholder="e.g. Cleaning supplies">
     <label>Amount (LKR)</label>
@@ -2294,12 +2291,11 @@
       <label>Whose mobile is it</label>
       <select id="expWhose"></select>
     </div>
-    <label>Funded from a staff advance? <span id="expAdvanceBalanceHint" style="font-weight:400; color:var(--muted);"></span> (optional)</label>
-    <select id="expFundedByAdvance">
-      <option value="">No — paid fresh from the card above</option>
-    </select>
-    <div class="field-hint">If this bill is being covered out of cash someone's already holding as an advance, pick them here — it verifies where the money's coming from and comes off their balance instead of counting against the card a second time.</div>
-    <div class="field-hint" id="expAdvanceWarn" style="display:none; color:#a06800; font-weight:600;"></div>
+    <div id="expForSlotPetty"></div>
+    <div id="expForWrap">
+      <label id="expForLabel">For</label>
+      <select id="expFor"></select>
+    </div>
     <div class="modal-checkbox-row" id="expStockRow">
       <input type="checkbox" id="expIsStock">
       <label for="expIsStock" id="expIsStockLabel">This is a stock item — also add to Inventory</label>
@@ -2312,20 +2308,24 @@
       <input type="number" id="expItemQty" min="0" step="1" placeholder="e.g. 5">
       <div class="field-hint" id="expStockNoMatchHint" style="display:none; color:var(--amber);">Couldn't match this to its original item record — re-enter the item and quantity to fix it going forward.</div>
     </div>
-    <div class="frm-row" style="margin-top:4px;">
+    <div class="frm-row frm-wrap" style="margin-top:4px;">
       <div>
         <label>Invoice / bill number</label>
-        <input type="text" id="expInvoiceNo" maxlength="60" placeholder="From the shop's bill, e.g. INV-2231">
+        <input type="text" id="expInvoiceNo" maxlength="60" placeholder="From the shop's bill">
+      </div>
+      <div>
+        <label>Invoice date</label>
+        <input type="date" id="expInvoiceDate">
       </div>
       <div>
         <label>Payment voucher number</label>
-        <input type="text" id="expVoucherNo" maxlength="40" placeholder="Given automatically when you save">
+        <input type="text" id="expVoucherNo" maxlength="40" placeholder="Given when you save">
       </div>
     </div>
-    <div class="field-hint" id="expDocHint">The voucher number is issued in order (PV-2026-0001, 0002…) when you save. Type one only if a paper voucher already has a number.</div>
+    <div class="field-hint" id="expDocHint">Invoice date = the date printed on the shop's bill. The voucher number is issued in order (PV-2026-0001, 0002…) when you save — type one only if a paper voucher already has a number.</div>
     <label>Note (optional)</label>
     <input type="text" id="expNote">
-    <label>Attach invoice / receipt (optional)</label>
+    <label>Attach invoice / payment voucher (optional)</label>
     <input type="file" id="expFile" accept="image/*,.pdf">
     <div id="expFileList"></div>
     <div class="field-hint" id="expFileHint"></div>
@@ -3130,7 +3130,7 @@ function rowToBooking(r){ return {
   agreedRate: r.fx_rate !== null && r.fx_rate !== undefined && Number(r.fx_rate) > 0 ? Number(r.fx_rate) : null,
   agreedRateDate: r.fx_rate_date || null,
 }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, invoiceDate: r.invoice_date || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -3241,7 +3241,7 @@ function fillVillaSelect(sel, opts){
 // Every villa-driven <select> in the page, refreshed together after a villa is
 // added, renamed or removed.
 function refreshVillaSelects(){
-  fillVillaSelect(document.getElementById('expFor'),   { office:true, store:true, boss:true });
+  try{ fillExpFor(); }catch(e){ /* form not set up yet */ }
   fillVillaSelect(document.getElementById('distVilla'),{ office:true });
   fillVillaSelect(document.getElementById('repLocationSelect'), { office:true, store:true });
   fillVillaSelect(document.getElementById('mpVilla'));
@@ -3758,7 +3758,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.09.30-villas';
+const APP_VERSION = 'v2026.10.01-forms';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4321,8 +4321,8 @@ function renderExPickers(){
   const kt = document.getElementById('exKindTabs');
   kt.innerHTML = '';
   // Short names here: the full wording is on the summary card and the section heading.
-  const SHORT = { staff:'Petty cash', direct_ceymora:'Direct — ' + cardName('ceymora'),
-    direct_kalava:'Direct — ' + cardName('kalava_card'), bank:'Bank transfers', sharon:"Sharon's" };
+  const SHORT = { staff:'Petty cash', direct:'Direct', sharon:"Sharon's" };
+  if(!PETTY_GROUPS.some(g => g.key === exKind)) exKind = 'all';
   [{ key:'all', label:'Everything' }, ...PETTY_GROUPS.map(g=>({ key:g.key, label:SHORT[g.key] || g.pl }))].forEach(k=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn';
@@ -4365,7 +4365,7 @@ function renderExSummary(rows){
   const totals = {}; PETTY_GROUPS.forEach(g => totals[g.key] = 0);
   let grand = 0;
   for(const r of rows){ totals[pettyGroupOf(r)] += r.amount; grand += r.amount; }
-  const colors = { staff:'#0c8599', direct_ceymora:'#3b5bdb', direct_kalava:'#a06800', bank:'#f08c00', sharon:'#e64980' };
+  const colors = { staff:'#0c8599', direct:'#3b5bdb', sharon:'#e64980' };
   const shown = PETTY_GROUPS.filter(g => exKind === 'all' || g.key === exKind);
   wrap.innerHTML = `
     <div class="cash-card" style="background:linear-gradient(135deg, #343a40, #14161a);">
@@ -6388,14 +6388,25 @@ async function nextVoucherNo(dateISO){
     return `PV-${y}-${String(data).padStart(4, '0')}`;
   }catch(e){ return null; }
 }
+// The invoice date column comes with file 18.
+let HAS_INV_DATE = null;
+async function invDateReady(){
+  if(HAS_INV_DATE !== null || !sb) return !!HAS_INV_DATE;
+  try{ const { error } = await sb.from('petty_cash_transactions').select('invoice_date').limit(1); HAS_INV_DATE = !error; }
+  catch(e){ HAS_INV_DATE = false; }
+  return HAS_INV_DATE;
+}
+function invDateText(t){ return t && t.invoiceDate ? 'dated ' + fmtDayY(t.invoiceDate) : ''; }
+function fmtDayY(iso){ const d = parseISO(iso); return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }
 function docNosHTML(t){
   const bits = [];
-  if(t && t.invoiceNo) bits.push(`Invoice ${esc(t.invoiceNo)}`);
+  if(t && (t.invoiceNo || t.invoiceDate)) bits.push(`Invoice${t.invoiceNo ? ' ' + esc(t.invoiceNo) : ''}${t.invoiceDate ? ' ' + esc(invDateText(t)) : ''}`);
   if(t && t.voucherNo) bits.push(`Voucher ${esc(t.voucherNo)}`);
   return bits.length ? `<span class="doc-nos">${bits.join(' · ')}</span>` : '';
 }
 function docNosText(t){
-  return [t && t.invoiceNo ? 'Invoice ' + t.invoiceNo : '', t && t.voucherNo ? 'Voucher ' + t.voucherNo : ''].filter(Boolean).join(' · ');
+  const inv = t && (t.invoiceNo || t.invoiceDate) ? ['Invoice', t.invoiceNo || '', invDateText(t)].filter(Boolean).join(' ') : '';
+  return [inv, t && t.voucherNo ? 'Voucher ' + t.voucherNo : ''].filter(Boolean).join(' · ');
 }
 function cardName(k){
   const n = ((APP_SETTINGS && APP_SETTINGS.cardNames) || {})[k];
@@ -6407,12 +6418,6 @@ function applyCardNames(){
   if(typeof CARD_LABELS === 'undefined') return;
   CARD_LABELS.ceymora = cardName('ceymora');
   CARD_LABELS.kalava_card = cardName('kalava_card');
-  if(typeof PETTY_GROUPS !== 'undefined'){
-    for(const g of PETTY_GROUPS){
-      if(g.key === 'direct_ceymora'){ g.label = '2. Direct purchases for the villa — ' + cardName('ceymora'); g.pl = `Direct purchases for the villa (${cardName('ceymora')})`; }
-      if(g.key === 'direct_kalava'){ g.label = '2. Direct purchases for the villa — ' + cardName('kalava_card'); g.pl = `Direct purchases for the villa (${cardName('kalava_card')})`; }
-    }
-  }
   document.querySelectorAll('[data-cardname]').forEach(el => el.textContent = cardName(el.dataset.cardname));
   document.querySelectorAll('[data-pettyname]').forEach(el => el.textContent = pettyName(el.dataset.pettyname));
   document.querySelectorAll('[data-pettyopt]').forEach(el => el.textContent = (el.dataset.pettyoptPrefix || '') + pettyName(el.dataset.pettyopt));
@@ -6488,8 +6493,10 @@ function isSharonCost(t){ return t.type === 'expense' && (t.purchasedBy === 'Sha
 // original route, via the stock tick), and anything logged through the newer
 // "+ Direct expense" button, which sets direct_expense on the row. Both feed the
 // "Direct Villa Purchases" / "Direct Ceymora Card Expenses" totals.
+// Direct = recorded with "+ Payment From Card". A petty cash bill stays petty cash
+// even when its stock went straight to a villa.
 function isDirectCost(t){
-  return t.type === 'expense' && t.for !== 'store' && (t.directExpense || !!t.linkedInventory);
+  return t.type === 'expense' && !!t.directExpense;
 }
 // Always shown as a balance box even at LKR 0, so it's obvious at a glance who's currently
 // holding cash. Anyone else who receives an advance shows up automatically alongside these.
@@ -6559,15 +6566,18 @@ function renderAdvanceWallets(){
 
 // Populates the "Funded from a staff advance?" dropdown in the expense form with every
 // known wallet holder, and keeps the balance hint next to it up to date.
+// "Whose advance" — everyone who has been given cash, those still holding some first.
 function updateExpenseAdvanceOptions(){
   const sel = document.getElementById('expFundedByAdvance');
   if(!sel) return;
   const wallets = computeAdvanceWallets();
   const names = new Set(ADVANCE_WALLET_DEFAULTS.map(d=>d.name));
   Object.keys(wallets).forEach(n=>names.add(n));
+  const bal = n => (wallets[n] && wallets[n].balance) || 0;
+  const list = [...names].sort((a,b)=> (bal(b) > 0) - (bal(a) > 0) || a.localeCompare(b));
   const current = sel.value;
-  sel.innerHTML = '<option value="">No — paid fresh from the card above</option>'
-    + [...names].map(n=>`<option value="${n}">${n}</option>`).join('');
+  sel.innerHTML = '<option value="">— Whose advance? —</option>'
+    + list.map(n=>`<option value="${esc(n)}">${esc(n)}${bal(n) > 0 ? ' — holding LKR ' + Math.round(bal(n)).toLocaleString() : ''}</option>`).join('');
   sel.value = names.has(current) ? current : '';
   updateExpenseAdvanceHint();
 }
@@ -6575,18 +6585,44 @@ function updateExpenseAdvanceHint(){
   const sel = document.getElementById('expFundedByAdvance');
   const hint = document.getElementById('expAdvanceBalanceHint');
   if(!sel || !hint) return;
-  const name = sel.value;
+  const pay = (document.getElementById('expCard') || {}).value;
+  const name = pay === 'advance' ? sel.value : '';
   const warn = document.getElementById('expAdvanceWarn');
   if(warn){
     const holders = [...new Set(allCashTxns.filter(t => t.type === 'advance' && !t.advanceId && !t.settled).map(t => t.employeeName).filter(Boolean))];
-    const card = (document.getElementById('expCard') || {}).value;
-    warn.style.display = (!name && holders.length && card !== 'sharon') ? '' : 'none';
-    warn.innerHTML = `⚠ ${holders.map(esc).join(', ')} ${holders.length === 1 ? 'is' : 'are'} holding advance cash. If this bill was paid from that cash, pick the name above — otherwise the card is charged twice (once for the advance, once for this bill).`;
+    warn.style.display = (pay !== 'advance' && pay !== 'sharon' && holders.length) ? '' : 'none';
+    warn.innerHTML = `⚠ ${holders.map(esc).join(', ')} ${holders.length === 1 ? 'is' : 'are'} holding advance cash. If this bill was paid from that cash, choose <b>From a staff advance</b> under Paid from.`;
   }
   if(!name){ hint.textContent = ''; return; }
   const wallets = computeAdvanceWallets();
   const balance = wallets[name] ? wallets[name].balance : 0;
-  hint.textContent = `(${name}'s current balance: LKR ${balance.toLocaleString()})`;
+  hint.textContent = `(${name} is holding LKR ${Math.round(balance).toLocaleString()})`;
+}
+// The "Paid from" list for the form that is open.
+function buildExpPayOptions(){
+  const sel = document.getElementById('expCard');
+  const nm = k => expDirectMode ? cardName(k) : pettyName(k);
+  sel.innerHTML = [
+    ['ceymora', nm('ceymora')],
+    ['kalava_card', nm('kalava_card')],
+    ['bank:ceymora', 'Bank transfer from Ceymora'],
+    ['bank:kalava', 'Bank transfer from Kalava Villa'],
+    ['sharon', 'Sharon paid personally (goes to Sharon Expenses)'],
+    ['advance', 'From a staff advance'],
+  ].map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join('')
+    + '<option value="bank" hidden disabled>Bank transfer (account not stated)</option>';
+}
+// The "For" list: villas first on a card payment, Store and Office first on petty cash.
+function fillExpFor(){
+  const sel = document.getElementById('expFor');
+  if(!sel) return;
+  const keep = sel.value;
+  const villas = VR_VILLAS.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  const places = '<option value="store">Store</option><option value="office">Office</option>';
+  sel.innerHTML = `<option value="">${expDirectMode ? '— Choose the villa —' : '— Where was it bought for? —'}</option>`
+    + (expDirectMode ? villas + places : places + villas)
+    + '<option value="boss">For Sharon (boss) — personal</option>';
+  if(keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
 
 let cashInited = false;
@@ -6606,7 +6642,6 @@ function initPettyCash(){
   document.getElementById('addExpenseBtn').addEventListener('click', ()=> openExpenseModal());
   document.getElementById('addAdvanceBtn').addEventListener('click', ()=> openAdvanceModal());
   document.getElementById('advGiveMode').addEventListener('change', advApplyGiveMode);
-  document.getElementById('addBankTransferBtn').addEventListener('click', ()=> openExpenseModal(null, false, { card:'bank', bank:true }));
   document.getElementById('addDirectExpenseBtn').addEventListener('click', ()=> openExpenseModal(null, true));
   document.getElementById('addSharonExpenseBtn').addEventListener('click', ()=> openMyPurchaseModal('Sharon'));
 
@@ -6686,25 +6721,28 @@ async function fetchCash(){
   if(companyInited) onAcctDataChanged();
 }
 
+let expForAuto = false;   // Kalava Villa was filled in because of the Kalava card
 function updateExpenseCardLock(){
-  const card = document.getElementById('expCard').value;
+  const pay = document.getElementById('expCard').value;
   const forSelect = document.getElementById('expFor');
   const hint = document.getElementById('expCardHint');
   const nm = k => expDirectMode ? cardName(k) : pettyName(k);
-  if(card === 'kalava_card'){
-    forSelect.value = 'kalava';
+  document.getElementById('expAdvWrap').style.display = pay === 'advance' ? '' : 'none';
+  if(pay === 'kalava_card'){
+    if(forSelect.value !== 'kalava'){ forSelect.value = 'kalava'; expForAuto = true; }
     forSelect.disabled = true;
-    hint.textContent = `${nm('kalava_card')} can only be used for Kalava Villa expenses.`;
-  } else if(isBankVal(card)){
-    forSelect.disabled = false;
-    hint.textContent = `${bankLabel(splitPay(card).bankAccount)} — charged to the villa/office below; no petty cash is touched.`;
-  } else if(card === 'sharon'){
-    forSelect.disabled = false;
-    hint.textContent = 'Sharon paid with his own money — charged to the villa/office below, but nothing comes out of petty cash.';
+    hint.textContent = `${nm('kalava_card')} is only for Kalava Villa — Kalava Villa is filled in for you.`;
   } else {
     forSelect.disabled = false;
-    hint.textContent = `${nm('ceymora')} can be used for any villa or the office.`;
+    if(expForAuto && forSelect.value === 'kalava') forSelect.value = '';
+    expForAuto = false;
+    hint.textContent = isBankVal(pay) ? `${bankLabel(splitPay(pay).bankAccount)} — no petty cash is touched.`
+      : pay === 'sharon' ? 'Sharon paid with his own money — kept under Sharon Expenses, not petty cash.'
+      : pay === 'advance' ? 'Paid out of cash a staff member is holding — it comes off their balance, not the card.'
+      : expDirectMode ? `${cardName('ceymora')} can pay for any villa — choose which one.`
+      : `${pettyName('ceymora')} can be used for any villa, the office or the store.`;
   }
+  updateExpenseAdvanceHint();
   updateExpenseStockLabel();
 }
 
@@ -6718,7 +6756,10 @@ function updateExpenseStockLabel(){
   const label = document.getElementById('expIsStockLabel');
   const hint = document.getElementById('expIsStockHint');
   if(!label || !hint) return;
-  if(forWhom === 'store'){
+  if(!forWhom){
+    label.textContent = 'This is a stock item — also add to Inventory';
+    hint.textContent = 'Choose where it was bought for first: Store keeps it in Store; a villa or the office gets it straight away.';
+  } else if(forWhom === 'store'){
     label.textContent = 'This is a stock item — add to Store inventory';
     hint.textContent = 'Goes into Store; you\'ll distribute it to a villa later from the Inventory tab.';
   } else {
@@ -6750,6 +6791,21 @@ let cashShowAll = false;
 // and which kind of line is listed, so money received can be checked on its own.
 let cashPeriod = 'month';
 let cashKind = 'all';
+// The Transactions tabs. Sharon's own-money payments and card payments are kept out
+// of "Petty cash expenses" — each has its own tab.
+const CASH_KIND_WORDS = {
+  income:  ['receipt', 'money received', 'Total money received'],
+  expense: ['petty cash expense', 'petty cash expenses', 'Total petty cash expenses'],
+  direct:  ['direct expense', 'direct expenses', 'Total direct expenses'],
+  sharon:  ['Sharon expense', 'Sharon expenses', 'Total Sharon expenses'],
+  advance: ['advance', 'advances', 'Total advances given'],
+};
+function cashKindMatch(t){
+  if(cashKind === 'all') return true;
+  if(cashKind === 'income' || cashKind === 'advance') return t.type === cashKind;
+  if(t.type !== 'expense') return false;
+  return pettyGroupOf(t) === (cashKind === 'expense' ? 'staff' : cashKind);
+}
 function cashWeekStart(d){
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = (x.getDay() + 6) % 7;        // Monday = 0
@@ -6877,14 +6933,11 @@ function renderCashMonth(){
       </div>`;
 
   // Only the kind of line being looked at goes into the list below.
-  const shown = cashKind === 'all' ? txns
-    : cashKind === 'income'  ? txns.filter(t => t.type === 'income')
-    : cashKind === 'expense' ? txns.filter(t => t.type === 'expense')
-    : txns.filter(t => t.type === 'advance');
+  const shown = txns.filter(cashKindMatch);
   const shownTotal = shown.reduce((a,t)=> a + t.amount, 0);
   document.getElementById('cashKindTotal').innerHTML = cashKind === 'all'
     ? `${shown.length} transaction${shown.length===1?'':'s'} · ${esc(range.label)}`
-    : `<b>${shown.length} ${cashKind === 'income' ? 'receipt' : cashKind === 'expense' ? 'expense' : 'advance'}${shown.length===1?'':'s'} · LKR ${Math.round(shownTotal).toLocaleString()}</b> · ${esc(range.label)}`;
+    : `<b>${shown.length} ${CASH_KIND_WORDS[cashKind][0]}${shown.length===1?'':'s'} · LKR ${Math.round(shownTotal).toLocaleString()}</b> · ${esc(range.label)}`;
   return shown;
 }
 
@@ -6960,7 +7013,7 @@ function renderCash(){
   const list = document.getElementById('cashList');
   list.innerHTML = '';
   if(monthTxns.length === 0){
-    const kindWord = cashKind === 'income' ? 'money received' : cashKind === 'expense' ? 'expenses' : cashKind === 'advance' ? 'advances' : 'transactions';
+    const kindWord = cashKind === 'all' ? 'transactions' : CASH_KIND_WORDS[cashKind][1];
     list.innerHTML = `<div class="manage-empty">No ${kindWord} ${cashPeriod === 'all' ? 'recorded yet' : 'in ' + esc(cashRange().label.toLowerCase())}.</div>`;
     renderAdvances();
     return;
@@ -7075,7 +7128,7 @@ function renderCash(){
     ? sorted.reduce((s,t)=> s + t.amount, 0)
     : sorted.reduce((s,t)=> s + cardEffect(t), 0);
   const footLabel = filtered
-    ? (cashKind === 'income' ? 'Total money received' : cashKind === 'expense' ? 'Total spent' : 'Total advances given')
+    ? CASH_KIND_WORDS[cashKind][2]
     : 'Net change on the cards';
   const tfoot = document.createElement('tfoot');
   tfoot.innerHTML = `<tr style="font-weight:800; border-top:2px solid var(--board-line); background:#f6f4ec;">
@@ -7155,39 +7208,21 @@ let expDirectMode = false;
 function applyDirectExpenseUI(){
   const g = id => document.getElementById(id);
   const on = expDirectMode;
-
-  // A direct expense can be goods too — ticking the stock box adds them straight to
-  // that villa's inventory, the same as a direct purchase from "Record expense".
-
-  // A direct purchase can be paid out of cash someone is holding as an advance, just
-  // like any other bill — so the advance picker stays available here too. (Hiding it
-  // used to charge the card a second time for bills paid from an advance.)
-
-  // A card payment can be for a villa, the office or the store, like any other bill.
-  Array.from(g('expFor').options).forEach(opt=>{ opt.hidden = false; opt.disabled = false; });
-
-  // Petty cash is spent from the floats; "Payment From Card" is paid with the cards.
-  const cs = g('expCard');
-  const o1 = cs.querySelector('option[value="ceymora"]'), o2 = cs.querySelector('option[value="kalava_card"]');
-  if(o1) o1.textContent = on ? cardName('ceymora') : pettyName('ceymora');
-  if(o2) o2.textContent = on ? cardName('kalava_card') : pettyName('kalava_card');
-  const hint = g('expCardHint');
-  if(on){
-    hint.innerHTML = `<b>${esc(cardName('kalava_card'))}</b> → Direct Kalava Villa Purchases. &nbsp;<b>${esc(cardName('ceymora'))}</b> → Direct ${esc(cardName('ceymora'))} Expenses.`+' Either way the cost still counts toward that villa\'s petty cash.';
-  }
-  document.querySelector('#expenseModalOverlay h3').textContent = expBankMode
-    ? (editingCashId ? 'Edit bank transfer' : 'Record a bank transfer')
-    : (editingCashId ? 'Edit — ' : '') + (on ? 'Payment From Card' : 'Petty Cash Expenses Cash');
-
-  // In bank transfer mode the payment method is the whole point of the button, so it is
-  // fixed rather than left as one option among four.
-  const cardSel = g('expCard');
-  const current = cardSel.value;
-  Array.from(cardSel.options).forEach(opt => {
-    const hide = (expBankMode && !isBankVal(opt.value)) || (opt.value === 'bank' && current !== 'bank');
-    opt.hidden = hide; opt.disabled = hide;
-  });
-  if(expBankMode && !isBankVal(cardSel.value)) cardSel.value = 'bank:ceymora';
+  const name = on ? 'Payment From Card' : 'Petty Cash Expenses';
+  document.querySelector('#expenseModalOverlay h3').textContent = (editingCashId ? 'Edit — ' : '') + name;
+  g('expModeHint').innerHTML = on
+    ? 'Paid straight for a villa. Recorded under <b>Direct Expenses</b> and charged to that villa.'
+    : 'Bought out of petty cash. Recorded under <b>Petty Cash Expenses</b>.';
+  // The villa is asked right after "Paid from" on a card payment; on petty cash,
+  // where it was bought for comes after the account.
+  (on ? g('expForSlotDirect') : g('expForSlotPetty')).appendChild(g('expForWrap'));
+  g('expForLabel').textContent = on ? 'For which villa' : 'Where was it bought for';
+  // A card payment goes straight to the villa — no stock tick. An older one that
+  // already has stock linked keeps the box so the link can still be changed.
+  const keepStock = !on || g('expIsStock').checked;
+  g('expStockRow').style.display = keepStock ? '' : 'none';
+  g('expIsStockHint').style.display = keepStock ? '' : 'none';
+  if(!keepStock) g('expStockFields').style.display = 'none';
 }
 
 let expLinkAdvanceId = null, expReturnToAdvance = null;
@@ -7210,13 +7245,17 @@ function openExpenseModal(record, forceDirect, opts){
   expLinkAdvanceId = opts.advanceId != null ? String(opts.advanceId) : (record && record.advanceId) || null;
   expReturnToAdvance = opts.returnToAdvance != null ? opts.returnToAdvance : null;
   expDirectMode = (forceDirect !== undefined) ? !!forceDirect : (record ? !!record.directExpense : false);
-  expBankMode = opts.bank ? true : (record ? record.card === 'bank' : false);
+  expBankMode = false;
+  expForAuto = false;
   try{
+    buildExpPayOptions();
+    fillExpFor();
     document.getElementById('expDate').value = record ? record.date : todayISO();
     setPaySelect('expCard', record ? record.card : 'ceymora', record ? record.bankAccount : null);
     document.getElementById('expInvoiceNo').value = record ? (record.invoiceNo || '') : '';
+    document.getElementById('expInvoiceDate').value = record ? (record.invoiceDate || '') : '';
     document.getElementById('expVoucherNo').value = record ? (record.voucherNo || '') : '';
-    document.getElementById('expFor').value = record ? record.for : firstVillaId();
+    document.getElementById('expFor').value = record ? (record.for || '') : (opts.for || '');
     document.getElementById('expFor').disabled = false;
     document.getElementById('expPurpose').value = record ? record.purpose : '';
     document.getElementById('expAmount').value = record ? record.amount : '';
@@ -7228,7 +7267,8 @@ function openExpenseModal(record, forceDirect, opts){
       advSel.insertAdjacentHTML('beforeend', `<option value="${esc(fundedName)}">${esc(fundedName)}</option>`);
     }
     advSel.value = fundedName;
-    if(!record && opts.card) setPaySelect('expCard', opts.card, opts.card === 'bank' ? 'ceymora' : null);
+    if(fundedName) document.getElementById('expCard').value = 'advance';
+    else if(!record && opts.card) setPaySelect('expCard', opts.card, opts.card === 'bank' ? 'ceymora' : null);
     updateExpenseAdvanceHint();
 
     const wasStock = record ? !!record.linkedInventory : false;
@@ -7279,22 +7319,40 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   }
   if(!sb){ errEl.textContent='Not connected to Supabase yet.'; errEl.style.display='block'; return; }
   const date = document.getElementById('expDate').value;
-  const { card, bankAccount } = splitPay(document.getElementById('expCard').value);
+  const payRaw = document.getElementById('expCard').value;
+  let { card, bankAccount } = splitPay(payRaw);
   const invoiceNo = document.getElementById('expInvoiceNo').value.trim() || null;
+  const invoiceDate = document.getElementById('expInvoiceDate').value || null;
   let voucherNo = document.getElementById('expVoucherNo').value.trim() || null;
   const forWhom = document.getElementById('expFor').value;
   const purpose = document.getElementById('expPurpose').value.trim();
   const amount = parseFloat(document.getElementById('expAmount').value);
   const note = document.getElementById('expNote').value.trim();
   const isStock = document.getElementById('expIsStock').checked;
-  const fundedByEmployee = document.getElementById('expFundedByAdvance').value || null;
+  const fundedByEmployee = payRaw === 'advance' ? (document.getElementById('expFundedByAdvance').value || null) : null;
   const itemName = document.getElementById('expItemName').value.trim();
   const itemQtyRaw = document.getElementById('expItemQty').value;
   const itemQty = itemQtyRaw ? parseFloat(itemQtyRaw) : 1;
   const files = expFileHandler.getFiles();
 
-  if(!date || !amount || amount <= 0 || !purpose){ errEl.textContent='Fill in date, purpose, and a valid amount.'; errEl.style.display='block'; return; }
-  if(card === 'kalava_card' && forWhom !== 'kalava'){ errEl.textContent=`${cardName('kalava_card')} can only be used for Kalava Villa.`; errEl.style.display='block'; return; }
+  const stop = m => { errEl.textContent = m; errEl.style.display = 'block'; };
+  if(!date || !amount || amount <= 0 || !purpose) return stop('Fill in date, what it was for, and a valid amount.');
+  if(!forWhom) return stop(expDirectMode ? 'Choose which villa this was for.' : 'Choose where it was bought for — Store, Office or a villa.');
+  if(payRaw === 'kalava_card' && forWhom !== 'kalava') return stop(`${expDirectMode ? cardName('kalava_card') : pettyName('kalava_card')} can only be used for Kalava Villa.`);
+  if(payRaw === 'advance'){
+    if(!fundedByEmployee) return stop('Choose whose advance this was paid from.');
+    // The bill carries the card (or bank account) the advance itself came from.
+    const orig = editingCashId ? allCashTxns.find(t => t.id === editingCashId) : null;
+    const linked = expLinkAdvanceId ? allCashTxns.find(t => String(t.id) === String(expLinkAdvanceId)) : null;
+    const theirs = allCashTxns.filter(t => t.type === 'advance' && t.employeeName === fundedByEmployee)
+      .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const src = (linked && linked.employeeName === fundedByEmployee ? linked : null)
+      || (orig && orig.employeeName === fundedByEmployee && orig.card ? orig : null)
+      || oldestOpenAdvanceFor(fundedByEmployee) || theirs[0] || null;
+    if(!src) return stop(`${fundedByEmployee} has not been given an advance yet. Give the advance first (+ Give advance), then record this bill.`);
+    card = src.card || 'ceymora';
+    bankAccount = card === 'bank' ? (src.bankAccount || null) : null;
+  }
   if(isStock && !itemName){ errEl.textContent='Enter an item name for the stock item.'; errEl.style.display='block'; return; }
   const accountCode = document.getElementById('expAccount').value || null;
   // Which advance this bill is paid out of: the one it was opened from, the one it was
@@ -7318,6 +7376,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const docCols = await pcColsReady();
   if(docCols && !voucherNo && !editingCashId) voucherNo = await nextVoucherNo(date);
   const docFields = docCols ? { bank_account: card === 'bank' ? bankAccount : null, invoice_no: invoiceNo, voucher_no: voucherNo } : {};
+  if(await invDateReady()) docFields.invoice_date = invoiceDate;
 
   try{
     const newUrls = [];
@@ -7398,6 +7457,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       if(error) throw error;
       logActivity('update', 'petty_cash_transactions', `Edited expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]})`);
       document.getElementById('expenseModalOverlay').classList.remove('open');
+      try{ await fetchCash(); }catch(_e){ console.error(_e); }
       await expBackToAdvance();
       return;
     }
@@ -7430,6 +7490,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       if(linkErr) throw linkErr;
     }
     document.getElementById('expenseModalOverlay').classList.remove('open');
+    try{ await fetchCash(); }catch(_e){ console.error(_e); }
     await expBackToAdvance();
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
@@ -8486,18 +8547,15 @@ function computeAvgUnitCost(){
      3. Bank transfers           — paid from the bank, not from a card
      4. Sharon's expenditure     — anything Sharon bought for the villa          */
 const PETTY_GROUPS = [
-  { key:'staff',          label:'1. Petty cash expenses — Zahny & staff',            pl:'Petty cash expenses', always:true },
-  { key:'direct_ceymora', label:'2. Direct purchases for the villa — Ceymora Card',  pl:'Direct purchases for the villa (Ceymora Card)' },
-  { key:'direct_kalava',  label:'2. Direct purchases for the villa — Kalava Card',   pl:'Direct purchases for the villa (Kalava Villa Card)' },
-  { key:'bank',           label:'3. Bank transfers',                                 pl:'Bank transfers', always:true },
-  { key:'sharon',         label:'4. Sharon\'s expenditure for the villa',            pl:'Sharon\'s expenditure for the villa', always:true },
+  { key:'staff',  label:'1. Petty Cash Expenses', pl:'Petty Cash Expenses', always:true },
+  { key:'direct', label:'2. Direct Expenses',     pl:'Direct Expenses',     always:true },
+  { key:'sharon', label:'3. Sharon Expenses',     pl:'Sharon Expenses',     always:true },
 ];
+// Which of the three an expense belongs to. Sharon's own money comes first, whichever
+// form it was entered on; then anything entered with "+ Payment From Card".
 function pettyGroupOf(e){
   if(isSharonCost(e)) return 'sharon';
-  if(isBankTransfer(e)) return 'bank';
-  const dc = directCardOf(e);
-  if(dc === 'ceymora') return 'direct_ceymora';
-  if(dc === 'kalava_card') return 'direct_kalava';
+  if(e.directExpense) return 'direct';
   return 'staff';
 }
 function pettyGroupsBlock(expenses){
@@ -8614,7 +8672,7 @@ function buildVillaReportHTML(loc, monthDate){
     </div>
 
     <div class="rpt-section" data-rpt-section="pettycash">
-      <div class="rpt-section-title">1. Petty Cash Expenses <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyTotal)}</span></div>
+      <div class="rpt-section-title">1. Expenses — Petty Cash, Direct and Sharon <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyTotal)}</span></div>
       ${pettyHtml}
     </div>
 
@@ -9799,7 +9857,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     </div>
 
     <div class="rpt-section" data-rpt-section="pettycash">
-      <div class="rpt-section-title">2. Petty Cash Expenses <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyCashTotal)}</span></div>
+      <div class="rpt-section-title">2. Expenses — Petty Cash, Direct and Sharon <span class="rpt-section-count">${expenses.length} item${expenses.length===1?'':'s'} · ${lkr(pettyCashTotal)}</span></div>
       ${pettyHtml}
     </div>
 
@@ -12760,35 +12818,49 @@ function coPettyCashHTML(){
 
   if(rows.length === 0){
     return `<div class="rpt-section">
-      <div class="rpt-section-title">Petty Cash Expenses</div>
-      <div class="rpt-empty">No petty cash spending recorded for this period.</div>
+      <div class="rpt-section-title">Expenses — Petty Cash, Direct and Sharon</div>
+      <div class="rpt-empty">No expenses recorded for this period.</div>
     </div>`;
   }
 
-  let total = 0;
-  const body = rows.map(t=>{
-    total += t.amount;
-    const details = (t.purpose || 'Expense') + (t.linkedInventory ? ' 📦' : '') + (t.note ? `<div class="dim">${esc(t.note)}</div>` : '');
-    const tag = t.employeeName ? `from ${esc(t.employeeName)}'s advance` : '';
-    return `<tr>
-      <td class="dim">${fmtDay(t.date)}</td>
-      <td><b>${details}</b></td>
-      <td class="dim">${esc(FOR_LABELS[t.for] || t.for)}</td>
-      <td class="dim">${acctOf(t) ? esc(acctLabel(acctOf(t))) : '<b style="color:#a06800;">Not sorted</b>'}</td>
-      <td class="dim">${esc(payLabel(t))}${tag ? `<div class="dim">${tag}</div>` : ''}</td>
-      <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
-    </tr>`;
+  // Three separate lists, the way they are recorded: petty cash, card payments
+  // straight to a villa, and what Sharon paid with his own money.
+  let grand = 0;
+  const parts = PETTY_GROUPS.map(g => {
+    const mine = rows.filter(t => pettyGroupOf(t) === g.key);
+    let total = 0;
+    const body = mine.map(t=>{
+      total += t.amount;
+      const details = esc(t.purpose || 'Expense') + (t.linkedInventory ? ' 📦' : '') + (t.note ? `<div class="dim">${esc(t.note)}</div>` : '');
+      const tag = t.employeeName ? `from ${esc(t.employeeName)}'s advance` : '';
+      const nos = docNosText(t);
+      return `<tr>
+        <td class="dim">${fmtDay(t.date)}</td>
+        <td><b>${details}</b>${nos ? `<div class="dim">${esc(nos)}</div>` : ''}</td>
+        <td class="dim">${esc(FOR_LABELS[t.for] || t.for)}</td>
+        <td class="dim">${acctOf(t) ? esc(acctLabel(acctOf(t))) : '<b style="color:#a06800;">Not sorted</b>'}</td>
+        <td class="dim">${esc(payLabel(t))}${tag ? `<div class="dim">${tag}</div>` : ''}</td>
+        <td class="r rpt-money-out">${Math.round(t.amount).toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+    grand += total;
+    return `<div class="rpt-section-title" style="font-size:14px; margin-top:12px;">${esc(g.pl)} <span class="rpt-section-count">${mine.length} item${mine.length===1?'':'s'} · ${lkr(total)}</span></div>
+    ${mine.length ? `<table class="rpt-table">
+      <thead><tr><th>Date</th><th>Expense details</th><th>For</th><th>Account</th><th>Paid from</th><th class="r">Amount (LKR)</th></tr></thead>
+      <tbody>${body}
+        <tr class="subtotal"><td colspan="5">${esc(g.pl)} — total</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
+      </tbody>
+    </table>` : '<div class="rpt-empty">None this month.</div>'}`;
   }).join('');
 
   return `<div class="rpt-section">
-    <div class="rpt-section-title">Petty Cash Expenses <span class="rpt-section-count">${rows.length} item${rows.length===1?'':'s'} · ${lkr(total)}</span></div>
-    <table class="rpt-table">
-      <thead><tr><th>Date</th><th>Expense details</th><th>For</th><th>Account</th><th>From which card</th><th class="r">Amount (LKR)</th></tr></thead>
-      <tbody>${body}
-        <tr class="subtotal"><td colspan="5">Net Total</td><td class="r">${Math.round(total).toLocaleString()}</td></tr>
-      </tbody>
-    </table>
-    <div class="rpt-note">Sourced directly from the Petty Cash tab — every expense recorded this month, whichever villa or card it was for. Only lines sorted to a company account count toward the company's own expenses; villa costs and Store stock are charged to the villas.</div>
+    <div class="rpt-section-title">Expenses — Petty Cash, Direct and Sharon <span class="rpt-section-count">${rows.length} item${rows.length===1?'':'s'} · ${lkr(grand)}</span></div>
+    ${parts}
+    <table class="rpt-table" style="margin-top:10px;"><tbody>
+      ${PETTY_GROUPS.map(g => `<tr><td>${esc(g.pl)}</td><td class="r">${Math.round(rows.filter(t => pettyGroupOf(t) === g.key).reduce((a,t)=> a + t.amount, 0)).toLocaleString()}</td></tr>`).join('')}
+      <tr class="subtotal"><td>All three together</td><td class="r">${Math.round(grand).toLocaleString()}</td></tr>
+    </tbody></table>
+    <div class="rpt-note">Sourced directly from the Petty Cash tab. Only lines sorted to a company account count toward the company's own expenses; villa costs and Store stock are charged to the villas.</div>
   </div>`;
 }
 
@@ -14938,13 +15010,14 @@ function exportPettyCashCSV(){
   const range = cashRange();
   const rows = allCashTxns
     .filter(t => cashPeriod === 'all' || (t.date >= range.from && t.date < range.to))
-    .filter(t => cashKind === 'all' || t.type === cashKind)
+    .filter(cashKindMatch)
     .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-  const out = [['Date','Type','Details','For','Account','Paid from / into','Paid from advance of','Invoice no.','Payment voucher no.','Amount LKR','Money on card LKR','Note']];
+  const groupName = t => t.type !== 'expense' ? '' : (PETTY_GROUPS.find(g => g.key === pettyGroupOf(t)) || {}).pl || '';
+  const out = [['Date','Type','Group','Details','For','Account','Paid from / into','Paid from advance of','Invoice no.','Invoice date','Payment voucher no.','Amount LKR','Money on card LKR','Note']];
   rows.forEach(t => out.push([
-    t.date, t.type, t.purpose || (t.type === 'advance' ? 'Advance — ' + (t.employeeName||'') : 'Money received'),
+    t.date, t.type, groupName(t), t.purpose || (t.type === 'advance' ? 'Advance — ' + (t.employeeName||'') : 'Money received'),
     FOR_LABELS[t.for] || t.for || '', acctLabel(acctOf(t)) || '', payLabel(t),
-    t.employeeName || '', t.invoiceNo || '', t.voucherNo || '', t.amount, cardEffect(t), t.note || '',
+    t.employeeName || '', t.invoiceNo || '', t.invoiceDate || '', t.voucherNo || '', t.amount, cardEffect(t), t.note || '',
   ]));
   downloadCSV(`petty-cash-${cashKind === 'all' ? '' : cashKind + '-'}${cashPeriod === 'all' ? 'all-time' : cashPeriod === 'week' ? 'week-' + range.from : ymKey(cashMonthDate)}.csv`, out);
 }
