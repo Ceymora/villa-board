@@ -3891,7 +3891,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.02-attendance';
+const APP_VERSION = 'v2026.10.05-boss';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7197,7 +7197,7 @@ function kindPlaces(k){
   const villas = VR_VILLAS.map(v => v.id);
   if(k === 'petty:kalava_card' || k === 'direct:kalava_card') return ['kalava'];
   if(k === 'petty:ceymora')  return ['store', 'office', ...villas, 'boss'];
-  if(k === 'direct:ceymora') return [...villas, 'office'];
+  if(k === 'direct:ceymora') return [...villas, 'office', 'boss'];
   if(k === 'sharon')         return [...villas, 'office', 'boss'];
   return [...villas, 'office', 'store', 'boss'];       // bank transfers
 }
@@ -7337,7 +7337,7 @@ function updateExpenseCardLock(){
   expDirectMode = kind.startsWith('direct:');
   fillExpFor();
   const one = kindPlaces(kind).length === 1;
-  document.getElementById('expForLabel').textContent = one ? 'For' : (expDirectMode ? 'For which villa (or the office)' : 'For which villa / place');
+  document.getElementById('expForLabel').textContent = one ? 'For' : (expDirectMode ? 'For which villa, the office or Sharon' : 'For which villa / place');
   const H = {
     'petty:ceymora':      `Comes out of ${pettyName('ceymora')}. For a villa, the office, the store, or Sharon.`,
     'petty:kalava_card':  `Comes out of ${pettyName('kalava_card')} — for Kalava Villa only.`,
