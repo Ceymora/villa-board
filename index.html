@@ -752,6 +752,36 @@
   .frm-row > div{ flex:1; min-width:0; }
   .frm-row.frm-wrap{ flex-wrap:wrap; }
   .frm-row.frm-wrap > div{ min-width:150px; }
+  /* attendance register */
+  .att-wrap{ overflow-x:auto; border:1px solid var(--board-line); border-radius:12px; background:#fff; }
+  .att-grid{ border-collapse:separate; border-spacing:0; font-size:12.5px; min-width:100%; }
+  .att-grid th, .att-grid td{ border-bottom:1px solid var(--board-line); padding:0; text-align:center; }
+  .att-grid thead th{ background:#f6f4ec; font-weight:700; color:var(--muted); padding:6px 0; min-width:30px; position:sticky; top:0; }
+  .att-grid thead th.wk{ color:#b02a37; }
+  .att-grid thead th.hol{ background:#fde2e4; color:#9c2a3d; }
+  .att-grid thead th.today{ background:var(--ink); color:#fff; }
+  .att-grid thead th.click{ cursor:pointer; }
+  .att-grid .att-name{ position:sticky; left:0; background:#fff; text-align:left; padding:6px 10px; min-width:170px; z-index:1; border-right:1px solid var(--board-line); }
+  .att-grid .att-name b{ display:block; color:var(--ink); }
+  .att-grid .att-name span{ color:var(--muted); font-size:11px; }
+  .att-grid thead th.att-sumh{ padding:6px 10px; white-space:nowrap; }
+  .att-grid .att-sum{ padding:6px 8px; font-weight:700; white-space:nowrap; background:#fbfaf6; }
+  .att-cell{ width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-weight:700; border-radius:6px; margin:2px; font-size:12px; }
+  .att-cell.can{ cursor:pointer; } .att-cell.can:hover{ outline:2px solid var(--ink); }
+  .att-present{ background:#d3f9d8; color:#2b8a3e; } .att-half{ background:#c3fae8; color:#087f5b; }
+  .att-annual{ background:#d0ebff; color:#1864ab; } .att-casual{ background:#e5dbff; color:#5f3dc4; }
+  .att-sick{ background:#ffe8cc; color:#d9480f; } .att-nopay{ background:#ffe3e3; color:#c92a2a; }
+  .att-absent{ background:#c92a2a; color:#fff; } .att-off{ background:#f1f3f5; color:#868e96; }
+  .att-holiday{ background:#fde2e4; color:#9c2a3d; } .att-unmarked{ background:#fff9db; color:#e67700; }
+  .att-future{ background:transparent; color:#ced4da; } .att-before{ background:transparent; color:#e9ecef; }
+  .att-worked-off{ box-shadow: inset 0 0 0 2px #f08c00; }
+  .att-legend{ display:flex; flex-wrap:wrap; gap:6px 12px; font-size:12px; color:var(--muted); margin:8px 0; }
+  .att-legend span{ display:inline-flex; align-items:center; gap:4px; }
+  .att-legend .att-cell{ width:22px; height:22px; margin:0; font-size:11px; }
+  .att-pop{ position:absolute; z-index:60; background:#fff; border:1px solid var(--board-line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:4px; width:260px; }
+  .att-pop .t{ grid-column:1/-1; font-weight:700; font-size:12.5px; padding:2px 4px 6px; }
+  .att-pop button{ border:0; border-radius:8px; padding:7px 6px; font-weight:600; font-size:12.5px; cursor:pointer; text-align:left; display:flex; gap:6px; align-items:center; }
+  .att-pop button.clear{ grid-column:1/-1; background:#f8f9fa; color:var(--muted); }
   .direct-block{
     margin-top:14px; border:1.5px dashed var(--direct); background:var(--direct-bg);
     border-radius:10px; padding:10px 12px 14px;
@@ -1238,6 +1268,7 @@
       <button class="maintab-btn" data-tab="reports" id="reportsTabBtn" style="display:none">📊 Reports</button>
       <button class="maintab-btn" data-tab="company" id="companyTabBtn" style="display:none">🏢 Company Accounts</button>
       <button class="maintab-btn" data-tab="payroll" id="payrollTabBtn" style="display:none">🧑‍💼 Staff &amp; Payroll</button>
+      <button class="maintab-btn" data-tab="attendance" id="attendanceTabBtn" style="display:none">🗓️ Attendance</button>
       <button class="maintab-btn" data-tab="users" id="usersTabBtn" style="display:none">👤 Users</button>
       <button class="maintab-btn" data-tab="settings" id="settingsTabBtn" style="display:none">🧾 Invoices &amp; Setup</button>
     </div>
@@ -1278,6 +1309,34 @@
       <div class="field-hint" style="margin:8px 0 2px;">Every expense charged to the place chosen above, whoever paid and however they paid. Advances aren't listed — an advance is money handed over, not yet spent; it appears here as the invoices come back.</div>
       <div class="field-hint" id="exLoadedNote" style="margin:2px 0;"></div>
       <div id="exBody" class="rpt-doc" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- ===================== ATTENDANCE REGISTER ===================== -->
+    <div id="attendancePanel" style="display:none">
+      <div class="toolbar">
+        <div class="villatabs" id="attGroupTabs" style="margin:0;">
+          <button class="villatab-btn active" data-att-group="office">🏢 Office staff</button>
+          <button class="villatab-btn" data-att-group="hk">🧹 Housekeeping staff</button>
+        </div>
+        <div class="weeknav">
+          <button id="attPrev">◀ Prev</button>
+          <span id="attMonthLabel">…</span>
+          <button id="attNext">Next ▶</button>
+          <button id="attThis">This month</button>
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:-6px;">
+        <div class="status-msg" id="attStatus"></div>
+        <div class="toolbar-actions">
+          <button class="add-booking-btn att-edit" id="attMarkToday">✓ Everyone present today</button>
+          <button class="add-booking-btn" id="attHolidaysBtn">🎉 Holidays</button>
+          <button class="add-booking-btn" id="attReportBtn">📊 Report</button>
+        </div>
+      </div>
+      <div id="attSetupNote" class="adv-status warn" style="display:none; margin-bottom:10px;"></div>
+      <div class="att-legend" id="attLegend"></div>
+      <div class="att-wrap"><div id="attGridHost"></div></div>
+      <div class="field-hint" style="margin-top:8px;">Tap a box to mark the day. Tap a date at the top to mark everyone not yet marked as present. Days off and holidays fill in by themselves — mark someone <b>Present</b> on one and it counts as worked on a holiday / day off (orange ring). Staff come from <b>Staff &amp; Payroll</b>: those working at the office are on the office register, those working at a villa on the housekeeping register. Tap ⚙ by a name for their day off and leave allowance.</div>
     </div>
 
     <!-- ===================== HOUSEKEEPING PANEL ===================== -->
@@ -2321,6 +2380,68 @@
       <button class="btn btn-cancel" id="expCancel">Cancel</button>
       <button class="btn btn-save" id="expSave">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- Attendance: per-person settings -->
+<div class="modal-overlay" id="attSetModalOverlay">
+  <div class="modal">
+    <h3 id="attSetTitle">Leave settings</h3>
+    <label>Weekly day off</label>
+    <select id="attSetOff">
+      <option value="">No fixed day off</option>
+      <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+      <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+    </select>
+    <div class="frm-row">
+      <div><label>Annual leave a year</label><input type="number" id="attSetAnnual" min="0" max="60" step="0.5"></div>
+      <div><label>Casual leave a year</label><input type="number" id="attSetCasual" min="0" max="60" step="0.5"></div>
+    </div>
+    <div class="field-hint">Sick leave and no-pay leave are counted but have no allowance here.</div>
+    <div class="modal-error" id="attSetError"></div>
+    <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
+      <button class="btn btn-cancel" id="attSetCancel">Cancel</button>
+      <button class="btn btn-save" id="attSetSave">Save</button></div></div>
+  </div>
+</div>
+
+<!-- Attendance: holidays -->
+<div class="modal-overlay" id="attHolModalOverlay">
+  <div class="modal">
+    <h3>🎉 Holidays <span id="attHolYear" style="color:var(--muted); font-weight:500;"></span></h3>
+    <div class="field-hint">Public and poya holidays. Each date is marked as a holiday for everyone on both registers.</div>
+    <div class="frm-row att-edit-row" style="margin-top:8px;">
+      <div><label>Date</label><input type="date" id="attHolDate"></div>
+      <div><label>Name</label><input type="text" id="attHolName" maxlength="60" placeholder="e.g. Vesak Full Moon Poya Day"></div>
+    </div>
+    <div class="att-edit-row" style="display:flex; justify-content:flex-end; margin-top:6px;"><button class="add-booking-btn" id="attHolAdd">+ Add holiday</button></div>
+    <div class="modal-error" id="attHolError"></div>
+    <div id="attHolList" class="manage-list" style="max-height:340px; margin-top:8px;"></div>
+    <div class="modal-actions"><span></span><button class="btn btn-cancel" id="attHolClose">Close</button></div>
+  </div>
+</div>
+
+<!-- Attendance: report -->
+<div class="modal-overlay" id="attRptModalOverlay">
+  <div class="modal bin-modal" style="max-width:1150px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h3 style="margin:0;">📊 Attendance report</h3>
+      <div style="display:flex; gap:8px;">
+        <button class="add-booking-btn" id="attRptPrint">🖨️ Print / PDF</button>
+        <button class="add-booking-btn" id="attRptCsv">⬇ Download CSV</button>
+        <button class="btn btn-cancel" id="attRptClose">Close</button>
+      </div>
+    </div>
+    <div class="rpt-picker no-print" style="margin-top:10px; flex-wrap:wrap;">
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Staff <select id="attRptGroup" class="acct-select">
+        <option value="all">Everyone</option><option value="office">Office staff</option><option value="hk">Housekeeping staff</option></select></label>
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Person <select id="attRptWho" class="acct-select"></select></label>
+      <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Period <select id="attRptPeriod" class="acct-select">
+        <option value="month">Month shown</option><option value="last">Month before</option><option value="year">Whole year</option><option value="range">Between dates…</option></select></label>
+      <span id="attRptRange" style="display:none; gap:6px; align-items:center;">
+        <input type="date" id="attRptFrom" class="acct-select"> – <input type="date" id="attRptTo" class="acct-select"></span>
+    </div>
+    <div id="attRptBody" class="rpt-doc" style="margin-top:10px; overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -3700,6 +3821,8 @@ const AREAS = [
     changeLabel:'enter and sort the monthly figures',            panel:'companyPanel' },
   { key:'payroll',      label:'Staff & Payroll',   see:'tab_payroll',      change:'edit_payroll',
     changeLabel:'staff profiles, salaries, pay slips',           panel:'payrollPanel' },
+  { key:'attendance',   label:'Attendance Register', see:'tab_attendance', change:'edit_attendance',
+    changeLabel:'mark attendance, leave, holidays and days off',  panel:'attendancePanel' },
   { key:'activitylog',  label:'Activity Log',      see:'tab_activitylog',  change:null,
     changeLabel:'',                                              panel:'activityLogPanel' },
   { key:'settings',     label:'Invoices & Setup',  see:'tab_settings',     change:'edit_settings',
@@ -3768,7 +3891,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.02-expenses';
+const APP_VERSION = 'v2026.10.02-attendance';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4164,7 +4287,7 @@ function applyRolePermissions(){
   const PANELS = {
     housekeeping:'housekeepingPanel', bookings:'bookingsPanel', pettycash:'pettyCashPanel',
     inventory:'inventoryPanel', expenses:'expensesPanel', villareport:'villaReportPanel',
-    reports:'reportsPanel', company:'companyPanel', payroll:'payrollPanel',
+    reports:'reportsPanel', company:'companyPanel', payroll:'payrollPanel', attendance:'attendancePanel',
     activitylog:'activityLogPanel', users:'usersPanel', settings:'settingsPanel',
   };
   const landing = allowed[0];
@@ -4186,6 +4309,7 @@ function applyRolePermissions(){
       reports: ()=>{ if(!reportsInited) initReports(); },
       company: ()=>{ if(!companyInited) initCompany(); },
       payroll: ()=>{ if(!payrollInited) initPayroll(); },
+      attendance: ()=>{ if(!attInited) initAttendance(); },
       users: ()=>{ if(!usersInited) initUsers(); },
       settings: ()=>{ if(!settingsInited) initSettings(); },
     };
@@ -4250,6 +4374,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     document.getElementById('reportsPanel').style.display = tab==='reports' ? '' : 'none';
     document.getElementById('companyPanel').style.display = tab==='company' ? '' : 'none';
     document.getElementById('payrollPanel').style.display = tab==='payroll' ? '' : 'none';
+    document.getElementById('attendancePanel').style.display = tab==='attendance' ? '' : 'none';
     document.getElementById('usersPanel').style.display = tab==='users' ? '' : 'none';
     document.getElementById('settingsPanel').style.display = tab==='settings' ? '' : 'none';
     if(tab === 'bookings' && !bookingsInited){ initBookings(); }
@@ -4262,10 +4387,419 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'bookings' && typeof renderGuestGroups === 'function') renderGuestGroups();
     if(tab === 'company' && !companyInited){ initCompany(); }
     if(tab === 'payroll' && !payrollInited){ initPayroll(); }
+    if(tab === 'attendance'){ if(!attInited) initAttendance(); else renderAttendance(); }
     if(tab === 'users' && !usersInited){ initUsers(); }
     if(tab === 'settings' && !settingsInited){ initSettings(); }
   });
 });
+
+/* ========================== ATTENDANCE REGISTER ==========================
+   One mark per person per day, for everyone in Staff & Payroll. Office staff and
+   housekeeping staff are two separate registers. A day nobody has marked shows
+   what it should be — the person's weekly day off, a holiday from the list, or
+   "not marked yet" — so the register is never silently counted as worked.     */
+const ATT = {
+  present:{ code:'P', label:'Present',      cls:'att-present' },
+  half:   { code:'½', label:'Half day',     cls:'att-half' },
+  annual: { code:'A', label:'Annual leave', cls:'att-annual' },
+  casual: { code:'C', label:'Casual leave', cls:'att-casual' },
+  sick:   { code:'S', label:'Sick leave',   cls:'att-sick' },
+  nopay:  { code:'N', label:'No-pay leave', cls:'att-nopay' },
+  absent: { code:'X', label:'Absent',       cls:'att-absent' },
+  off:    { code:'O', label:'Day off',      cls:'att-off' },
+  holiday:{ code:'H', label:'Holiday',      cls:'att-holiday' },
+  unmarked:{ code:'·', label:'Not marked yet', cls:'att-unmarked' },
+};
+const ATT_PICK = ['present','half','annual','casual','sick','nopay','absent','off','holiday'];
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+let attInited = false, attGroup = 'office', attMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let attPeople = [], attHolidays = new Map(), attMarks = new Map(), attLoadedRange = null, attReady = true;
+const attKey = (pid, day) => pid + '|' + day;
+
+function attGroupOf(p){ return (p.worksAt || 'office') === 'office' ? 'office' : 'hk'; }
+function attPlace(p){ return p.worksAt === 'office' ? 'Office' : (FOR_LABELS[p.worksAt] || p.worksAt || ''); }
+function attMonthRange(d){ return { from: toISO(new Date(d.getFullYear(), d.getMonth(), 1)), to: toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1)) }; }
+function attDays(from, to){ const out = []; for(let d = parseISO(from); toISO(d) < to; d.setDate(d.getDate() + 1)) out.push(toISO(d)); return out; }
+
+async function fetchAttPeople(){
+  const { data, error } = await sb.rpc('attendance_people');
+  if(error){ attReady = false; return error; }
+  attReady = true;
+  attPeople = (data || []).map(r => ({ id:r.id, name:r.full_name || '', designation:r.designation || '', worksAt:r.works_at || 'office',
+    active: r.active !== false, joinDate: r.join_date || null,
+    weeklyOff: (r.weekly_off === null || r.weekly_off === undefined) ? null : Number(r.weekly_off),
+    annual: Number(r.annual_leave ?? 14), casual: Number(r.casual_leave ?? 7) }));
+  return null;
+}
+async function fetchAttHolidays(){
+  const { data, error } = await sb.from('holidays').select('*').order('day');
+  if(!error) attHolidays = new Map((data || []).map(h => [String(h.day).slice(0,10), h.name]));
+}
+// Marks for a date range, page by page (a year of a dozen people is several thousand rows).
+async function fetchAttMarks(from, to){
+  const out = new Map();
+  for(let i = 0; ; i += 1000){
+    const { data, error } = await sb.from('attendance').select('*').gte('day', from).lt('day', to).order('day').range(i, i + 999);
+    if(error) return { error };
+    (data || []).forEach(r => out.set(attKey(r.profile_id, String(r.day).slice(0,10)), { id:r.id, status:r.status, note:r.note || '', by:r.updated_by || '' }));
+    if(!data || data.length < 1000) break;
+  }
+  return { marks: out };
+}
+async function loadAttMonth(){
+  const r = attMonthRange(attMonth);
+  const res = await fetchAttMarks(r.from, r.to);
+  if(res.error){ document.getElementById('attStatus').textContent = 'Could not load the register.'; return; }
+  attMarks = res.marks; attLoadedRange = r;
+}
+
+// What a day is for this person: their mark, or else what it should be.
+function attStatusOf(p, day, marks){
+  const m = (marks || attMarks).get(attKey(p.id, day));
+  if(m) return m.status;
+  if(p.joinDate && day < p.joinDate) return 'before';
+  if(attHolidays.has(day)) return 'holiday';
+  if(p.weeklyOff !== null && parseISO(day).getDay() === p.weeklyOff) return 'off';
+  return day <= todayISO() ? 'unmarked' : 'future';
+}
+function attIsRestDay(p, day){ return attHolidays.has(day) || (p.weeklyOff !== null && parseISO(day).getDay() === p.weeklyOff); }
+
+// Every count the register and the report need, for one person over a range.
+function attCount(p, from, to, marks){
+  const c = { scheduled:0, worked:0, present:0, half:0, annual:0, casual:0, sick:0, nopay:0, absent:0, off:0, holiday:0, restWorked:0, unmarked:0 };
+  const last = to > toISO(new Date(Date.now() + 86400000)) ? toISO(new Date(Date.now() + 86400000)) : to;   // not beyond today
+  for(const day of attDays(from, last)){
+    const st = attStatusOf(p, day, marks);
+    if(st === 'before' || st === 'future') continue;
+    const rest = attIsRestDay(p, day);
+    if(!rest) c.scheduled++;
+    if(st === 'present' || st === 'half'){
+      const v = st === 'half' ? 0.5 : 1;
+      c.worked += v; c[st]++;
+      if(rest) c.restWorked += v;
+    } else if(c[st] !== undefined) c[st]++;
+  }
+  return c;
+}
+
+function attPeopleShown(group){
+  const r = attLoadedRange || attMonthRange(attMonth);
+  return attPeople.filter(p => attGroupOf(p) === group)
+    .filter(p => p.active || attDays(r.from, r.to).some(d => attMarks.has(attKey(p.id, d))))
+    .sort((a,b)=> attPlace(a).localeCompare(attPlace(b)) || a.name.localeCompare(b.name));
+}
+
+function renderAttendance(){
+  const host = document.getElementById('attGridHost');
+  if(!host) return;
+  document.getElementById('attMonthLabel').textContent = attMonth.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  document.querySelectorAll('#attGroupTabs [data-att-group]').forEach(b => {
+    const on = b.dataset.attGroup === attGroup;
+    b.classList.toggle('active', on); b.style.background = on ? 'var(--ink)' : '#fff'; b.style.color = on ? '#fff' : 'var(--muted)';
+  });
+  const can = canChange('attendance');
+  document.querySelectorAll('#attendancePanel .att-edit').forEach(b => b.style.display = can ? '' : 'none');
+  document.getElementById('attLegend').innerHTML = ATT_PICK.concat('unmarked').map(k => `<span><span class="att-cell ${ATT[k].cls}">${ATT[k].code}</span>${esc(ATT[k].label)}</span>`).join('')
+    + '<span><span class="att-cell att-present att-worked-off">P</span>Worked on a holiday / day off</span>';
+  const note = document.getElementById('attSetupNote');
+  if(!attReady){
+    note.style.display = '';
+    note.innerHTML = 'The register is not set up in the database yet. Run <b>21-supabase-attendance-register.sql</b> in Supabase once.';
+    host.innerHTML = ''; return;
+  }
+  note.style.display = 'none';
+  const r = attMonthRange(attMonth);
+  const days = attDays(r.from, r.to);
+  const people = attPeopleShown(attGroup);
+  if(!people.length){
+    host.innerHTML = `<div class="manage-empty" style="padding:18px;">Nobody on the ${attGroup === 'office' ? 'office' : 'housekeeping'} register yet. Add staff in <b>Staff &amp; Payroll</b> — set “Works at” to ${attGroup === 'office' ? 'Office' : 'their villa'}.</div>`;
+    return;
+  }
+  const today = todayISO();
+  const head = days.map(d => {
+    const dt = parseISO(d), hol = attHolidays.get(d);
+    const cls = [d === today ? 'today' : '', hol ? 'hol' : '', dt.getDay() === 0 ? 'wk' : '', can ? 'click' : ''].filter(Boolean).join(' ');
+    return `<th class="${cls}" data-att-day="${d}" title="${esc(hol ? hol + ' — ' : '')}${esc(dt.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' }))}${can ? ' · tap to mark everyone present' : ''}">${dt.getDate()}<br><span style="font-weight:500;font-size:10px;">${'SMTWTFS'[dt.getDay()]}</span></th>`;
+  }).join('');
+  const rows = people.map(p => {
+    const c = attCount(p, r.from, r.to);
+    const cells = days.map(d => {
+      const st = attStatusOf(p, d);
+      const meta = ATT[st] || { code:'', cls:'att-' + st, label:'' };
+      const m = attMarks.get(attKey(p.id, d));
+      const restWorked = (st === 'present' || st === 'half') && attIsRestDay(p, d);
+      const editable = can && st !== 'before';
+      const tip = `${p.name} · ${fmtDayY(d)} · ${meta.label || (st === 'future' ? 'Not yet' : 'Before joining')}${restWorked ? ' (on a ' + (attHolidays.has(d) ? 'holiday' : 'day off') + ')' : ''}${m && m.note ? ' — ' + m.note : ''}${m && m.by ? ' · marked by ' + m.by : ''}`;
+      return `<td><div class="att-cell ${meta.cls}${restWorked ? ' att-worked-off' : ''}${editable ? ' can' : ''}" ${editable ? `data-att-p="${esc(p.id)}" data-att-d="${d}"` : ''} title="${esc(tip)}">${meta.code}</div></td>`;
+    }).join('');
+    const leave = c.annual + c.casual + c.sick;
+    return `<tr>
+      <td class="att-name"><b>${esc(p.name)}${p.active ? '' : ' <span>(left)</span>'} ${can ? `<button class="manage-edit" data-att-set="${esc(p.id)}" title="Day off and leave allowance" style="padding:1px 6px; margin-left:4px;">⚙</button>` : ''}</b>
+        <span>${esc(p.designation || '')}${p.designation ? ' · ' : ''}${esc(attPlace(p))}${p.weeklyOff !== null ? ' · off ' + DOW[p.weeklyOff].slice(0,3) : ''}</span></td>
+      <td class="att-sum" title="Days worked (half days count ½)">${c.worked}</td>
+      <td class="att-sum" title="Annual + casual + sick leave">${leave}</td>
+      <td class="att-sum" style="color:${c.nopay + c.absent ? '#c92a2a' : 'inherit'};" title="No-pay leave + absent">${c.nopay + c.absent}</td>
+      <td class="att-sum" style="color:${c.unmarked ? '#e67700' : 'inherit'}; border-right:1px solid var(--board-line);" title="Working days not marked yet">${c.unmarked}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+  host.innerHTML = `<table class="att-grid"><thead><tr><th class="att-name" style="z-index:2;">${attGroup === 'office' ? 'Office staff' : 'Housekeeping staff'}</th>
+      <th class="att-sumh" title="Days worked this month">Worked</th><th class="att-sumh" title="Annual + casual + sick">Leave</th><th class="att-sumh" title="No-pay + absent">No pay</th><th class="att-sumh" title="Not marked yet" style="border-right:1px solid var(--board-line);">To mark</th>${head}</tr></thead>
+    <tbody>${rows}</tbody></table>`;
+  host.querySelectorAll('[data-att-p]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); openAttPicker(el); }));
+  host.querySelectorAll('[data-att-set]').forEach(b => b.addEventListener('click', () => openAttSettings(b.dataset.attSet)));
+  if(can) host.querySelectorAll('[data-att-day]').forEach(th => th.addEventListener('click', () => attMarkDay(th.dataset.attDay)));
+  const unmarked = people.reduce((n, p) => n + attCount(p, r.from, r.to).unmarked, 0);
+  document.getElementById('attStatus').textContent = unmarked ? `${unmarked} working day${unmarked === 1 ? '' : 's'} not marked yet this month` : 'All marked ✓';
+}
+
+function closeAttPicker(){ document.querySelectorAll('.att-pop').forEach(x => x.remove()); }
+function openAttPicker(cell){
+  closeAttPicker();
+  const p = attPeople.find(x => x.id === cell.dataset.attP), day = cell.dataset.attD;
+  if(!p) return;
+  const m = attMarks.get(attKey(p.id, day));
+  const pop = document.createElement('div');
+  pop.className = 'att-pop';
+  pop.innerHTML = `<div class="t">${esc(p.name)} — ${esc(parseISO(day).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }))}${attHolidays.has(day) ? ' · ' + esc(attHolidays.get(day)) : ''}</div>`
+    + ATT_PICK.map(k => `<button type="button" class="${ATT[k].cls}" data-pick="${k}">${ATT[k].code} ${esc(ATT[k].label)}</button>`).join('')
+    + (m ? '<button type="button" class="clear" data-pick="">↺ Clear the mark</button>' : '');
+  document.body.appendChild(pop);
+  const r = cell.getBoundingClientRect();
+  pop.style.top = (window.scrollY + r.bottom + 4) + 'px';
+  pop.style.left = Math.max(8, Math.min(window.scrollX + r.left - 110, window.scrollX + document.documentElement.clientWidth - 270)) + 'px';
+  pop.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation(); closeAttPicker();
+    await setAttMark(p, day, b.dataset.pick || null);
+  }));
+}
+document.addEventListener('click', e => { if(!e.target.closest('.att-pop')) closeAttPicker(); });
+
+async function setAttMark(p, day, status){
+  if(!canChange('attendance')) return;
+  const who = currentUser ? currentUser.username : '';
+  try{
+    if(status){
+      const { error } = await sb.from('attendance').upsert({ profile_id:p.id, day, status, updated_by: who, updated_at: new Date().toISOString() }, { onConflict:'profile_id,day' });
+      if(error) throw error;
+      attMarks.set(attKey(p.id, day), { status, note:'', by: who });
+      logActivity('update', 'attendance', `${p.name} — ${fmtDayY(day)}: ${ATT[status].label}`);
+    } else {
+      const { error } = await sb.from('attendance').delete().eq('profile_id', p.id).eq('day', day);
+      if(error) throw error;
+      attMarks.delete(attKey(p.id, day));
+      logActivity('update', 'attendance', `${p.name} — ${fmtDayY(day)}: mark cleared`);
+    }
+    renderAttendance();
+  }catch(e){ console.error(e); alert('Could not save the mark. ' + ((e && e.message) || '')); }
+}
+// Everyone on this register who has no mark on a working day → Present.
+async function attMarkDay(day){
+  if(!canChange('attendance')) return;
+  if(day > todayISO()){ alert('That day has not come yet.'); return; }
+  const people = attPeopleShown(attGroup).filter(p => p.active && attStatusOf(p, day) === 'unmarked');
+  if(!people.length){ alert(`Everyone on this register is already marked for ${fmtDayY(day)} (or it is their day off / a holiday).`); return; }
+  if(!confirm(`Mark ${people.length} ${people.length === 1 ? 'person' : 'people'} present on ${fmtDayY(day)}?\n\n${people.map(p => '• ' + p.name).join('\n')}\n\nAnyone on leave that day — mark them first, or change their box afterwards.`)) return;
+  const who = currentUser ? currentUser.username : '';
+  const rows = people.map(p => ({ profile_id:p.id, day, status:'present', updated_by:who, updated_at:new Date().toISOString() }));
+  const { error } = await sb.from('attendance').upsert(rows, { onConflict:'profile_id,day' });
+  if(error){ alert('Could not save. ' + (error.message || '')); return; }
+  people.forEach(p => attMarks.set(attKey(p.id, day), { status:'present', note:'', by:who }));
+  logActivity('update', 'attendance', `${people.length} marked present on ${fmtDayY(day)} (${attGroup === 'office' ? 'office' : 'housekeeping'} register)`);
+  renderAttendance();
+}
+
+// ---- per-person settings
+let attSetId = null;
+function openAttSettings(id){
+  const p = attPeople.find(x => x.id === id); if(!p) return;
+  attSetId = id;
+  document.getElementById('attSetTitle').textContent = `${p.name} — day off & leave`;
+  document.getElementById('attSetOff').value = p.weeklyOff === null ? '' : String(p.weeklyOff);
+  document.getElementById('attSetAnnual').value = p.annual;
+  document.getElementById('attSetCasual').value = p.casual;
+  document.getElementById('attSetError').style.display = 'none';
+  document.getElementById('attSetModalOverlay').classList.add('open');
+}
+document.getElementById('attSetCancel').addEventListener('click', () => document.getElementById('attSetModalOverlay').classList.remove('open'));
+document.getElementById('attSetSave').addEventListener('click', async () => {
+  const p = attPeople.find(x => x.id === attSetId); if(!p) return;
+  const err = document.getElementById('attSetError');
+  const offRaw = document.getElementById('attSetOff').value;
+  const annual = parseFloat(document.getElementById('attSetAnnual').value), casual = parseFloat(document.getElementById('attSetCasual').value);
+  if(!(annual >= 0 && annual <= 60) || !(casual >= 0 && casual <= 60)){ err.textContent = 'Leave allowance must be between 0 and 60 days.'; err.style.display = 'block'; return; }
+  const { error } = await sb.rpc('set_attendance_settings', { p_id: p.id, p_weekly_off: offRaw === '' ? null : Number(offRaw), p_annual: annual, p_casual: casual });
+  if(error){ err.textContent = 'Could not save — ' + (error.message || ''); err.style.display = 'block'; return; }
+  p.weeklyOff = offRaw === '' ? null : Number(offRaw); p.annual = annual; p.casual = casual;
+  logActivity('update', 'staff_profiles', `${p.name}: day off ${p.weeklyOff === null ? 'none' : DOW[p.weeklyOff]}, annual ${annual}, casual ${casual}`);
+  document.getElementById('attSetModalOverlay').classList.remove('open');
+  renderAttendance();
+});
+
+// ---- holidays
+function renderAttHolidays(){
+  const y = attMonth.getFullYear();
+  document.getElementById('attHolYear').textContent = String(y);
+  const can = canChange('attendance');
+  document.querySelectorAll('#attHolModalOverlay .att-edit-row').forEach(el => el.style.display = can ? '' : 'none');
+  const list = [...attHolidays.entries()].filter(([d]) => d.startsWith(y + '-')).sort((a,b)=> a[0].localeCompare(b[0]));
+  const wrap = document.getElementById('attHolList');
+  wrap.innerHTML = list.length ? list.map(([d, n]) => `<div class="manage-row">
+      <span class="manage-type-dot" style="background:#e64980;"></span>
+      <span class="manage-guest">${esc(n)}</span>
+      <span class="manage-dates">${esc(parseISO(d).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' }))}</span>
+      ${can ? `<button class="manage-del" data-hol-del="${d}">Remove</button>` : ''}</div>`).join('')
+    : `<div class="manage-empty">No holidays added for ${y} yet.</div>`;
+  wrap.querySelectorAll('[data-hol-del]').forEach(b => b.addEventListener('click', async () => {
+    const d = b.dataset.holDel;
+    if(!confirm(`Remove ${attHolidays.get(d)} (${fmtDayY(d)}) from the holiday list?`)) return;
+    const { error } = await sb.from('holidays').delete().eq('day', d);
+    if(error){ alert('Could not remove. ' + (error.message || '')); return; }
+    logActivity('delete', 'holidays', `Removed holiday ${attHolidays.get(d)} (${d})`);
+    attHolidays.delete(d); renderAttHolidays(); renderAttendance();
+  }));
+}
+document.getElementById('attHolidaysBtn').addEventListener('click', () => { renderAttHolidays(); document.getElementById('attHolModalOverlay').classList.add('open'); });
+document.getElementById('attHolClose').addEventListener('click', () => document.getElementById('attHolModalOverlay').classList.remove('open'));
+document.getElementById('attHolAdd').addEventListener('click', async () => {
+  const d = document.getElementById('attHolDate').value, n = document.getElementById('attHolName').value.trim();
+  const err = document.getElementById('attHolError');
+  if(!d || !n){ err.textContent = 'Pick the date and type its name.'; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  const { error } = await sb.from('holidays').upsert({ day:d, name:n }, { onConflict:'day' });
+  if(error){ err.textContent = 'Could not add — ' + (error.message || ''); err.style.display = 'block'; return; }
+  attHolidays.set(d, n);
+  logActivity('create', 'holidays', `Holiday: ${n} (${d})`);
+  document.getElementById('attHolDate').value = ''; document.getElementById('attHolName').value = '';
+  renderAttHolidays(); renderAttendance();
+});
+
+async function initAttendance(){
+  attInited = true;
+  document.querySelectorAll('#attGroupTabs [data-att-group]').forEach(b => b.addEventListener('click', () => { attGroup = b.dataset.attGroup; renderAttendance(); }));
+  const go = async delta => {
+    attMonth = delta === 0 ? new Date(new Date().getFullYear(), new Date().getMonth(), 1) : new Date(attMonth.getFullYear(), attMonth.getMonth() + delta, 1);
+    await loadAttMonth(); renderAttendance();
+  };
+  document.getElementById('attPrev').addEventListener('click', () => go(-1));
+  document.getElementById('attNext').addEventListener('click', () => go(1));
+  document.getElementById('attThis').addEventListener('click', () => go(0));
+  document.getElementById('attMarkToday').addEventListener('click', () => attMarkDay(todayISO()));
+  document.getElementById('attReportBtn').addEventListener('click', openAttReport);
+  if(!sb) return;
+  document.getElementById('attStatus').textContent = 'Loading…';
+  const err = await fetchAttPeople();
+  if(!err){ await fetchAttHolidays(); await loadAttMonth(); }
+  renderAttendance();
+  sb.channel('attendance_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'attendance' }, async () => { await loadAttMonth(); renderAttendance(); })
+    .on('postgres_changes', { event:'*', schema:'public', table:'holidays' }, async () => { await fetchAttHolidays(); renderAttendance(); })
+    .subscribe();
+}
+
+/* ---- the report: worked days, every kind of leave, and what is left of the year's allowance ---- */
+let attRptMarks = null, attRptKey = '';
+function attRptRange(){
+  const per = document.getElementById('attRptPeriod').value;
+  if(per === 'last') return Object.assign(attMonthRange(new Date(attMonth.getFullYear(), attMonth.getMonth() - 1, 1)), { label: new Date(attMonth.getFullYear(), attMonth.getMonth() - 1, 1).toLocaleDateString('en-GB', { month:'long', year:'numeric' }) });
+  if(per === 'year') return { from: attMonth.getFullYear() + '-01-01', to: (attMonth.getFullYear() + 1) + '-01-01', label: String(attMonth.getFullYear()) };
+  if(per === 'range'){
+    const f = document.getElementById('attRptFrom').value, t = document.getElementById('attRptTo').value;
+    if(f && t && t >= f) return { from: f, to: toISO(new Date(parseISO(t).getTime() + 86400000)), label: `${fmtDayY(f)} – ${fmtDayY(t)}` };
+  }
+  return Object.assign(attMonthRange(attMonth), { label: attMonth.toLocaleDateString('en-GB', { month:'long', year:'numeric' }) });
+}
+function openAttReport(){
+  const sel = document.getElementById('attRptWho');
+  sel.innerHTML = '<option value="">Everyone</option>' + [...attPeople].sort((a,b)=> a.name.localeCompare(b.name)).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  document.getElementById('attRptGroup').value = attGroup;
+  document.getElementById('attRptModalOverlay').classList.add('open');
+  renderAttReport();
+}
+async function renderAttReport(){
+  const body = document.getElementById('attRptBody');
+  document.getElementById('attRptRange').style.display = document.getElementById('attRptPeriod').value === 'range' ? 'inline-flex' : 'none';
+  const r = attRptRange();
+  const y = r.from.slice(0, 4);
+  // The report needs the period itself, and the whole year for the leave balance.
+  const from = r.from < y + '-01-01' ? r.from : y + '-01-01';
+  const to = r.to > (Number(y) + 1) + '-01-01' ? r.to : (Number(y) + 1) + '-01-01';
+  const key = from + '|' + to;
+  if(attRptKey !== key){
+    body.innerHTML = '<div class="manage-empty">Loading…</div>';
+    const res = await fetchAttMarks(from, to);
+    if(res.error){ body.innerHTML = '<div class="adv-status warn">Could not load the register.</div>'; return; }
+    attRptMarks = res.marks; attRptKey = key;
+  }
+  const group = document.getElementById('attRptGroup').value, who = document.getElementById('attRptWho').value;
+  const people = attPeople.filter(p => (group === 'all' || attGroupOf(p) === group) && (!who || p.id === who))
+    .filter(p => p.active || attDays(r.from, r.to).some(d => attRptMarks.has(attKey(p.id, d))))
+    .sort((a,b)=> attGroupOf(a).localeCompare(attGroupOf(b)) || a.name.localeCompare(b.name));
+  if(!people.length){ body.innerHTML = '<div class="rpt-empty">Nobody matches these filters.</div>'; return; }
+  const yearTo = (Number(y) + 1) + '-01-01';
+  const lines = people.map(p => ({ p, c: attCount(p, r.from, r.to, attRptMarks), yc: attCount(p, y + '-01-01', yearTo, attRptMarks) }));
+  const tot = {}; ['scheduled','worked','half','annual','casual','sick','nopay','absent','holiday','off','restWorked','unmarked'].forEach(k => tot[k] = lines.reduce((n, l) => n + l.c[k], 0));
+  const row = (l) => `<tr>
+      <td><b>${esc(l.p.name)}</b><div class="dim">${attGroupOf(l.p) === 'office' ? 'Office' : 'Housekeeping · ' + esc(attPlace(l.p))}</div></td>
+      <td class="c">${l.c.scheduled}</td><td class="c"><b>${l.c.worked}</b></td><td class="c">${l.c.half || '—'}</td>
+      <td class="c">${l.c.annual || '—'}</td><td class="c">${l.c.casual || '—'}</td><td class="c">${l.c.sick || '—'}</td>
+      <td class="c" style="color:${l.c.nopay ? '#c92a2a' : 'inherit'};">${l.c.nopay || '—'}</td>
+      <td class="c" style="color:${l.c.absent ? '#c92a2a' : 'inherit'};">${l.c.absent || '—'}</td>
+      <td class="c">${l.c.holiday || '—'}</td><td class="c">${l.c.off || '—'}</td>
+      <td class="c">${l.c.restWorked || '—'}</td>
+      <td class="c" style="color:${l.c.unmarked ? '#e67700' : 'inherit'};">${l.c.unmarked || '—'}</td></tr>`;
+  const bal = (l) => {
+    const aLeft = l.p.annual - l.yc.annual, cLeft = l.p.casual - l.yc.casual;
+    return `<tr><td><b>${esc(l.p.name)}</b></td>
+      <td class="c">${l.p.annual}</td><td class="c">${l.yc.annual}</td><td class="c"><b style="color:${aLeft < 0 ? '#c92a2a' : 'var(--green)'};">${aLeft}</b></td>
+      <td class="c">${l.p.casual}</td><td class="c">${l.yc.casual}</td><td class="c"><b style="color:${cLeft < 0 ? '#c92a2a' : 'var(--green)'};">${cLeft}</b></td>
+      <td class="c">${l.yc.sick || '—'}</td><td class="c">${(l.yc.nopay + l.yc.absent) || '—'}</td></tr>`;
+  };
+  body.innerHTML = `
+    <div class="rpt-head"><div class="rpt-title">Attendance${who ? ' — ' + esc(people[0].name) : group === 'office' ? ' — office staff' : group === 'hk' ? ' — housekeeping staff' : ''}</div>
+      <div class="rpt-sub">${esc(r.label)} · counted up to today · ${lines.length} ${lines.length === 1 ? 'person' : 'people'}</div></div>
+    <div class="rpt-section-title">Days</div>
+    <table class="rpt-table">
+      <thead><tr><th>Person</th><th class="c" title="Days that were not a day off or holiday">Working days</th><th class="c">Worked</th><th class="c">Half days</th>
+        <th class="c">Annual</th><th class="c">Casual</th><th class="c">Sick</th><th class="c">No pay</th><th class="c">Absent</th>
+        <th class="c">Holidays</th><th class="c">Days off</th><th class="c" title="Worked on a holiday or their day off">Worked on holiday / off</th><th class="c">Not marked</th></tr></thead>
+      <tbody>${lines.map(row).join('')}
+        <tr class="subtotal"><td>Total</td><td class="c">${tot.scheduled}</td><td class="c">${tot.worked}</td><td class="c">${tot.half}</td><td class="c">${tot.annual}</td><td class="c">${tot.casual}</td><td class="c">${tot.sick}</td><td class="c">${tot.nopay}</td><td class="c">${tot.absent}</td><td class="c">${tot.holiday}</td><td class="c">${tot.off}</td><td class="c">${tot.restWorked}</td><td class="c">${tot.unmarked}</td></tr>
+      </tbody></table>
+    <div class="rpt-section-title" style="margin-top:14px;">Leave for ${esc(y)} — allowance, taken, left</div>
+    <table class="rpt-table">
+      <thead><tr><th>Person</th><th class="c">Annual a year</th><th class="c">Annual taken</th><th class="c">Annual left</th><th class="c">Casual a year</th><th class="c">Casual taken</th><th class="c">Casual left</th><th class="c">Sick taken</th><th class="c">No pay + absent</th></tr></thead>
+      <tbody>${lines.map(bal).join('')}</tbody></table>
+    <div class="rpt-note">Worked counts present days, with half days as ½ — including any worked on a holiday or day off. Leave left goes red when more was taken than the allowance. Days not marked yet are counted separately, never as worked.</div>`;
+  document.getElementById('attRptCsv').onclick = () => {
+    const out = [['Person','Register','Works at','Working days','Worked','Half days','Annual','Casual','Sick','No pay','Absent','Holidays','Days off','Worked on holiday/off','Not marked',
+      `Annual allowance ${y}`, `Annual taken ${y}`, `Annual left ${y}`, `Casual allowance ${y}`, `Casual taken ${y}`, `Casual left ${y}`]];
+    lines.forEach(l => out.push([l.p.name, attGroupOf(l.p) === 'office' ? 'Office' : 'Housekeeping', attPlace(l.p), l.c.scheduled, l.c.worked, l.c.half, l.c.annual, l.c.casual, l.c.sick, l.c.nopay, l.c.absent, l.c.holiday, l.c.off, l.c.restWorked, l.c.unmarked,
+      l.p.annual, l.yc.annual, l.p.annual - l.yc.annual, l.p.casual, l.yc.casual, l.p.casual - l.yc.casual]));
+    downloadCSV(`attendance-${r.from}-to-${toISO(new Date(parseISO(r.to).getTime() - 86400000))}.csv`, out);
+  };
+}
+['attRptGroup','attRptWho','attRptPeriod','attRptFrom','attRptTo'].forEach(id => document.getElementById(id).addEventListener('change', renderAttReport));
+document.getElementById('attRptClose').addEventListener('click', () => document.getElementById('attRptModalOverlay').classList.remove('open'));
+document.getElementById('attRptPrint').addEventListener('click', () => printPiece('Attendance report', document.getElementById('attRptBody').innerHTML));
+
+/* Payroll shows what the register says about no-pay and absent days for the month. */
+const attPayCache = {};
+function attNoPayHint(profileId, ym){
+  if(!profileId) return '';
+  if(!(ym in attPayCache)){
+    attPayCache[ym] = null;
+    const from = ym + '-01', d = parseISO(from), to = toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1));
+    fetchAttMarks(from, to).then(res => { attPayCache[ym] = res.error ? false : res.marks; if(res.marks && typeof renderPayroll === 'function') renderPayroll(); });
+    return '';
+  }
+  const marks = attPayCache[ym];
+  if(!marks) return '';
+  let np = 0, ab = 0;
+  marks.forEach((m, k) => { if(k.startsWith(profileId + '|')){ if(m.status === 'nopay') np++; else if(m.status === 'absent') ab++; } });
+  if(!np && !ab) return '';
+  return `<div class="ce-sub" style="color:#c92a2a;" title="From the attendance register — set the no-pay days on this pay slip yourself">Register: ${[np ? np + ' no-pay' : '', ab ? ab + ' absent' : ''].filter(Boolean).join(', ')}</div>`;
+}
 
 /* ========================== VILLA EXPENSES TAB ==========================
    The same four-way breakdown the villa report prints — petty cash, direct
@@ -14075,7 +14609,7 @@ function renderPayRun(){
     const add = r2(c.gross - c.basicEarned);
     t.basic += c.basicEarned; t.add += add; t.gross += c.gross; t.ded += c.deductions; t.net += c.net; t.er += c.epfEmployer + c.etf;
     return `<tr data-pay="${p.id}">
-      <td><b>${esc(p.name)}</b><div class="ce-sub">${esc(p.designation || '')}${p.paidBy !== 'company' ? ' · paid by ' + esc(paidByLabel(p.paidBy)) : ''}</div></td>
+      <td><b>${esc(p.name)}</b><div class="ce-sub">${esc(p.designation || '')}${p.paidBy !== 'company' ? ' · paid by ' + esc(paidByLabel(p.paidBy)) : ''}</div>${attNoPayHint(p.profileId, ymKey(payMonthDate))}</td>
       <td class="r hide-sm">${fmt2(c.basicEarned)}${p.noPayDays ? `<div class="ce-sub">${p.noPayDays} no-pay day${p.noPayDays===1?'':'s'}</div>` : ''}</td>
       <td class="r hide-sm">${add ? fmt2(add) : '—'}</td>
       <td class="r">${fmt2(c.gross)}</td>
