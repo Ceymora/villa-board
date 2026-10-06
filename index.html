@@ -3095,6 +3095,11 @@
         <input type="checkbox" id="spActive" checked>
         <label for="spActive">Currently working here</label>
       </div>
+      <div class="modal-checkbox-row">
+        <input type="checkbox" id="spOnPayroll" checked>
+        <label for="spOnPayroll">Paid through Ceymora payroll — gets a line when payroll is prepared</label>
+      </div>
+      <div class="field-hint" style="margin-top:-6px;">Untick for someone on the Housekeeping board or the attendance register who is not paid through this payroll (a helper, for example).</div>
       <label>Notes (optional)</label>
       <input type="text" id="spNotes">
     </div>
@@ -3891,7 +3896,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.05-boss';
+const APP_VERSION = 'v2026.10.06-stafflist';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4421,6 +4426,22 @@ function attPlace(p){ return p.worksAt === 'office' ? 'Office' : (FOR_LABELS[p.w
 function attMonthRange(d){ return { from: toISO(new Date(d.getFullYear(), d.getMonth(), 1)), to: toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1)) }; }
 function attDays(from, to){ const out = []; for(let d = parseISO(from); toISO(d) < to; d.setDate(d.getDate() + 1)) out.push(toISO(d)); return out; }
 
+let HAS_ONPAY = null;
+async function onPayrollReady(){
+  if(HAS_ONPAY !== null || !sb) return !!HAS_ONPAY;
+  try{ const { error } = await sb.from('staff_profiles').select('on_payroll').limit(1); HAS_ONPAY = !error; }catch(e){ HAS_ONPAY = false; }
+  return HAS_ONPAY;
+}
+// One staff list (file 22): the board, Staff & Payroll and the register all follow a
+// change made in any of them.
+async function refreshStaffEverywhere(){
+  const jobs = [];
+  if(typeof fetchVillasAndStaff === 'function') jobs.push(fetchVillasAndStaff());
+  if(typeof payrollInited !== 'undefined' && payrollInited && typeof fetchStaffProfiles === 'function') jobs.push(fetchStaffProfiles());
+  if(attInited) jobs.push(fetchAttPeople().then(() => renderAttendance()));
+  try{ await Promise.all(jobs); }catch(e){ console.error('staff refresh', e); }
+  if(typeof payrollInited !== 'undefined' && payrollInited && typeof renderPayroll === 'function') renderPayroll();
+}
 async function fetchAttPeople(){
   const { data, error } = await sb.rpc('attendance_people');
   if(error){ attReady = false; return error; }
@@ -5272,6 +5293,7 @@ document.getElementById('empSave').addEventListener('click', async ()=>{
       logActivity('create', 'staff', `Added employee: ${name} (${VILLAS.find(v=>v.id===villaId)?.name || villaId})`);
     }
     document.getElementById('employeeModalOverlay').classList.remove('open');
+    await refreshStaffEverywhere();
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
 document.getElementById('empDeleteBtn').addEventListener('click', async ()=>{
@@ -5283,6 +5305,7 @@ document.getElementById('empDeleteBtn').addEventListener('click', async ()=>{
     await delRows('staff', 'id', editingStaffId);
     logActivity('delete', 'staff', `Removed employee: ${editingStaffId}`);
     document.getElementById('employeeModalOverlay').classList.remove('open');
+    await refreshStaffEverywhere();
     await afterDelete('staff');
   }catch(e){ delFailed(e); }
 });
@@ -13947,7 +13970,7 @@ function rowToSp(r){ return {
   joinDate:r.join_date || '', phone:r.phone || '', address:r.address || '', bankName:r.bank_name || '',
   bankAccount:r.bank_account || '', basicSalary:Number(r.basic_salary)||0, allowance:Number(r.allowance)||0,
   travellingAllowance:Number(r.travelling_allowance)||0, epfApplies:r.epf_applies !== false,
-  active:r.active !== false, notes:r.notes || '' }; }
+  active:r.active !== false, onPayroll:r.on_payroll !== false, notes:r.notes || '' }; }
 function rowToPay(r){ return {
   id:r.id, period:r.period, profileId:r.profile_id || null, name:r.name || '', designation:r.designation || '',
   paidBy:r.paid_by || 'company', basic:Number(r.basic)||0, noPayDays:Number(r.no_pay_days)||0,
@@ -14636,10 +14659,10 @@ async function payPrepareMonth(){
   if(!canChange('payroll') || !sb){ alert('You do not have permission to prepare payroll.'); return; }
   const period = ymKey(payMonthDate);
   const have = new Set(allPayroll.filter(p => p.period === period).map(p => p.profileId));
-  const todo = allStaffProfiles.filter(s => s.active && !have.has(s.id));
+  const todo = allStaffProfiles.filter(s => s.active && s.onPayroll !== false && !have.has(s.id));
   const msg = document.getElementById('payMsg');
   if(!allStaffProfiles.length){ payView = 'staff'; renderPayroll(); document.getElementById('payStaffMsg').textContent = 'Add each staff member here first, with their basic salary.'; return; }
-  if(!todo.length){ msg.textContent = 'Everyone active is already on this month’s payroll.'; return; }
+  if(!todo.length){ msg.textContent = 'Everyone active and paid through payroll is already on this month’s payroll.'; return; }
   const rows = todo.map(s => ({
     period, profile_id:s.id, name:s.fullName, designation:s.designation, paid_by:s.paidBy,
     basic:s.basicSalary, allowance:s.allowance, travelling_allowance:s.travellingAllowance,
@@ -14665,7 +14688,7 @@ function renderPayStaff(){
     <thead><tr><th>Name</th><th class="hide-sm">Works at</th><th>Salary paid by</th><th class="r">Basic</th><th class="r hide-sm">Allowances</th><th class="hide-sm">EPF no.</th><th class="hide-sm">Bank</th><th></th></tr></thead>
     <tbody>${rows.map(s=>`
       <tr data-sp="${s.id}" class="${s.active ? '' : 'pay-inactive'}">
-        <td><b>${esc(s.fullName)}</b><div class="ce-sub">${esc([s.designation, s.employeeNo].filter(Boolean).join(' · '))}${s.active ? '' : ' · left'}</div></td>
+        <td><b>${esc(s.fullName)}</b><div class="ce-sub">${esc([s.designation, s.employeeNo].filter(Boolean).join(' · '))}${s.active ? '' : ' · left'}${s.onPayroll === false ? ' · <b style="color:#a06800;">not on payroll</b>' : ''}</div></td>
         <td class="hide-sm">${esc(worksAtLabel(s.worksAt))}</td>
         <td>${esc(paidByLabel(s.paidBy))}</td>
         <td class="r">${s.basicSalary ? fmt2(s.basicSalary) : '<span class="pay-unpaid">not set</span>'}</td>
@@ -14699,6 +14722,7 @@ function openSpModal(s){
   v('spBasic', s ? s.basicSalary || '' : ''); v('spAllowance', s ? s.allowance || '' : ''); v('spTravel', s ? s.travellingAllowance || '' : '');
   g('spEpf').checked = s ? s.epfApplies : true;
   g('spActive').checked = s ? s.active : true;
+  g('spOnPayroll').checked = s ? s.onPayroll !== false : true;
   v('spNotes', s && s.notes);
   g('spError').style.display = 'none';
   g('spDelete').style.display = s ? '' : 'none';
@@ -14721,6 +14745,19 @@ document.getElementById('spSave').addEventListener('click', async ()=>{
     basic_salary:num(g('spBasic').value), allowance:num(g('spAllowance').value), travelling_allowance:num(g('spTravel').value),
     epf_applies:g('spEpf').checked, active:g('spActive').checked, notes:g('spNotes').value.trim() || null,
   };
+  // The payroll tick comes with file 22; before that the column does not exist.
+  if(await onPayrollReady()) payload.on_payroll = g('spOnPayroll').checked;
+  // The same person may already be here — added from the Housekeeping board, say.
+  // Update that profile rather than make a second one.
+  if(!editingSp){
+    const norm = x => String(x || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const twin = allStaffProfiles.find(x => norm(x.fullName) === norm(fullName));
+    if(twin){
+      const where = twin.worksAt === 'office' ? 'the office' : (FOR_LABELS[twin.worksAt] || twin.worksAt);
+      if(!confirm(`${twin.fullName} is already in Staff & Payroll (${where}${twin.onPayroll === false ? ', not on payroll yet' : ''}).\n\nPress OK to update that profile with what you typed here — their attendance and Housekeeping board line stay with them.\nPress Cancel to go back and change the name if this is a different person.`)) return;
+      editingSp = twin;
+    }
+  }
   try{
     if(editingSp){
       const { error } = await sb.from('staff_profiles').update(payload).eq('id', editingSp.id);
@@ -14733,6 +14770,7 @@ document.getElementById('spSave').addEventListener('click', async ()=>{
     }
     g('spModalOverlay').classList.remove('open');
     await fetchStaffProfiles(); onAcctDataChanged();
+    await refreshStaffEverywhere();
   }catch(e){ console.error(e); fail('Save failed — check that supabase-accounts-and-payroll.sql has been run.'); }
 });
 document.getElementById('spDelete').addEventListener('click', async ()=>{
