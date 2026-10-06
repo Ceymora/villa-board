@@ -752,6 +752,12 @@
   .frm-row > div{ flex:1; min-width:0; }
   .frm-row.frm-wrap{ flex-wrap:wrap; }
   .frm-row.frm-wrap > div{ min-width:150px; }
+  /* delete requests */
+  .delsel-bar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 12px; margin:6px 0; background:#fff8f0; border:1px solid #ffd8a8; border-radius:10px; font-size:13px; }
+  .delsel-bar button{ font-size:12.5px; }
+  tr.dr-pending td{ background:#fff4e6 !important; }
+  .dr-badge{ font-size:11.5px; color:#a65b00; margin-top:3px; }
+  input.dr-cb{ width:16px; height:16px; cursor:pointer; }
   /* attendance register */
   .att-wrap{ overflow-x:auto; border:1px solid var(--board-line); border-radius:12px; background:#fff; }
   .att-grid{ border-collapse:separate; border-spacing:0; font-size:12.5px; min-width:100%; }
@@ -1495,6 +1501,7 @@
       <div class="card-tools no-print">
         <button class="rpt-quick" id="renameCardsBtn" style="display:none;">✏️ Rename the boxes</button>
         <button class="rpt-quick" data-bin-open="pettycash" style="display:none;">🗑 Deleted items <span class="bin-count"></span></button>
+        <button class="rpt-quick" id="delReqBtnCash" style="display:none;">🗂 Delete requests <span class="delreq-count"></span></button>
       </div>
       <div class="field-hint" style="margin-top:-10px;margin-bottom:12px;">Petty Cash Ceymora and Petty Cash Kalava are the cash on each card: top-ups and returned cash in, advances and petty cash expenses out. Direct Villa Purchases are paid with the card straight for a villa, so they are shown here but NOT taken off petty cash. Bank transfers and Sharon's own-money payments are kept apart too. Record any of them with <b>+ Expenses</b>.</div>
 
@@ -1570,6 +1577,7 @@
         <div class="field-hint" style="margin:6px 0 0;">The card balances at the top are always running all-time balances. The figures below are just for the month shown.</div>
         <div id="cashMonthSummary" class="cash-summary" style="margin-top:10px;"></div>
         <div id="cashMonthBreakdown"></div>
+        <div class="delsel-bar no-print" id="cashSelBar" style="display:none;"></div>
         <div id="cashList" class="manage-list" style="max-height:420px;"></div>
       </div>
     </div>
@@ -1584,6 +1592,7 @@
           <button class="add-booking-btn" id="storeIssuesBtn">📋 Store issues report</button>
           <button class="add-booking-btn cmp-open-btn" data-cmp-open="inventory">📈 Compare</button>
           <button class="add-booking-btn" data-bin-open="inventory" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
+          <button class="add-booking-btn" id="delReqBtnInv" style="display:none;">🗂 Delete requests <span class="delreq-count"></span></button>
         </div>
       </div>
 
@@ -1605,6 +1614,7 @@
           <button class="villatab-btn active" id="histTabPurchase" style="background:var(--ink);color:#fff;">Purchase History</button>
           <button class="villatab-btn" id="histTabDistribute">Distribution History</button>
         </div>
+        <div class="delsel-bar no-print" id="invSelBar" style="display:none;"></div>
         <div id="invHistoryList" class="manage-list" style="max-height:320px;"></div>
       </div>
     </div>
@@ -2381,6 +2391,44 @@
       <button class="btn btn-cancel" id="expCancel">Cancel</button>
       <button class="btn btn-save" id="expSave">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- Delete: ask Makky (or, for Makky, delete now) -->
+<div class="modal-overlay" id="drAskModalOverlay">
+  <div class="modal">
+    <h3 id="drAskTitle">Delete</h3>
+    <div id="drAskList" class="manage-list" style="max-height:220px;"></div>
+    <label id="drAskReasonLabel">Why</label>
+    <textarea id="drAskReason" rows="3" maxlength="300" style="width:100%; box-sizing:border-box;" placeholder="e.g. Entered twice by mistake"></textarea>
+    <div class="field-hint" id="drAskHint"></div>
+    <div class="modal-error" id="drAskError"></div>
+    <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
+      <button class="btn btn-cancel" id="drAskCancel">Cancel</button>
+      <button class="btn btn-delete" id="drAskSend">Send</button></div></div>
+  </div>
+</div>
+
+<!-- Delete requests: waiting, and the record of what was deleted -->
+<div class="modal-overlay" id="drModalOverlay">
+  <div class="modal bin-modal" style="max-width:1150px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h3 style="margin:0;">🗂 Delete requests</h3>
+      <div style="display:flex; gap:8px;"><button class="btn btn-cancel" id="drClose">Close</button></div>
+    </div>
+    <div class="rpt-picker no-print" style="margin-top:10px; flex-wrap:wrap;">
+      <div class="villatabs" style="margin:0;">
+        <button class="villatab-btn" data-dr-view="waiting">🕓 Waiting</button>
+        <button class="villatab-btn" data-dr-view="history">📊 History by month</button>
+      </div>
+      <span id="drHistTools" style="display:none; gap:8px; align-items:center; flex-wrap:wrap;">
+        <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Month <select id="drMonth" class="acct-select"></select></label>
+        <label style="display:flex; gap:6px; align-items:center; font-weight:600; margin:0;">Person <select id="drPerson" class="acct-select"></select></label>
+        <button class="add-booking-btn" id="drPrint">🖨️ Print</button>
+        <button class="add-booking-btn" id="drCsv">⬇ CSV</button>
+      </span>
+    </div>
+    <div id="drBody" class="rpt-doc" style="margin-top:10px; overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -3909,7 +3957,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.06-board';
+const APP_VERSION = 'v2026.10.06-deletes';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4410,6 +4458,309 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'settings' && !settingsInited){ initSettings(); }
   });
 });
+
+/* ============================================================================
+   DELETE REQUESTS (file 23) — tick lines in Petty Cash or Inventory and delete
+   them. Makky's deletes happen at once; anyone else's go to Makky as a request
+   with a reason. Approved lines leave every total and report, and can be put
+   back with Undo until Makky deletes them for good. Every request is kept, so
+   Makky can see month by month what was deleted, by whom and why.
+   ============================================================================ */
+const DR_TABLES = {
+  petty_cash_transactions: { label:'Petty cash', edit:'edit_cash',      bar:'cashSelBar' },
+  inventory_transactions:  { label:'Inventory',  edit:'edit_inventory', bar:'invSelBar' },
+};
+let allDelReqs = [], drReady = null;
+const DELSEL = { petty_cash_transactions: new Set(), inventory_transactions: new Set() };
+const drMe = () => (currentUser && currentUser.email || '').toLowerCase();
+const drWho = e => { const p = (typeof allAppUsers !== 'undefined' ? allAppUsers : []).find(u => (u.email || '').toLowerCase() === (e || '').toLowerCase());
+  return p && p.full_name ? p.full_name : (e || '').split('@')[0] || '—'; };
+
+async function fetchDelReqs(){
+  if(!sb) return;
+  const { data, error } = await sb.from('delete_requests').select('*').order('requested_at', { ascending:false }).limit(3000);
+  if(error){ drReady = false; allDelReqs = []; }
+  else { drReady = true; allDelReqs = data || []; }
+  drRefreshViews();
+}
+function drPending(table, id){ return allDelReqs.find(r => r.table_name === table && String(r.row_id) === String(id) && r.status === 'pending') || null; }
+function drCanAsk(table){ return hasPerm(DR_TABLES[table].edit) || isAdmin(); }
+function drRowOf(table, id){
+  return table === 'petty_cash_transactions' ? allCashTxns.find(t => String(t.id) === String(id)) : allInvTxns.find(t => String(t.id) === String(id));
+}
+// Lines that belong to an advance are changed on the advance's own page instead.
+function drSelectable(table, t){
+  if(!t || !drReady || !drCanAsk(table)) return false;
+  if(table === 'petty_cash_transactions'){
+    if(t.type === 'advance') return false;
+    if(t.type === 'income' && t.advanceId) return false;
+    if(billLockedBySettledAdvance(t)) return false;
+  }
+  return !drPending(table, t.id);
+}
+function drSummary(table, t){
+  if(!t) return '(gone)';
+  if(table === 'petty_cash_transactions') return `${t.date} · ${t.type === 'income' ? 'Money received' : (t.purpose || 'Expense')} · ${FOR_LABELS[t.for] || t.for || ''} · LKR ${Number(t.amount || 0).toLocaleString()}`;
+  return `${t.date} · ${t.type === 'purchase' ? 'Purchase' : 'Sent to ' + (INV_LOCATION_LABELS[t.toVilla] || t.toVilla)}: ${t.item} × ${t.qty}${t.amount ? ' · LKR ' + Number(t.amount).toLocaleString() : ''}`;
+}
+
+// The tick box at the start of a line, and what a waiting request looks like on it.
+function drDecorateRow(table, t, tr){
+  const td = document.createElement('td');
+  td.className = 'no-print'; td.style.width = '28px';
+  if(drSelectable(table, t)){
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'dr-cb'; cb.checked = DELSEL[table].has(String(t.id));
+    cb.title = 'Tick to delete';
+    cb.addEventListener('change', () => { cb.checked ? DELSEL[table].add(String(t.id)) : DELSEL[table].delete(String(t.id)); drRenderBar(table); });
+    td.appendChild(cb);
+  }
+  tr.insertBefore(td, tr.firstChild);
+  const req = drReady ? drPending(table, t.id) : null;
+  if(!req) return null;
+  tr.classList.add('dr-pending');
+  const badge = document.createElement('div');
+  badge.className = 'dr-badge';
+  badge.innerHTML = `🕓 Delete asked by <b>${esc(drWho(req.requested_by_email))}</b> — “${esc(req.reason)}”`;
+  // the description column: petty cash [tick, date, type, details…], inventory [tick, date, item…]
+  const col = table === 'petty_cash_transactions' ? 3 : 2;
+  (tr.children[col] || tr.lastChild).appendChild(badge);
+  return req;
+}
+function drRowActions(req, actionTd){
+  if(!req) return;
+  if(isAdmin()){
+    const ap = document.createElement('button'); ap.className = 'manage-edit'; ap.textContent = '✓ Approve delete'; ap.style.marginRight = '4px';
+    ap.addEventListener('click', () => drDecide([req.id], true));
+    const rj = document.createElement('button'); rj.className = 'manage-del'; rj.textContent = '✕ Keep it';
+    rj.addEventListener('click', () => drDecide([req.id], false));
+    actionTd.prepend(rj); actionTd.prepend(ap);
+  } else if((req.requested_by_email || '').toLowerCase() === drMe()){
+    const un = document.createElement('button'); un.className = 'adv-undo-btn'; un.textContent = '↩ Undo request';
+    un.addEventListener('click', () => drCancel(req.id));
+    actionTd.prepend(un);
+  }
+}
+function drRenderBar(table){
+  const bar = document.getElementById(DR_TABLES[table].bar);
+  if(!bar) return;
+  if(!drReady || !drCanAsk(table)){ bar.style.display = 'none'; return; }
+  // forget ticks on lines that have gone or are no longer shown
+  [...DELSEL[table]].forEach(id => { if(!drRowOf(table, id) || drPending(table, id)) DELSEL[table].delete(id); });
+  const n = DELSEL[table].size;
+  const sum = [...DELSEL[table]].reduce((s, id) => s + Number((drRowOf(table, id) || {}).amount || 0), 0);
+  bar.style.display = '';
+  bar.innerHTML = n
+    ? `<b>${n} line${n === 1 ? '' : 's'} ticked</b>${sum ? ' · LKR ' + Math.round(sum).toLocaleString() : ''}
+       <button class="manage-del" data-dr-go>🗑 ${isAdmin() ? 'Delete' : 'Ask Makky to delete'} ${n === 1 ? 'it' : 'them'}</button>
+       <button class="manage-edit" data-dr-clear>Clear ticks</button>`
+    : `<span class="dim">Tick lines to delete them${isAdmin() ? '' : ' — Makky approves each delete'}.</span>`;
+  const go = bar.querySelector('[data-dr-go]'); if(go) go.addEventListener('click', () => drAsk(table, [...DELSEL[table]]));
+  const cl = bar.querySelector('[data-dr-clear]'); if(cl) cl.addEventListener('click', () => { DELSEL[table].clear(); drRefreshViews(); });
+}
+
+// ---- asking (or, for Makky, deleting straight away)
+let drAskState = null;
+function drAsk(table, ids){
+  ids = ids.map(String).filter(id => drRowOf(table, id) && !drPending(table, id));
+  if(!ids.length){ alert('Those lines are already waiting for Makky, or have gone.'); return; }
+  drAskState = { table, ids };
+  const admin = isAdmin();
+  document.getElementById('drAskTitle').textContent = admin
+    ? `Delete ${ids.length} line${ids.length === 1 ? '' : 's'} — ${DR_TABLES[table].label}`
+    : `Ask Makky to delete ${ids.length} line${ids.length === 1 ? '' : 's'} — ${DR_TABLES[table].label}`;
+  document.getElementById('drAskList').innerHTML = ids.map(id => `<div class="manage-row"><span class="manage-dates">${esc(drSummary(table, drRowOf(table, id)))}</span></div>`).join('');
+  document.getElementById('drAskReasonLabel').textContent = admin ? 'Why (optional, kept with the record)' : 'Why should these be deleted? (Makky sees this)';
+  document.getElementById('drAskReason').value = '';
+  document.getElementById('drAskHint').textContent = admin
+    ? 'They leave every total and report now. You can put them back from 🗑 Delete requests → History, or from Deleted items, until you delete them for good.'
+    : 'Nothing is removed until Makky approves. You can undo your request until then.';
+  document.getElementById('drAskSend').textContent = admin ? 'Delete now' : 'Send to Makky';
+  document.getElementById('drAskError').style.display = 'none';
+  document.getElementById('drAskModalOverlay').classList.add('open');
+}
+async function drAskSubmit(){
+  if(!drAskState) return;
+  const { table, ids } = drAskState;
+  const err = document.getElementById('drAskError');
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  const admin = isAdmin();
+  let reason = document.getElementById('drAskReason').value.trim();
+  if(!admin && reason.length < 3) return fail('Write why these should be deleted.');
+  if(admin && reason.length < 3) reason = 'Deleted by ' + (currentUser.username || 'Makky');
+  const btn = document.getElementById('drAskSend'); btn.disabled = true;
+  try{
+    const { error } = await sb.rpc('request_delete', { p_table: table, p_ids: ids, p_reason: reason });
+    if(error) throw error;
+    await fetchDelReqs();
+    if(admin){
+      const mine = allDelReqs.filter(r => r.status === 'pending' && r.table_name === table && ids.includes(String(r.row_id))).map(r => r.id);
+      for(const id of mine){ const { error: e2 } = await sb.rpc('decide_delete_request', { p_id: id, p_approve: true, p_note: null }); if(e2) throw e2; }
+      logActivity('delete', table, `Deleted ${ids.length} ${DR_TABLES[table].label.toLowerCase()} line(s): ${reason}`);
+    } else {
+      logActivity('update', table, `Asked Makky to delete ${ids.length} ${DR_TABLES[table].label.toLowerCase()} line(s): ${reason}`);
+    }
+    ids.forEach(id => DELSEL[table].delete(id));
+    document.getElementById('drAskModalOverlay').classList.remove('open');
+    await drAfterChange([table]);
+  }catch(e){ console.error(e); fail('Could not send — ' + ((e && e.message) || 'check the connection.')); }
+  finally{ btn.disabled = false; }
+}
+async function drCancel(id){
+  if(!confirm('Undo your delete request? The line stays as it is.')) return;
+  const { error } = await sb.rpc('cancel_delete_request', { p_id: id });
+  if(error){ alert('Could not undo — ' + (error.message || '')); return; }
+  logActivity('update', 'delete_requests', 'Withdrew a delete request');
+  await drAfterChange([]);
+}
+async function drDecide(ids, approve){
+  if(!isAdmin() || !ids.length) return;
+  const reqs = ids.map(id => allDelReqs.find(r => r.id === id)).filter(Boolean);
+  let note = null;
+  if(approve){ if(!confirm(`Delete ${reqs.length} line${reqs.length === 1 ? '' : 's'}?\n\n${reqs.map(r => '• ' + r.summary + ' — “' + r.reason + '”').join('\n')}\n\nYou can still undo it from History until you delete it for good.`)) return; }
+  else { note = prompt(`Keep ${reqs.length} line${reqs.length === 1 ? '' : 's'}. A note for ${[...new Set(reqs.map(r => drWho(r.requested_by_email)))].join(', ')} (optional):`, ''); if(note === null) return; }
+  const tables = new Set(), problems = [];
+  for(const r of reqs){
+    const { error } = await sb.rpc('decide_delete_request', { p_id: r.id, p_approve: approve, p_note: note });
+    if(error) problems.push(r.summary + ': ' + error.message); else { tables.add(r.table_name); if(approve && r.table_name === 'petty_cash_transactions') tables.add('inventory_transactions'); }
+  }
+  logActivity(approve ? 'delete' : 'update', 'delete_requests', `${approve ? 'Approved' : 'Rejected'} ${reqs.length - problems.length} delete request(s)${note ? ': ' + note : ''}`);
+  if(problems.length) alert('Some could not be done:\n\n' + problems.join('\n'));
+  await drAfterChange([...tables]);
+}
+// Undo an approved delete: every copy it made goes back where it was.
+async function drUndo(reqId){
+  const r = allDelReqs.find(x => x.id === reqId); if(!r) return;
+  if(!confirm(`Put this back?\n\n${r.summary}`)) return;
+  const problems = []; const tables = new Set();
+  for(const id of (r.deleted_record_ids || [])){
+    const { data, error } = await sb.rpc('restore_deleted', { p_id: id });
+    if(error && !/already been restored/i.test(error.message || '')) problems.push(error.message); else if(data) tables.add(data);
+  }
+  logActivity('restore', r.table_name, 'Undid delete: ' + r.summary);
+  if(problems.length) alert('Could not put all of it back:\n\n' + problems.join('\n'));
+  await drAfterChange([...tables, r.table_name]);
+}
+async function drAfterChange(tables){
+  await fetchDelReqs();
+  if(tables.length) await refreshAfterRestore(new Set(tables));
+  refreshBinCount();
+  if(document.getElementById('drModalOverlay').classList.contains('open')) renderDrModal();
+}
+function drRefreshViews(){
+  const pend = t => allDelReqs.filter(r => r.status === 'pending' && r.table_name === t).length;
+  document.querySelectorAll('.delreq-count').forEach(el => { const n = pend('petty_cash_transactions') + pend('inventory_transactions'); el.textContent = n ? '· ' + n + ' waiting' : ''; });
+  ['delReqBtnCash','delReqBtnInv'].forEach(id => { const b = document.getElementById(id); if(b) b.style.display = drReady && (isAdmin() || canRestore() || drCanAsk(id === 'delReqBtnCash' ? 'petty_cash_transactions' : 'inventory_transactions')) ? '' : 'none'; });
+  const it = document.querySelector('.maintab-btn[data-tab="inventory"]');
+  if(it){ if(!it.dataset.base) it.dataset.base = it.textContent; const n = isAdmin() ? pend('inventory_transactions') : 0; it.textContent = it.dataset.base + (n ? ` 🔔${n}` : ''); }
+  if(typeof cashInited !== 'undefined' && cashInited && typeof renderCash === 'function') renderCash();
+  if(typeof invInited !== 'undefined' && invInited && typeof renderInventory === 'function') renderInventory();
+}
+
+// ---- Makky's view: waiting requests, and the monthly record of what was deleted
+let drView = 'waiting', drDeletedInfo = new Map();
+function openDrModal(view){ drView = view || (allDelReqs.some(r => r.status === 'pending') ? 'waiting' : 'history'); document.getElementById('drModalOverlay').classList.add('open'); renderDrModal(); }
+async function renderDrModal(){
+  const body = document.getElementById('drBody');
+  document.querySelectorAll('[data-dr-view]').forEach(b => { const on = b.dataset.drView === drView; b.style.background = on ? 'var(--ink)' : '#fff'; b.style.color = on ? '#fff' : 'var(--muted)'; });
+  document.getElementById('drHistTools').style.display = drView === 'history' ? 'flex' : 'none';
+  if(drView === 'waiting'){
+    const list = allDelReqs.filter(r => r.status === 'pending');
+    if(!list.length){ body.innerHTML = '<div class="manage-empty">Nothing waiting.</div>'; return; }
+    body.innerHTML = `<table class="rpt-table"><thead><tr>${isAdmin() ? '<th><input type="checkbox" id="drAllCb"></th>' : ''}<th>Asked</th><th>By</th><th>Section</th><th>What</th><th class="r">LKR</th><th>Why</th><th></th></tr></thead><tbody>
+      ${list.map(r => `<tr>${isAdmin() ? `<td><input type="checkbox" class="drW" value="${r.id}"></td>` : ''}
+        <td class="dim">${esc(new Date(r.requested_at).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }))}</td>
+        <td><b>${esc(drWho(r.requested_by_email))}</b></td><td>${esc(DR_TABLES[r.table_name].label)}</td>
+        <td>${esc(r.summary || '')}</td><td class="r">${r.amount ? Math.round(r.amount).toLocaleString() : '—'}</td>
+        <td>“${esc(r.reason)}”</td>
+        <td style="white-space:nowrap;">${isAdmin() ? `<button class="manage-edit" data-dr-approve="${r.id}">✓ Delete</button> <button class="manage-del" data-dr-reject="${r.id}">✕ Keep</button>`
+          : (r.requested_by_email || '').toLowerCase() === drMe() ? `<button class="adv-undo-btn" data-dr-cancel="${r.id}">↩ Undo request</button>` : ''}</td></tr>`).join('')}
+      </tbody></table>
+      ${isAdmin() ? '<div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;"><button class="manage-edit" id="drApproveSel">✓ Delete the ticked ones</button><button class="manage-del" id="drRejectSel">✕ Keep the ticked ones</button></div>' : ''}`;
+    body.querySelectorAll('[data-dr-approve]').forEach(b => b.addEventListener('click', () => drDecide([Number(b.dataset.drApprove)], true)));
+    body.querySelectorAll('[data-dr-reject]').forEach(b => b.addEventListener('click', () => drDecide([Number(b.dataset.drReject)], false)));
+    body.querySelectorAll('[data-dr-cancel]').forEach(b => b.addEventListener('click', () => drCancel(Number(b.dataset.drCancel))));
+    const all = document.getElementById('drAllCb'); if(all) all.addEventListener('change', () => body.querySelectorAll('.drW').forEach(c => c.checked = all.checked));
+    const sel = () => [...body.querySelectorAll('.drW:checked')].map(c => Number(c.value));
+    const a = document.getElementById('drApproveSel'); if(a) a.addEventListener('click', () => { const s = sel(); if(!s.length) return alert('Tick the requests first.'); drDecide(s, true); });
+    const rj = document.getElementById('drRejectSel'); if(rj) rj.addEventListener('click', () => { const s = sel(); if(!s.length) return alert('Tick the requests first.'); drDecide(s, false); });
+    return;
+  }
+  // History & monitor
+  const mSel = document.getElementById('drMonth'), wSel = document.getElementById('drPerson');
+  if(!mSel.options.length){
+    const now = new Date();
+    mSel.innerHTML = '<option value="all">All time</option>' + Array.from({ length: 18 }, (_, i) => new Date(now.getFullYear(), now.getMonth() - i, 1))
+      .map(d => `<option value="${ymKey(d)}">${d.toLocaleDateString('en-GB', { month:'long', year:'numeric' })}</option>`).join('');
+    mSel.value = ymKey(now);
+  }
+  const people = [...new Set(allDelReqs.map(r => (r.requested_by_email || '').toLowerCase()).filter(Boolean))];
+  const keepW = wSel.value;
+  wSel.innerHTML = '<option value="">Everyone</option>' + people.map(e => `<option value="${esc(e)}">${esc(drWho(e))}</option>`).join('');
+  wSel.value = people.includes(keepW) ? keepW : '';
+  const ym = mSel.value, who = wSel.value;
+  const rows = allDelReqs.filter(r => (ym === 'all' || String(r.requested_at).slice(0, 7) === ym) && (!who || (r.requested_by_email || '').toLowerCase() === who));
+  // Whether each approved delete can still be undone.
+  const ids = [...new Set(rows.flatMap(r => r.deleted_record_ids || []))].filter(id => !drDeletedInfo.has(id));
+  if(ids.length && canRestore()){
+    const { data } = await sb.from('deleted_records').select('id,restored_at').in('id', ids);
+    ids.forEach(id => drDeletedInfo.set(id, 'gone'));
+    (data || []).forEach(d => drDeletedInfo.set(d.id, d.restored_at ? 'back' : 'kept'));
+  }
+  const stateOf = r => {
+    if(r.status !== 'approved') return r.status;
+    const st = (r.deleted_record_ids || []).map(id => drDeletedInfo.get(id));
+    if(!st.length) return 'approved';
+    if(st.every(s => s === 'back')) return 'restored';
+    if(st.every(s => s === 'gone')) return 'forever';
+    return 'deleted';
+  };
+  const LBL = { pending:'🕓 Waiting', approved:'Deleted', deleted:'Deleted — can undo', restored:'↩ Put back', forever:'Deleted for good', rejected:'Kept (rejected)', cancelled:'Withdrawn' };
+  const per = {};
+  for(const r of rows){
+    const k = (r.requested_by_email || '').toLowerCase();
+    const p = per[k] || (per[k] = { asked:0, deleted:0, kept:0, withdrawn:0, waiting:0, petty:0, invLines:0, invValue:0 });
+    p.asked++;
+    const st = stateOf(r);
+    if(st === 'pending') p.waiting++; else if(st === 'rejected') p.kept++; else if(st === 'cancelled') p.withdrawn++;
+    else if(st !== 'restored'){ p.deleted++; if(r.table_name === 'petty_cash_transactions') p.petty += Number(r.amount || 0); else { p.invLines++; p.invValue += Number(r.amount || 0); } }
+  }
+  const L = n => Math.round(n).toLocaleString();
+  body.innerHTML = !rows.length ? '<div class="manage-empty">No delete requests in this period.</div>' : `
+    <div class="rpt-section-title">By person</div>
+    <table class="rpt-table"><thead><tr><th>Person</th><th class="c">Asked</th><th class="c">Deleted</th><th class="c">Kept</th><th class="c">Withdrawn</th><th class="c">Waiting</th><th class="r">Petty cash deleted (LKR)</th><th class="c">Inventory lines deleted</th><th class="r">Inventory value (LKR)</th></tr></thead>
+      <tbody>${Object.entries(per).map(([e, p]) => `<tr><td><b>${esc(drWho(e))}</b></td><td class="c">${p.asked}</td><td class="c">${p.deleted}</td><td class="c">${p.kept}</td><td class="c">${p.withdrawn}</td><td class="c">${p.waiting}</td><td class="r"><b>${L(p.petty)}</b></td><td class="c">${p.invLines}</td><td class="r">${L(p.invValue)}</td></tr>`).join('')}</tbody></table>
+    <div class="rpt-section-title" style="margin-top:14px;">Every request</div>
+    <table class="rpt-table"><thead><tr><th>Asked</th><th>By</th><th>Section</th><th>What</th><th class="r">LKR</th><th>Why</th><th>What happened</th><th class="no-print"></th></tr></thead><tbody>
+      ${rows.map(r => { const st = stateOf(r); return `<tr>
+        <td class="dim">${esc(fmtDayY(String(r.requested_at).slice(0, 10)))}</td><td><b>${esc(drWho(r.requested_by_email))}</b></td>
+        <td>${esc(DR_TABLES[r.table_name].label)}</td><td>${esc(r.summary || '')}</td><td class="r">${r.amount ? L(r.amount) : '—'}</td>
+        <td>“${esc(r.reason)}”</td>
+        <td>${esc(LBL[st] || st)}${r.decided_by_email && st !== 'pending' ? `<div class="dim">${esc(drWho(r.decided_by_email))}${r.decided_at ? ' · ' + esc(fmtDayY(String(r.decided_at).slice(0, 10))) : ''}${r.decision_note ? ' — ' + esc(r.decision_note) : ''}</div>` : ''}</td>
+        <td class="no-print">${st === 'deleted' && canRestore() ? `<button class="adv-undo-btn" data-dr-undo="${r.id}">↩ Undo</button>` : ''}</td></tr>`; }).join('')}
+    </tbody></table>
+    <div class="rpt-note">Deleted lines are out of every total and report. "Deleted — can undo" lines are kept under Deleted items until Makky deletes them for good; after that they cannot come back.</div>`;
+  body.querySelectorAll('[data-dr-undo]').forEach(b => b.addEventListener('click', async () => { await drUndo(Number(b.dataset.drUndo)); drDeletedInfo.clear(); renderDrModal(); }));
+  document.getElementById('drCsv').onclick = () => {
+    const out = [['Asked on','Asked by','Section','What','Amount LKR','Why','What happened','Decided by','Decided on','Note']];
+    rows.forEach(r => out.push([String(r.requested_at).slice(0, 10), drWho(r.requested_by_email), DR_TABLES[r.table_name].label, r.summary || '', r.amount || '', r.reason, LBL[stateOf(r)] || r.status, drWho(r.decided_by_email), String(r.decided_at || '').slice(0, 10), r.decision_note || '']));
+    downloadCSV(`delete-requests-${ym}.csv`, out);
+  };
+}
+document.getElementById('drAskSend').addEventListener('click', drAskSubmit);
+document.getElementById('drAskCancel').addEventListener('click', () => document.getElementById('drAskModalOverlay').classList.remove('open'));
+document.getElementById('drClose').addEventListener('click', () => document.getElementById('drModalOverlay').classList.remove('open'));
+document.querySelectorAll('[data-dr-view]').forEach(b => b.addEventListener('click', () => { drView = b.dataset.drView; renderDrModal(); }));
+['drMonth','drPerson'].forEach(id => document.getElementById(id).addEventListener('change', renderDrModal));
+document.getElementById('delReqBtnCash').addEventListener('click', () => openDrModal());
+document.getElementById('delReqBtnInv').addEventListener('click', () => openDrModal());
+document.getElementById('drPrint').addEventListener('click', () => printPiece('Delete requests', document.getElementById('drBody').innerHTML));
+let drStarted = false;
+function startDelReqs(){
+  if(drStarted || !sb) return; drStarted = true;
+  fetchDelReqs();
+  sb.channel('delete_requests_changes').on('postgres_changes', { event:'*', schema:'public', table:'delete_requests' }, fetchDelReqs).subscribe();
+}
 
 /* ========================== ATTENDANCE REGISTER ==========================
    One mark per person per day, for everyone in Staff & Payroll. Office staff and
@@ -7325,6 +7676,7 @@ function initPettyCash(){
   if(!sb){ cashStatusMsg.textContent = 'Not connected to Supabase yet'; renderCash(); return; }
   cashStatusMsg.textContent = 'Loading…';
   fetchCash();
+  startDelReqs();
   sb.channel('petty_cash_changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'petty_cash_transactions' }, fetchCash)
     .subscribe();
@@ -7709,6 +8061,7 @@ function renderCash(){
   table.innerHTML = `
     <thead>
       <tr>
+        <th class="no-print"></th>
         <th>Date</th>
         <th>Type</th>
         <th>Details</th>
@@ -7756,6 +8109,7 @@ function renderCash(){
       <td>${cardLabel}</td>
       <td class="num" style="color:${t.type==='income' ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${t.type==='income'?'+':'−'} ${t.amount.toLocaleString()}</td>
     `;
+    const drReq = drDecorateRow('petty_cash_transactions', t, tr);
     const actionTd = document.createElement('td');
     actionTd.style.whiteSpace = 'nowrap';
     if(canEdit()){
@@ -7785,8 +8139,11 @@ function renderCash(){
     }
     const delBtn = document.createElement('button');
     delBtn.className = 'manage-del';
-    delBtn.textContent = 'Delete';
+    const askInstead = drReady && !canDelete() && drSelectable('petty_cash_transactions', t);
+    delBtn.textContent = askInstead ? 'Ask to delete' : 'Delete';
+    if(drReq) delBtn.style.display = 'none';
     delBtn.addEventListener('click', async ()=>{
+      if(askInstead){ drAsk('petty_cash_transactions', [t.id]); return; }
       const parentAdv = (t.advanceId && allCashTxns.find(a => String(a.id) === String(t.advanceId))) || (t.type === 'advance' ? t : null);
       if(!canApproveUndo() && parentAdv && parentAdv.settled){
         alert('This line belongs to a settled advance, so only Makky can delete it. Request an undo first if it\'s wrong.');
@@ -7812,9 +8169,11 @@ function renderCash(){
       }
     });
     actionTd.appendChild(delBtn);
+    drRowActions(drReq, actionTd);
     tr.appendChild(actionTd);
     tbody.appendChild(tr);
   }
+  drRenderBar('petty_cash_transactions');
   // Looking at one kind of line: add those lines up. Looking at everything: show
   // what the cards actually moved by, which is the figure to check against the cards.
   const filtered = cashKind !== 'all';
@@ -7826,7 +8185,7 @@ function renderCash(){
     : 'Net change on the cards';
   const tfoot = document.createElement('tfoot');
   tfoot.innerHTML = `<tr style="font-weight:800; border-top:2px solid var(--board-line); background:#f6f4ec;">
-      <td colspan="4" style="padding:9px 10px;">${esc(footLabel)} — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
+      <td colspan="5" style="padding:9px 10px;">${esc(footLabel)} — ${sorted.length} transaction${sorted.length===1?'':'s'}</td>
       <td class="num" style="padding:9px 10px; color:${netTotal>=0?'var(--green)':'var(--red)'};">${netTotal>=0?'+':'−'} ${Math.abs(Math.round(netTotal)).toLocaleString()}</td>
       <td style="padding:9px 10px;"></td>
     </tr>`;
@@ -8971,7 +9330,9 @@ function renderUndoRequests(){
   const tab = document.querySelector('.maintab-btn[data-tab="pettycash"]');
   if(tab){
     if(!tab.dataset.base) tab.dataset.base = tab.textContent;
-    tab.textContent = tab.dataset.base + (canApproveUndo() && pending.length ? ` 🔔${pending.length}` : '');
+    const delWaiting = isAdmin() ? allDelReqs.filter(r => r.status === 'pending' && r.table_name === 'petty_cash_transactions').length : 0;
+    const n = (canApproveUndo() ? pending.length : 0) + delWaiting;
+    tab.textContent = tab.dataset.base + (n ? ` 🔔${n}` : '');
   }
   if(!canApproveUndo() || !pending.length){ sec.style.display = 'none'; return; }
   sec.style.display = '';
@@ -9006,6 +9367,7 @@ function initInventory(){
   if(!sb){ invStatusMsg.textContent = 'Not connected to Supabase yet'; renderInventory(); return; }
   invStatusMsg.textContent = 'Loading…';
   fetchInv();
+  startDelReqs();
   sb.channel('inventory_changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'inventory_transactions' }, fetchInv)
     .subscribe();
@@ -9100,7 +9462,9 @@ function renderInventory(){
       delBtn.className = 'manage-del';
       delBtn.textContent = 'Delete';
       delBtn.title = 'Delete this item entirely (all history)';
+      if(drReady && !canDelete()) delBtn.textContent = 'Ask to delete';
       delBtn.addEventListener('click', async ()=>{
+        if(drReady && !canDelete()){ drAsk('inventory_transactions', allInvTxns.filter(x => x.item === name).map(x => x.id)); return; }
         if(!checkDeletePassword()) return;
         if(!confirm(`Delete "${name}" completely? This removes all its purchase and distribution history.`)) return;
         try{
@@ -9116,6 +9480,7 @@ function renderInventory(){
   }
 
   // datalist for distribute modal autocomplete
+  setTimeout(() => drRenderBar('inventory_transactions'), 0);
   const dl = document.getElementById('invItemList');
   dl.innerHTML = itemNames.map(n=>`<option value="${n}">`).join('');
 
@@ -9133,6 +9498,7 @@ function renderInventory(){
     table.innerHTML = `
       <thead>
         <tr>
+          <th class="no-print"></th>
           <th>Date</th>
           <th>Item Purchased</th>
           <th style="text-align:center">Quantity</th>
@@ -9154,6 +9520,7 @@ function renderInventory(){
         <td class="num">${t.qty}</td>
         <td class="num ${isPurchase && !t.amount ? 'zero' : ''}">${lastCol}</td>
       `;
+      const drReq = drDecorateRow('inventory_transactions', t, tr);
       const actionTd = document.createElement('td');
       actionTd.style.whiteSpace = 'nowrap';
       if(canChange('inventory')){
@@ -9168,8 +9535,11 @@ function renderInventory(){
       }
       const delBtn = document.createElement('button');
       delBtn.className = 'manage-del';
-      delBtn.textContent = 'Delete';
+      const askInstead = drReady && !canDelete();
+      delBtn.textContent = askInstead ? 'Ask to delete' : 'Delete';
+      if(drReq) delBtn.style.display = 'none';
       delBtn.addEventListener('click', async ()=>{
+        if(askInstead){ drAsk('inventory_transactions', [t.id]); return; }
         if(!checkDeletePassword()) return;
         if(confirm('Delete this record?')){
           try{
@@ -9180,6 +9550,7 @@ function renderInventory(){
         }
       });
       actionTd.appendChild(delBtn);
+      drRowActions(drReq, actionTd);
       tr.appendChild(actionTd);
       tbody.appendChild(tr);
     }
