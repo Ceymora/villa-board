@@ -3358,6 +3358,18 @@ function onVillasChanged(){
 }
 
 function villaById(id){ return villasNow().find(v => v.id === id) || null; }
+// The villa a saved value means, even when it was saved slightly differently —
+// "Noelia ", "NOELIA", or the villa's name instead of its code. Null if none.
+function villaKeyOf(raw){
+  if(raw === null || raw === undefined) return null;
+  const list = villasNow();
+  if(list.some(v => v.id === raw)) return raw;
+  const n = String(raw).trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+  if(!n) return null;
+  const bare = x => String(x || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ').replace(/ villa$/, '');
+  const hit = list.find(v => bare(v.id) === bare(n)) || list.find(v => bare(v.name) === bare(n));
+  return hit ? hit.id : null;
+}
 function villaColor(id){ const v = villaById(id); return v ? v.color : '#495057'; }
 function villaName(id){ return FOR_LABELS[id] || (villaById(id) || {}).name || id; }
 function firstVillaId(){ return VILLA_IDS[0] || 'kalava'; }
@@ -3897,7 +3909,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.06-fillmonth';
+const APP_VERSION = 'v2026.10.06-board';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4423,7 +4435,7 @@ let attPeople = [], attHolidays = new Map(), attMarks = new Map(), attLoadedRang
 const attKey = (pid, day) => pid + '|' + day;
 
 function attGroupOf(p){ return (p.worksAt || 'office') === 'office' ? 'office' : 'hk'; }
-function attPlace(p){ return p.worksAt === 'office' ? 'Office' : (FOR_LABELS[p.worksAt] || p.worksAt || ''); }
+function attPlace(p){ return p.worksAt === 'office' ? 'Office' : (FOR_LABELS[villaKeyOf(p.worksAt) || p.worksAt] || p.worksAt || 'Not on a villa'); }
 function attMonthRange(d){ return { from: toISO(new Date(d.getFullYear(), d.getMonth(), 1)), to: toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1)) }; }
 function attDays(from, to){ const out = []; for(let d = parseISO(from); toISO(d) < to; d.setDate(d.getDate() + 1)) out.push(toISO(d)); return out; }
 
@@ -5301,11 +5313,12 @@ let editingStaffId = null;
 function openEmployeeModal(staff, villaId){
   editingStaffId = staff ? staff.id : null;
   const sel = document.getElementById('empVilla');
-  sel.innerHTML = villasNow().map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  sel.innerHTML = '<option value="">— Choose the villa —</option>' + villasNow().map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  sel.value = '';
   if(!staff && villaId && [...sel.options].some(o => o.value === villaId)) sel.value = villaId;
   document.getElementById('employeeModalOverlay').querySelector('h3').textContent = staff ? 'Edit employee' : 'Add employee';
   document.getElementById('empName').value = staff ? staff.name : '';
-  if(staff) sel.value = staff.villa;
+  if(staff) sel.value = villaKeyOf(staff.villa) || '';
   document.getElementById('empRoleSelect').value = staff ? staff.role : 'Housekeeping';
   document.getElementById('empError').style.display = 'none';
   document.getElementById('empDeleteBtn').style.display = staff ? '' : 'none';
@@ -5426,9 +5439,9 @@ function renderHK(){
   const known = new Set(villaOrder.map(v => v.id));
   const lockedV = (typeof lockedVilla === 'function') ? lockedVilla() : null;
   const blocks = villaOrder.filter(v => !lockedV || v.id === lockedV)
-    .map(v => ({ villa:v, people: STAFF.filter(p => p.villa === v.id) }));
-  const orphans = STAFF.filter(p => !known.has(p.villa));
-  if(orphans.length && !lockedV) blocks.push({ villa:{ id:'', name:'No villa — edit to reassign', color:'#868e96' }, people: orphans, orphan:true });
+    .map(v => ({ villa:v, people: STAFF.filter(p => villaKeyOf(p.villa) === v.id) }));
+  const orphans = STAFF.filter(p => !villaKeyOf(p.villa));
+  if(orphans.length && !lockedV) blocks.push({ villa:{ id:'', name:'⚠ Not on any villa — tap the name and choose the villa', color:'#c92a2a' }, people: orphans, orphan:true });
   const rowsInOrder = [];
   for(const blk of blocks){
     rowsInOrder.push({ head: blk });
@@ -5484,7 +5497,8 @@ function renderHK(){
     }
     nameTd.appendChild(nameSpan);
     if(person.pool){ const poolBadge=document.createElement('span'); poolBadge.className='pool-badge'; poolBadge.textContent='POOL'; nameTd.appendChild(poolBadge); }
-    const roleSpan=document.createElement('span'); roleSpan.className='staffrole'; roleSpan.textContent=person.role;
+    const roleSpan=document.createElement('span'); roleSpan.className='staffrole';
+    roleSpan.textContent = person.role + (villaKeyOf(person.villa) ? '' : ` · villa saved as “${person.villa || 'nothing'}”`);
     nameTd.appendChild(roleSpan);
     tr.appendChild(nameTd);
     for(let i=0;i<7;i++){
