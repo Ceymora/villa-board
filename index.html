@@ -1329,6 +1329,7 @@
         <div class="status-msg" id="attStatus"></div>
         <div class="toolbar-actions">
           <button class="add-booking-btn att-edit" id="attMarkToday">✓ Everyone present today</button>
+          <button class="add-booking-btn att-edit" id="attFillMonth">📅 Fill this month as present</button>
           <button class="add-booking-btn" id="attHolidaysBtn">🎉 Holidays</button>
           <button class="add-booking-btn" id="attReportBtn">📊 Report</button>
         </div>
@@ -3896,7 +3897,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.06-stafflist';
+const APP_VERSION = 'v2026.10.06-fillmonth';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4630,6 +4631,45 @@ async function attMarkDay(day){
   renderAttendance();
 }
 
+// Back-filling a month: every working day nobody has marked → Present, for everyone
+// on this register. Days off, holidays, days before someone joined, days still to
+// come, and anything already marked are left exactly as they are.
+async function attFillMonth(){
+  if(!canChange('attendance')) return;
+  const r = attMonthRange(attMonth);
+  const label = attMonth.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  const days = attDays(r.from, r.to).filter(d => d <= todayISO());
+  if(!days.length){ alert(`${label} has not started yet.`); return; }
+  const people = attPeopleShown(attGroup).filter(p => p.active);
+  const rows = [], who = currentUser ? currentUser.username : '';
+  const per = {};
+  for(const p of people) for(const d of days){
+    if(attStatusOf(p, d) !== 'unmarked') continue;
+    rows.push({ profile_id:p.id, day:d, status:'present', updated_by:who, updated_at:new Date().toISOString() });
+    per[p.name] = (per[p.name] || 0) + 1;
+  }
+  if(!rows.length){ alert(`Nothing left to fill in ${label} — every working day is already marked.`); return; }
+  const hol = [...attHolidays.keys()].filter(d => d >= r.from && d < r.to).length;
+  const noOff = people.filter(p => p.weeklyOff === null).map(p => p.name);
+  if(!confirm(`Fill ${label} — ${attGroup === 'office' ? 'office' : 'housekeeping'} register\n\n`
+    + Object.entries(per).map(([n, c]) => `• ${n}: ${c} day${c === 1 ? '' : 's'} as Present`).join('\n')
+    + `\n\nBefore you go on, check:\n`
+    + `• Holidays for ${label}: ${hol ? hol + ' on the list' : 'NONE on the list yet — add them first (🎉 Holidays), or they will be filled as worked'}\n`
+    + (noOff.length ? `• No weekly day off set for: ${noOff.join(', ')} — set it first (⚙), or their days off will be filled as worked\n` : '')
+    + `\nAfterwards, tap each leave day and change it (annual, casual, sick, no pay…).`)) return;
+  const btn = document.getElementById('attFillMonth'); btn.disabled = true;
+  try{
+    for(let i = 0; i < rows.length; i += 500){
+      const { error } = await sb.from('attendance').upsert(rows.slice(i, i + 500), { onConflict:'profile_id,day' });
+      if(error) throw error;
+    }
+    rows.forEach(x => attMarks.set(attKey(x.profile_id, x.day), { status:'present', note:'', by:who }));
+    logActivity('update', 'attendance', `Filled ${label} as present — ${rows.length} days, ${Object.keys(per).length} people (${attGroup === 'office' ? 'office' : 'housekeeping'} register)`);
+    renderAttendance();
+  }catch(e){ console.error(e); alert('Could not fill the month. ' + ((e && e.message) || '')); await loadAttMonth(); renderAttendance(); }
+  finally{ btn.disabled = false; }
+}
+
 // ---- per-person settings
 let attSetId = null;
 function openAttSettings(id){
@@ -4706,6 +4746,7 @@ async function initAttendance(){
   document.getElementById('attNext').addEventListener('click', () => go(1));
   document.getElementById('attThis').addEventListener('click', () => go(0));
   document.getElementById('attMarkToday').addEventListener('click', () => attMarkDay(todayISO()));
+  document.getElementById('attFillMonth').addEventListener('click', attFillMonth);
   document.getElementById('attReportBtn').addEventListener('click', openAttReport);
   if(!sb) return;
   document.getElementById('attStatus').textContent = 'Loading…';
