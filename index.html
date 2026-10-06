@@ -2446,7 +2446,7 @@
       <div><label>Annual leave a year</label><input type="number" id="attSetAnnual" min="0" max="60" step="0.5"></div>
       <div><label>Casual leave a year</label><input type="number" id="attSetCasual" min="0" max="60" step="0.5"></div>
     </div>
-    <div class="field-hint">Sick leave and no-pay leave are counted but have no allowance here.</div>
+    <div class="field-hint">Annual + casual make the year's leave. Absent days (leave not said to be annual, casual or medical) come off it too. Medical and no-pay leave are counted on their own.</div>
     <div class="modal-error" id="attSetError"></div>
     <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
       <button class="btn btn-cancel" id="attSetCancel">Cancel</button>
@@ -3957,7 +3957,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.06-deletes';
+const APP_VERSION = 'v2026.10.06-leave';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4772,9 +4772,9 @@ const ATT = {
   half:   { code:'½', label:'Half day',     cls:'att-half' },
   annual: { code:'A', label:'Annual leave', cls:'att-annual' },
   casual: { code:'C', label:'Casual leave', cls:'att-casual' },
-  sick:   { code:'S', label:'Sick leave',   cls:'att-sick' },
+  sick:   { code:'S', label:'Medical leave', cls:'att-sick' },
   nopay:  { code:'N', label:'No-pay leave', cls:'att-nopay' },
-  absent: { code:'X', label:'Absent',       cls:'att-absent' },
+  absent: { code:'X', label:'Absent (taken from leave)', cls:'att-absent' },
   off:    { code:'O', label:'Day off',      cls:'att-off' },
   holiday:{ code:'H', label:'Holiday',      cls:'att-holiday' },
   unmarked:{ code:'·', label:'Not marked yet', cls:'att-unmarked' },
@@ -4832,10 +4832,20 @@ async function fetchAttMarks(from, to){
   return { marks: out };
 }
 async function loadAttMonth(){
-  const r = attMonthRange(attMonth);
-  const res = await fetchAttMarks(r.from, r.to);
+  // The whole year is loaded, so every person's leave balance can be shown.
+  const r = attMonthRange(attMonth), y = attMonth.getFullYear();
+  const res = await fetchAttMarks(y + '-01-01', (y + 1) + '-01-01');
   if(res.error){ document.getElementById('attStatus').textContent = 'Could not load the register.'; return; }
   attMarks = res.marks; attLoadedRange = r;
+}
+/* LEAVE BALANCE for the year. Annual and casual leave come off the allowance, and so
+   does an absent day — leave that was not said to be annual, casual or medical.
+   Medical (sick) and no-pay leave are counted on their own. */
+function attLeaveBalance(p, year, marks){
+  const yc = attCount(p, year + '-01-01', (Number(year) + 1) + '-01-01', marks);
+  const allowed = (Number(p.annual) || 0) + (Number(p.casual) || 0);
+  const used = yc.annual + yc.casual + yc.absent;
+  return { allowed, used, left: allowed - used, over: Math.max(0, used - allowed), yc };
 }
 
 // What a day is for this person: their mark, or else what it should be.
@@ -4917,19 +4927,21 @@ function renderAttendance(){
       const tip = `${p.name} · ${fmtDayY(d)} · ${meta.label || (st === 'future' ? 'Not yet' : 'Before joining')}${restWorked ? ' (on a ' + (attHolidays.has(d) ? 'holiday' : 'day off') + ')' : ''}${m && m.note ? ' — ' + m.note : ''}${m && m.by ? ' · marked by ' + m.by : ''}`;
       return `<td><div class="att-cell ${meta.cls}${restWorked ? ' att-worked-off' : ''}${editable ? ' can' : ''}" ${editable ? `data-att-p="${esc(p.id)}" data-att-d="${d}"` : ''} title="${esc(tip)}">${meta.code}</div></td>`;
     }).join('');
-    const leave = c.annual + c.casual + c.sick;
+    const leave = c.annual + c.casual + c.sick + c.absent;
+    const bal = attLeaveBalance(p, attMonth.getFullYear(), attMarks);
     return `<tr>
       <td class="att-name"><b>${esc(p.name)}${p.active ? '' : ' <span>(left)</span>'} ${can ? `<button class="manage-edit" data-att-set="${esc(p.id)}" title="Day off and leave allowance" style="padding:1px 6px; margin-left:4px;">⚙</button>` : ''}</b>
         <span>${esc(p.designation || '')}${p.designation ? ' · ' : ''}${esc(attPlace(p))}${p.weeklyOff !== null ? ' · off ' + DOW[p.weeklyOff].slice(0,3) : ''}</span></td>
       <td class="att-sum" title="Days worked (half days count ½)">${c.worked}</td>
-      <td class="att-sum" title="Annual + casual + sick leave">${leave}</td>
-      <td class="att-sum" style="color:${c.nopay + c.absent ? '#c92a2a' : 'inherit'};" title="No-pay leave + absent">${c.nopay + c.absent}</td>
+      <td class="att-sum" title="This month: annual ${c.annual}, casual ${c.casual}, medical ${c.sick}, absent ${c.absent}">${leave}</td>
+      <td class="att-sum" style="color:${c.nopay ? '#c92a2a' : 'inherit'};" title="No-pay leave this month">${c.nopay}</td>
+      <td class="att-sum" style="color:${bal.left < 0 ? '#c92a2a' : bal.left <= 2 ? '#e67700' : 'var(--green)'};" title="Leave left for ${attMonth.getFullYear()}: ${bal.allowed} allowed (annual ${p.annual} + casual ${p.casual}) − ${bal.used} used (annual ${bal.yc.annual}, casual ${bal.yc.casual}, absent ${bal.yc.absent})${bal.over ? ' — ' + bal.over + ' over the allowance: treat as no pay' : ''}">${bal.left}</td>
       <td class="att-sum" style="color:${c.unmarked ? '#e67700' : 'inherit'}; border-right:1px solid var(--board-line);" title="Working days not marked yet">${c.unmarked}</td>
       ${cells}
     </tr>`;
   }).join('');
   host.innerHTML = `<table class="att-grid"><thead><tr><th class="att-name" style="z-index:2;">${attGroup === 'office' ? 'Office staff' : 'Housekeeping staff'}</th>
-      <th class="att-sumh" title="Days worked this month">Worked</th><th class="att-sumh" title="Annual + casual + sick">Leave</th><th class="att-sumh" title="No-pay + absent">No pay</th><th class="att-sumh" title="Not marked yet" style="border-right:1px solid var(--board-line);">To mark</th>${head}</tr></thead>
+      <th class="att-sumh" title="Days worked this month">Worked</th><th class="att-sumh" title="Annual + casual + medical + absent, this month">Leave</th><th class="att-sumh" title="No-pay leave, this month">No pay</th><th class="att-sumh" title="Leave left for the year: annual + casual allowance, less annual, casual and absent days taken">Leave left</th><th class="att-sumh" title="Not marked yet" style="border-right:1px solid var(--board-line);">To mark</th>${head}</tr></thead>
     <tbody>${rows}</tbody></table>`;
   host.querySelectorAll('[data-att-p]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); openAttPicker(el); }));
   host.querySelectorAll('[data-att-set]').forEach(b => b.addEventListener('click', () => openAttSettings(b.dataset.attSet)));
@@ -5174,11 +5186,13 @@ async function renderAttReport(){
       <td class="c">${l.c.restWorked || '—'}</td>
       <td class="c" style="color:${l.c.unmarked ? '#e67700' : 'inherit'};">${l.c.unmarked || '—'}</td></tr>`;
   const bal = (l) => {
-    const aLeft = l.p.annual - l.yc.annual, cLeft = l.p.casual - l.yc.casual;
+    const b = attLeaveBalance(l.p, y, attRptMarks);
     return `<tr><td><b>${esc(l.p.name)}</b></td>
-      <td class="c">${l.p.annual}</td><td class="c">${l.yc.annual}</td><td class="c"><b style="color:${aLeft < 0 ? '#c92a2a' : 'var(--green)'};">${aLeft}</b></td>
-      <td class="c">${l.p.casual}</td><td class="c">${l.yc.casual}</td><td class="c"><b style="color:${cLeft < 0 ? '#c92a2a' : 'var(--green)'};">${cLeft}</b></td>
-      <td class="c">${l.yc.sick || '—'}</td><td class="c">${(l.yc.nopay + l.yc.absent) || '—'}</td></tr>`;
+      <td class="c">${b.allowed}<div class="dim">${l.p.annual} + ${l.p.casual}</div></td>
+      <td class="c">${l.yc.annual || '—'}</td><td class="c">${l.yc.casual || '—'}</td><td class="c">${l.yc.absent || '—'}</td>
+      <td class="c"><b>${b.used}</b></td>
+      <td class="c"><b style="color:${b.left < 0 ? '#c92a2a' : 'var(--green)'};">${b.left}</b>${b.over ? `<div style="color:#c92a2a; font-size:11px;">${b.over} over — treat as no pay</div>` : ''}</td>
+      <td class="c">${l.yc.sick || '—'}</td><td class="c">${l.yc.nopay || '—'}</td></tr>`;
   };
   body.innerHTML = `
     <div class="rpt-head"><div class="rpt-title">Attendance${who ? ' — ' + esc(people[0].name) : group === 'office' ? ' — office staff' : group === 'hk' ? ' — housekeeping staff' : ''}</div>
@@ -5186,21 +5200,21 @@ async function renderAttReport(){
     <div class="rpt-section-title">Days</div>
     <table class="rpt-table">
       <thead><tr><th>Person</th><th class="c" title="Days that were not a day off or holiday">Working days</th><th class="c">Worked</th><th class="c">Half days</th>
-        <th class="c">Annual</th><th class="c">Casual</th><th class="c">Sick</th><th class="c">No pay</th><th class="c">Absent</th>
+        <th class="c">Annual</th><th class="c">Casual</th><th class="c">Medical</th><th class="c">No pay</th><th class="c">Absent</th>
         <th class="c">Holidays</th><th class="c">Days off</th><th class="c" title="Worked on a holiday or their day off">Worked on holiday / off</th><th class="c">Not marked</th></tr></thead>
       <tbody>${lines.map(row).join('')}
         <tr class="subtotal"><td>Total</td><td class="c">${tot.scheduled}</td><td class="c">${tot.worked}</td><td class="c">${tot.half}</td><td class="c">${tot.annual}</td><td class="c">${tot.casual}</td><td class="c">${tot.sick}</td><td class="c">${tot.nopay}</td><td class="c">${tot.absent}</td><td class="c">${tot.holiday}</td><td class="c">${tot.off}</td><td class="c">${tot.restWorked}</td><td class="c">${tot.unmarked}</td></tr>
       </tbody></table>
     <div class="rpt-section-title" style="margin-top:14px;">Leave for ${esc(y)} — allowance, taken, left</div>
     <table class="rpt-table">
-      <thead><tr><th>Person</th><th class="c">Annual a year</th><th class="c">Annual taken</th><th class="c">Annual left</th><th class="c">Casual a year</th><th class="c">Casual taken</th><th class="c">Casual left</th><th class="c">Sick taken</th><th class="c">No pay + absent</th></tr></thead>
+      <thead><tr><th>Person</th><th class="c">Leave a year<div class="dim">annual + casual</div></th><th class="c">Annual taken</th><th class="c">Casual taken</th><th class="c">Absent<div class="dim">taken from leave</div></th><th class="c">Total used</th><th class="c">Leave left</th><th class="c">Medical taken<div class="dim">counted apart</div></th><th class="c">No-pay leave</th></tr></thead>
       <tbody>${lines.map(bal).join('')}</tbody></table>
-    <div class="rpt-note">Worked counts present days, with half days as ½ — including any worked on a holiday or day off. Leave left goes red when more was taken than the allowance. Days not marked yet are counted separately, never as worked.</div>`;
+    <div class="rpt-note">Worked counts present days, with half days as ½ — including any worked on a holiday or day off. An absent day is leave that was not said to be annual, casual or medical, so it comes off the year's leave like annual and casual leave do. Leave left goes red when more was used than allowed — those days are to be treated as no pay. Medical leave and no-pay leave are counted on their own. Days not marked yet are counted separately, never as worked.</div>`;
   document.getElementById('attRptCsv').onclick = () => {
-    const out = [['Person','Register','Works at','Working days','Worked','Half days','Annual','Casual','Sick','No pay','Absent','Holidays','Days off','Worked on holiday/off','Not marked',
-      `Annual allowance ${y}`, `Annual taken ${y}`, `Annual left ${y}`, `Casual allowance ${y}`, `Casual taken ${y}`, `Casual left ${y}`]];
-    lines.forEach(l => out.push([l.p.name, attGroupOf(l.p) === 'office' ? 'Office' : 'Housekeeping', attPlace(l.p), l.c.scheduled, l.c.worked, l.c.half, l.c.annual, l.c.casual, l.c.sick, l.c.nopay, l.c.absent, l.c.holiday, l.c.off, l.c.restWorked, l.c.unmarked,
-      l.p.annual, l.yc.annual, l.p.annual - l.yc.annual, l.p.casual, l.yc.casual, l.p.casual - l.yc.casual]));
+    const out = [['Person','Register','Works at','Working days','Worked','Half days','Annual','Casual','Medical','No pay','Absent','Holidays','Days off','Worked on holiday/off','Not marked',
+      `Leave allowed ${y}`, `Annual taken ${y}`, `Casual taken ${y}`, `Absent ${y}`, `Leave used ${y}`, `Leave left ${y}`, `Over the allowance ${y}`, `Medical ${y}`, `No pay ${y}`]];
+    lines.forEach(l => { const b = attLeaveBalance(l.p, y, attRptMarks); out.push([l.p.name, attGroupOf(l.p) === 'office' ? 'Office' : 'Housekeeping', attPlace(l.p), l.c.scheduled, l.c.worked, l.c.half, l.c.annual, l.c.casual, l.c.sick, l.c.nopay, l.c.absent, l.c.holiday, l.c.off, l.c.restWorked, l.c.unmarked,
+      b.allowed, l.yc.annual, l.yc.casual, l.yc.absent, b.used, b.left, b.over, l.yc.sick, l.yc.nopay]); });
     downloadCSV(`attendance-${r.from}-to-${toISO(new Date(parseISO(r.to).getTime() - 86400000))}.csv`, out);
   };
 }
@@ -5223,7 +5237,7 @@ function attNoPayHint(profileId, ym){
   let np = 0, ab = 0;
   marks.forEach((m, k) => { if(k.startsWith(profileId + '|')){ if(m.status === 'nopay') np++; else if(m.status === 'absent') ab++; } });
   if(!np && !ab) return '';
-  return `<div class="ce-sub" style="color:#c92a2a;" title="From the attendance register — set the no-pay days on this pay slip yourself">Register: ${[np ? np + ' no-pay' : '', ab ? ab + ' absent' : ''].filter(Boolean).join(', ')}</div>`;
+  return `<div class="ce-sub" style="color:#c92a2a;" title="From the attendance register. Absent days come off the year's leave; once that is used up, treat them as no pay. Set the no-pay days on this pay slip yourself.">Register: ${[np ? np + ' no-pay' : '', ab ? ab + ' absent (from leave)' : ''].filter(Boolean).join(', ')}</div>`;
 }
 
 /* ========================== VILLA EXPENSES TAB ==========================
