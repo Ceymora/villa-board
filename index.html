@@ -3958,7 +3958,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.06-medical';
+const APP_VERSION = 'v2026.10.06-names';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4879,11 +4879,18 @@ function attCount(p, from, to, marks){
   return c;
 }
 
+// Villas in the board's order; anyone not on a villa comes last.
+function attPlaceOrder(p){
+  if(p.worksAt === 'office') return -1;
+  const k = villaKeyOf(p.worksAt), i = villasNow().findIndex(v => v.id === k);
+  return i < 0 ? 999 : i;
+}
+const attNamed = p => String(p.name || '').trim() !== '';
 function attPeopleShown(group){
   const r = attLoadedRange || attMonthRange(attMonth);
-  return attPeople.filter(p => attGroupOf(p) === group)
+  return attPeople.filter(p => attGroupOf(p) === group && attNamed(p))
     .filter(p => p.active || attDays(r.from, r.to).some(d => attMarks.has(attKey(p.id, d))))
-    .sort((a,b)=> attPlace(a).localeCompare(attPlace(b)) || a.name.localeCompare(b.name));
+    .sort((a,b)=> attPlaceOrder(a) - attPlaceOrder(b) || a.name.localeCompare(b.name));
 }
 
 function renderAttendance(){
@@ -4918,7 +4925,12 @@ function renderAttendance(){
     const cls = [d === today ? 'today' : '', hol ? 'hol' : '', dt.getDay() === 0 ? 'wk' : '', can ? 'click' : ''].filter(Boolean).join(' ');
     return `<th class="${cls}" data-att-day="${d}" title="${esc(hol ? hol + ' — ' : '')}${esc(dt.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' }))}${can ? ' · tap to mark everyone present' : ''}">${dt.getDate()}<br><span style="font-weight:500;font-size:10px;">${'SMTWTFS'[dt.getDay()]}</span></th>`;
   }).join('');
+  let lastPlace = null;
   const rows = people.map(p => {
+    const place = attPlace(p);
+    const heading = (attGroup === 'hk' && place !== lastPlace)
+      ? `<tr><td class="att-name" style="background:#f6f4ec; font-weight:700; color:${villaColor(villaKeyOf(p.worksAt))};">${esc(place)}</td><td colspan="${days.length + 5}" style="background:#f6f4ec;"></td></tr>` : '';
+    lastPlace = place;
     const c = attCount(p, r.from, r.to);
     const cells = days.map(d => {
       const st = attStatusOf(p, d);
@@ -4931,7 +4943,7 @@ function renderAttendance(){
     }).join('');
     const leave = c.annual + c.casual + c.sick + c.absent;
     const bal = attLeaveBalance(p, attMonth.getFullYear(), attMarks);
-    return `<tr>
+    return heading + `<tr>
       <td class="att-name"><b>${esc(p.name)}${p.active ? '' : ' <span>(left)</span>'} ${can ? `<button class="manage-edit" data-att-set="${esc(p.id)}" title="Day off and leave allowance" style="padding:1px 6px; margin-left:4px;">⚙</button>` : ''}</b>
         <span>${esc(p.designation || '')}${p.designation ? ' · ' : ''}${esc(attPlace(p))}${p.weeklyOff !== null ? ' · off ' + DOW[p.weeklyOff].slice(0,3) : ''}</span></td>
       <td class="att-sum" title="Days worked (half days count ½)">${c.worked}</td>
@@ -4949,6 +4961,11 @@ function renderAttendance(){
   host.querySelectorAll('[data-att-set]').forEach(b => b.addEventListener('click', () => openAttSettings(b.dataset.attSet)));
   if(can) host.querySelectorAll('[data-att-day]').forEach(th => th.addEventListener('click', () => attMarkDay(th.dataset.attDay)));
   const unmarked = people.reduce((n, p) => n + attCount(p, r.from, r.to).unmarked, 0);
+  const nameless = attPeople.filter(p => attGroupOf(p) === attGroup && !attNamed(p)).length;
+  if(nameless){
+    note.style.display = '';
+    note.innerHTML = `${nameless} staff profile${nameless === 1 ? ' has' : 's have'} no name, so ${nameless === 1 ? 'it is' : 'they are'} left off this register. Open <b>Staff &amp; Payroll → Staff profiles</b> and give ${nameless === 1 ? 'it' : 'them'} a name, or delete ${nameless === 1 ? 'it' : 'them'} — or run <b>25-supabase-tidy-blank-staff.sql</b>, which removes nameless ones that have nothing recorded.`;
+  }
   document.getElementById('attStatus').textContent = unmarked ? `${unmarked} working day${unmarked === 1 ? '' : 's'} not marked yet this month` : 'All marked ✓';
 }
 
@@ -5863,7 +5880,8 @@ function renderHK(){
     const nameTd=document.createElement('td'); nameTd.className='staffcell';
     const nameSpan = document.createElement('span');
     nameSpan.className = 'staffname';
-    nameSpan.textContent = person.name;
+    nameSpan.textContent = String(person.name || '').trim() || '(no name — tap to fix or delete)';
+    if(!String(person.name || '').trim()) nameSpan.style.color = '#c92a2a';
     if(canChange('housekeeping')){
       nameSpan.style.cursor = 'pointer';
       nameSpan.style.textDecoration = 'underline dotted';
@@ -15138,7 +15156,7 @@ function renderPayStaff(){
     <thead><tr><th>Name</th><th class="hide-sm">Works at</th><th>Salary paid by</th><th class="r">Basic</th><th class="r hide-sm">Allowances</th><th class="hide-sm">EPF no.</th><th class="hide-sm">Bank</th><th></th></tr></thead>
     <tbody>${rows.map(s=>`
       <tr data-sp="${s.id}" class="${s.active ? '' : 'pay-inactive'}">
-        <td><b>${esc(s.fullName)}</b><div class="ce-sub">${esc([s.designation, s.employeeNo].filter(Boolean).join(' · '))}${s.active ? '' : ' · left'}${s.onPayroll === false ? ' · <b style="color:#a06800;">not on payroll</b>' : ''}</div></td>
+        <td><b${s.fullName.trim() ? '' : ' style="color:#c92a2a;"'}>${s.fullName.trim() ? esc(s.fullName) : '(no name — open to fix or delete)'}</b><div class="ce-sub">${esc([s.designation, s.employeeNo].filter(Boolean).join(' · '))}${s.active ? '' : ' · left'}${s.onPayroll === false ? ' · <b style="color:#a06800;">not on payroll</b>' : ''}</div></td>
         <td class="hide-sm">${esc(worksAtLabel(s.worksAt))}</td>
         <td>${esc(paidByLabel(s.paidBy))}</td>
         <td class="r">${s.basicSalary ? fmt2(s.basicSalary) : '<span class="pay-unpaid">not set</span>'}</td>
