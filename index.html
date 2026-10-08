@@ -753,7 +753,8 @@
   .frm-row.frm-wrap{ flex-wrap:wrap; }
   .frm-row.frm-wrap > div{ min-width:150px; }
   /* delete requests */
-  .delsel-bar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 12px; margin:6px 0; background:#fff8f0; border:1px solid #ffd8a8; border-radius:10px; font-size:13px; }
+  .delsel-bar{ display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; margin:6px 0; font-size:13px; }
+  .delsel-bar.picking{ justify-content:flex-start; padding:8px 12px; background:#fff8f0; border:1px solid #ffd8a8; border-radius:10px; }
   .delsel-bar button{ font-size:12.5px; }
   tr.dr-pending td{ background:#fff4e6 !important; }
   .dr-badge{ font-size:11.5px; color:#a65b00; margin-top:3px; }
@@ -1291,6 +1292,9 @@
           <button id="exNextMonth">Next ▶</button>
           <button id="exThisMonth">This month</button>
           <button id="exAllTime">All time</button>
+          <button id="exDailyBtn">Daily</button>
+          <button id="exYesterday" style="display:none;">Yesterday</button>
+          <input type="date" id="exDayPick" class="acct-select" style="display:none; max-width:160px;">
         </div>
       </div>
 
@@ -3961,7 +3965,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.08-store-daily';
+const APP_VERSION = 'v2026.10.08-daywise';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4476,6 +4480,7 @@ const DR_TABLES = {
 };
 let allDelReqs = [], drReady = null;
 const DELSEL = { petty_cash_transactions: new Set(), inventory_transactions: new Set() };
+const DR_PICKING = { petty_cash_transactions: false, inventory_transactions: false };   // tick boxes shown only after "Select lines to delete"
 const drMe = () => (currentUser && currentUser.email || '').toLowerCase();
 const drWho = e => { const p = (typeof allAppUsers !== 'undefined' ? allAppUsers : []).find(u => (u.email || '').toLowerCase() === (e || '').toLowerCase());
   return p && p.full_name ? p.full_name : (e || '').split('@')[0] || '—'; };
@@ -4512,7 +4517,7 @@ function drSummary(table, t){
 function drDecorateRow(table, t, tr){
   const td = document.createElement('td');
   td.className = 'no-print'; td.style.width = '28px';
-  if(drSelectable(table, t)){
+  if(DR_PICKING[table] && drSelectable(table, t)){
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.className = 'dr-cb'; cb.checked = DELSEL[table].has(String(t.id));
     cb.title = 'Tick to delete';
@@ -4554,13 +4559,21 @@ function drRenderBar(table){
   const n = DELSEL[table].size;
   const sum = [...DELSEL[table]].reduce((s, id) => s + Number((drRowOf(table, id) || {}).amount || 0), 0);
   bar.style.display = '';
-  bar.innerHTML = n
+  bar.classList.toggle('picking', DR_PICKING[table]);
+  if(!DR_PICKING[table]){
+    bar.innerHTML = `<button class="manage-edit" data-dr-pick title="Show tick boxes to choose several lines">🗑 Select lines to delete</button>`;
+    bar.querySelector('[data-dr-pick]').addEventListener('click', () => { DR_PICKING[table] = true; drRefreshViews(); });
+    return;
+  }
+  bar.innerHTML = (n
     ? `<b>${n} line${n === 1 ? '' : 's'} ticked</b>${sum ? ' · LKR ' + Math.round(sum).toLocaleString() : ''}
        <button class="manage-del" data-dr-go>🗑 ${isAdmin() ? 'Delete' : 'Ask Makky to delete'} ${n === 1 ? 'it' : 'them'}</button>
        <button class="manage-edit" data-dr-clear>Clear ticks</button>`
-    : `<span class="dim">Tick lines to delete them${isAdmin() ? '' : ' — Makky approves each delete'}.</span>`;
+    : `<span>Tick the lines to delete${isAdmin() ? '' : ' — Makky approves each delete'}.</span>`)
+    + ` <button class="manage-edit" data-dr-done style="margin-left:auto;">Done</button>`;
   const go = bar.querySelector('[data-dr-go]'); if(go) go.addEventListener('click', () => drAsk(table, [...DELSEL[table]]));
   const cl = bar.querySelector('[data-dr-clear]'); if(cl) cl.addEventListener('click', () => { DELSEL[table].clear(); drRefreshViews(); });
+  bar.querySelector('[data-dr-done]').addEventListener('click', () => { DR_PICKING[table] = false; DELSEL[table].clear(); drRefreshViews(); });
 }
 
 // ---- asking (or, for Makky, deleting straight away)
@@ -4605,6 +4618,7 @@ async function drAskSubmit(){
       logActivity('update', table, `Asked Makky to delete ${ids.length} ${DR_TABLES[table].label.toLowerCase()} line(s): ${reason}`);
     }
     ids.forEach(id => DELSEL[table].delete(id));
+    if(!DELSEL[table].size) DR_PICKING[table] = false;
     document.getElementById('drAskModalOverlay').classList.remove('open');
     await drAfterChange([table]);
   }catch(e){ console.error(e); fail('Could not send — ' + ((e && e.message) || 'check the connection.')); }
@@ -5279,6 +5293,7 @@ let exInited = false;
 let exPlace = 'all';             // which villa / place, or 'all'
 let exKind = 'all';              // one of PETTY_GROUPS' keys, or 'all'
 let exAllTime = false;
+let exDaily = false;              // one day at a time
 let exGroupBy = 'paid';          // 'paid' = how it was paid, 'account' = what it was for
 let exMonthDate = new Date();
 // Shown in another currency: every rupee amount is divided by one rate — the rate on
@@ -5287,6 +5302,7 @@ let exShowCur = recallCur('exShowCur');
 const exRateCache = {};
 function exRateDay(){
   if(exAllTime) return todayISO();
+  if(exDaily){ const d = exRange().from; return d > todayISO() ? todayISO() : d; }
   const last = toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth() + 1, 0));
   return last > todayISO() ? todayISO() : last;
 }
@@ -5303,6 +5319,10 @@ const EX_PLACES = () => ([
 // money handed to someone, not a cost — it becomes one when the invoice arrives, and
 // that invoice is an expense row in its own right. Counting both would double it.
 function exRange(){
+  if(exDaily){
+    const d = new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), exMonthDate.getDate());
+    return { from: toISO(d), to: toISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) };
+  }
   return {
     from: toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), 1)),
     to:   toISO(new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1)),
@@ -5330,8 +5350,12 @@ function exRows(){
 }
 
 function exPeriodLabel(){
-  return exAllTime ? 'All time'
-    : exMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+  if(exAllTime) return 'All time';
+  if(exDaily){
+    const iso = exRange().from, word = iso === todayISO() ? 'Today — ' : iso === toISO(new Date(Date.now() - 86400000)) ? 'Yesterday — ' : '';
+    return word + parseISO(iso).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  }
+  return exMonthDate.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
 }
 
 function renderExPickers(){
@@ -5371,7 +5395,7 @@ function renderExPickers(){
 
   const gt = document.getElementById('exGroupTabs');
   gt.innerHTML = '';
-  [['paid','How it was paid'],['account','What it was for']].forEach(([k,label])=>{
+  [['paid','How it was paid'],['account','What it was for'],['day','Day by day']].forEach(([k,label])=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn';
     b.textContent = label;
@@ -5390,6 +5414,15 @@ function renderExPickers(){
   });
   const at = document.getElementById('exAllTime');
   at.textContent = exAllTime ? '← Back to months' : 'All time';
+  const db = document.getElementById('exDailyBtn');
+  db.textContent = exDaily ? '← Back to months' : 'Daily';
+  db.style.display = exAllTime ? 'none' : '';
+  at.style.display = exDaily ? 'none' : '';
+  document.getElementById('exThisMonth').textContent = exDaily ? 'Today' : 'This month';
+  document.getElementById('exYesterday').style.display = exDaily ? '' : 'none';
+  const dp = document.getElementById('exDayPick');
+  dp.style.display = exDaily ? '' : 'none';
+  if(exDaily) dp.value = exRange().from;
 }
 
 // One card per section, so the split is readable before any row is.
@@ -5516,7 +5549,9 @@ function renderVillaExpensesIn(curNote){
     <div class="rpt-sub">${esc(exPeriodLabel())}${exKind === 'all' ? '' : ' · ' + esc((PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || '')} · amounts in ${esc(RPT_CUR.cur)}</div></div>`
     + (curNote ? `<div class="rpt-note" style="margin-bottom:8px;">${esc(curNote)}</div>` : '');
 
-  if(exGroupBy === 'account'){
+  if(exGroupBy === 'day'){
+    html += dayGroupsBlock(rows, (exKind === 'all' || exKind === 'store') ? exStoreLines() : [], exPlace === 'all');
+  } else if(exGroupBy === 'account'){
     html += accountGroupsBlock(rows, exPlace === 'all');
   } else if(exPlace === 'all'){
     // One block per place, so "everything" is still readable rather than one long list.
@@ -5558,6 +5593,40 @@ function renderVillaExpensesIn(curNote){
     }
   }
   document.getElementById('exBody').innerHTML = html;
+}
+
+/* Day by day: each date with what was spent and what Store sent, newest first. */
+function dayGroupsBlock(rows, storeLines, showPlace){
+  const days = {};
+  rows.forEach(t => (days[t.date] = days[t.date] || { spend:[], store:[] }).spend.push(t));
+  storeLines.forEach(x => (days[x.t.date] = days[x.t.date] || { spend:[], store:[] }).store.push(x));
+  const keys = Object.keys(days).sort((a,b) => b.localeCompare(a));
+  if(!keys.length) return '<div class="rpt-empty">Nothing recorded for this period.</div>';
+  const groupName = k => ({ staff:'Petty cash', direct:'Direct', bank:'Bank', sharon:"Sharon's" })[k] || k;
+  let grandSpend = 0, grandStore = 0;
+  const html = keys.map(d => {
+    const g = days[d];
+    const sp = g.spend.reduce((n, t) => n + t.amount, 0), st = g.store.reduce((n, x) => n + (x.value || 0), 0);
+    grandSpend += sp; grandStore += st;
+    const lines = g.spend.sort((a,b) => (a.for||'').localeCompare(b.for||'')).map(t => `<tr>
+        <td><b>${esc(t.purpose || 'Expense')}</b>${t.note ? `<div class="dim">${esc(t.note)}</div>` : ''} ${invoiceLinksHTML(t)}${docNosHTML(t)}</td>
+        ${showPlace ? `<td class="dim">${esc(FOR_LABELS[t.for] || t.for || '—')}</td>` : ''}
+        <td class="dim">${esc(groupName(pettyGroupOf(t)))} · ${t.employeeName ? esc(t.employeeName) + "'s advance" : esc(payLabel(t))}</td>
+        <td class="r rpt-money-out">${rn(t.amount)}</td></tr>`).join('')
+      + g.store.map(x => `<tr>
+        <td><b>📦 ${esc(x.t.item)} × ${x.t.qty}</b><div class="dim">issued from Store</div></td>
+        ${showPlace ? `<td class="dim">${esc(INV_LOCATION_LABELS[x.loc] || x.loc)}</td>` : ''}
+        <td class="dim">Store stock</td>
+        <td class="r">${x.value === null ? '<span class="dim">no price</span>' : rn(x.value) + (x.estimated ? ' ~' : '')}</td></tr>`).join('');
+    const dt = parseISO(d).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short', year:'numeric' });
+    return `<div class="rpt-section-title" style="font-size:13.5px; margin-top:12px;">${esc(dt)}
+        <span class="rpt-section-count">${g.spend.length ? g.spend.length + ' bill' + (g.spend.length === 1 ? '' : 's') + ' · ' + lkr(sp) : ''}${g.store.length ? (g.spend.length ? ' · ' : '') + g.store.length + ' from Store · ' + lkr(st) : ''}</span></div>
+      <table class="rpt-table"><thead><tr><th>What</th>${showPlace ? '<th>Place</th>' : ''}<th>How</th><th class="r">${esc(RPT_CUR.cur)}</th></tr></thead><tbody>${lines}</tbody></table>`;
+  }).join('');
+  return html + `<table class="rpt-table" style="margin-top:14px;"><tbody>
+    <tr class="subtotal"><td><b>Spent, ${keys.length} day${keys.length === 1 ? '' : 's'}</b></td><td class="r"><b>${rn(grandSpend)}</b></td></tr>
+    ${grandStore ? `<tr><td>Store supplies issued${showPlace ? ' (already paid for under Store)' : ''}</td><td class="r">${rn(grandStore)}</td></tr>` : ''}
+  </tbody></table>`;
 }
 
 /* The same rows, grouped by what the money was spent on. Villa accounts first in
@@ -5647,16 +5716,23 @@ function initVillaExpenses(){
       document.getElementById('exShowCur').addEventListener('change', e => { exShowCur = e.target.value; rememberCur('exShowCur', exShowCur); renderVillaExpenses(); });
     }
     document.getElementById('exPrevMonth').addEventListener('click', ()=>{
-      exMonthDate = new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()-1, 1); renderVillaExpenses();
+      exMonthDate = exDaily ? new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), exMonthDate.getDate()-1) : new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()-1, 1); renderVillaExpenses();
     });
     document.getElementById('exNextMonth').addEventListener('click', ()=>{
-      exMonthDate = new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1); renderVillaExpenses();
+      exMonthDate = exDaily ? new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), exMonthDate.getDate()+1) : new Date(exMonthDate.getFullYear(), exMonthDate.getMonth()+1, 1); renderVillaExpenses();
     });
     document.getElementById('exThisMonth').addEventListener('click', ()=>{
       exMonthDate = new Date(); exAllTime = false; renderVillaExpenses();
     });
+    document.getElementById('exDailyBtn').addEventListener('click', ()=>{
+      exDaily = !exDaily; exAllTime = false;
+      exMonthDate = exDaily ? new Date() : new Date(exMonthDate.getFullYear(), exMonthDate.getMonth(), 1);
+      renderVillaExpenses();
+    });
+    document.getElementById('exYesterday').addEventListener('click', ()=>{ exDaily = true; exAllTime = false; exMonthDate = new Date(Date.now() - 86400000); renderVillaExpenses(); });
+    document.getElementById('exDayPick').addEventListener('change', e => { if(!e.target.value) return; exDaily = true; exAllTime = false; exMonthDate = parseISO(e.target.value); renderVillaExpenses(); });
     document.getElementById('exAllTime').addEventListener('click', ()=>{
-      exAllTime = !exAllTime; renderVillaExpenses();
+      exAllTime = !exAllTime; exDaily = false; renderVillaExpenses();
     });
     document.getElementById('exExportBtn').addEventListener('click', exportVillaExpensesCSV);
     document.getElementById('exPrintBtn').addEventListener('click', ()=> window.print());
