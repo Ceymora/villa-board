@@ -1549,6 +1549,7 @@
           <span class="manage-title">Transactions</span>
           <div class="weeknav">
             <div class="villatabs" id="cashPeriodTabs" style="margin:0 6px 0 0;">
+              <button class="villatab-btn" data-cashperiod="day">Daily</button>
               <button class="villatab-btn" data-cashperiod="week">Weekly</button>
               <button class="villatab-btn active" data-cashperiod="month">Monthly</button>
               <button class="villatab-btn" data-cashperiod="all">All time</button>
@@ -1558,6 +1559,8 @@
             <button id="cashNextMonth">Next ▶</button>
             <button id="cashThisMonth">This month</button>
             <select id="cashMonthPick" class="acct-select" style="max-width:170px; margin-left:6px;"></select>
+            <button id="cashYesterday" style="display:none;">Yesterday</button>
+            <input type="date" id="cashDayPick" class="acct-select" style="display:none; max-width:160px; margin-left:6px;">
             <button id="cashExportBtn" title="Download these transactions as a spreadsheet file">⬇ Export CSV</button>
             <button class="cmp-open-btn" data-cmp-open="costs" title="Compare petty cash spending between two periods">📈 Compare</button>
           </div>
@@ -3958,7 +3961,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.06-names';
+const APP_VERSION = 'v2026.10.08-store-daily';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -5352,8 +5355,8 @@ function renderExPickers(){
   kt.innerHTML = '';
   // Short names here: the full wording is on the summary card and the section heading.
   const SHORT = { staff:'Petty cash', direct:'Direct', bank:'Bank', sharon:"Sharon's" };
-  if(!PETTY_GROUPS.some(g => g.key === exKind)) exKind = 'all';
-  [{ key:'all', label:'Everything' }, ...PETTY_GROUPS.map(g=>({ key:g.key, label:SHORT[g.key] || g.pl }))].forEach(k=>{
+  if(!PETTY_GROUPS.some(g => g.key === exKind) && exKind !== 'store') exKind = 'all';
+  [{ key:'all', label:'Everything' }, ...PETTY_GROUPS.map(g=>({ key:g.key, label:SHORT[g.key] || g.pl })), { key:'store', label:'📦 Store supplies' }].forEach(k=>{
     const b = document.createElement('button');
     b.className = 'villatab-btn';
     b.textContent = k.label;
@@ -5390,6 +5393,35 @@ function renderExPickers(){
 }
 
 // One card per section, so the split is readable before any row is.
+/* What Store sent out to the places shown — the same lines and values as the Villa
+   Report's "Store Supplies Received". Not money spent again: the stock was paid for
+   when Store bought it; this is where it went. */
+function exStorePlaces(){
+  if(exPlace === 'store' || exPlace === 'boss') return [];
+  if(exPlace === 'all') return INV_LOCATIONS.filter(l => l !== 'store');
+  return [exPlace];
+}
+function exStoreLines(){
+  if(typeof allInvTxns === 'undefined') return [];
+  const { from, to } = exAllTime ? { from:'0000-01-01', to:'9999-12-31' } : exRange();
+  return exStorePlaces().flatMap(loc => storeIssueLines(loc, from, to).map(x => Object.assign(x, { loc })));
+}
+function exStoreBlock(lines, showPlace){
+  if(!lines.length) return '<div class="rpt-empty">Nothing was issued from Store in this period.</div>';
+  const total = lines.reduce((n, x) => n + (x.value || 0), 0);
+  const est = lines.some(x => x.estimated), noVal = lines.filter(x => x.value === null).length;
+  return `<table class="rpt-table">
+    <thead><tr><th>Date</th><th>Item</th>${showPlace ? '<th>Sent to</th>' : ''}<th class="c">Qty</th><th class="r">Value (${esc(RPT_CUR.cur)})</th></tr></thead>
+    <tbody>${lines.map(x => `<tr>
+      <td class="dim">${fmtDay(x.t.date)}</td>
+      <td><b>${esc(x.t.item)}</b>${x.t.note ? `<div class="dim">${esc(x.t.note)}</div>` : ''}</td>
+      ${showPlace ? `<td class="dim">${esc(INV_LOCATION_LABELS[x.loc] || x.loc)}</td>` : ''}
+      <td class="c">${x.t.qty}</td>
+      <td class="r">${x.value === null ? '<span class="dim">no price</span>' : rn(x.value) + (x.estimated ? ' <span class="dim" title="Worked out from the average price Store paid">~</span>' : '')}</td></tr>`).join('')}
+      <tr class="subtotal"><td colspan="${showPlace ? 4 : 3}">Store supplies issued — ${lines.length} line${lines.length === 1 ? '' : 's'}</td><td class="r">${rn(total)}</td></tr>
+    </tbody></table>
+    ${est || noVal ? `<div class="rpt-note">${est ? '~ = valued at the average price Store paid for that item. ' : ''}${noVal ? noVal + ' line' + (noVal === 1 ? ' has' : 's have') + ' no price yet (the item was never bought with a price).' : ''}</div>` : ''}`;
+}
 function renderExSummary(rows){
   const wrap = document.getElementById('exSummary');
   const totals = {}; PETTY_GROUPS.forEach(g => totals[g.key] = 0);
@@ -5397,16 +5429,32 @@ function renderExSummary(rows){
   for(const r of rows){ totals[pettyGroupOf(r)] += r.amount; grand += r.amount; }
   const colors = { staff:'#0c8599', direct:'#3b5bdb', bank:'#f08c00', sharon:'#e64980' };
   const shown = PETTY_GROUPS.filter(g => exKind === 'all' || g.key === exKind);
-  wrap.innerHTML = `
+  const st = (exKind === 'all' || exKind === 'store') ? exStoreLines() : [];
+  const stVal = st.reduce((n, x) => n + (x.value || 0), 0);
+  const placeName = EX_PLACES().find(v=>v.id===exPlace).name;
+  const onePlace = exPlace !== 'all' && exPlace !== 'store';
+  const storeCard = (exKind === 'all' || exKind === 'store') && exStorePlaces().length ? `
+    <div class="cash-card" style="background:linear-gradient(135deg, #a06800, #6b4500);">
+      <div class="cash-card-label">📦 Store supplies issued</div>
+      <div class="cash-card-balance">${lkr(stVal)}</div>
+      <div class="cash-card-sub">${st.length} line${st.length===1?'':'s'} from Store stock${exPlace === 'all' ? ' · already paid for under Store, not added again' : ''}</div>
+    </div>` : '';
+  const withStore = onePlace && exKind === 'all' && st.length ? `
+    <div class="cash-card" style="background:linear-gradient(135deg, #2b2b2b, #000);">
+      <div class="cash-card-label">${esc(placeName)} — full cost</div>
+      <div class="cash-card-balance">${lkr(grand + stVal)}</div>
+      <div class="cash-card-sub">spending + store supplies</div>
+    </div>` : '';
+  wrap.innerHTML = (exKind === 'store' ? '' : `
     <div class="cash-card" style="background:linear-gradient(135deg, #343a40, #14161a);">
       <div class="cash-card-label">${esc(exKind === 'all' ? 'Total spending' : (PETTY_GROUPS.find(g=>g.key===exKind)||{}).pl || 'Total')}</div>
       <div class="cash-card-balance">${lkr(grand)}</div>
-      <div class="cash-card-sub">${esc(EX_PLACES().find(v=>v.id===exPlace).name)} · ${esc(exPeriodLabel())} · ${rows.length} item${rows.length===1?'':'s'}</div>
-    </div>` + shown.map(g => `
+      <div class="cash-card-sub">${esc(placeName)} · ${esc(exPeriodLabel())} · ${rows.length} item${rows.length===1?'':'s'}</div>
+    </div>`) + withStore + (exKind === 'store' ? '' : shown.map(g => `
     <div class="cash-card" style="background:linear-gradient(135deg, ${colors[g.key]}, ${colors[g.key]}bb);">
       <div class="cash-card-label">${esc(g.pl)}</div>
       <div class="cash-card-balance">${lkr(totals[g.key])}</div>
-    </div>`).join('');
+    </div>`).join('')) + storeCard;
 }
 
 function renderVillaExpenses(){
@@ -5474,13 +5522,16 @@ function renderVillaExpensesIn(curNote){
     // One block per place, so "everything" is still readable rather than one long list.
     const places = EX_PLACES().filter(v => v.id !== 'all');
     let any = false;
+    const stAll = (exKind === 'all' || exKind === 'store') ? exStoreLines() : [];
     for(const v of places){
-      const mine = rows.filter(r => r.for === v.id);
-      if(!mine.length) continue;
+      const mine = exKind === 'store' ? [] : rows.filter(r => r.for === v.id);
+      const st = stAll.filter(x => x.loc === v.id);
+      if(!mine.length && !st.length) continue;
       any = true;
-      const blk = pettyGroupsBlock(mine);
+      const blk = mine.length ? pettyGroupsBlock(mine) : { html:'', total:0 };
       html += `<div class="rpt-section-title" style="margin-top:16px;">${esc(v.name)}
-        <span class="rpt-section-count">${mine.length} item${mine.length===1?'':'s'} · ${lkr(blk.total)}</span></div>${blk.html}`;
+        <span class="rpt-section-count">${mine.length ? mine.length + ' item' + (mine.length===1?'':'s') + ' · ' + lkr(blk.total) : ''}${st.length ? (mine.length ? ' · ' : '') + st.length + ' from Store' : ''}</span></div>${blk.html}`
+        + (st.length ? `<div class="rpt-section-title" style="font-size:13.5px; margin-top:10px;">📦 Store supplies issued</div>${exStoreBlock(st, false)}` : '');
     }
     // Anything saved without a place, or with one that no longer exists, would otherwise
     // be dropped silently here — which is how an expense goes missing from every report.
@@ -5500,7 +5551,11 @@ function renderVillaExpensesIn(curNote){
         <td class="r"><b>${rn(grand)}</b></td></tr></tbody></table>`;
     }
   } else {
-    html += pettyGroupsBlock(rows).html;
+    if(exKind !== 'store') html += pettyGroupsBlock(rows).html;
+    if((exKind === 'all' || exKind === 'store') && exStorePlaces().length){
+      html += `<div class="rpt-section-title" style="margin-top:16px;">📦 Store supplies issued
+        <span class="rpt-section-count">stock sent from Store with + Distribute</span></div>${exStoreBlock(exStoreLines(), false)}`;
+    }
   }
   document.getElementById('exBody').innerHTML = html;
 }
@@ -5553,7 +5608,7 @@ function accountGroupsBlock(rows, showPlace){
 
 function exportVillaExpensesCSV(){
   const rows = exRows();
-  if(!rows.length){ alert('Nothing to export for these filters.'); return; }
+  if(!rows.length && !((exKind === 'all' || exKind === 'store') && exStoreLines().length)){ alert('Nothing to export for these filters.'); return; }
   const groupName = k => (PETTY_GROUPS.find(g=>g.key===k)||{}).pl || k;
   const key = (exShowCur || 'LKR') + '|' + exRateDay();
   const rate = exShowCur && exShowCur !== 'LKR' ? exRateCache[key] : null;
@@ -5570,12 +5625,20 @@ function exportVillaExpensesCSV(){
     ]);
   }
   const total = rows.reduce((s2,t)=>s2+t.amount,0);
-  out.push([]); out.push(['', '', '', '', '', '', '', '', '', '', '', '', 'Total', total, ...(rate ? [Math.round(total / rate * 100) / 100] : [])]);
+  out.push([]); out.push(['', '', '', '', '', '', '', '', '', '', '', '', 'Total spending', total, ...(rate ? [Math.round(total / rate * 100) / 100] : [])]);
+  const st = (exKind === 'all' || exKind === 'store') ? exStoreLines() : [];
+  if(st.length){
+    out.push([]);
+    st.forEach(x => out.push([x.t.date, INV_LOCATION_LABELS[x.loc] || x.loc, 'Store supplies issued', x.t.item, 'From Store stock', '', '', `${x.t.item} x ${x.t.qty}`, x.t.note || '', '', '', '', '', x.value === null ? '' : x.value, ...(rate && x.value !== null ? [Math.round(x.value / rate * 100) / 100] : [])]));
+    const sv = st.reduce((n, x) => n + (x.value || 0), 0);
+    out.push(['', '', '', '', '', '', '', '', '', '', '', '', 'Store supplies issued', sv, ...(rate ? [Math.round(sv / rate * 100) / 100] : [])]);
+  }
   const when = exAllTime ? 'all-time' : ymKey(exMonthDate);
   downloadCSV(`villa-expenses-${exPlace}-${exKind === 'all' ? 'all' : exKind}-${when}.csv`, out);
 }
 
 function initVillaExpenses(){
+  if(typeof invInited !== 'undefined' && !invInited && typeof initInventory === 'function') initInventory();
   if(!exInited){
     exInited = true;
     const cw = document.getElementById('exCurWrap');
@@ -7743,16 +7806,20 @@ function initPettyCash(){
   // Month navigation for the transaction list + monthly spend figures
   const stepCash = dir => {
     if(cashPeriod === 'all') return;
-    if(cashPeriod === 'week') cashMonthDate.setDate(cashMonthDate.getDate() + dir * 7);
+    if(cashPeriod === 'day') cashMonthDate.setDate(cashMonthDate.getDate() + dir);
+    else if(cashPeriod === 'week') cashMonthDate.setDate(cashMonthDate.getDate() + dir * 7);
     else cashMonthDate.setMonth(cashMonthDate.getMonth() + dir);
     renderCash();
   };
   document.getElementById('cashPrevMonth').addEventListener('click', ()=> stepCash(-1));
   document.getElementById('cashNextMonth').addEventListener('click', ()=> stepCash(1));
   document.getElementById('cashThisMonth').addEventListener('click', ()=>{
-    cashMonthDate = cashPeriod === 'week' ? cashWeekStart(new Date()) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    cashMonthDate = cashPeriod === 'day' ? new Date() : cashPeriod === 'week' ? cashWeekStart(new Date()) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     renderCash();
   });
+  // A day's petty cash: "Yesterday" in one tap, or any date.
+  document.getElementById('cashYesterday').addEventListener('click', ()=>{ cashPeriod = 'day'; cashShowAll = false; cashMonthDate = new Date(Date.now() - 86400000); renderCash(); });
+  document.getElementById('cashDayPick').addEventListener('change', e => { if(!e.target.value) return; cashPeriod = 'day'; cashShowAll = false; cashMonthDate = parseISO(e.target.value); renderCash(); });
   document.querySelectorAll('#cashPeriodTabs [data-cashperiod]').forEach(b=>
     b.addEventListener('click', ()=> setCashPeriod(b.dataset.cashperiod)));
   document.querySelectorAll('#cashKindTabs [data-cashkind]').forEach(b=>
@@ -7894,6 +7961,13 @@ function cashWeekStart(d){
 // The window currently on screen, as plain date strings.
 function cashRange(){
   if(cashPeriod === 'all') return { from:'0000-01-01', to:'9999-12-31', label:'All time' };
+  if(cashPeriod === 'day'){
+    const d = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth(), cashMonthDate.getDate());
+    const iso = toISO(d), t = todayISO(), y = toISO(new Date(Date.now() - 86400000));
+    const word = iso === t ? 'Today — ' : iso === y ? 'Yesterday — ' : '';
+    return { from: iso, to: toISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)),
+             label: word + d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) };
+  }
   if(cashPeriod === 'week'){
     const start = cashWeekStart(cashMonthDate);
     const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
@@ -7909,6 +7983,7 @@ function setCashPeriod(p){
   cashPeriod = p;
   cashShowAll = (p === 'all');
   if(p === 'week') cashMonthDate = cashWeekStart(new Date());
+  if(p === 'day') cashMonthDate = new Date();
   if(p === 'month') cashMonthDate = new Date(cashMonthDate.getFullYear(), cashMonthDate.getMonth(), 1);
   renderCash();
 }
@@ -7919,7 +7994,11 @@ function renderCashMonth(){
   const range = cashRange();
   const fromISO = range.from, toISOEnd = range.to;
   document.getElementById('cashMonthLabel').textContent = range.label;
-  document.getElementById('cashThisMonth').textContent = cashPeriod === 'week' ? 'This week' : 'This month';
+  document.getElementById('cashThisMonth').textContent = cashPeriod === 'day' ? 'Today' : cashPeriod === 'week' ? 'This week' : 'This month';
+  document.getElementById('cashYesterday').style.display = cashPeriod === 'day' ? '' : 'none';
+  const dp = document.getElementById('cashDayPick');
+  dp.style.display = cashPeriod === 'day' ? '' : 'none';
+  if(cashPeriod === 'day') dp.value = range.from;
   ['cashPrevMonth','cashNextMonth','cashThisMonth'].forEach(id=>{
     document.getElementById(id).style.display = cashPeriod === 'all' ? 'none' : '';
   });
@@ -7996,7 +8075,7 @@ function renderCashMonth(){
   const forRows = Object.keys(byFor).sort((a,b)=> byFor[b]-byFor[a])
     .map(k=>`<tr><td>${esc(FOR_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byFor[k]).toLocaleString()}</td><td class="r dim">${pct(byFor[k], spent)}</td></tr>`).join('');
   const cardRows = Object.keys(byCard).sort((a,b)=> byCard[b]-byCard[a])
-    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchases — ' + cardName('ceymora') : k==='direct_kalava' ? 'Direct villa purchases — ' + cardName('kalava_card') : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
+    .map(k=>`<tr><td>${k==='advance' ? 'Paid out of a staff advance' : k==='direct_ceymora' ? 'Direct villa purchases — ' + cardName('ceymora') : k==='direct_kalava' ? 'Direct villa purchases — ' + cardName('kalava_card') : (k==='ceymora' || k==='kalava_card') ? esc(pettyName(k)) : k==='bank' ? 'Bank transfers' : esc(CARD_LABELS[k] || k)}</td><td class="r rpt-money-out">${Math.round(byCard[k]).toLocaleString()}</td></tr>`).join('');
 
   document.getElementById('cashMonthBreakdown').innerHTML = (spent === 0 && advanced === 0)
     ? ''
@@ -8823,7 +8902,7 @@ document.getElementById('advMoveToggle').addEventListener('click', ()=>{
     for(const t of picked){
       await sb.from('petty_cash_transactions').update({ employee_name: adv.employeeName, advance_id: String(adv.id) }).eq('id', t.id);
     }
-    logActivity('update', 'petty_cash_transactions', `Moved ${picked.length} bill(s) (LKR ${sum.toLocaleString()}) into ${adv.employeeName}'s advance — removed double charge on ${CARD_LABELS[adv.card]}`);
+    logActivity('update', 'petty_cash_transactions', `Moved ${picked.length} bill(s) (LKR ${sum.toLocaleString()}) into ${adv.employeeName}'s advance — removed double charge on ${(adv.card==='ceymora'||adv.card==='kalava_card') ? pettyName(adv.card) : (CARD_LABELS[adv.card] || adv.card)}`);
     await fetchCash();
     advPanelRecord = allCashTxns.find(t => t.id === adv.id) || adv;
     renderAdvSettlePanel();
@@ -9441,6 +9520,7 @@ async function fetchInv(){
   renderInventory();
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
   if(typeof reportsInited !== 'undefined' && reportsInited) renderReports();
+  if(typeof exInited !== 'undefined' && exInited) renderVillaExpenses();
 }
 
 function blankStockRow(){
@@ -9903,7 +9983,7 @@ function openDirectPurchasesDetail(card){
   const rows = allCashTxns.filter(t => directCardOf(t) === card)
     .sort((a,b)=> (a.for||'').localeCompare(b.for||'') || (b.date||'').localeCompare(a.date||''));
 
-  document.getElementById('villaDetailTitle').textContent = `Direct Villa Purchases — via ${cardLabel}`;
+  document.getElementById('villaDetailTitle').textContent = cardName(card);
 
   let html = '';
   if(rows.length === 0){
@@ -16264,7 +16344,7 @@ function exportPettyCashCSV(){
     FOR_LABELS[t.for] || t.for || '', acctLabel(acctOf(t)) || '', payLabel(t),
     t.employeeName || '', t.invoiceNo || '', t.invoiceDate || '', t.voucherNo || '', t.amount, cardEffect(t), t.note || '',
   ]));
-  downloadCSV(`petty-cash-${cashKind === 'all' ? '' : cashKind + '-'}${cashPeriod === 'all' ? 'all-time' : cashPeriod === 'week' ? 'week-' + range.from : ymKey(cashMonthDate)}.csv`, out);
+  downloadCSV(`petty-cash-${cashKind === 'all' ? '' : cashKind + '-'}${cashPeriod === 'all' ? 'all-time' : cashPeriod === 'day' ? range.from : cashPeriod === 'week' ? 'week-' + range.from : ymKey(cashMonthDate)}.csv`, out);
 }
 function exportPayrollCSV(){
   const rows = payRowsForMonth();
