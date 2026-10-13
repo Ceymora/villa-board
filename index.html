@@ -4135,7 +4135,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-dashreport';
+const APP_VERSION = 'v2026.10.13-salesanalysis';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -16953,7 +16953,7 @@ function restDonut(staff, company, total){
 function restCard(color, icon, label, value, rows){
   // long amounts get a smaller font so they always stay inside the box
   const len = String(value).replace(/<[^>]*>/g, '').length;
-  const fs = len > 18 ? 15 : len > 15 ? 17 : len > 12 ? 19 : 22;
+  const fs = len > 16 ? 15 : len > 14 ? 17 : len > 11 ? 19 : 22;
   return `<div class="r-card"><div class="top"><div class="badge" style="background:${color}">${icon}</div>
     <div style="min-width:0;flex:1"><div class="lbl" style="color:${color}">${label}</div><div class="val" style="font-size:${fs}px">${value}</div></div></div>
     <div class="rows">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div></div>`;
@@ -17781,7 +17781,7 @@ async function restHistoryView(body, info){
 
 /* ======================= Reports ======================= */
 const REPORT_TYPES = [
-  ['dash','🧭 Dashboard'], ['pl','📈 Profit & Loss'], ['sales','🔄 Sales vs Loyverse'], ['pay','💳 Payment methods'],
+  ['dash','🧭 Dashboard'], ['pl','📈 Profit & Loss'], ['analysis','📊 Sales Analysis'], ['sales','🔄 Sales vs Loyverse'], ['pay','💳 Payment methods'],
   ['exp','🧾 Expenses by category'], ['week','📅 Weekday analysis'], ['months','🗓 Month by month'] ];
 function restReportsView(body, info){
   if(!REST.repFrom){ REST.repFrom = monthStart(REST.month); REST.repTo = monthEnd(REST.month); }
@@ -17810,10 +17810,10 @@ function restReportsView(body, info){
   }));
   const out = body.querySelector('#repOut');
   if(from > to){ out.innerHTML = '<div class="r-warn">The "From" day is after the "To" day.</div>'; return; }
-  const F = { dash:restDashReport, pl:restPLReport, sales:restSalesReport, pay:restPayReport, exp:restExpReport, week:restWeekReport, months:restMonthsReport }[type] || restPLReport;
+  const F = { dash:restDashReport, analysis:restSalesAnalysis, pl:restPLReport, sales:restSalesReport, pay:restPayReport, exp:restExpReport, week:restWeekReport, months:restMonthsReport }[type] || restPLReport;
   Promise.resolve(F(out, info, from, to)).then(r => {
     if(!r || REST.view !== 'reports') return;
-    restWireExport(body, r.title + ' — ' + rLong(from) + ' to ' + rLong(to), r.head, r.rows, r.tot, r.cls);
+    restWireExport(body, r.noRange ? r.title : r.title + ' — ' + rLong(from) + ' to ' + rLong(to), r.head, r.rows, r.tot, r.cls);
   });
 }
 
@@ -18213,6 +18213,66 @@ function restOpenBalance(row, asAt){
     ov.classList.remove('open'); await restLoad(); renderRest(); restToast('✓ Balance saved');
   });
   ov.classList.add('open');
+}
+
+/* ======================= Sales Analysis (financial year April – March) ======================= */
+function restFyOf(iso){ const y = Number(iso.slice(0,4)), m = Number(iso.slice(5,7)); return m >= 4 ? y : y - 1; }
+function restSalesAnalysis(out, info, from, to){
+  const fyNow = restFyOf(todayISO());
+  const years = [...new Set(REST.sales.map(r => restFyOf(r.day)).concat([fyNow, restFyOf(to)]))].sort((a, b) => b - a);
+  const fy = REST.fy && years.includes(REST.fy) ? REST.fy : restFyOf(to);
+  const months = Array.from({ length:12 }, (_, i) => shiftMonth(fy + '-04', i));
+  const data = months.map(m => { const s = sumSales(salesBetween(monthStart(m), monthEnd(m)), info);
+    return { m, card:rc(s.card + s.transfer), cash:rc(s.cash), total:rc(s.total), has:salesBetween(monthStart(m), monthEnd(m)).length > 0 }; });
+  const T = data.reduce((a, d) => ({ card:a.card + d.card, cash:a.cash + d.cash, total:a.total + d.total }), { card:0, cash:0, total:0 });
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mName = m => MON[Number(m.slice(5,7)) - 1] + '-' + m.slice(2,4);
+  const withSales = data.filter(d => d.has), best = withSales.slice().sort((a, b) => b.total - a.total)[0];
+  const avg = withSales.length ? T.total / withSales.length : 0;
+  // grouped bars: card & transfer (orange) and cash (blue) for each month
+  const W = 760, H = 300, L = 70, R = 10, Tp = 20, B = 34;
+  const max = Math.max(1, ...data.map(d => Math.max(d.card, d.cash)));
+  const step = [10000,20000,25000,50000,100000,200000,250000,500000,1000000,2000000,2500000,5000000,10000000].find(s => max / s <= 6) || Math.ceil(max / 6);
+  const top = Math.ceil(max / step) * step, y = v => Tp + (H - Tp - B) * (1 - v / top);
+  const slot = (W - L - R) / 12, bw = Math.min(22, slot * 0.34);
+  let g = '';
+  for(let v = 0; v <= top + 0.5; v += step) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e9ecf2"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="10.5" fill="#6b7385">${rnum(v)}</text>`;
+  const bar = (x, v, col) => { if(v <= 0) return ''; const yt = y(v), hgt = y(0) - yt, r = Math.min(4, hgt);
+    return `<path d="M${x},${y(0)} V${yt + r} q0,-${r} ${r},-${r} H${x + bw - r} q${r},0 ${r},${r} V${y(0)} Z" fill="${col}"/>`; };
+  data.forEach((d, i) => { const cx = L + slot * (i + 0.5);
+    g += bar(cx - bw - 1, d.card, '#eb6834') + bar(cx + 1, d.cash, '#2a78d6');
+    g += `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="11" fill="#13233a">${esc(mName(d.m))}</text>`;
+    g += `<rect class="r-hit" data-i="${i}" x="${cx - slot / 2}" y="${Tp}" width="${slot}" height="${H - Tp - B}" fill="transparent"/>`; });
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="#c9cfdb"/>`;
+  const head = ['Month','Card Sale & Bank Transfer','Cash Sale','Total'];
+  const rows = data.map(d => [mName(d.m), d.has ? d.card : '', d.has ? d.cash : '', d.has ? d.total : '—']);
+  const tot = ['Total', rc(T.card), rc(T.cash), rc(T.total)];
+  out.innerHTML = `
+    <div class="r-box" style="margin-bottom:14px"><h3><span>${esc(info.name.toUpperCase())} — Sales summary April ${fy} to March ${fy + 1}</span>
+      <select id="saFy" class="r-btn">${years.map(yv => `<option value="${yv}" ${yv === fy ? 'selected' : ''}>${yv}/${String(yv + 1).slice(2)}</option>`).join('')}</select></h3>
+      <div class="r-cards" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:12px">
+        ${restCard('#13233a', 'Σ', 'Total sales', rs(T.total), [['Months with sales', String(withSales.length)]])}
+        ${restCard('#eb6834', '💳', 'Card & bank transfer', rs(T.card), [['Share', T.total ? Math.round(T.card / T.total * 1000) / 10 + '%' : '—']])}
+        ${restCard('#2a78d6', '💵', 'Cash sale', rs(T.cash), [['Share', T.total ? Math.round(T.cash / T.total * 1000) / 10 + '%' : '—']])}
+        ${restCard('#1f7a55', '🏆', 'Best month', best ? esc(mName(best.m)) : '—', [['Sales', best ? rs(best.total) : '—'], ['Average a month', rs(avg)]])}
+      </div>
+      <div class="r-grid2 r-compact" style="grid-template-columns:repeat(auto-fit,minmax(470px,1fr))">
+        <div>${restTableHTML(head, rows, tot)}</div>
+        <div><h3 style="margin:0 0 6px"><span>Sales Analysis ${fy}/${fy + 1}</span><span class="r-legend"><span><i style="background:#eb6834"></i>Card Sale &amp; Bank Transfer</span><span><i style="background:#2a78d6"></i>Cash Sale</span></span></h3>
+          <div class="r-chart" id="saChart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Card and cash sales for each month of ${fy}/${fy + 1}">${g}</svg><div class="r-tip"></div></div></div>
+      </div>
+      <div class="r-note">The financial year runs from April to March. Card Sale includes bank transfers, as in your sheet. Months not reached yet are left empty.</div></div>`;
+  out.querySelector('#saFy').addEventListener('change', e => { REST.fy = Number(e.target.value); renderRest(); });
+  const wrap = out.querySelector('#saChart'), tip = wrap.querySelector('.r-tip');
+  wrap.querySelectorAll('.r-hit').forEach(hb => {
+    hb.addEventListener('mousemove', ev => { const d = data[+hb.dataset.i];
+      tip.innerHTML = `<b>${esc(rMonthName(d.m))}</b><br><span style="color:#f5a07a">●</span> Card & transfer ${esc(rs(d.card))}<br><span style="color:#8fb4ff">●</span> Cash ${esc(rs(d.cash))}<br>Total <b>${esc(rs(d.total))}</b>`;
+      tip.style.display = 'block'; const bx = wrap.getBoundingClientRect();
+      let left = ev.clientX - bx.left + 14; if(left + 190 > bx.width) left = ev.clientX - bx.left - 200;
+      tip.style.left = left + 'px'; tip.style.top = Math.max(0, ev.clientY - bx.top - 30) + 'px'; });
+    hb.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+  return { title:'Sales summary April ' + fy + ' to March ' + (fy + 1) + ' — ' + info.name, head, rows, tot, noRange:true };
 }
 </script>
 </body>
