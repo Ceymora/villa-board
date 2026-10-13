@@ -1244,7 +1244,7 @@
   .r-card .top{ display:flex; gap:12px; align-items:center; }
   .r-card .badge{ width:46px; height:46px; flex:0 0 46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff; }
   .r-card .lbl{ font-size:13px; font-weight:600; }
-  .r-card .val{ font-size:22px; font-weight:700; margin-top:2px; white-space:nowrap; }
+  .r-card .val{ font-size:22px; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .r-card .rows{ margin-top:12px; border-top:1px solid var(--r-line); padding-top:10px; font-size:12px; color:var(--r-muted); }
   .r-card .rows div{ display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
   .r-card .rows b{ color:var(--r-ink); font-weight:600; white-space:nowrap; }
@@ -1261,6 +1261,7 @@
   .r-table td{ padding:8px 8px; border-bottom:1px solid var(--r-line); white-space:nowrap; }
   .r-table td.wrap{ white-space:normal; min-width:140px; }
   .r-table .n{ text-align:right; font-variant-numeric:tabular-nums; }
+  .r-table tr.r-bad td{ background:#fdecec; color:#a61e1e; } .r-table tr.r-miss td{ background:#fff4e0; } .r-table tr.r-ok td{ background:#f6fbf8; }
   .r-table tr.tot td{ background:var(--r-green-bg); font-weight:700; border-bottom:0; }
   .r-table input[type=number], .r-table input[type=text]{ width:110px; font:500 13px Inter,sans-serif; border:1px solid var(--r-line); border-radius:6px; padding:6px 8px; text-align:right; }
   .r-grid3 .r-table th, .r-grid3 .r-table td{ padding:7px 5px; font-size:12px; }
@@ -1746,6 +1747,7 @@
           <button data-rv="monthly"><span class="i">📊</span>Monthly Summary</button>
           <button data-rv="reports"><span class="i">📄</span>Reports</button>
           <button data-rv="loyverse"><span class="i">🔄</span>Loyverse Check</button>
+          <button data-rv="history"><span class="i">🕘</span>Change History</button>
           <button data-rv="settings" id="restNavSettings"><span class="i">⚙️</span>Settings</button>
         </nav>
         <div class="rest-tag">Good Food<br>&nbsp;&nbsp;Happy People<br>&nbsp;&nbsp;&nbsp;&nbsp;Better Together ♡</div>
@@ -4116,7 +4118,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-dailysales';
+const APP_VERSION = 'v2026.10.13-history';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -16653,6 +16655,11 @@ function restToast(msg){
   if(!t){ t = document.createElement('div'); t.id = 'restToast'; t.style.cssText = 'position:fixed;right:18px;bottom:18px;background:#1f7a55;color:#fff;font:600 13px Inter,sans-serif;padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:9999;transition:opacity .3s'; document.body.appendChild(t); }
   t.textContent = msg; t.style.opacity = '1'; clearTimeout(t._h); t._h = setTimeout(() => { t.style.opacity = '0'; }, 2600);
 }
+function restWho(r){
+  const c = r.created_by_email ? `entered by ${r.created_by_email.split('@')[0]}${r.created_at ? ' · ' + rDay(String(r.created_at).slice(0,10)) : ''}` : '';
+  const u = r.updated_by_email ? `changed by ${r.updated_by_email.split('@')[0]}${r.updated_at ? ' · ' + rDay(String(r.updated_at).slice(0,10)) : ''}` : '';
+  return [c, u].filter(Boolean).join(' — ');
+}
 function feeOf(r, key, info){ const v = r[key]; return (v === null || v === undefined || v === '') ? Number(info[key]) : Number(v); }
 /* fee = bank commission on card payments and bank transfers (2.5% unless Makky changes it) */
 function sumSales(rows, info){
@@ -16794,6 +16801,7 @@ function renderRest(){
     petty:['Petty Cash', 'Money given to the restaurant and what it was spent on.'],
     service:['Service Charge', `${info.service_rate}% ${scWord(info)} — ${info.staff_share}% to employees, ${100 - info.staff_share}% to the company.`],
     loyverse:['Loyverse Check', 'Compare what was entered here with Loyverse, day by day, in LKR.'],
+    history:['Change History', 'Who entered, changed or deleted each figure — and what it was before and after.'],
     monthly:['Monthly Summary', 'The month at a glance.'],
     reports:['Reports', 'Any period, day by day — print or download.'],
     settings:['Settings', 'Service charge, bank commission, petty cash allocation, logo and Loyverse.'],
@@ -16811,7 +16819,7 @@ function renderRest(){
   }
   if(REST.loadedFor !== id){ body.innerHTML = `<div class="r-muted" style="padding:30px 4px;">${REST.loadError ? esc(REST.loadError) : 'Loading…'}</div>`; return; }
   const V = { dashboard:restDashboard, sales:restSalesView, petty:restPettyView, service:restServiceView,
-              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView };
+              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView, history:restHistoryView };
   (V[REST.view] || restDashboard)(body, info);
 }
 function restGo(view){ REST.view = view; renderRest(); document.querySelector('.rest-main').scrollIntoView({ block:'nearest' }); }
@@ -16881,8 +16889,11 @@ function restDonut(staff, company, total){
 
 /* ---- Dashboard ---- */
 function restCard(color, icon, label, value, rows){
+  // long amounts get a smaller font so they always stay inside the box
+  const len = String(value).replace(/<[^>]*>/g, '').length;
+  const fs = len > 18 ? 15 : len > 15 ? 17 : len > 12 ? 19 : 22;
   return `<div class="r-card"><div class="top"><div class="badge" style="background:${color}">${icon}</div>
-    <div style="min-width:0"><div class="lbl" style="color:${color}">${label}</div><div class="val">${value}</div></div></div>
+    <div style="min-width:0;flex:1"><div class="lbl" style="color:${color}">${label}</div><div class="val" style="font-size:${fs}px">${value}</div></div></div>
     <div class="rows">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div></div>`;
 }
 function restDashboard(body, info){
@@ -16981,7 +16992,7 @@ function restSalesView(body, info){
           <tr class="tot"><td>Net received</td><td class="n" id="dsNet">${rs(t.received)}</td></tr>
           <tr><td>Service charge (${esc(info.service_rate)}% ${esc(scWord(info))})</td><td class="n" id="dsSc">${rs(t.sc)}</td></tr>
         </tbody></table>
-        ${lines.length ? `<div class="r-muted" style="font-size:11.5px;margin-top:6px">Entered by ${esc(lines.map(r => r.updated_by_email || r.created_by_email || '').filter(Boolean).join(', ') || '—')}</div>` : ''}
+        ${lines.length ? `<div class="r-muted" style="font-size:11.5px;margin-top:6px">${esc(lines.map(restWho).filter(Boolean).join('; ') || '')} · <button class="r-link" id="dsHist">See all changes</button></div>` : ''}
         <div class="r-err" id="dsErr"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px">
           ${del && lines.length ? `<button class="r-btn danger" id="dsDelete">🗑 Delete this day</button>` : ''}
@@ -17003,9 +17014,25 @@ function restSalesView(body, info){
   const rows = monthDays.map(x => { const s = sumSales(salesBetween(x, x), info); return [rLong(x), s.total, s.card, s.transfer, s.cash, s.fee, s.received, s.sc]; });
   const m = sumSales(salesBetween(monthStart(ym), monthEnd(ym)), info);
   const tot = ['Total', m.total, m.card, m.transfer, m.cash, m.fee, m.received, m.sc];
-  body.querySelector('#dsMonth').innerHTML = restTableHTML(head, rows, tot);
-  body.querySelectorAll('#dsMonth tbody tr').forEach((tr, i) => { if(i < monthDays.length){ tr.classList.add('click'); tr.addEventListener('click', () => { REST.day = monthDays[i]; renderRest(); }); } });
+  body.querySelector('#dsMonth').innerHTML = restTableHTML(head.concat(['Entered / changed by', '']), rows.map((r, i) =>
+    r.concat([salesBetween(monthDays[i], monthDays[i]).map(restWho).filter(Boolean).join('; '), ''])), tot.concat(['', '']));
+  body.querySelectorAll('#dsMonth tbody tr').forEach((tr, i) => {
+    if(i >= monthDays.length) return;
+    const day = monthDays[i], cells = tr.children, last = cells[cells.length - 1];
+    cells[cells.length - 2].style.cssText = 'white-space:normal;min-width:130px;font-size:11px;color:var(--r-muted)';
+    last.style.whiteSpace = 'nowrap';
+    last.innerHTML = `<button class="r-btn" data-ds-edit title="${edit ? 'Edit' : 'Open'}">${edit ? '✏️ Edit' : 'Open'}</button>${del ? ' <button class="r-btn danger" data-ds-del title="Delete">🗑</button>' : ''}`;
+    last.querySelector('[data-ds-edit]').addEventListener('click', () => { REST.day = day; renderRest(); document.querySelector('.rest-main').scrollIntoView(); });
+    const db = last.querySelector('[data-ds-del]');
+    if(db) db.addEventListener('click', async () => {
+      if(!confirm('Delete the sales for ' + rLong(day) + '? They go to Deleted items and can be put back.')) return;
+      const { error } = await sb.from('restaurant_sales').delete().in('id', salesBetween(day, day).map(r => r.id));
+      if(error){ alert('Could not delete — ' + (error.message || 'check the connection.')); return; }
+      await restLoad(); renderRest(); restToast('Deleted ' + rLong(day));
+    });
+  });
   restWireExport(body, 'Daily sales — ' + rMonthName(ym), head, rows, tot);
+  const hl = body.querySelector('#dsHist'); if(hl) hl.addEventListener('click', () => { REST.histFrom = d; REST.histTo = d; REST.histType = 'restaurant_sales'; restGo('history'); });
   const printDay = body.querySelector('#dsPrintDay');
   if(printDay) printDay.addEventListener('click', () => restPrintDay(d, info));
   const delBtn = body.querySelector('#dsDelete');
@@ -17056,6 +17083,7 @@ function restPrintPage(title, inner){
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:12px}
     th,td{border:1px solid #d5dae3;padding:6px 8px}th{background:#f2f4f8;text-align:left}tr.tot td{font-weight:bold;background:#e8f6ee}
+    tr.r-bad td{background:#fdecec;color:#a61e1e}tr.r-miss td{background:#fff4e0}tr.r-ok td{background:#f1faf4}
     .hd{display:flex;align-items:center;gap:16px;border-bottom:2px solid #13233a;padding-bottom:12px;margin-bottom:14px}
     .sig{display:flex;gap:40px;margin-top:48px;font-size:12px}.sig div{flex:1;border-top:1px solid #13233a;padding-top:6px}
     @media print{body{padding:0}}</style></head>
@@ -17090,7 +17118,7 @@ function restPettyView(body, info){
   body.innerHTML = `
     <div class="r-toolbar">
       <button class="r-btn" id="rpPrev">◀</button><input type="month" id="rpMonth" value="${esc(ym)}"><button class="r-btn" id="rpNext">▶</button>
-      <span class="sp"></span>
+      <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
       ${edit ? `<button class="r-btn" id="rpAddIn">＋ Money in</button><button class="r-btn primary" id="rpAddEx">＋ Expense</button>` : '<span class="r-muted">View only</span>'}
     </div>
     <div class="r-cards">
@@ -17107,7 +17135,7 @@ function restPettyView(body, info){
             return `<tr><td>${esc(rDay(r.day))}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}</td>
               <td>${r.kind === 'in' ? '<span class="r-in">Money in</span>' : esc(r.category || '')}</td><td>${esc(r.invoice_no || '')}</td>
               <td class="n r-in">${r.kind === 'in' ? rs(r.amount) : ''}</td><td class="n">${r.kind === 'expense' ? rs(r.amount) : ''}</td><td class="n">${rs(run)}</td>
-              <td class="r-muted" style="font-size:11px">${esc((r.created_by_email || '').split('@')[0])}</td>
+              <td class="r-muted" style="font-size:11px;white-space:normal;min-width:110px">${esc(restWho(r))}</td>
               ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn" data-edit-p="${esc(r.id)}" title="Correct">✏️</button>` : ''}${del ? ` <button class="r-btn danger" data-del-p="${esc(r.id)}" title="Delete">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')}
           <tr class="tot"><td colspan="4">Totals / balance</td><td class="n">${rs(sums.in)}</td><td class="n">${rs(sums.out)}</td><td class="n">${rs(run)}</td><td></td>${edit || del ? '<td></td>' : ''}</tr>
         </tbody></table></div></div>
@@ -17116,6 +17144,12 @@ function restPettyView(body, info){
           || '<tr><td class="r-muted">No expenses this month.</td></tr>'}
           <tr class="tot"><td>Total</td><td class="n">${rs(sums.out)}</td><td></td></tr></tbody></table></div>
     </div>`;
+  { let bal = opening;
+    const ph = ['Date','Description','Category','Bill no.','Money in','Spent','Balance','Entered / changed by'];
+    const pr = [[rLong(from), 'Brought forward', '', '', '', '', opening, '']].concat(rows.map(r => { bal += r.kind === 'in' ? Number(r.amount) : -Number(r.amount);
+      return [rLong(r.day), r.description + (r.note ? ' — ' + r.note : ''), r.kind === 'in' ? 'Money in' : (r.category || ''), r.invoice_no || '',
+              r.kind === 'in' ? Number(r.amount) : '', r.kind === 'expense' ? Number(r.amount) : '', bal, restWho(r)]; }));
+    restWireExport(body, 'Petty cash — ' + rMonthName(ym), ph, pr, ['Total', '', '', '', sums.in, sums.out, bal, '']); }
   const setM = m => { if(m){ REST.month = m; renderRest(); } };
   body.querySelector('#rpPrev').addEventListener('click', () => setM(shiftMonth(ym, -1)));
   body.querySelector('#rpNext').addEventListener('click', () => setM(shiftMonth(ym, 1)));
@@ -17205,13 +17239,13 @@ function restServiceView(body, info){
   restWireMonthBar(body, 'rscMonth');
   restWireExport(body, 'Service charge — ' + info.name + ' — ' + rMonthName(ym), head, table, tot);
 }
-function restTableHTML(head, rows, tot){
+function restTableHTML(head, rows, tot, rowCls){
   const cell = v => typeof v === 'number' ? `<td class="n">${rmoney(v)}</td>` : `<td>${esc(v)}</td>`;
   return `<div class="r-scroll"><table class="r-table"><thead><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>
-    ${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('') || `<tr><td colspan="${head.length}" class="r-muted">Nothing recorded in this period.</td></tr>`}
+    ${rows.map((r, i) => `<tr${rowCls && rowCls[i] ? ` class="${rowCls[i]}"` : ''}>${r.map(cell).join('')}</tr>`).join('') || `<tr><td colspan="${head.length}" class="r-muted">Nothing recorded in this period.</td></tr>`}
     ${tot ? `<tr class="tot">${tot.map(cell).join('')}</tr>` : ''}</tbody></table></div>`;
 }
-function restWireExport(body, title, head, rows, tot){
+function restWireExport(body, title, head, rows, tot, rowCls){
   const all = tot ? rows.concat([tot]) : rows;
   const p = body.querySelector('[data-print]'), c = body.querySelector('[data-csv]');
   if(c) c.addEventListener('click', () => {
@@ -17225,7 +17259,7 @@ function restWireExport(body, title, head, rows, tot){
   if(p) p.addEventListener('click', () => {
     const cell = v => typeof v === 'number' ? `<td style="text-align:right">${esc(rmoney(v))}</td>` : `<td>${esc(v)}</td>`;
     restPrintPage(title.replace(' — ' + restInfo(REST.id).name, ''), `<table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
-      ${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('')}${tot ? `<tr class="tot">${tot.map(cell).join('')}</tr>` : ''}</tbody></table>
+      ${rows.map((r, i) => `<tr${rowCls && rowCls[i] ? ` class="${rowCls[i]}"` : ''}>${r.map(cell).join('')}</tr>`).join('')}${tot ? `<tr class="tot">${tot.map(cell).join('')}</tr>` : ''}</tbody></table>
       <div style="font-size:11px;color:#6b7385;margin-top:6px">All amounts in Rs. (LKR)</div>`);
   });
 }
@@ -17248,16 +17282,35 @@ function restMonthlyView(body, info){
   restWireExport(body, 'Monthly summary — ' + info.name + ' — ' + rMonthName(ym), head, rows, tot);
 }
 
-/* ---- Reports ---- */
+/* ---- Reports: our entries day by day, next to Loyverse ---- */
 function restReportsView(body, info){
   if(!REST.repFrom){ REST.repFrom = monthStart(REST.month); REST.repTo = monthEnd(REST.month); }
   const from = REST.repFrom, to = REST.repTo;
-  const head = ['Date','Sale total','Card','Transfer','Cash','Bank commission','Net received','Service charge','Employees','Company','Petty cash in','Petty cash used'];
-  const rows = (from <= to ? restDaysOf(from, to) : []).map(d => { const x = sumSales(salesBetween(d, d), info), q = pettySums(pettyBetween(d, d));
-    return (x.total || q.in || q.out) ? [rLong(d), x.total, x.card, x.transfer, x.cash, x.fee, x.received, x.sc, x.staff, x.company, q.in, q.out] : null; }).filter(Boolean);
+  const key = REST.id + '|' + from + '|' + to;
+  const lv = REST.repLv && REST.repLv.key === key ? REST.repLv : null;
+  const L = lv && lv.data ? (lv.data.days || {}) : null;
+  const head = ['Date','Sale total'].concat(L ? ['Loyverse total','Difference','Check'] : [])
+    .concat(['Card','Transfer','Cash','Bank commission','Net received','Service charge','Employees','Company','Petty cash in','Petty cash used']);
+  const rows = [], cls = [];
+  let bad = 0, miss = 0;
+  (from <= to ? restDaysOf(from, to) : []).forEach(d => {
+    const x = sumSales(salesBetween(d, d), info), q = pettySums(pettyBetween(d, d)), lt = L && L[d] ? Number(L[d].total) || 0 : 0;
+    if(!(x.total || q.in || q.out || lt)) return;
+    let cmp = [];
+    if(L){
+      const entered = salesBetween(d, d).length > 0, diff = rc(x.total - lt);
+      if(!entered && lt){ cmp = [lt, '', 'Not entered here']; cls.push('r-miss'); miss++; }
+      else if(entered && !lt && !L[d]){ cmp = [0, diff, 'Not in Loyverse']; cls.push('r-bad'); bad++; }
+      else if(Math.abs(diff) >= 1){ cmp = [lt, diff, 'Different']; cls.push('r-bad'); bad++; }
+      else { cmp = [lt, 0, 'Matches']; cls.push('r-ok'); }
+    } else cls.push('');
+    rows.push([rLong(d), x.total].concat(cmp, [x.card, x.transfer, x.cash, x.fee, x.received, x.sc, x.staff, x.company, q.in, q.out]));
+  });
   const s = sumSales(salesBetween(from, to), info), p = pettySums(pettyBetween(from, to));
-  const tot = ['Total', s.total, s.card, s.transfer, s.cash, s.fee, s.received, s.sc, s.staff, s.company, p.in, p.out];
+  const lvTot = L ? Object.entries(L).filter(([d]) => d >= from && d <= to).reduce((a, [, v]) => a + (Number(v.total) || 0), 0) : 0;
+  const tot = ['Total', s.total].concat(L ? [lvTot, rc(s.total - lvTot), ''] : [], [s.card, s.transfer, s.cash, s.fee, s.received, s.sc, s.staff, s.company, p.in, p.out]);
   const both = restList().length > 1;
+  const span = (Date.parse(to) - Date.parse(from)) / 86400000;
   body.innerHTML = `
     <div class="r-toolbar">
       <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">From <input type="date" id="rrFrom" value="${esc(from)}"></label>
@@ -17265,7 +17318,11 @@ function restReportsView(body, info){
       <button class="r-btn" data-q="month">This month</button><button class="r-btn" data-q="last">Last month</button><button class="r-btn" data-q="7">Last 7 days</button>
       <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
     </div>
-    <div class="r-box" style="margin-bottom:16px;"><h3>${esc(info.name)} <small>${esc(rLong(from))} – ${esc(rLong(to))}</small></h3>${restTableHTML(head, rows, tot)}</div>
+    <div class="r-box" style="margin-bottom:16px;"><h3><span>${esc(info.name)} <small>${esc(rLong(from))} – ${esc(rLong(to))}</small></span>
+      <small id="rrLvState">${L ? `Compared with Loyverse: <b style="color:#1f7a55">${rows.length - bad - miss} match</b> · <b style="color:#c92a2a">${bad} different</b> · <b style="color:#b36b00">${miss} not entered</b>`
+        : lv && lv.error ? 'Loyverse: ' + esc(lv.error) : span > 92 ? 'Loyverse comparison: pick 3 months or less' : 'Loading Loyverse…'}</small></h3>
+      ${restTableHTML(head, rows, tot, cls)}
+      ${L ? '<div class="r-note"><span style="background:#fdecec;padding:1px 6px;border-radius:4px">Red</span> = different from Loyverse (or missing in Loyverse) · <span style="background:#fff4e0;padding:1px 6px;border-radius:4px">Orange</span> = in Loyverse, not entered here · <span style="background:#f1faf4;padding:1px 6px;border-radius:4px">Green</span> = matches. Difference = entered here minus Loyverse.</div>' : ''}</div>
     ${both ? `<div class="r-box"><h3>Both restaurants <small>same period</small></h3><div id="rrBoth" class="r-muted">Loading…</div></div>` : ''}`;
   const set = (f, t) => { REST.repFrom = f; REST.repTo = t; renderRest(); };
   body.querySelector('#rrFrom').addEventListener('change', e => { if(e.target.value) set(e.target.value, to); });
@@ -17276,8 +17333,16 @@ function restReportsView(body, info){
     else if(b.dataset.q === 'last'){ const l = shiftMonth(ym, -1); set(monthStart(l), monthEnd(l)); }
     else set(addDays(t, -6), t);
   }));
-  restWireExport(body, 'Report — ' + info.name + ' — ' + rLong(from) + ' to ' + rLong(to), head, rows, tot);
+  restWireExport(body, 'Report — ' + info.name + ' — ' + rLong(from) + ' to ' + rLong(to), head, rows, tot, cls);
   if(both) restBothRestaurants(from, to);
+  if(!lv && from <= to && span <= 92){
+    REST.repLv = { key, pending:true };
+    restCallLoyverse({ action:'check', restaurant:REST.id, from, to: to > todayISO() ? todayISO() : to }).then(res => {
+      if(!REST.repLv || REST.repLv.key !== key) return;
+      REST.repLv = res.error ? { key, error:res.error } : { key, data:res.data };
+      if(REST.view === 'reports' && REST.repFrom === from && REST.repTo === to) renderRest();
+    });
+  }
 }
 async function restBothRestaurants(from, to){
   const out = [];
@@ -17529,6 +17594,88 @@ async function restLoyverseCopy(days, lv, info){
   if(error){ alert('Could not copy — ' + (error.message || 'check the connection.')); if(btn){ btn.disabled = false; btn.textContent = '⬇ Copy missing days from Loyverse'; } return; }
   await restLoad();
   if(REST.view === 'loyverse') restLoyverseShow(lv, restInfo(REST.id));
+}
+
+/* ---- Change History (kept by the database; nobody can edit or delete it) ---- */
+const REST_FIELD = { cash:'Cash balance', card:'Card', transfer:'Bank transfer', day:'Date', description:'Description', amount:'Amount',
+  category:'Category', invoice_no:'Bill no.', note:'Note', kind:'Type', slot:'Line', service_rate:'Service charge %',
+  service_included:'Service included', card_fee:'Card commission %', transfer_fee:'Transfer commission %' };
+const REST_MONEY = new Set(['cash','card','transfer','amount']);
+function restHistVal(k, v){
+  if(v === null || v === undefined || v === '') return '—';
+  if(REST_MONEY.has(k)) return rs(v);
+  if(k === 'day') return rLong(String(v));
+  if(k === 'kind') return v === 'in' ? 'Money in' : 'Expense';
+  return String(v);
+}
+function restHistSummary(c){
+  const r = c.after || c.before || {};
+  if(c.table_name === 'restaurant_sales'){
+    const t = (Number(r.cash) || 0) + (Number(r.card) || 0) + (Number(r.transfer) || 0);
+    return `Sale total ${rs(t)} (card ${rs(r.card)}, transfer ${rs(r.transfer)}, cash ${rs(r.cash)})`;
+  }
+  return `${r.kind === 'in' ? 'Money in' : 'Expense'}: ${r.description || ''} — ${rs(r.amount)}${r.category ? ' · ' + r.category : ''}`;
+}
+function restHistDetails(c){
+  if(c.action !== 'changed') return restHistSummary(c);
+  const b = c.before || {}, a = c.after || {};
+  const keys = Object.keys(a).filter(k => k !== 'day' || b.day !== a.day).filter(k => REST_FIELD[k]);
+  return keys.map(k => `${REST_FIELD[k]}: ${restHistVal(k, b[k])} → ${restHistVal(k, a[k])}`).join(' · ') || 'No visible change';
+}
+async function restHistoryView(body, info){
+  const t = todayISO();
+  if(!REST.histFrom){ REST.histFrom = monthStart(t.slice(0,7)); REST.histTo = t; }
+  const from = REST.histFrom, to = REST.histTo, type = REST.histType || '', who = REST.histWho || '';
+  body.innerHTML = `
+    <div class="r-toolbar">
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">From <input type="date" id="hFrom" value="${esc(from)}"></label>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">To <input type="date" id="hTo" value="${esc(to)}"></label>
+      <select id="hType" class="r-btn"><option value="">Everything</option><option value="restaurant_sales" ${type === 'restaurant_sales' ? 'selected' : ''}>Daily sales</option><option value="restaurant_petty" ${type === 'restaurant_petty' ? 'selected' : ''}>Petty cash</option></select>
+      <select id="hWho" class="r-btn"><option value="">Everyone</option></select>
+      <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
+    </div>
+    <div class="r-box" id="hBox"><div class="r-muted">Loading…</div></div>`;
+  const set = () => { REST.histFrom = body.querySelector('#hFrom').value || from; REST.histTo = body.querySelector('#hTo').value || to;
+    REST.histType = body.querySelector('#hType').value; REST.histWho = body.querySelector('#hWho').value; renderRest(); };
+  ['#hFrom','#hTo','#hType','#hWho'].forEach(id => body.querySelector(id).addEventListener('change', set));
+  const id = REST.id;
+  // "From / To" are the days the change was made (Sri Lanka time)
+  const startUtc = new Date(Date.parse(from + 'T00:00:00+05:30')).toISOString(), endUtc = new Date(Date.parse(addDays(to, 1) + 'T00:00:00+05:30')).toISOString();
+  let q = sb.from('restaurant_changes').select('*').eq('restaurant', id).gte('at', startUtc).lt('at', endUtc);
+  if(type) q = q.eq('table_name', type);
+  const { data, error } = await q.order('at', { ascending:false }).range(0, 1999);
+  if(REST.id !== id || REST.view !== 'history') return;
+  const box = body.querySelector('#hBox');
+  if(error){ box.innerHTML = `<div class="r-warn">${/restaurant_changes/.test(error.message || '') ? 'The change history is not set up in the database yet. Run <b>30-supabase-restaurant-change-history.sql</b> in Supabase once.' : esc(error.message || 'Could not load.')}</div>`; return; }
+  const all = data || [];
+  const people = [...new Set(all.map(c => c.by_email).filter(Boolean))].sort();
+  const sel = body.querySelector('#hWho');
+  sel.innerHTML = '<option value="">Everyone</option>' + people.map(p => `<option value="${esc(p)}" ${p === who ? 'selected' : ''}>${esc(p)}</option>`).join('');
+  const list = who ? all.filter(c => c.by_email === who) : all;
+  const when = c => new Date(c.at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  const what = c => (c.table_name === 'restaurant_sales' ? 'Daily sales' : 'Petty cash') + (c.day ? ' · ' + rLong(c.day) : '');
+  const badge = a => a === 'added' ? '<span style="background:#e8f6ee;color:#1f7a55;padding:2px 8px;border-radius:10px;font-weight:600">Added</span>'
+    : a === 'changed' ? '<span style="background:#fff4e0;color:#b36b00;padding:2px 8px;border-radius:10px;font-weight:600">Changed</span>'
+    : '<span style="background:#fdecec;color:#c92a2a;padding:2px 8px;border-radius:10px;font-weight:600">Deleted</span>';
+  const edit = restEdits(id), del = restCanDelete();
+  const exists = c => c.table_name === 'restaurant_sales' ? REST.sales.some(r => String(r.id) === c.row_id) : REST.petty.some(r => String(r.id) === c.row_id);
+  box.innerHTML = `<h3><span>${list.length} change${list.length === 1 ? '' : 's'}</span><small>newest first · kept by the database, cannot be edited</small></h3>
+    <div class="r-scroll"><table class="r-table"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Action</th><th>Details</th><th></th></tr></thead><tbody>
+    ${list.map((c, i) => `<tr><td>${esc(when(c))}</td><td>${esc(c.by_email || '')}</td><td>${esc(what(c))}</td><td>${badge(c.action)}</td>
+      <td class="wrap" style="min-width:260px">${esc(restHistDetails(c))}</td>
+      <td style="white-space:nowrap">${exists(c) ? `<button class="r-btn" data-h-open="${i}">${edit ? '✏️ Edit' : 'Open'}</button>${del ? ` <button class="r-btn danger" data-h-del="${i}" title="Delete">🗑</button>` : ''}` : '<span class="r-muted" style="font-size:11px">no longer there</span>'}</td></tr>`).join('')
+      || '<tr><td colspan="6" class="r-muted">No changes in these days.</td></tr>'}</tbody></table></div>`;
+  box.querySelectorAll('[data-h-open]').forEach(b => b.addEventListener('click', () => {
+    const c = list[+b.dataset.hOpen];
+    if(c.table_name === 'restaurant_sales'){ REST.day = c.day; restGo('sales'); }
+    else { REST.month = String(c.day).slice(0,7); restGo('petty'); const r = REST.petty.find(x => String(x.id) === c.row_id); if(r && edit) restOpenPetty(r.kind, r); }
+  }));
+  box.querySelectorAll('[data-h-del]').forEach(b => b.addEventListener('click', () => {
+    const c = list[+b.dataset.hDel];
+    restDelete(c.table_name, c.row_id, c.table_name === 'restaurant_sales' ? 'the sales line for ' + rLong(c.day) : 'this petty cash line');
+  }));
+  restWireExport(body, 'Change history — ' + rLong(from) + ' to ' + rLong(to), ['When','Who','What','Action','Details'],
+    list.map(c => [when(c), c.by_email || '', what(c), c.action, restHistDetails(c)]), null);
 }
 </script>
 </body>
