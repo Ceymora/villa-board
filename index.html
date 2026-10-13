@@ -1204,6 +1204,103 @@
     .board > h1{ font-size:27px; }
     .modal, .modal-wide{ width:94vw; }
   }
+
+  /* ============================ RESTAURANTS ============================ */
+  .area-switch{ display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px; padding-right:250px; }
+  .area-switch button{ font-family:Inter,sans-serif; font-size:12.5px; font-weight:600; border:1px solid var(--board-line);
+    background:#fff; color:var(--muted); padding:7px 13px; border-radius:20px; cursor:pointer; }
+  .area-switch button.on{ background:#13233a; color:#fff; border-color:#13233a; }
+  body.in-rest .frame{ max-width:1320px; }
+  body.in-rest #board > h1, body.in-rest #board > .sub, body.in-rest #board > .maintabs{ display:none !important; }
+  #restPanel{ --r-ink:#13233a; --r-muted:#6b7385; --r-line:#e6e9f0; --r-bg:#f4f6fa; --r-cash:#2f9e5b; --r-card:#2563eb;
+    --r-co:#8b5cf6; --r-tr:#d97706; --r-amber:#e8890c; --r-green-bg:#e8f6ee;
+    display:flex; background:var(--r-bg); border-radius:14px; overflow:hidden; border:1px solid var(--r-line); min-height:640px; color:var(--r-ink); }
+  .rest-side{ width:218px; flex:0 0 218px; background:#13233a; color:#dfe5ef; padding:18px 12px; display:flex; flex-direction:column; }
+  .rest-brand{ display:flex; gap:10px; align-items:center; padding:2px 6px 18px; }
+  .rest-brand .ico{ font-size:28px; line-height:1; }
+  .rest-brand b{ display:block; font-size:15.5px; color:#fff; line-height:1.2; }
+  .rest-brand small{ display:block; font-size:10px; color:#9fb0c8; margin-top:3px; }
+  .rest-nav{ display:flex; flex-direction:column; gap:4px; }
+  .rest-nav button{ display:flex; gap:11px; align-items:center; text-align:left; background:none; border:0; color:#dfe5ef; font:500 13.5px Inter,sans-serif;
+    padding:10px 12px; border-radius:8px; cursor:pointer; }
+  .rest-nav button:hover{ background:rgba(255,255,255,0.06); }
+  .rest-nav button.on{ background:#1f7a55; color:#fff; font-weight:600; }
+  .rest-nav .i{ width:20px; text-align:center; }
+  .rest-tag{ margin-top:auto; padding:18px 10px 4px; font:italic 13px/1.5 'Kalam',cursive; color:#b9c4d6; }
+  .rest-main{ flex:1; min-width:0; padding:20px 22px 26px; }
+  .rest-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid var(--r-line); margin-bottom:16px; }
+  .rest-head h2{ margin:0; font:700 22px Inter,sans-serif; color:var(--r-ink); }
+  .rest-head p{ margin:4px 0 0; color:var(--r-muted); font-size:13px; }
+  .rest-datebox{ display:flex; gap:6px; align-items:center; }
+  .rest-datebox input, .rest-main input[type=month], .rest-main input[type=date]{ font:600 13px Inter,sans-serif; color:var(--r-ink); border:1px solid var(--r-line);
+    background:#fff; border-radius:8px; padding:8px 10px; }
+  .r-btn{ font:600 12.5px Inter,sans-serif; border:1px solid var(--r-line); background:#fff; color:var(--r-ink); border-radius:8px; padding:8px 12px; cursor:pointer; }
+  .r-btn:hover{ border-color:#c3cad8; }
+  .r-btn.primary{ background:#1f7a55; color:#fff; border-color:#1f7a55; }
+  .r-btn.danger{ color:#c92a2a; }
+  .r-btn:disabled{ opacity:.5; cursor:default; }
+  .r-cards{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+  .r-card{ background:#fff; border:1px solid var(--r-line); border-radius:12px; padding:16px; box-shadow:0 1px 2px rgba(19,35,58,0.04); min-width:0; }
+  .r-card .top{ display:flex; gap:12px; align-items:center; }
+  .r-card .badge{ width:46px; height:46px; flex:0 0 46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff; }
+  .r-card .lbl{ font-size:13px; font-weight:600; }
+  .r-card .val{ font-size:22px; font-weight:700; margin-top:2px; white-space:nowrap; }
+  .r-card .rows{ margin-top:12px; border-top:1px solid var(--r-line); padding-top:10px; font-size:12px; color:var(--r-muted); }
+  .r-card .rows div{ display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
+  .r-card .rows b{ color:var(--r-ink); font-weight:600; white-space:nowrap; }
+  .r-grid2{ display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:14px; margin-bottom:16px; }
+  .r-grid3{ display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:14px; }
+  .r-box{ background:#fff; border:1px solid var(--r-line); border-radius:12px; padding:16px; min-width:0; }
+  .r-box h3{ margin:0 0 12px; font:700 15px Inter,sans-serif; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .r-box h3 small{ font-weight:500; color:var(--r-muted); font-size:12.5px; }
+  .r-link{ background:none; border:0; color:var(--r-card); font:600 12px Inter,sans-serif; cursor:pointer; padding:0; }
+  .r-legend{ display:flex; gap:14px; font-size:12px; font-weight:500; color:var(--r-ink); }
+  .r-legend i{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .r-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .r-table th{ text-transform:none; letter-spacing:0; text-align:left; font-weight:600; color:var(--r-ink); background:#f6f8fb; padding:8px 8px; border-bottom:1px solid var(--r-line); white-space:nowrap; }
+  .r-table td{ padding:8px 8px; border-bottom:1px solid var(--r-line); white-space:nowrap; }
+  .r-table td.wrap{ white-space:normal; min-width:140px; }
+  .r-table .n{ text-align:right; font-variant-numeric:tabular-nums; }
+  .r-table tr.tot td{ background:var(--r-green-bg); font-weight:700; border-bottom:0; }
+  .r-table input[type=number], .r-table input[type=text]{ width:110px; font:500 13px Inter,sans-serif; border:1px solid var(--r-line); border-radius:6px; padding:6px 8px; text-align:right; }
+  .r-grid3 .r-table th, .r-grid3 .r-table td{ padding:7px 5px; font-size:12px; }
+  .r-table tr.click{ cursor:pointer; } .r-table tr.click:hover td{ background:#f8fafc; }
+  .r-scroll{ overflow-x:auto; }
+  .r-sum div{ display:flex; align-items:center; gap:12px; padding:8px 0; font-size:13px; }
+  .r-sum .b{ width:32px; height:32px; flex:0 0 32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .r-sum span{ flex:1; } .r-sum b{ white-space:nowrap; }
+  .r-note{ background:#eef4fd; border:1px solid #d6e4fa; border-radius:8px; padding:10px 12px; font-size:12px; color:#3b4a63; margin-top:12px; line-height:1.5; }
+  .r-warn{ background:#fff4e0; border:1px solid #f5d9a8; border-radius:8px; padding:12px 14px; font-size:13px; color:#6b4a00; }
+  .r-toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .r-toolbar .sp{ flex:1; }
+  .r-in{ color:var(--r-cash); font-weight:600; }
+  .r-muted{ color:var(--r-muted); }
+  .r-chart{ position:relative; }
+  .r-chart svg{ display:block; width:100%; height:auto; }
+  .r-tip{ position:absolute; pointer-events:none; background:#13233a; color:#fff; font-size:12px; padding:8px 10px; border-radius:8px; white-space:nowrap;
+    box-shadow:0 6px 18px rgba(0,0,0,0.18); display:none; z-index:3; line-height:1.55; }
+  .r-donut{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  .r-donut svg{ width:170px; height:170px; flex:0 0 170px; }
+  .r-donut .lg div{ margin-bottom:12px; font-size:13.5px; } .r-donut .lg b{ display:block; font-size:15px; margin-left:15px; }
+  .r-form label{ display:block; font-size:12px; font-weight:600; color:var(--r-muted); margin:10px 0 4px; }
+  .r-form input, .r-form select, .r-form textarea{ width:100%; box-sizing:border-box; font:500 13.5px Inter,sans-serif; border:1px solid var(--r-line); border-radius:8px; padding:9px 10px; }
+  .r-err{ color:#c92a2a; font-size:12.5px; margin-top:8px; min-height:16px; }
+  @media (max-width: 1100px){
+    .r-cards{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .r-grid2{ grid-template-columns:minmax(0,1fr) !important; }
+  }
+  @media (max-width: 760px){
+    #restPanel{ flex-direction:column; }
+    .rest-side{ width:auto; flex:none; padding:12px; }
+    .rest-brand{ padding-bottom:10px; }
+    .rest-nav{ flex-direction:row; overflow-x:auto; }
+    .rest-nav button{ white-space:nowrap; padding:8px 10px; }
+    .rest-tag{ display:none; }
+    .rest-main{ padding:14px; }
+    .r-cards{ grid-template-columns:minmax(0,1fr) !important; }
+    .r-grid3{ grid-template-columns:minmax(0,1fr); }
+    .area-switch{ padding-right:0; margin-top:40px; }
+  }
 </style>
 </head>
 <body>
@@ -1638,6 +1735,34 @@
     </div>
 
     <!-- ===================== USERS PANEL (admin only) ===================== -->
+    <div id="restPanel" style="display:none">
+      <aside class="rest-side">
+        <div class="rest-brand"><span class="ico" id="restIcon">🍽</span><div><b id="restName">Restaurant</b><small>Cash • Card • Transfer • Service Charge • Petty Cash</small></div></div>
+        <nav class="rest-nav" id="restNav">
+          <button data-rv="dashboard"><span class="i">🏠</span>Dashboard</button>
+          <button data-rv="sales"><span class="i">🧾</span>Daily Sales</button>
+          <button data-rv="petty"><span class="i">👛</span>Petty Cash</button>
+          <button data-rv="service"><span class="i">👥</span>Service Charge</button>
+          <button data-rv="monthly"><span class="i">📊</span>Monthly Summary</button>
+          <button data-rv="reports"><span class="i">📄</span>Reports</button>
+          <button data-rv="loyverse"><span class="i">🔄</span>Loyverse Check</button>
+          <button data-rv="settings" id="restNavSettings"><span class="i">⚙️</span>Settings</button>
+        </nav>
+        <div class="rest-tag">Good Food<br>&nbsp;&nbsp;Happy People<br>&nbsp;&nbsp;&nbsp;&nbsp;Better Together ♡</div>
+      </aside>
+      <main class="rest-main">
+        <div class="rest-head">
+          <div><h2 id="restTitle">Welcome</h2><p id="restSubtitle">Manage your daily sales, petty cash and service charge easily.</p></div>
+          <div class="rest-datebox" id="restDateBox">
+            <button class="r-btn" id="restDayPrev" title="Day before">◀</button>
+            <input type="date" id="restDay" aria-label="Day">
+            <button class="r-btn" id="restDayNext" title="Day after">▶</button>
+            <button class="r-btn" id="restToday">Today</button>
+          </div>
+        </div>
+        <div id="restBody"></div>
+      </main>
+    </div>
     <div id="usersPanel" style="display:none">
       <div class="toolbar">
         <div class="status-msg" id="usersStatusMsg">Loading…</div>
@@ -2402,6 +2527,28 @@
 </div>
 
 <!-- Delete: ask Makky (or, for Makky, delete now) -->
+<!-- Restaurant petty cash: money in / expense -->
+<div class="modal-overlay" id="rpModalOverlay">
+  <div class="modal r-form" style="max-width:460px;">
+    <h3 id="rpTitle">Petty cash</h3>
+    <label for="rpDay">Date</label>
+    <input type="date" id="rpDay">
+    <label for="rpDesc">Description</label>
+    <input type="text" id="rpDesc" maxlength="160" placeholder="e.g. Vegetables from market">
+    <div id="rpCatWrap"><label for="rpCat">Category</label><select id="rpCat"></select></div>
+    <label for="rpAmount">Amount (Rs.)</label>
+    <input type="number" id="rpAmount" min="0" step="0.01" inputmode="decimal">
+    <div id="rpInvWrap"><label for="rpInv">Bill / invoice no. (optional)</label>
+    <input type="text" id="rpInv" maxlength="60"></div>
+    <label for="rpNote">Note (optional)</label>
+    <input type="text" id="rpNote" maxlength="200">
+    <div class="r-err" id="rpError"></div>
+    <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
+      <button class="btn btn-cancel" id="rpCancel">Cancel</button>
+      <button class="btn btn-save" id="rpSave">Save</button></div></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="drAskModalOverlay">
   <div class="modal">
     <h3 id="drAskTitle">Delete</h3>
@@ -3903,6 +4050,10 @@ const AREAS = [
     changeLabel:'company details, logo, villa photos, tax, deposits', panel:'settingsPanel' },
   { key:'users',        label:'Users',             see:'tab_users',        change:'manage_users',
     changeLabel:'approve people and change their ticks',          panel:'usersPanel' },
+  { key:'rest_sda',     label:'🍽 SDA Restaurant ( Mezze )', see:'tab_rest_sda', change:'edit_rest_sda',
+    changeLabel:'daily sales and petty cash — only this restaurant', panel:'restPanel' },
+  { key:'rest_thai',    label:'🍜 Thai Charm Restaurant',    see:'tab_rest_thai', change:'edit_rest_thai',
+    changeLabel:'daily sales and petty cash — only this restaurant', panel:'restPanel' },
 ];
 const AREA = Object.fromEntries(AREAS.map(a => [a.key, a]));
 const TRUSTED_PERMS = [
@@ -3965,7 +4116,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.08-daywise';
+const APP_VERSION = 'v2026.10.13-loyverse';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4278,6 +4429,9 @@ const DB_CHECKS = [
   { file:'14-supabase-invoice-and-voucher-numbers.sql', what:'Invoice numbers, payment voucher numbers and which bank account',
     critical:false,
     test: async () => { HAS_PC_COLS = null; return await pcColsReady(); } },
+  { file:'27-supabase-restaurants.sql', what:'SDA Restaurant ( Mezze ) and Thai Charm Restaurant, kept apart from the villas',
+    critical:false,
+    test: async () => { const { error } = await sb.from('restaurants').select('id').limit(1); return !error; } },
   { file:'17-supabase-setup-history.sql', what:'Every earlier version of Invoices & Setup is kept and can be put back',
     critical:false,
     test: async () => { const { error } = await sb.from('app_settings_history').select('id').limit(1); return !error; } },
@@ -4324,8 +4478,8 @@ async function runDbSetupCheck(){
 function startApp(){
   applyRolePermissions();
   if(isAdmin()) runDbSetupCheck();
-  renderHK();
-  subscribeWeek(currentMonday);
+  if(hasVillaSide()){ renderHK(); subscribeWeek(currentMonday); }
+  initAreaSwitch();
 }
 
 function applyRolePermissions(){
@@ -4400,7 +4554,7 @@ function applyRolePermissions(){
   badge.style.cssText = 'font-size:11.5px; color:var(--muted); background:#fff; border:1px solid var(--board-line); padding:4px 10px; border-radius:20px;';
   // What the badge calls them now follows the ticks, not a job title.
   const whoLabel = hasPerm('admin') ? 'Admin'
-    : (canEdit() || hasPerm('edit_inventory') || hasPerm('edit_bookings')) ? 'Can record'
+    : (canEdit() || hasPerm('edit_inventory') || hasPerm('edit_bookings') || hasPerm('edit_rest_sda') || hasPerm('edit_rest_thai')) ? 'Can record'
     : 'View only';
   badge.className = 'who-badge';
   const initial = String(currentUser.username || '?').trim().charAt(0).toUpperCase() || '?';
@@ -11951,6 +12105,8 @@ const BIN_SECTIONS = {
   staff_profiles:           { label:'Staff & Payroll — staff',  area:'payroll' },
   staff:                    { label:'Housekeeping — staff',     area:'housekeeping' },
   villas:                   { label:'Villas',                   area:'housekeeping' },
+  restaurant_sales:         { label:'Restaurants — daily sales', area:'rest_sda' },
+  restaurant_petty:         { label:'Restaurants — petty cash',  area:'rest_sda' },
 };
 const BIN_TAB_OF = { pettycash:['petty_cash_transactions'], expenses:['petty_cash_transactions'], inventory:['inventory_transactions'],
   bookings:['villa_bookings'], villareport:['villa_operating_expenses','owner_payments','petty_cash_transactions'] };
@@ -11984,6 +12140,10 @@ function binSummary(table, r){
       return `Housekeeping staff: ${r.name || ''}`;
     case 'villas':
       return `Villa: ${r.name || r.id || ''}`;
+    case 'restaurant_sales':
+      return `${restDef(r.restaurant).name} sales ${r.slot || ''}: cash ${binMoney(r.cash)}, card ${binMoney(r.card)}${r.day ? ' · ' + r.day : ''}`;
+    case 'restaurant_petty':
+      return `${restDef(r.restaurant).name} petty cash ${r.kind === 'in' ? 'money in' : 'expense'}: ${r.description || ''} — ${binMoney(r.amount)}${r.day ? ' · ' + r.day : ''}`;
   }
   return table;
 }
@@ -16443,6 +16603,790 @@ function exportCompanyCSV(){
   downloadCSV(`company-accounts-${ymKey(coMonthDate)}.csv`, out);
 }
 
+
+/* ============================================================================
+   RESTAURANTS — SDA Restaurant ( Mezze ) and Thai Charm Restaurant
+   A separate area from the villas: own sales, own petty cash, own ticks.
+   Nothing here is ever added into villa expenses, Company Accounts or invoices.
+   ============================================================================ */
+const RESTAURANTS_DEF = [
+  { id:'sda',  name:'SDA Restaurant ( Mezze )', icon:'🍽' },
+  { id:'thai', name:'Thai Charm Restaurant',    icon:'🍜' },
+];
+const REST_DEFAULTS = { service_rate:10, staff_share:80, petty_allocation:150000, service_included:true, loyverse_store_id:null,
+  slots:['08:00 - 11:00','11:00 - 14:00','14:00 - 17:00','17:00 - 20:00','20:00 - 23:00'] };
+const REST_CATEGORIES = ['Groceries','Market Purchase','Kitchen Supplies','Beverages','Gas & Utilities','Cleaning',
+                         'Repairs & Maintenance','Transport','Miscellaneous'];
+const REST = { id:null, view:'dashboard', day:null, month:null, repFrom:null, repTo:null,
+               sales:[], petty:[], loadedFor:null, ready:null, chan:null, villaShown:[], editing:null, kind:'expense' };
+let REST_INFO = {};
+
+function restDef(id){ return RESTAURANTS_DEF.find(r => r.id === id) || { id, name:id, icon:'🍽' }; }
+function restInfo(id){ return Object.assign({ name:restDef(id).name }, REST_DEFAULTS, REST_INFO[id] || {}); }
+function restSees(id){ return canSee('rest_' + id); }
+function restEdits(id){ return hasPerm('edit_rest_' + id); }
+function restCanDelete(){ return isAdmin() || canDelete(); }
+function restList(){ return RESTAURANTS_DEF.filter(r => restSees(r.id)); }
+function hasVillaSide(){ return AREAS.some(a => !a.key.startsWith('rest_') && canSee(a.key)); }
+function rs(n){ const v = Math.round(Number(n) || 0); return 'Rs. ' + v.toLocaleString('en-US'); }
+function rnum(n){ return Math.round(Number(n) || 0).toLocaleString('en-US'); }
+function rDay(iso){ return iso ? parseISO(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : ''; }
+function rLong(iso){ return iso ? parseISO(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : ''; }
+function rMonthName(ym){ const [y,m] = ym.split('-').map(Number); return new Date(y, m-1, 1).toLocaleDateString('en-GB', { month:'long', year:'numeric' }); }
+function addDays(iso, n){ const d = parseISO(iso); d.setDate(d.getDate() + n); return toISO(d); }
+function monthStart(ym){ return ym + '-01'; }
+function monthEnd(ym){ const [y,m] = ym.split('-').map(Number); return toISO(new Date(y, m, 0)); }
+function shiftMonth(ym, n){ const [y,m] = ym.split('-').map(Number); const d = new Date(y, m-1+n, 1); return toISO(d).slice(0,7); }
+
+/* ---- the numbers ---- */
+function saleTotal(r){ return (Number(r.cash) || 0) + (Number(r.card) || 0) + (Number(r.transfer) || 0); }
+function saleIncl(r, info){ const v = r.service_included; return (v === null || v === undefined) ? info.service_included !== false : !!v; }
+/* Service charge included in the menu prices: of every Rs. 110 taken, Rs. 10 is service charge (10 / 110).
+   Added on top instead: 10% of the takings. */
+function scOf(total, rate, incl){ return incl ? total * rate / (100 + rate) : total * rate / 100; }
+function scWord(info){ return info.service_included !== false ? 'included in prices' : 'added on top'; }
+function saleRate(r, info){ const v = r.service_rate; return (v === null || v === undefined || v === '') ? Number(info.service_rate) : Number(v); }
+function sumSales(rows, info){
+  const o = { cash:0, card:0, transfer:0, total:0, sc:0 };
+  rows.forEach(r => { const t = saleTotal(r); o.cash += Number(r.cash) || 0; o.card += Number(r.card) || 0; o.transfer += Number(r.transfer) || 0;
+    o.total += t; o.sc += scOf(t, saleRate(r, info), saleIncl(r, info)); });
+  o.staff = o.sc * Number(info.staff_share) / 100; o.company = o.sc - o.staff; o.net = o.total - o.sc;
+  return o;
+}
+function salesBetween(from, to){ return REST.sales.filter(r => r.day >= from && r.day <= to); }
+function pettyBetween(from, to){ return REST.petty.filter(r => r.day >= from && r.day <= to); }
+function pettyBalanceBefore(day){
+  let b = 0; REST.petty.forEach(r => { if(r.day < day) b += r.kind === 'in' ? Number(r.amount) : -Number(r.amount); }); return b;
+}
+function pettySums(rows){ const o = { in:0, out:0 }; rows.forEach(r => { if(r.kind === 'in') o.in += Number(r.amount); else o.out += Number(r.amount); }); return o; }
+
+/* ---- the area switch: Villas | SDA | Thai ---- */
+function initAreaSwitch(){
+  const board = document.getElementById('board');
+  let bar = document.getElementById('areaSwitch');
+  const rests = restList();
+  const villas = hasVillaSide();
+  if(!rests.length){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div'); bar.id = 'areaSwitch'; bar.className = 'area-switch';
+    board.insertBefore(bar, board.querySelector(':scope > h1'));
+  }
+  const btns = [];
+  if(villas) btns.push(`<button data-area="villas">🏡 Villas</button>`);
+  rests.forEach(r => btns.push(`<button data-area="${esc(r.id)}">${r.icon} ${esc(restInfo(r.id).name)}</button>`));
+  bar.innerHTML = btns.join('');
+  bar.style.display = btns.length > 1 ? '' : 'none';
+  bar.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => {
+    if(b.dataset.area === 'villas') leaveRest(); else enterRest(b.dataset.area);
+  }));
+  markAreaSwitch();
+  fetchRestInfo().then(() => { // names may have been renamed in Settings
+    bar.querySelectorAll('[data-area]').forEach(b => { if(b.dataset.area !== 'villas') b.textContent = restDef(b.dataset.area).icon + ' ' + restInfo(b.dataset.area).name; });
+  });
+  if(!villas) enterRest(rests[0].id);
+}
+function markAreaSwitch(){
+  const bar = document.getElementById('areaSwitch'); if(!bar) return;
+  bar.querySelectorAll('[data-area]').forEach(b => b.classList.toggle('on', (REST.id || 'villas') === b.dataset.area));
+}
+function villaPanelIds(){ return [...new Set(AREAS.filter(a => !a.key.startsWith('rest_')).map(a => a.panel))]; }
+
+function enterRest(id){
+  if(!restSees(id)) return;
+  if(!REST.id){
+    REST.villaShown = villaPanelIds().filter(p => { const el = document.getElementById(p); return el && el.style.display !== 'none'; });
+    villaPanelIds().forEach(p => { const el = document.getElementById(p); if(el) el.style.display = 'none'; });
+  }
+  if(REST.id !== id){ REST.sales = []; REST.petty = []; REST.loadedFor = null; }
+  REST.id = id;
+  if(!REST.day) REST.day = todayISO();
+  if(!REST.month) REST.month = REST.day.slice(0,7);
+  if(REST.view === 'settings' && !isAdmin()) REST.view = 'dashboard';
+  document.body.classList.add('in-rest');
+  document.getElementById('restPanel').style.display = '';
+  markAreaSwitch();
+  restSubscribe();
+  restLoad().then(renderRest);
+  renderRest();
+}
+function leaveRest(){
+  if(!REST.id) return;
+  REST.id = null;
+  document.body.classList.remove('in-rest');
+  document.getElementById('restPanel').style.display = 'none';
+  (REST.villaShown.length ? REST.villaShown : ['housekeepingPanel']).forEach(p => { const el = document.getElementById(p); if(el) el.style.display = ''; });
+  markAreaSwitch();
+}
+
+/* ---- loading ---- */
+async function fetchRestInfo(){
+  if(!sb) return false;
+  const { data, error } = await sb.from('restaurants').select('*').order('sort_order', { ascending:true });
+  if(error){ REST.ready = false; return false; }
+  REST.ready = true;
+  (data || []).forEach(r => { REST_INFO[r.id] = r; });
+  return true;
+}
+async function restFetchAll(table, id){
+  const out = [];
+  for(let from = 0; from < 200000; from += 1000){
+    const { data, error } = await sb.from(table).select('*').eq('restaurant', id).order('day', { ascending:true }).range(from, from + 999);
+    if(error) throw error;
+    out.push(...(data || []));
+    if(!data || data.length < 1000) break;
+  }
+  return out;
+}
+async function restLoad(){
+  const id = REST.id; if(!id || !sb) return;
+  try{
+    await fetchRestInfo();
+    if(REST.ready === false) return;
+    const [s, p] = await Promise.all([restFetchAll('restaurant_sales', id), restFetchAll('restaurant_petty', id)]);
+    if(REST.id !== id) return;
+    REST.sales = s; REST.petty = p; REST.loadedFor = id;
+  }catch(e){ console.error('restaurant load', e); REST.loadError = e.message || 'Could not load.'; }
+}
+let restReloadTimer = null;
+function restSubscribe(){
+  if(REST.chan || !sb || !sb.channel) return;
+  const again = () => { clearTimeout(restReloadTimer); restReloadTimer = setTimeout(() => { if(REST.id) restLoad().then(renderRest); }, 300); };
+  REST.chan = sb.channel('restaurant_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'restaurant_sales' }, again)
+    .on('postgres_changes', { event:'*', schema:'public', table:'restaurant_petty' }, again)
+    .on('postgres_changes', { event:'*', schema:'public', table:'restaurants' }, again)
+    .subscribe();
+}
+
+/* ---- the frame: sidebar, header, date ---- */
+function renderRest(){
+  const id = REST.id; if(!id) return;
+  const info = restInfo(id);
+  document.getElementById('restIcon').textContent = restDef(id).icon;
+  document.getElementById('restName').textContent = info.name;
+  document.getElementById('restNavSettings').style.display = isAdmin() ? '' : 'none';
+  document.querySelectorAll('#restNav [data-rv]').forEach(b => b.classList.toggle('on', b.dataset.rv === REST.view));
+  const titles = {
+    dashboard:['Welcome to ' + info.name, 'Manage your daily sales, petty cash and service charge easily.'],
+    sales:['Daily Sales', 'Cash, card and bank transfer takings for each time of the day.'],
+    petty:['Petty Cash', 'Money given to the restaurant and what it was spent on.'],
+    service:['Service Charge', `${info.service_rate}% ${scWord(info)} — ${info.staff_share}% to employees, ${100 - info.staff_share}% to the company.`],
+    loyverse:['Loyverse Check', 'Compare what was entered here with Loyverse, day by day, in LKR.'],
+    monthly:['Monthly Summary', 'The month at a glance.'],
+    reports:['Reports', 'Any period, day by day — print or download.'],
+    settings:['Settings', 'Service charge, staff share, petty cash allocation, time slots and Loyverse.'],
+  };
+  const [t, s] = titles[REST.view] || titles.dashboard;
+  document.getElementById('restTitle').textContent = t;
+  document.getElementById('restSubtitle').textContent = s;
+  document.getElementById('restDateBox').style.display = ['dashboard','sales'].includes(REST.view) ? '' : 'none';
+  document.getElementById('restDay').value = REST.day;
+  const body = document.getElementById('restBody');
+  if(REST.ready === false){
+    body.innerHTML = `<div class="r-warn"><b>The restaurant section is not set up in the database yet.</b><br>
+      Run <b>27-supabase-restaurants.sql</b> in Supabase once, then reload this page.</div>`;
+    return;
+  }
+  if(REST.loadedFor !== id){ body.innerHTML = `<div class="r-muted" style="padding:30px 4px;">${REST.loadError ? esc(REST.loadError) : 'Loading…'}</div>`; return; }
+  const V = { dashboard:restDashboard, sales:restSalesView, petty:restPettyView, service:restServiceView,
+              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView };
+  (V[REST.view] || restDashboard)(body, info);
+}
+function restGo(view){ REST.view = view; renderRest(); document.querySelector('.rest-main').scrollIntoView({ block:'nearest' }); }
+
+/* ---- charts ---- */
+function restBarChart(days, info){
+  const W = 640, H = 270, L = 54, R = 10, T = 26, B = 32;
+  const data = days.map(d => { const s = sumSales(salesBetween(d, d), info); return { d, cash:s.cash, card:s.card, transfer:s.transfer, total:s.total }; });
+  const max = Math.max(1, ...data.map(x => x.total));
+  const step = [1000,2000,5000,10000,20000,25000,50000,100000,200000,250000,500000,1000000].find(s => max / s <= 4) || Math.ceil(max / 4);
+  const top = Math.ceil(max / step) * step;
+  const y = v => T + (H - T - B) * (1 - v / top);
+  const bw = Math.min(54, (W - L - R) / data.length * 0.55);
+  const cx = i => L + (W - L - R) * (i + 0.5) / data.length;
+  let g = '';
+  for(let v = 0; v <= top + 0.5; v += step){
+    g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e9ecf2" stroke-width="1"/>
+          <text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#6b7385">${rnum(v)}</text>`;
+  }
+  data.forEach((x, i) => {
+    const x0 = cx(i) - bw / 2, base = y(0), r = 4;
+    // cash at the bottom, then card, then transfer; 2px gaps; the top segment gets the rounded end
+    const segs = [['cash','var(--r-cash)'],['card','var(--r-card)'],['transfer','var(--r-tr)']]
+      .map(([k, col]) => ({ h: base - y(x[k]), col })).filter(sg => sg.h > 0.5);
+    let yb = base;
+    segs.forEach((sg, j) => {
+      const yt = yb - sg.h, last = j === segs.length - 1;
+      g += last ? `<path d="M${x0},${yb} V${Math.min(yb, yt + r)} q0,-${r} ${r},-${r} H${x0 + bw - r} q${r},0 ${r},${r} V${yb} Z" fill="${sg.col}"/>`
+                : `<rect x="${x0}" y="${yt}" width="${bw}" height="${sg.h}" fill="${sg.col}"/>`;
+      yb = yt - 2;
+    });
+    if(x.total > 0) g += `<text x="${cx(i)}" y="${y(x.total) - 7}" text-anchor="middle" font-size="11" font-weight="600" fill="#13233a">Rs. ${rnum(x.total)}</text>`;
+    g += `<text x="${cx(i)}" y="${H - 10}" text-anchor="middle" font-size="11.5" fill="#13233a">${esc(rDay(x.d))}</text>`;
+    g += `<rect class="r-hit" data-i="${i}" x="${cx(i) - (W - L - R) / data.length / 2}" y="${T}" width="${(W - L - R) / data.length}" height="${H - T - B}" fill="transparent"/>`;
+  });
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="#c9cfdb" stroke-width="1"/>`;
+  return { svg:`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sales for the last ${data.length} days, cash, card and transfer">${g}</svg>`, data };
+}
+function restWireTip(wrap, data){
+  const tip = wrap.querySelector('.r-tip');
+  wrap.querySelectorAll('.r-hit').forEach(h => {
+    h.addEventListener('mousemove', ev => {
+      const x = data[+h.dataset.i];
+      tip.innerHTML = `<b>${esc(rLong(x.d))}</b><br><span style="color:#7fd3a3">●</span> Cash ${esc(rs(x.cash))}<br><span style="color:#8fb4ff">●</span> Card ${esc(rs(x.card))}<br><span style="color:#f5b55c">●</span> Transfer ${esc(rs(x.transfer))}<br>Total <b>${esc(rs(x.total))}</b>`;
+      tip.style.display = 'block';
+      const b = wrap.getBoundingClientRect();
+      let left = ev.clientX - b.left + 14; if(left + 170 > b.width) left = ev.clientX - b.left - 180;
+      tip.style.left = left + 'px'; tip.style.top = Math.max(0, ev.clientY - b.top - 30) + 'px';
+    });
+    h.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    h.addEventListener('click', () => { REST.day = data[+h.dataset.i].d; renderRest(); });
+  });
+}
+function restDonut(staff, company, total){
+  const R = 62, C = 2 * Math.PI * R, sum = staff + company;
+  let arcs = '';
+  if(sum > 0){
+    const gap = staff > 0 && company > 0 ? 3 : 0;
+    const a = C * staff / sum, b = C * company / sum;
+    arcs = `<circle cx="85" cy="85" r="${R}" fill="none" stroke="var(--r-cash)" stroke-width="22" stroke-dasharray="${Math.max(0, a - gap)} ${C}" transform="rotate(-90 85 85)"/>
+            <circle cx="85" cy="85" r="${R}" fill="none" stroke="var(--r-co)" stroke-width="22" stroke-dasharray="${Math.max(0, b - gap)} ${C}" stroke-dashoffset="${-a}" transform="rotate(-90 85 85)"/>`;
+  } else arcs = `<circle cx="85" cy="85" r="${R}" fill="none" stroke="#e9ecf2" stroke-width="22"/>`;
+  return `<svg viewBox="0 0 170 170" role="img" aria-label="Service charge split">${arcs}
+    <text x="85" y="80" text-anchor="middle" font-size="14" font-weight="700" fill="#13233a">${esc(rs(total))}</text>
+    <text x="85" y="97" text-anchor="middle" font-size="9.5" fill="#6b7385">Total</text><text x="85" y="109" text-anchor="middle" font-size="9.5" fill="#6b7385">Service Charge</text></svg>`;
+}
+
+/* ---- Dashboard ---- */
+function restCard(color, icon, label, value, rows){
+  return `<div class="r-card"><div class="top"><div class="badge" style="background:${color}">${icon}</div>
+    <div style="min-width:0"><div class="lbl" style="color:${color}">${label}</div><div class="val">${value}</div></div></div>
+    <div class="rows">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div></div>`;
+}
+function restSlotRows(day, info){
+  const rows = salesBetween(day, day);
+  const slots = [...info.slots];
+  rows.forEach(r => { if(!slots.includes(r.slot)) slots.push(r.slot); });
+  return slots.map(sl => { const these = rows.filter(r => r.slot === sl); return { slot:sl, rows:these, s:sumSales(these, info) }; });
+}
+function restDashboard(body, info){
+  const d = REST.day, ym = d.slice(0,7);
+  const today = sumSales(salesBetween(d, d), info);
+  const usedMonth = pettySums(pettyBetween(monthStart(ym), d)).out;
+  const balance = pettyBalanceBefore(addDays(d, 1));
+  const days = Array.from({ length:7 }, (_, i) => addDays(d, i - 6));
+  const chart = restBarChart(days, info);
+  const slotRows = restSlotRows(d, info).filter(x => x.rows.length || info.slots.includes(x.slot));
+  // petty log: this month up to the chosen day, newest last, with running balance
+  const mRows = pettyBetween(monthStart(ym), d).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  let run = pettyBalanceBefore(monthStart(ym));
+  const logAll = mRows.map(r => { run += r.kind === 'in' ? Number(r.amount) : -Number(r.amount); return { r, bal:run }; });
+  const log = logAll.slice(-6);
+  const opening = pettyBalanceBefore(monthStart(ym));
+  body.innerHTML = `
+    <div class="r-cards">
+      ${restCard('#2f9e5b', '💵', 'Total Sales' + (d === todayISO() ? ' (Today)' : ' (' + esc(rDay(d)) + ')'), rs(today.total), [['Cash', rs(today.cash)], ['Card', rs(today.card)], ['Bank transfer', rs(today.transfer)]])}
+      ${restCard('#2563eb', '💳', `Service Charge (${esc(info.service_rate)}%)`, rs(today.sc), [[`Employees (${esc(info.staff_share)}%)`, rs(today.staff)], [`Company (${esc(100 - info.staff_share)}%)`, rs(today.company)]])}
+      ${restCard('#e8890c', '👛', 'Petty Cash Balance', rs(balance), [['Monthly Allocation', rs(info.petty_allocation)], ['Used This Month', rs(usedMonth)]])}
+      ${restCard('#7c3aed', '📈', 'Net Profit' + (d === todayISO() ? ' (Today)' : ' (' + esc(rDay(d)) + ')'), rs(today.net), [['Total Sales - Service Charge', ''], [esc(rs(today.total)) + ' - ' + esc(rnum(today.sc)), '']])}
+    </div>
+    <div class="r-grid2">
+      <div class="r-box"><h3><span>Sales Overview <small>(Last 7 Days)</small></span>
+        <span class="r-legend"><span><i style="background:var(--r-cash)"></i>Cash</span><span><i style="background:var(--r-card)"></i>Card</span><span><i style="background:var(--r-tr)"></i>Transfer</span></span></h3>
+        <div class="r-chart" id="restChart">${chart.svg}<div class="r-tip"></div></div></div>
+      <div class="r-box"><h3>Service Charge Breakdown <small>(${d === todayISO() ? 'Today' : esc(rDay(d))})</small></h3>
+        <div class="r-donut">${restDonut(today.staff, today.company, today.sc)}
+          <div class="lg"><div><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--r-cash);margin-right:5px"></i>Employees (${esc(info.staff_share)}%)<b>${rs(today.staff)}</b></div>
+          <div><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--r-co);margin-right:5px"></i>Company (${esc(100 - info.staff_share)}%)<b>${rs(today.company)}</b></div></div></div>
+        <div class="r-note">ⓘ ${info.service_included !== false ? `Service charge (${esc(info.service_rate)}%) is included in the prices: ${esc(info.service_rate)} of every ${esc(100 + Number(info.service_rate))} rupees taken.` : `Service charge is ${esc(info.service_rate)}% added on top of total sales.`}<br>${esc(info.staff_share)}% goes to employees and ${esc(100 - info.staff_share)}% to the company.</div></div>
+    </div>
+    <div class="r-grid3">
+      <div class="r-box"><h3><span>${d === todayISO() ? "Today's" : esc(rDay(d))} Sales Details</span><button class="r-link" data-go="sales">View All</button></h3>
+        <div class="r-scroll"><table class="r-table"><thead><tr><th>Time</th><th class="n">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Total</th><th class="n">Service</th></tr></thead>
+        <tbody>${slotRows.map(x => `<tr><td>${esc(x.slot)}</td><td class="n">${rnum(x.s.cash)}</td><td class="n">${rnum(x.s.card)}</td><td class="n">${rnum(x.s.transfer)}</td><td class="n">${rnum(x.s.total)}</td><td class="n">${rnum(x.s.sc)}</td></tr>`).join('')}
+        <tr class="tot"><td>Total</td><td class="n">${rnum(today.cash)}</td><td class="n">${rnum(today.card)}</td><td class="n">${rnum(today.transfer)}</td><td class="n">${rnum(today.total)}</td><td class="n">${rnum(today.sc)}</td></tr></tbody></table></div></div>
+      <div class="r-box"><h3><span>Petty Cash Log <small>(This Month)</small></span><button class="r-link" data-go="petty">View All</button></h3>
+        <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Description</th><th class="n">Amount (Rs.)</th><th class="n">Balance (Rs.)</th></tr></thead>
+        <tbody>${logAll.length > log.length ? '' : (opening ? `<tr><td>${esc(rDay(monthStart(ym)))}</td><td>Brought forward</td><td class="n"></td><td class="n">${rnum(opening)}</td></tr>` : '')}
+        ${log.map(x => `<tr><td>${esc(rDay(x.r.day))}</td><td class="wrap">${esc(x.r.kind === 'in' ? (x.r.description || 'Money in') : x.r.description)}</td>
+          <td class="n${x.r.kind === 'in' ? ' r-in' : ''}">${x.r.kind === 'in' ? '+' : ''}${rnum(x.r.amount)}</td><td class="n">${rnum(x.bal)}</td></tr>`).join('')
+          || '<tr><td colspan="4" class="r-muted">Nothing recorded this month yet.</td></tr>'}
+        <tr class="tot"><td colspan="3">Current Balance</td><td class="n">${rnum(balance)}</td></tr></tbody></table></div></div>
+      <div class="r-box">${restMonthSummaryBox(ym, info, 'restDashMonth')}</div>
+    </div>`;
+  restWireTip(body.querySelector('#restChart'), chart.data);
+  body.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => restGo(b.dataset.go)));
+  const ms = body.querySelector('#restDashMonth');
+  if(ms) ms.addEventListener('change', () => { if(ms.value){ body.querySelector('.r-sum').outerHTML = restMonthSumList(ms.value, info); } });
+}
+function restMonthSumList(ym, info){
+  const s = sumSales(salesBetween(monthStart(ym), monthEnd(ym)), info);
+  const p = pettySums(pettyBetween(monthStart(ym), monthEnd(ym)));
+  const left = pettyBalanceBefore(addDays(monthEnd(ym), 1));
+  const row = (bg, ic, label, v) => `<div><span class="b" style="background:${bg}">${ic}</span><span>${label}</span><b>${rs(v)}</b></div>`;
+  return `<div class="r-sum">
+    ${row('#e8f6ee', '📊', 'Total Sales', s.total)}
+    ${row('#e8f0fe', '💳', 'Total Service Charge', s.sc)}
+    ${row('#f1ebfe', '👥', `Employees Share (${esc(info.staff_share)}%)`, s.staff)}
+    ${row('#f1ebfe', '🏢', `Company Share (${esc(100 - info.staff_share)}%)`, s.company)}
+    ${row('#fff1de', '🧾', 'Total Petty Cash Used', p.out)}
+    ${row('#e8f6ee', '💰', 'Remaining Petty Cash', left)}</div>`;
+}
+function restMonthSummaryBox(ym, info, selId){
+  return `<h3><span>Monthly Summary</span><input type="month" id="${selId}" value="${esc(ym)}" style="padding:5px 8px;font-size:12px;"></h3>${restMonthSumList(ym, info)}`;
+}
+
+/* ---- Daily Sales ---- */
+function restSalesView(body, info){
+  const d = REST.day, edit = restEdits(REST.id), del = restCanDelete();
+  const rows = restSlotRows(d, info);
+  const tot = sumSales(salesBetween(d, d), info);
+  const recent = Array.from({ length:14 }, (_, i) => addDays(d, -i));
+  body.innerHTML = `
+    <div class="r-box" style="margin-bottom:16px;">
+      <h3><span>Sales for ${esc(rLong(d))}</span>${edit ? '' : '<small>View only</small>'}</h3>
+      <div class="r-scroll"><table class="r-table" id="restSalesTable"><thead><tr><th>Time</th><th class="n">Cash (Rs.)</th><th class="n">Card (Rs.)</th><th class="n">Bank transfer (Rs.)</th>
+        <th class="n">Total Sales</th><th class="n">Service Charge</th><th>Entered by</th>${del ? '<th></th>' : ''}</tr></thead><tbody>
+        ${rows.map((x, i) => { const r = x.rows[0];
+          const c = r ? Number(r.cash) : 0, k = r ? Number(r.card) : 0, t = r ? Number(r.transfer || 0) : 0;
+          return `<tr data-slot="${i}"><td>${esc(x.slot)}</td>
+            <td class="n">${edit ? `<input type="number" min="0" step="1" inputmode="decimal" data-f="cash" value="${r ? esc(c) : ''}" placeholder="0" aria-label="${esc(x.slot)} cash">` : rs(c)}</td>
+            <td class="n">${edit ? `<input type="number" min="0" step="1" inputmode="decimal" data-f="card" value="${r ? esc(k) : ''}" placeholder="0" aria-label="${esc(x.slot)} card">` : rs(k)}</td>
+            <td class="n">${edit ? `<input type="number" min="0" step="1" inputmode="decimal" data-f="transfer" value="${r ? esc(t) : ''}" placeholder="0" aria-label="${esc(x.slot)} bank transfer">` : rs(t)}</td>
+            <td class="n" data-t>${rs(x.s.total)}</td><td class="n" data-sc>${rs(x.s.sc)}</td>
+            <td class="r-muted" style="font-size:11.5px">${r ? esc(r.updated_by_email || r.created_by_email || '') : ''}</td>
+            ${del ? `<td>${r ? `<button class="r-btn danger" data-del-sale="${esc(r.id)}" title="Delete this line">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')}
+        <tr class="tot"><td>Total</td><td class="n" id="rsCash">${rs(tot.cash)}</td><td class="n" id="rsCard">${rs(tot.card)}</td><td class="n" id="rsTr">${rs(tot.transfer)}</td><td class="n" id="rsTot">${rs(tot.total)}</td><td class="n" id="rsSc">${rs(tot.sc)}</td><td></td>${del ? '<td></td>' : ''}</tr>
+      </tbody></table></div>
+      ${edit ? `<div class="r-toolbar" style="margin:14px 0 0;"><span class="sp r-muted" style="font-size:12px;">Leave a time blank if nothing was sold. Service charge: ${esc(info.service_rate)}% ${esc(scWord(info))}.</span>
+        <span class="r-err" id="rsErr" style="margin:0"></span><button class="r-btn primary" id="rsSave">Save ${esc(rDay(d))}</button></div>` : ''}
+    </div>
+    <div class="r-box"><h3>Last 14 days <small>click a day to open it</small></h3>
+      <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th class="n">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Total Sales</th><th class="n">Service Charge</th><th class="n">After service charge</th></tr></thead><tbody>
+      ${recent.map(x => { const s = sumSales(salesBetween(x, x), info);
+        return `<tr class="click" data-day="${esc(x)}"><td>${esc(rLong(x))}</td><td class="n">${rs(s.cash)}</td><td class="n">${rs(s.card)}</td><td class="n">${rs(s.transfer)}</td><td class="n">${rs(s.total)}</td><td class="n">${rs(s.sc)}</td><td class="n">${rs(s.net)}</td></tr>`; }).join('')}
+      </tbody></table></div></div>`;
+  body.querySelectorAll('tr[data-day]').forEach(tr => tr.addEventListener('click', () => { REST.day = tr.dataset.day; renderRest(); }));
+  body.querySelectorAll('[data-del-sale]').forEach(b => b.addEventListener('click', () => restDelete('restaurant_sales', b.dataset.delSale, 'this sales line')));
+  if(!edit) return;
+  const rate = Number(info.service_rate);
+  const recalc = () => {
+    let C = 0, K = 0, TR = 0, SC = 0;
+    body.querySelectorAll('tr[data-slot]').forEach(tr => {
+      const c = Number(tr.querySelector('[data-f="cash"]').value) || 0, k = Number(tr.querySelector('[data-f="card"]').value) || 0,
+            t = Number(tr.querySelector('[data-f="transfer"]').value) || 0;
+      C += c; K += k; TR += t;
+      tr.querySelector('[data-t]').textContent = rs(c + k + t);
+      const r = rows[+tr.dataset.slot].rows[0];
+      const sc = r ? scOf(c + k + t, saleRate(r, info), saleIncl(r, info)) : scOf(c + k + t, rate, info.service_included !== false); SC += sc;
+      tr.querySelector('[data-sc]').textContent = rs(sc);
+    });
+    document.getElementById('rsSc').textContent = rs(SC);
+    document.getElementById('rsCash').textContent = rs(C); document.getElementById('rsCard').textContent = rs(K);
+    document.getElementById('rsTr').textContent = rs(TR); document.getElementById('rsTot').textContent = rs(C + K + TR);
+  };
+  body.querySelectorAll('#restSalesTable input').forEach(i => i.addEventListener('input', recalc));
+  document.getElementById('rsSave').addEventListener('click', async () => {
+    const err = document.getElementById('rsErr'), btn = document.getElementById('rsSave');
+    err.textContent = '';
+    const jobs = [];
+    for(const tr of body.querySelectorAll('tr[data-slot]')){
+      const x = rows[+tr.dataset.slot], r = x.rows[0];
+      const cv = tr.querySelector('[data-f="cash"]').value.trim(), kv = tr.querySelector('[data-f="card"]').value.trim(),
+            tv = tr.querySelector('[data-f="transfer"]').value.trim();
+      const c = cv === '' ? 0 : Number(cv), k = kv === '' ? 0 : Number(kv), t = tv === '' ? 0 : Number(tv);
+      if(!isFinite(c) || !isFinite(k) || !isFinite(t) || c < 0 || k < 0 || t < 0){ err.textContent = 'Amounts must be 0 or more (' + x.slot + ').'; return; }
+      if(r){ if(c !== Number(r.cash) || k !== Number(r.card) || t !== Number(r.transfer || 0)) jobs.push(sb.from('restaurant_sales').update({ cash:c, card:k, transfer:t }).eq('id', r.id)); }
+      else if(c > 0 || k > 0 || t > 0) jobs.push(sb.from('restaurant_sales').insert({ restaurant:REST.id, day:d, slot:x.slot, cash:c, card:k, transfer:t }));
+    }
+    if(!jobs.length){ err.textContent = 'Nothing changed.'; return; }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const res = await Promise.all(jobs);
+    const bad = res.find(r => r && r.error);
+    btn.disabled = false; btn.textContent = 'Save ' + rDay(d);
+    if(bad){ err.textContent = 'Could not save — ' + (bad.error.message || 'check the connection.'); return; }
+    await restLoad(); renderRest();
+    const ok = document.getElementById('rsErr'); if(ok){ ok.style.color = '#1f7a55'; ok.textContent = '✓ Saved'; }
+  });
+}
+
+/* ---- Petty Cash ---- */
+function restPettyView(body, info){
+  const ym = REST.month, from = monthStart(ym), to = monthEnd(ym);
+  const edit = restEdits(REST.id), del = restCanDelete();
+  const opening = pettyBalanceBefore(from);
+  const rows = pettyBetween(from, to).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  const sums = pettySums(rows);
+  let run = opening;
+  const byCat = {};
+  rows.filter(r => r.kind === 'expense').forEach(r => { const c = r.category || 'Miscellaneous'; byCat[c] = (byCat[c] || 0) + Number(r.amount); });
+  body.innerHTML = `
+    <div class="r-toolbar">
+      <button class="r-btn" id="rpPrev">◀</button><input type="month" id="rpMonth" value="${esc(ym)}"><button class="r-btn" id="rpNext">▶</button>
+      <span class="sp"></span>
+      ${edit ? `<button class="r-btn" id="rpAddIn">＋ Money in</button><button class="r-btn primary" id="rpAddEx">＋ Expense</button>` : '<span class="r-muted">View only</span>'}
+    </div>
+    <div class="r-cards">
+      ${restCard('#6b7385', '📂', 'Brought forward', rs(opening), [['Balance on ' + rDay(from), '']])}
+      ${restCard('#2f9e5b', '⬇', 'Money in', rs(sums.in), [['Monthly Allocation', rs(info.petty_allocation)]])}
+      ${restCard('#e8890c', '🧾', 'Used This Month', rs(sums.out), [['Lines', String(rows.filter(r => r.kind === 'expense').length)]])}
+      ${restCard('#2563eb', '👛', 'Balance', rs(opening + sums.in - sums.out), [['End of ' + rMonthName(ym), '']])}
+    </div>
+    <div class="r-grid2" style="grid-template-columns:minmax(0,1fr)">
+      <div class="r-box"><h3>Petty Cash Log <small>${esc(rMonthName(ym))}</small></h3>
+        <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Bill no.</th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th><th>By</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+          <tr><td>${esc(rDay(from))}</td><td class="r-muted">Brought forward</td><td></td><td></td><td></td><td></td><td class="n">${rs(opening)}</td><td></td>${edit || del ? '<td></td>' : ''}</tr>
+          ${rows.map(r => { run += r.kind === 'in' ? Number(r.amount) : -Number(r.amount);
+            return `<tr><td>${esc(rDay(r.day))}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}</td>
+              <td>${r.kind === 'in' ? '<span class="r-in">Money in</span>' : esc(r.category || '')}</td><td>${esc(r.invoice_no || '')}</td>
+              <td class="n r-in">${r.kind === 'in' ? rs(r.amount) : ''}</td><td class="n">${r.kind === 'expense' ? rs(r.amount) : ''}</td><td class="n">${rs(run)}</td>
+              <td class="r-muted" style="font-size:11px">${esc((r.created_by_email || '').split('@')[0])}</td>
+              ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn" data-edit-p="${esc(r.id)}" title="Correct">✏️</button>` : ''}${del ? ` <button class="r-btn danger" data-del-p="${esc(r.id)}" title="Delete">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')}
+          <tr class="tot"><td colspan="4">Totals / balance</td><td class="n">${rs(sums.in)}</td><td class="n">${rs(sums.out)}</td><td class="n">${rs(run)}</td><td></td>${edit || del ? '<td></td>' : ''}</tr>
+        </tbody></table></div></div>
+      <div class="r-box" style="max-width:560px"><h3>Spent by category <small>${esc(rMonthName(ym))}</small></h3>
+        <table class="r-table"><tbody>${Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(c => `<tr><td>${esc(c)}</td><td class="n">${rs(byCat[c])}</td><td class="n r-muted">${sums.out ? Math.round(byCat[c] / sums.out * 100) + '%' : ''}</td></tr>`).join('')
+          || '<tr><td class="r-muted">No expenses this month.</td></tr>'}
+          <tr class="tot"><td>Total</td><td class="n">${rs(sums.out)}</td><td></td></tr></tbody></table></div>
+    </div>`;
+  const setM = m => { if(m){ REST.month = m; renderRest(); } };
+  body.querySelector('#rpPrev').addEventListener('click', () => setM(shiftMonth(ym, -1)));
+  body.querySelector('#rpNext').addEventListener('click', () => setM(shiftMonth(ym, 1)));
+  body.querySelector('#rpMonth').addEventListener('change', e => setM(e.target.value));
+  if(edit){
+    body.querySelector('#rpAddIn').addEventListener('click', () => restOpenPetty('in'));
+    body.querySelector('#rpAddEx').addEventListener('click', () => restOpenPetty('expense'));
+    body.querySelectorAll('[data-edit-p]').forEach(b => b.addEventListener('click', () => {
+      const r = REST.petty.find(x => String(x.id) === b.dataset.editP); if(r) restOpenPetty(r.kind, r);
+    }));
+  }
+  body.querySelectorAll('[data-del-p]').forEach(b => b.addEventListener('click', () => restDelete('restaurant_petty', b.dataset.delP, 'this petty cash line')));
+}
+function restOpenPetty(kind, row){
+  REST.kind = kind; REST.editing = row || null;
+  const info = restInfo(REST.id);
+  document.getElementById('rpTitle').textContent = (row ? 'Correct ' : '') + (kind === 'in' ? 'Money in' : 'Expense') + ' — ' + info.name;
+  document.getElementById('rpCatWrap').style.display = kind === 'in' ? 'none' : '';
+  document.getElementById('rpInvWrap').style.display = kind === 'in' ? 'none' : '';
+  const cat = document.getElementById('rpCat');
+  cat.innerHTML = REST_CATEGORIES.map(c => `<option>${esc(c)}</option>`).join('');
+  const today = todayISO();
+  document.getElementById('rpDay').value = row ? row.day : (REST.month === today.slice(0,7) ? today : monthEnd(REST.month));
+  document.getElementById('rpDesc').value = row ? row.description : (kind === 'in' ? 'Petty cash allocation' : '');
+  if(row && row.category && !REST_CATEGORIES.includes(row.category)) cat.insertAdjacentHTML('beforeend', `<option>${esc(row.category)}</option>`);
+  cat.value = row && row.category ? row.category : 'Groceries';
+  document.getElementById('rpAmount').value = row ? row.amount : (kind === 'in' ? info.petty_allocation : '');
+  document.getElementById('rpInv').value = row ? (row.invoice_no || '') : '';
+  document.getElementById('rpNote').value = row ? (row.note || '') : '';
+  document.getElementById('rpError').textContent = '';
+  document.getElementById('rpModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById(kind === 'in' ? 'rpAmount' : 'rpDesc').focus(), 30);
+}
+async function restSavePetty(){
+  const err = document.getElementById('rpError');
+  const day = document.getElementById('rpDay').value;
+  const description = document.getElementById('rpDesc').value.trim();
+  const amount = Number(document.getElementById('rpAmount').value);
+  if(!day){ err.textContent = 'Pick the date.'; return; }
+  if(!description){ err.textContent = 'Write what it was.'; return; }
+  if(!(amount > 0)){ err.textContent = 'Enter an amount above 0.'; return; }
+  const rec = { day, description, amount, kind:REST.kind,
+    category: REST.kind === 'in' ? null : document.getElementById('rpCat').value,
+    invoice_no: REST.kind === 'in' ? null : (document.getElementById('rpInv').value.trim() || null),
+    note: document.getElementById('rpNote').value.trim() || null };
+  const btn = document.getElementById('rpSave'); btn.disabled = true;
+  const res = REST.editing ? await sb.from('restaurant_petty').update(rec).eq('id', REST.editing.id)
+                           : await sb.from('restaurant_petty').insert(Object.assign({ restaurant:REST.id }, rec));
+  btn.disabled = false;
+  if(res.error){ err.textContent = 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
+  document.getElementById('rpModalOverlay').classList.remove('open');
+  REST.month = day.slice(0,7);
+  await restLoad(); renderRest();
+}
+async function restDelete(table, id, what){
+  if(!restCanDelete()) return;
+  if(!confirm('Delete ' + what + '? It goes to Deleted items and can be put back.')) return;
+  const { error } = await sb.from(table).delete().eq('id', id);
+  if(error){ alert('Could not delete — ' + (error.message || 'check the connection.')); return; }
+  await restLoad(); renderRest();
+}
+
+/* ---- Service Charge ---- */
+function restMonthBar(id, ym){
+  return `<div class="r-toolbar"><button class="r-btn" data-mshift="-1">◀</button><input type="month" id="${id}" value="${esc(ym)}"><button class="r-btn" data-mshift="1">▶</button><span class="sp"></span>
+    <button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button></div>`;
+}
+function restWireMonthBar(body, id){
+  body.querySelectorAll('[data-mshift]').forEach(b => b.addEventListener('click', () => { REST.month = shiftMonth(REST.month, +b.dataset.mshift); renderRest(); }));
+  body.querySelector('#' + id).addEventListener('change', e => { if(e.target.value){ REST.month = e.target.value; renderRest(); } });
+}
+function restDaysOf(from, to){ const out = []; for(let d = from; d <= to; d = addDays(d, 1)) out.push(d); return out; }
+function restServiceView(body, info){
+  const ym = REST.month, days = restDaysOf(monthStart(ym), monthEnd(ym));
+  const all = sumSales(salesBetween(monthStart(ym), monthEnd(ym)), info);
+  const lines = days.map(d => ({ d, s:sumSales(salesBetween(d, d), info) })).filter(x => x.s.total > 0);
+  const head = ['Date','Total Sales','Service Charge',`Employees (${info.staff_share}%)`,`Company (${100 - info.staff_share}%)`];
+  const table = lines.map(x => [rLong(x.d), x.s.total, x.s.sc, x.s.staff, x.s.company]);
+  const tot = ['Total', all.total, all.sc, all.staff, all.company];
+  body.innerHTML = restMonthBar('rscMonth', ym) + `
+    <div class="r-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      ${restCard('#2563eb', '💳', 'Total Service Charge', rs(all.sc), [['From sales of', rs(all.total)]])}
+      ${restCard('#2f9e5b', '👥', `Employees (${esc(info.staff_share)}%)`, rs(all.staff), [['To share among the staff', '']])}
+      ${restCard('#8b5cf6', '🏢', `Company (${esc(100 - info.staff_share)}%)`, rs(all.company), [['Kept by the restaurant', '']])}
+    </div>
+    <div class="r-box"><h3>Day by day <small>${esc(rMonthName(ym))}</small></h3>${restTableHTML(head, table, tot)}</div>`;
+  restWireMonthBar(body, 'rscMonth');
+  restWireExport(body, 'Service charge — ' + info.name + ' — ' + rMonthName(ym), head, table, tot);
+}
+function restTableHTML(head, rows, tot){
+  const cell = v => typeof v === 'number' ? `<td class="n">${rs(v)}</td>` : `<td>${esc(v)}</td>`;
+  return `<div class="r-scroll"><table class="r-table"><thead><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('') || `<tr><td colspan="${head.length}" class="r-muted">Nothing recorded in this period.</td></tr>`}
+    ${tot ? `<tr class="tot">${tot.map(cell).join('')}</tr>` : ''}</tbody></table></div>`;
+}
+function restWireExport(body, title, head, rows, tot){
+  const all = tot ? rows.concat([tot]) : rows;
+  const p = body.querySelector('[data-print]'), c = body.querySelector('[data-csv]');
+  if(c) c.addEventListener('click', () => {
+    const q = v => { const s = typeof v === 'number' ? String(Math.round(v * 100) / 100) : String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const csv = [head].concat(all).map(r => r.map(q).join(',')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' }));
+    a.download = title.replace(/[^\w\- ()]+/g, '').replace(/\s+/g, ' ').trim() + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+  if(p) p.addEventListener('click', () => {
+    const w = window.open('', '_blank'); if(!w) return;
+    const cell = v => typeof v === 'number' ? `<td style="text-align:right">${esc(rs(v))}</td>` : `<td>${esc(v)}</td>`;
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+      <style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:12px}
+      th,td{border:1px solid #d5dae3;padding:6px 8px}th{background:#f2f4f8;text-align:left}tr:last-child td{font-weight:bold;background:#e8f6ee}</style></head>
+      <body><h2 style="margin:0 0 4px">${esc(title)}</h2><div style="color:#6b7385;font-size:12px;margin-bottom:12px">Printed ${esc(rLong(todayISO()))}</div>
+      <table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${all.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('')}</tbody></table></body></html>`);
+    w.document.close(); setTimeout(() => w.print(), 300);
+  });
+}
+
+/* ---- Monthly Summary ---- */
+function restMonthlyView(body, info){
+  const ym = REST.month, from = monthStart(ym), to = monthEnd(ym);
+  const s = sumSales(salesBetween(from, to), info), p = pettySums(pettyBetween(from, to));
+  const head = ['Date','Cash','Card','Transfer','Total Sales','Service Charge','After service charge','Petty cash used'];
+  const rows = restDaysOf(from, to).map(d => { const x = sumSales(salesBetween(d, d), info), q = pettySums(pettyBetween(d, d));
+    return (x.total || q.out) ? [rLong(d), x.cash, x.card, x.transfer, x.total, x.sc, x.net, q.out] : null; }).filter(Boolean);
+  const tot = ['Total', s.cash, s.card, s.transfer, s.total, s.sc, s.net, p.out];
+  body.innerHTML = restMonthBar('rmMonth', ym) + `
+    <div class="r-grid2" style="grid-template-columns:minmax(0,1fr)">
+      <div class="r-box" style="max-width:560px"><h3>${esc(rMonthName(ym))}</h3>${restMonthSumList(ym, info)}
+        <div class="r-note">After service charge and petty cash: <b>${rs(s.net - p.out)}</b><br>Days with sales: ${rows.filter(r => r[4] > 0).length} · Average a day: ${rs(rows.filter(r => r[4] > 0).length ? s.total / rows.filter(r => r[4] > 0).length : 0)}</div></div>
+      <div class="r-box"><h3>Day by day</h3>${restTableHTML(head, rows, tot)}</div>
+    </div>`;
+  restWireMonthBar(body, 'rmMonth');
+  restWireExport(body, 'Monthly summary — ' + info.name + ' — ' + rMonthName(ym), head, rows, tot);
+}
+
+/* ---- Reports ---- */
+function restReportsView(body, info){
+  if(!REST.repFrom){ REST.repFrom = monthStart(REST.month); REST.repTo = monthEnd(REST.month); }
+  const from = REST.repFrom, to = REST.repTo;
+  const head = ['Date','Cash','Card','Transfer','Total Sales','Service Charge','Employees','Company','Petty cash in','Petty cash used'];
+  const rows = (from <= to ? restDaysOf(from, to) : []).map(d => { const x = sumSales(salesBetween(d, d), info), q = pettySums(pettyBetween(d, d));
+    return (x.total || q.in || q.out) ? [rLong(d), x.cash, x.card, x.transfer, x.total, x.sc, x.staff, x.company, q.in, q.out] : null; }).filter(Boolean);
+  const s = sumSales(salesBetween(from, to), info), p = pettySums(pettyBetween(from, to));
+  const tot = ['Total', s.cash, s.card, s.transfer, s.total, s.sc, s.staff, s.company, p.in, p.out];
+  const both = restList().length > 1;
+  body.innerHTML = `
+    <div class="r-toolbar">
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">From <input type="date" id="rrFrom" value="${esc(from)}"></label>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">To <input type="date" id="rrTo" value="${esc(to)}"></label>
+      <button class="r-btn" data-q="month">This month</button><button class="r-btn" data-q="last">Last month</button><button class="r-btn" data-q="7">Last 7 days</button>
+      <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
+    </div>
+    <div class="r-box" style="margin-bottom:16px;"><h3>${esc(info.name)} <small>${esc(rLong(from))} – ${esc(rLong(to))}</small></h3>${restTableHTML(head, rows, tot)}</div>
+    ${both ? `<div class="r-box"><h3>Both restaurants <small>same period</small></h3><div id="rrBoth" class="r-muted">Loading…</div></div>` : ''}`;
+  const set = (f, t) => { REST.repFrom = f; REST.repTo = t; renderRest(); };
+  body.querySelector('#rrFrom').addEventListener('change', e => { if(e.target.value) set(e.target.value, to); });
+  body.querySelector('#rrTo').addEventListener('change', e => { if(e.target.value) set(from, e.target.value); });
+  body.querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => {
+    const t = todayISO(), ym = t.slice(0,7);
+    if(b.dataset.q === 'month') set(monthStart(ym), monthEnd(ym));
+    else if(b.dataset.q === 'last'){ const l = shiftMonth(ym, -1); set(monthStart(l), monthEnd(l)); }
+    else set(addDays(t, -6), t);
+  }));
+  restWireExport(body, 'Report — ' + info.name + ' — ' + rLong(from) + ' to ' + rLong(to), head, rows, tot);
+  if(both) restBothRestaurants(from, to);
+}
+async function restBothRestaurants(from, to){
+  const out = [];
+  for(const r of restList()){
+    const info = restInfo(r.id);
+    const [{ data:s, error:e1 }, { data:p, error:e2 }] = await Promise.all([
+      sb.from('restaurant_sales').select('*').eq('restaurant', r.id).gte('day', from).lte('day', to).range(0, 9999),
+      sb.from('restaurant_petty').select('*').eq('restaurant', r.id).gte('day', from).lte('day', to).range(0, 9999)]);
+    if(e1 || e2){ out.push([info.name, 'Could not load']); continue; }
+    const x = sumSales(s || [], info), q = pettySums(p || []);
+    out.push([info.name, x.total, x.sc, x.net, q.out, x.net - q.out]);
+  }
+  const el = document.getElementById('rrBoth'); if(!el || REST.repFrom !== from || REST.repTo !== to) return;
+  const nums = out.filter(r => r.length > 2);
+  const tot = nums.length ? ['Both', ...[1,2,3,4,5].map(i => nums.reduce((a, r) => a + r[i], 0))] : null;
+  el.classList.remove('r-muted');
+  el.innerHTML = restTableHTML(['Restaurant','Total Sales','Service Charge','After service charge','Petty cash used','Left after both'], out, tot);
+}
+
+/* ---- Settings (Makky) ---- */
+function restSettingsView(body, info){
+  if(!isAdmin()){ body.innerHTML = '<div class="r-warn">Only Makky can change restaurant settings.</div>'; return; }
+  body.innerHTML = `<div class="r-box r-form" style="max-width:560px;">
+    <h3>${esc(info.name)}</h3>
+    <label for="rsName">Restaurant name</label><input type="text" id="rsName" maxlength="80" value="${esc(info.name)}">
+    <label for="rsRate">Service charge (% of sales)</label><input type="number" id="rsRate" min="0" max="100" step="0.5" value="${esc(info.service_rate)}">
+    <label style="display:flex;gap:8px;align-items:center;font-weight:600;color:var(--r-ink);margin-top:10px"><input type="checkbox" id="rsIncl" style="width:auto" ${info.service_included !== false ? 'checked' : ''}> Service charge is included in the menu prices</label>
+    <label for="rsShare">Employees' share of the service charge (%)</label><input type="number" id="rsShare" min="0" max="100" step="1" value="${esc(info.staff_share)}">
+    <label for="rsAlloc">Petty cash monthly allocation (Rs.)</label><input type="number" id="rsAlloc" min="0" step="100" value="${esc(info.petty_allocation)}">
+    <label for="rsStore">Loyverse store for this restaurant</label>
+    <div style="display:flex;gap:8px"><select id="rsStore" style="flex:1"><option value="">${info.loyverse_store_id ? 'Saved store (' + esc(String(info.loyverse_store_id).slice(0,8)) + '…)' : 'Not chosen — only needed if Loyverse has more than one store'}</option></select>
+      <button class="r-btn" type="button" id="rsStoreLoad" style="white-space:nowrap">Load stores</button></div>
+    <div class="r-muted" id="rsStoreMsg" style="font-size:12px;margin-top:4px"></div>
+    <label for="rsSlots">Time slots for daily sales — one per line</label><textarea id="rsSlots" rows="6">${esc(info.slots.join('\n'))}</textarea>
+    <div class="r-note">A change to the service charge % (or to "included in prices") applies to sales entered from now on. Days already entered keep what they were saved with.</div>
+    <div class="r-err" id="rsSetErr"></div>
+    <div style="display:flex;justify-content:flex-end"><button class="r-btn primary" id="rsSetSave">Save settings</button></div></div>`;
+  document.getElementById('rsSetSave').addEventListener('click', async () => {
+    const err = document.getElementById('rsSetErr'); err.style.color = ''; err.textContent = '';
+    const rec = { name:document.getElementById('rsName').value.trim(),
+      service_rate:Number(document.getElementById('rsRate').value), staff_share:Number(document.getElementById('rsShare').value),
+      petty_allocation:Number(document.getElementById('rsAlloc').value),
+      service_included:document.getElementById('rsIncl').checked,
+      slots:[...new Set(document.getElementById('rsSlots').value.split('\n').map(s => s.trim()).filter(Boolean))] };
+    if(!rec.name){ err.textContent = 'The name cannot be empty.'; return; }
+    if(!(rec.service_rate >= 0 && rec.service_rate <= 100) || !(rec.staff_share >= 0 && rec.staff_share <= 100)){ err.textContent = 'Percentages must be between 0 and 100.'; return; }
+    if(!(rec.petty_allocation >= 0)){ err.textContent = 'The allocation cannot be negative.'; return; }
+    if(!rec.slots.length){ err.textContent = 'Keep at least one time slot.'; return; }
+    const st = document.getElementById('rsStore').value; if(st) rec.loyverse_store_id = st;
+    let { error } = await sb.from('restaurants').update(rec).eq('id', REST.id);
+    if(error && /service_included|loyverse_store_id|transfer/.test(error.message || '')){
+      error = { message:'run 28-supabase-restaurants-loyverse.sql in Supabase first' };
+    }
+    if(error){ err.textContent = 'Could not save — ' + (error.message || 'check the connection.'); return; }
+    REST_INFO[REST.id] = Object.assign({}, REST_INFO[REST.id] || {}, rec, { id:REST.id });
+    initAreaSwitch(); renderRest();
+    const e2 = document.getElementById('rsSetErr'); if(e2){ e2.style.color = '#1f7a55'; e2.textContent = '✓ Saved'; }
+  });
+  document.getElementById('rsStoreLoad').addEventListener('click', async () => {
+    const msg = document.getElementById('rsStoreMsg'); msg.textContent = 'Asking Loyverse…';
+    const res = await restCallLoyverse({ action:'stores', restaurant:REST.id });
+    if(res.error){ msg.textContent = res.error; return; }
+    const sel = document.getElementById('rsStore');
+    sel.innerHTML = '<option value="">— choose —</option>' + (res.data.stores || []).map(x =>
+      `<option value="${esc(x.id)}" ${x.id === info.loyverse_store_id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+    msg.textContent = `Loyverse account: ${res.data.merchant || ''} · currency ${res.data.currency || '?'}${res.data.currency === 'LKR' ? ' ✓' : ' — not LKR!'}. Pick the store, then Save settings.`;
+  });
+}
+
+/* ---- wiring ---- */
+document.querySelectorAll('#restNav [data-rv]').forEach(b => b.addEventListener('click', () => restGo(b.dataset.rv)));
+document.getElementById('restDay').addEventListener('change', e => { if(e.target.value){ REST.day = e.target.value; renderRest(); } });
+document.getElementById('restDayPrev').addEventListener('click', () => { REST.day = addDays(REST.day, -1); renderRest(); });
+document.getElementById('restDayNext').addEventListener('click', () => { REST.day = addDays(REST.day, 1); renderRest(); });
+document.getElementById('restToday').addEventListener('click', () => { REST.day = todayISO(); renderRest(); });
+document.getElementById('rpCancel').addEventListener('click', () => document.getElementById('rpModalOverlay').classList.remove('open'));
+document.getElementById('rpSave').addEventListener('click', restSavePetty);
+
+
+/* ---- Loyverse check ----
+   The page never sees the Loyverse access token: it asks our own Supabase function
+   ("loyverse"), which checks the person may see this restaurant, then reads Loyverse
+   with the token kept in Supabase secrets and sends back only daily totals. */
+async function restCallLoyverse(body){
+  if(!sb || !sb.functions) return { error:'Not connected.' };
+  try{
+    const { data, error } = await sb.functions.invoke('loyverse', { body });
+    if(error){
+      let m = error.message || 'Could not reach Loyverse.';
+      try{ const j = error.context && await error.context.json(); if(j && j.error) m = j.error; }catch(e){}
+      if(/not found|404|Failed to send/i.test(m)) m = 'The Loyverse link is not set up in Supabase yet (the "loyverse" function). See the setup steps in the README.';
+      return { error:m };
+    }
+    if(data && data.error) return { error:data.error };
+    return { data };
+  }catch(e){ return { error:e.message || 'Could not reach Loyverse.' }; }
+}
+function restLoyverseView(body, info){
+  if(!REST.lvFrom){ REST.lvFrom = monthStart(todayISO().slice(0,7)); REST.lvTo = todayISO(); }
+  const from = REST.lvFrom, to = REST.lvTo;
+  body.innerHTML = `
+    <div class="r-toolbar">
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">From <input type="date" id="lvFrom" value="${esc(from)}"></label>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">To <input type="date" id="lvTo" value="${esc(to)}"></label>
+      <button class="r-btn" data-lq="y">Yesterday</button><button class="r-btn" data-lq="m">This month</button><button class="r-btn" data-lq="l">Last month</button>
+      <span class="sp"></span><button class="r-btn primary" id="lvRun">🔄 Check with Loyverse</button>
+    </div>
+    <div id="lvOut">${REST.lvResult && REST.lvResult.id === REST.id && REST.lvResult.from === from && REST.lvResult.to === to
+      ? '' : '<div class="r-box r-muted">Pick the days and press <b>Check with Loyverse</b>. Each day here is compared with Loyverse: cash, card, bank transfer and the total.</div>'}</div>`;
+  const set = (f, t) => { REST.lvFrom = f; REST.lvTo = t; renderRest(); };
+  body.querySelector('#lvFrom').addEventListener('change', e => { if(e.target.value) set(e.target.value, to); });
+  body.querySelector('#lvTo').addEventListener('change', e => { if(e.target.value) set(from, e.target.value); });
+  body.querySelectorAll('[data-lq]').forEach(b => b.addEventListener('click', () => {
+    const t = todayISO(), ym = t.slice(0,7);
+    if(b.dataset.lq === 'y') set(addDays(t, -1), addDays(t, -1));
+    else if(b.dataset.lq === 'm') set(monthStart(ym), t);
+    else { const l = shiftMonth(ym, -1); set(monthStart(l), monthEnd(l)); }
+  }));
+  body.querySelector('#lvRun').addEventListener('click', () => restLoyverseRun(from, to));
+  if(REST.lvResult && REST.lvResult.id === REST.id && REST.lvResult.from === from && REST.lvResult.to === to) restLoyverseShow(REST.lvResult.data, info);
+}
+async function restLoyverseRun(from, to){
+  const out = document.getElementById('lvOut'), btn = document.getElementById('lvRun');
+  if(from > to){ out.innerHTML = '<div class="r-warn">The "From" day is after the "To" day.</div>'; return; }
+  out.innerHTML = '<div class="r-box r-muted">Checking with Loyverse…</div>'; btn.disabled = true;
+  const id = REST.id;
+  const res = await restCallLoyverse({ action:'check', restaurant:id, from, to });
+  btn.disabled = false;
+  if(REST.id !== id || REST.view !== 'loyverse') return;
+  if(res.error){ out.innerHTML = `<div class="r-warn">${esc(res.error)}</div>`; return; }
+  REST.lvResult = { id, from, to, data:res.data };
+  restLoyverseShow(res.data, restInfo(id));
+}
+function restLoyverseShow(lv, info){
+  const out = document.getElementById('lvOut'); if(!out) return;
+  const from = REST.lvFrom, to = REST.lvTo;
+  const cur = String(lv.currency || '').toUpperCase();
+  const days = restDaysOf(from, to);
+  const L = lv.days || {};
+  let ok = 0, bad = 0, diffSum = 0;
+  const keys = ['cash','card','transfer'];
+  const rows = days.map(d => {
+    const a = sumSales(salesBetween(d, d), info), b = Object.assign({ cash:0, card:0, transfer:0, other:0, total:0, receipts:0, refunds:0 }, L[d] || {});
+    if(!a.total && !b.total && !b.receipts) return null;
+    const diff = a.total - b.total;
+    const each = keys.map(k => Math.abs(a[k] - b[k]) < 1);
+    const match = Math.abs(diff) < 1 && each.every(Boolean) && Math.abs(b.other) < 1;
+    match ? ok++ : bad++; diffSum += diff;
+    const pair = (x, y, same) => `<td class="n"><b>${rnum(x)}</b><div style="font-size:11px;color:${same ? '#6b7385' : '#c92a2a'}">${rnum(y)}</div></td>`;
+    return `<tr><td>${esc(rLong(d))}<div class="r-muted" style="font-size:11px">${esc(b.receipts)} receipts${b.refunds ? ' · ' + esc(b.refunds) + ' refunds' : ''}</div></td>
+      ${pair(a.cash, b.cash, each[0])}${pair(a.card, b.card, each[1])}${pair(a.transfer, b.transfer, each[2])}
+      <td class="n">${b.other ? `<span style="color:#c92a2a">${rnum(b.other)}</span>` : '—'}</td>
+      ${pair(a.total, b.total, Math.abs(diff) < 1)}
+      <td class="n" style="font-weight:700;color:${Math.abs(diff) < 1 ? '#1f7a55' : '#c92a2a'}">${Math.abs(diff) < 1 ? '0' : (diff > 0 ? '+' : '') + rnum(diff)}</td>
+      <td>${match ? '✅' : '⚠️'}</td></tr>`;
+  }).filter(Boolean);
+  const names = lv.payment_names || {};
+  const nameLine = k => (names[k] && names[k].length) ? names[k].map(esc).join(', ') : '—';
+  out.innerHTML = `
+    <div class="r-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      ${restCard(cur === 'LKR' ? '#2f9e5b' : '#c92a2a', cur === 'LKR' ? '✓' : '!', 'Loyverse currency', esc(cur || '?'),
+        [[cur === 'LKR' ? 'Everything is in LKR' : 'Not LKR — figures cannot be compared', ''], ['Store', esc((lv.store && lv.store.name) || '')]])}
+      ${restCard('#2563eb', '✅', 'Days that match', String(ok), [['Days with a difference', String(bad)]])}
+      ${restCard(Math.abs(diffSum) < 1 ? '#2f9e5b' : '#e8890c', '±', 'Difference', (diffSum > 0 ? '+' : '') + rs(diffSum),
+        [['Entered here minus Loyverse', ''], [lv.complete === false ? 'Loyverse list was cut short — check fewer days' : 'Loyverse receipts', lv.complete === false ? '' : esc(String(lv.receipts || 0))]])}
+    </div>
+    <div class="r-box"><h3><span>Day by day <small>top: entered here · below: Loyverse</small></span></h3>
+      <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th class="n">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Other in Loyverse</th><th class="n">Total</th><th class="n">Difference</th><th></th></tr></thead>
+      <tbody>${rows.join('') || '<tr><td colspan="8" class="r-muted">No sales here or in Loyverse for these days.</td></tr>'}</tbody></table></div>
+      <div class="r-note">Loyverse payment types are counted as — <b>Cash:</b> ${nameLine('cash')} · <b>Card:</b> ${nameLine('card')} · <b>Transfer:</b> ${nameLine('transfer')}${names.other && names.other.length ? ` · <b style="color:#c92a2a">Not sorted:</b> ${nameLine('other')} (rename it in Loyverse to include "card" or "transfer")` : ''}.<br>
+        Refunds in Loyverse are taken off the day they happened. Days follow Sri Lanka time.</div></div>`;
+}
 </script>
 </body>
 </html>
