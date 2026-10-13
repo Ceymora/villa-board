@@ -8,6 +8,107 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://wjbgbuvatrsnamsbvqrs.supabase.co wss://wjbgbuvatrsnamsbvqrs.supabase.co https://cdn.jsdelivr.net https://*.currency-api.pages.dev; img-src 'self' data: blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
 <!-- Links opened from here (bills, WhatsApp) are not told which page they came from. -->
 <meta name="referrer" content="no-referrer">
+<script>
+/* Safety net: whatever the page puts on screen is cleaned first. Even if a name, note or
+   description somewhere contained code, it is shown as plain text and never runs.
+   Removes <script>, frames, objects, on…= handlers and javascript: links. Print windows
+   get the same cleaning; only their own Print and Close buttons keep a click handler. */
+(function(){
+  'use strict';
+  var RISKY = /<\s*\/?\s*(script|iframe|frame|object|embed|base|meta|link|form|svg|math)\b|\bon[a-z]+\s*=|javascript\s*:|vbscript\s*:|srcdoc|data\s*:\s*text/i;
+  var BAD_TAGS = {SCRIPT:1,IFRAME:1,FRAME:1,FRAMESET:1,OBJECT:1,EMBED:1,BASE:1,META:1,LINK:1,FORM:1,NOSCRIPT:1,MATH:1,NOEMBED:1,NOFRAMES:1,XMP:1,PLAINTEXT:1};
+  var URL_ATTRS = {href:1,src:1,action:1,formaction:1,'xlink:href':1,background:1,poster:1,data:1,ping:1};
+  var KEEP_CLICK = {'window.print()':1,'window.close()':1};
+  var desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  var setInner = desc.set;
+  function badUrl(v){
+    var u = String(v).replace(/[\u0000- \u007f- ]+/g, '').toLowerCase();
+    if(/^(javascript|vbscript):/.test(u)) return true;
+    if(u.indexOf('data:') === 0 && !/^data:image\/(png|jpe?g|gif|webp);/.test(u)) return true;
+    return false;
+  }
+  function cleanTree(root, keepPrintButtons){
+    var all = root.querySelectorAll('*');
+    for(var i = all.length - 1; i >= 0; i--){
+      var el = all[i];
+      var tag = el.tagName.toUpperCase();
+      if(BAD_TAGS[tag] && !(keepPrintButtons && (tag === 'META' || tag === 'LINK' && /stylesheet/i.test(el.getAttribute('rel') || '')))){
+        el.remove(); continue;
+      }
+      if(tag === 'SVG' || tag === 'MATH'){
+        var sc = el.querySelectorAll('script,foreignObject,animate,set,animateTransform,animateMotion');
+        for(var k = 0; k < sc.length; k++) sc[k].remove();
+      }
+      var attrs = el.attributes;
+      for(var j = attrs.length - 1; j >= 0; j--){
+        var n = attrs[j].name.toLowerCase(), v = attrs[j].value;
+        if(n.indexOf('on') === 0){
+          if(keepPrintButtons && n === 'onclick' && KEEP_CLICK[v.trim()]) continue;
+          el.removeAttribute(attrs[j].name);
+        } else if(n === 'srcdoc' || (URL_ATTRS[n] && badUrl(v))){
+          el.removeAttribute(attrs[j].name);
+        } else if(n === 'http-equiv'){
+          el.removeAttribute(attrs[j].name);
+        }
+      }
+    }
+  }
+  function cleanHTML(html, keepPrintButtons){
+    var s = String(html == null ? '' : html);
+    if(s.indexOf('<') < 0 || !RISKY.test(s)) return s;
+    if(keepPrintButtons && /^\s*(<!doctype|<html)/i.test(s)){
+      // a whole print page: keep its <head> and layout, clean everything else
+      for(var dp = 0; dp < 4; dp++){
+        var doc = new DOMParser().parseFromString(s, 'text/html');
+        cleanTree(doc.documentElement, true);
+        var whole = '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+        if(whole === s) return whole;
+        s = whole;
+      }
+      return '<!DOCTYPE html><p>This page could not be shown safely.</p>';
+    }
+    // Cleaned, written out and read back until it no longer changes — so markup that the
+    // browser would rearrange into something new on a second reading is caught too.
+    for(var pass = 0; pass < 4; pass++){
+      var t = document.createElement('template');
+      setInner.call(t, s);
+      cleanTree(t.content, keepPrintButtons);
+      var out = desc.get.call(t);
+      if(out === s) return out;
+      s = out;
+    }
+    return String(html).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+  window.__cleanHTML = cleanHTML;
+  function skip(el){ var t = el && el.tagName; return t === 'STYLE' || t === 'SCRIPT' || t === 'TEXTAREA' || t === 'TEMPLATE'; }
+  Object.defineProperty(Element.prototype, 'innerHTML', {
+    configurable: true, enumerable: desc.enumerable, get: desc.get,
+    set: function(v){ return setInner.call(this, skip(this) ? v : cleanHTML(v)); }
+  });
+  var od = Object.getOwnPropertyDescriptor(Element.prototype, 'outerHTML');
+  if(od && od.set){
+    Object.defineProperty(Element.prototype, 'outerHTML', {
+      configurable: true, enumerable: od.enumerable, get: od.get,
+      set: function(v){ return od.set.call(this, cleanHTML(v)); }
+    });
+  }
+  var adj = Element.prototype.insertAdjacentHTML;
+  Element.prototype.insertAdjacentHTML = function(pos, html){ return adj.call(this, pos, cleanHTML(html)); };
+  // Print windows: what is written into them is cleaned too (their Print / Close buttons stay).
+  var wopen = window.open;
+  window.open = function(){
+    var w = wopen.apply(window, arguments);
+    try{
+      if(w && w.document){
+        var d = w.document, wr = d.write, wl = d.writeln;
+        d.write = function(){ return wr.call(d, cleanHTML(Array.prototype.join.call(arguments, ''), true)); };
+        d.writeln = function(){ return wl.call(d, cleanHTML(Array.prototype.join.call(arguments, ''), true)); };
+      }
+    }catch(e){}
+    return w;
+  };
+})();
+</script>
 <title>Villa Management Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -4135,7 +4236,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-salesanalysis';
+const APP_VERSION = 'v2026.10.13-security';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4223,7 +4324,7 @@ async function loadMyProfile(){
     role: data.role,
     perms: permsOf(data),
     villaScopes: scopes,
-    villaScope: data.villa_scope || (scopes.length === 1 ? scopes[0] : null),
+    villaScope: scopes.length ? (scopes.length === 1 ? scopes[0] : null) : (data.villa_scope || null),   // the ticked villas win over the old single-villa setting
   };
 }
 
@@ -6547,7 +6648,7 @@ function renderManageList(villaBookings){
       ? `<span class="manage-money">${moneyFull(b.rateUsd, cur)}/night · ${moneyFull(b.rateUsd*nights, cur)} total</span>`
       : `<span class="manage-dates" style="font-style:italic;">no rate set</span>`;
     row.innerHTML = `
-      <span class="manage-type-dot ${b.type}"></span>
+      <span class="manage-type-dot ${safeClass(b.type)}"></span>
       <span class="manage-guest">${esc(b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest'))}</span>
       <span class="manage-dates">${b.checkIn} → ${b.checkOut} · <b>${nights} night${nights===1?'':'s'}</b></span>
       ${moneyHtml}
@@ -6887,7 +6988,7 @@ function renderEarningsDetail(rows){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="font-weight:600;">
-        <span class="manage-type-dot ${r.type}" style="display:inline-block; margin-right:6px;"></span>
+        <span class="manage-type-dot ${safeClass(r.type)}" style="display:inline-block; margin-right:6px;"></span>
         ${esc(r.guest ? r.guest : (r.type==='airbnb' ? 'Airbnb guest' : 'Direct guest'))}
       </td>
       <td style="color:var(--muted); font-size:12px;">${r.checkIn} → ${r.checkOut}</td>
@@ -8475,7 +8576,7 @@ function renderCash(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${t.date}</td>
-      <td><span class="txn-badge ${t.type}">${t.type}</span></td>
+      <td><span class="txn-badge ${safeClass(t.type)}">${esc(t.type)}</span></td>
       <td>${details}${invoiceLink ? ' '+invoiceLink : ''}${docNosHTML(t)}</td>
       <td>${cardLabel}</td>
       <td class="num" style="color:${t.type==='income' ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${t.type==='income'?'+':'−'} ${t.amount.toLocaleString()}</td>
@@ -9885,7 +9986,7 @@ function renderInventory(){
       const tr = document.createElement('tr');
       const lastCol = isPurchase
         ? (t.amount ? t.amount.toLocaleString() : '—')
-        : (INV_LOCATION_LABELS[t.toVilla] || t.toVilla);
+        : esc(INV_LOCATION_LABELS[t.toVilla] || t.toVilla);
       tr.innerHTML = `
         <td>${t.date}</td>
         <td>${esc(t.item)}${t.note ? `<div class="txn-sub">${esc(t.note)}</div>` : ''}</td>
@@ -10909,6 +11010,11 @@ function pct(part, whole){ return whole > 0 ? Math.round(part/whole*100) + '%' :
 /* Escapes text for HTML. Single quote and slash are included deliberately: without
    them this is only safe inside double-quoted attributes, and the next person to write
    style='${esc(x)}' would reintroduce an injection without noticing. */
+function safeColor(c, dflt){
+  const v = String(c == null ? '' : c).trim();
+  return /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\([0-9.,\s%]+\)|hsla?\([0-9.,\s%deg]+\))$/.test(v) ? v : (dflt || '#495057');
+}
+function safeClass(c){ return String(c == null ? '' : c).replace(/[^A-Za-z0-9_-]/g, ''); }
 function esc(s){
   return String(s==null?'':s).replace(/[&<>"'\/]/g, c=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'
@@ -11073,7 +11179,7 @@ async function buildVillaProfitReportHTML(loc, monthDate){
     bookingRowsHtml += `<tr>
       <td class="dim">${fmtDay(b.checkIn)} – ${fmtDay(b.checkOut)}</td>
       <td><b>${esc(b.guest || 'Guest')}</b>${b.guests ? `<div class="dim">${esc(b.guests)} guests</div>` : ''}</td>
-      <td><span class="rpt-badge ${b.type}">${b.type==='airbnb'?'Airbnb':'Direct'}</span></td>
+      <td><span class="rpt-badge ${safeClass(b.type)}">${b.type==='airbnb'?'Airbnb':'Direct'}</span></td>
       <td class="c">${nights}</td>
       <td class="r">${b.rateUsd ? moneyFull(b.rateUsd, cur) : '—'}</td>
       <td class="r">${lineGross!==null ? moneyFull(lineGross, cur) : '—'}</td>
@@ -11452,7 +11558,7 @@ function renderBankTransferSummary(){
   const places = [...VR_VILLAS.map(v => ({ id:v.id, name:v.name })),
     ...['office','store'].filter(k => byPlace[k]).map(k => ({ id:k, name:FOR_LABELS[k] || k }))];
   wrap.innerHTML = places.map(v => `
-    <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id] || '#495057'}, ${(villaColors[v.id] || '#495057')}cc); cursor:pointer;" data-bank-place="${esc(v.id)}">
+    <div class="cash-card" style="background:linear-gradient(135deg, ${safeColor(villaColors[v.id])}, ${safeColor(villaColors[v.id])}cc); cursor:pointer;" data-bank-place="${esc(v.id)}">
       <div class="cash-card-label">Bank transfer → ${esc(v.name)}</div>
       <div class="cash-card-balance">LKR ${Math.round(byPlace[v.id] || 0).toLocaleString()}</div>
     </div>
@@ -11794,7 +11900,7 @@ function renderSharonExpensesSummary(){
   }
   const villaColors = Object.fromEntries(VR_VILLAS.map(v => [v.id, v.color]));
   wrap.innerHTML = VR_VILLAS.map(v => `
-    <div class="cash-card" style="background:linear-gradient(135deg, ${villaColors[v.id] || '#495057'}, ${(villaColors[v.id] || '#495057')}cc); cursor:pointer;" data-sharon-villa="${v.id}">
+    <div class="cash-card" style="background:linear-gradient(135deg, ${safeColor(villaColors[v.id])}, ${safeColor(villaColors[v.id])}cc); cursor:pointer;" data-sharon-villa="${esc(v.id)}">
       <div class="cash-card-label">Sharon → ${esc(v.name)}</div>
       <div class="cash-card-balance">LKR ${byVilla[v.id].toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">${ownByVilla[v.id] ? 'LKR ' + ownByVilla[v.id].toLocaleString() + ' paid from his own pocket' : 'all from petty cash cards'}</div>
@@ -12476,10 +12582,10 @@ function renderActivityLog(rows){
     row.className = 'txn-row';
     const when = new Date(r.created_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
     row.innerHTML = `
-      <span class="txn-badge ${actionColor[r.action] || 'expense'}">${r.action}</span>
+      <span class="txn-badge ${actionColor[r.action] || 'expense'}">${esc(r.action)}</span>
       <span class="txn-main">
         <div class="txn-title">${esc(r.username)} — ${esc(r.description)}</div>
-        <div class="txn-sub">${when} · ${r.table_name}</div>
+        <div class="txn-sub">${esc(when)} · ${esc(r.table_name)}</div>
       </span>
     `;
     list.appendChild(row);
@@ -13454,7 +13560,7 @@ function renderDepositRows(){
     row.className = 'dep-row';
     row.style.display = (settingsVillaScope === 'all' || settingsVillaScope === v.id) ? '' : 'none';
     row.innerHTML = `
-      <span class="manage-type-dot" style="background:${v.color};"></span>
+      <span class="manage-type-dot" style="background:${safeColor(v.color)};"></span>
       <span class="dep-name">${esc(v.name)}</span>
       <span class="dep-cur">${esc(v.currency)}</span>
       <input type="number" min="0" step="1" id="dep_${v.id}" value="${damageDepositFor(v.id)}">
@@ -16324,9 +16430,18 @@ document.getElementById('opSave').addEventListener('click', async ()=>{
 });
 
 /* ---- CSV exports, so the accountant doesn't retype anything ---- */
+/* A cell that starts with = + - or @ would be run as a formula by Excel. Text like that gets a
+   leading ' so it is shown as text; real numbers (also negative ones) stay numbers. */
+function csvSafe(c){
+  if(c === null || c === undefined) return '';
+  if(typeof c === 'number') return String(c);
+  const v = String(c);
+  if(/^[-+]?[\d,]*\.?\d+%?$/.test(v.trim())) return v;
+  return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+}
 function toCSV(rows){
   return rows.map(r => r.map(c=>{
-    const v = c === null || c === undefined ? '' : String(c);
+    const v = csvSafe(c);
     return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }).join(',')).join('\r\n');
 }
@@ -17365,7 +17480,7 @@ function restWireExport(body, title, head, rows, tot, rowCls){
   const all = tot ? rows.concat([tot]) : rows;
   const p = body.querySelector('[data-print]'), c = body.querySelector('[data-csv]');
   if(c) c.addEventListener('click', () => {
-    const q = v => { const s = typeof v === 'number' ? String(Math.round(v * 100) / 100) : String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const q = v => { const s = typeof v === 'number' ? String(Math.round(v * 100) / 100) : csvSafe(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const csv = [head].concat(all).map(r => r.map(q).join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' }));
