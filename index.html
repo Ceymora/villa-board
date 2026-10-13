@@ -4135,7 +4135,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-askdelete';
+const APP_VERSION = 'v2026.10.13-dashreport';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -12128,6 +12128,7 @@ const BIN_SECTIONS = {
   restaurant_sales:         { label:'Restaurants — daily sales', area:'rest_sda' },
   restaurant_petty:         { label:'Restaurants — petty cash',  area:'rest_sda' },
   restaurant_bills:         { label:'Restaurants — bills',       area:'rest_sda' },
+  restaurant_balances:      { label:'Restaurants — bank balances', area:'rest_sda' },
 };
 const BIN_TAB_OF = { pettycash:['petty_cash_transactions'], expenses:['petty_cash_transactions'], inventory:['inventory_transactions'],
   bookings:['villa_bookings'], villareport:['villa_operating_expenses','owner_payments','petty_cash_transactions'] };
@@ -12163,6 +12164,8 @@ function binSummary(table, r){
       return `Villa: ${r.name || r.id || ''}`;
     case 'restaurant_sales':
       return `${restDef(r.restaurant).name} sales ${r.slot || ''}: cash ${binMoney(r.cash)}, card ${binMoney(r.card)}${r.day ? ' · ' + r.day : ''}`;
+    case 'restaurant_balances':
+      return `${restDef(r.restaurant).name} bank balance: ${r.account || ''} — ${binMoney(r.amount)}${r.day ? ' · ' + r.day : ''}`;
     case 'restaurant_bills':
       return `${restDef(r.restaurant).name} bill: ${r.description || ''} — ${binMoney(r.amount)}${r.category ? ' · ' + r.category : ''}${r.day ? ' · ' + r.day : ''}`;
     case 'restaurant_petty':
@@ -16664,7 +16667,7 @@ const EXPENSE_CATEGORIES = PL_GROUPS.flatMap(g => g.items).filter(i => i !== 'Ca
 const REST_CATEGORIES = EXPENSE_CATEGORIES, BILL_CATEGORIES = EXPENSE_CATEGORIES;
 const COST_OF_SALES = new Set(PL_GROUPS[0].items);
 const PAID_FROM = { bank:'Bank', card:'Card', owner:'Owner (Sharon)', other:'Other' };
-const REST = { id:null, dreqs:[], bills:[], billsMissing:false, repType:'pl', plScope:'one', view:'dashboard', day:null, month:null, repFrom:null, repTo:null,
+const REST = { id:null, dreqs:[], balances:[], bills:[], billsMissing:false, repType:'dash', plScope:'one', view:'dashboard', day:null, month:null, repFrom:null, repTo:null,
                sales:[], petty:[], loadedFor:null, ready:null, chan:null, villaShown:[], editing:null, kind:'expense' };
 let REST_INFO = {};
 
@@ -16818,6 +16821,7 @@ async function restLoad(){
     if(REST.ready === false) return;
     const [s, p, b] = await Promise.all([restFetchAll('restaurant_sales', id), restFetchAll('restaurant_petty', id),
       restFetchAll('restaurant_bills', id).catch(e => { REST.billsMissing = true; return []; })]);
+    REST.balances = await restFetchAll('restaurant_balances', id).then(x => { REST.balMissing = false; return x; }).catch(() => { REST.balMissing = true; return []; });
     if(REST.id !== id) return;
     const dr = await sb.from('delete_requests').select('*').eq('restaurant', id).order('requested_at', { ascending:false }).range(0, 1999);
     REST.dreqs = dr.error ? [] : (dr.data || []); REST.dreqMissing = !!dr.error;
@@ -16833,6 +16837,7 @@ function restSubscribe(){
     .on('postgres_changes', { event:'*', schema:'public', table:'restaurant_petty' }, again)
     .on('postgres_changes', { event:'*', schema:'public', table:'restaurant_bills' }, again)
     .on('postgres_changes', { event:'*', schema:'public', table:'delete_requests' }, again)
+    .on('postgres_changes', { event:'*', schema:'public', table:'restaurant_balances' }, again)
     .on('postgres_changes', { event:'*', schema:'public', table:'restaurants' }, again)
     .subscribe();
 }
@@ -17691,7 +17696,7 @@ async function restLoyverseCopy(days, lv, info){
 
 /* ---- Change History (kept by the database; nobody can edit or delete it) ---- */
 const REST_FIELD = { cash:'Cash balance', card:'Card', transfer:'Bank transfer', day:'Date', description:'Description', amount:'Amount',
-  category:'Category', invoice_no:'Bill no.', note:'Note', kind:'Type', slot:'Line', paid_from:'Paid from', service_rate:'Service charge %',
+  category:'Category', invoice_no:'Bill no.', note:'Note', kind:'Type', slot:'Line', paid_from:'Paid from', account:'Account', service_rate:'Service charge %',
   service_included:'Service included', card_fee:'Card commission %', transfer_fee:'Transfer commission %' };
 const REST_MONEY = new Set(['cash','card','transfer','amount']);
 function restHistVal(k, v){
@@ -17707,6 +17712,7 @@ function restHistSummary(c){
     const t = (Number(r.cash) || 0) + (Number(r.card) || 0) + (Number(r.transfer) || 0);
     return `Sale total ${rs(t)} (card ${rs(r.card)}, transfer ${rs(r.transfer)}, cash ${rs(r.cash)})`;
   }
+  if(c.table_name === 'restaurant_balances') return `Bank balance: ${r.account || ''} — ${rs(r.amount)}`;
   if(c.table_name === 'restaurant_bills') return `Bill: ${r.description || ''} — ${rs(r.amount)}${r.category ? ' · ' + r.category : ''}${r.paid_from ? ' · paid from ' + (PAID_FROM[r.paid_from] || r.paid_from) : ''}`;
   return `${r.kind === 'in' ? 'Money in' : 'Expense'}: ${r.description || ''} — ${rs(r.amount)}${r.category ? ' · ' + r.category : ''}`;
 }
@@ -17775,7 +17781,7 @@ async function restHistoryView(body, info){
 
 /* ======================= Reports ======================= */
 const REPORT_TYPES = [
-  ['pl','📈 Profit & Loss'], ['sales','🔄 Sales vs Loyverse'], ['pay','💳 Payment methods'],
+  ['dash','🧭 Dashboard'], ['pl','📈 Profit & Loss'], ['sales','🔄 Sales vs Loyverse'], ['pay','💳 Payment methods'],
   ['exp','🧾 Expenses by category'], ['week','📅 Weekday analysis'], ['months','🗓 Month by month'] ];
 function restReportsView(body, info){
   if(!REST.repFrom){ REST.repFrom = monthStart(REST.month); REST.repTo = monthEnd(REST.month); }
@@ -17804,7 +17810,7 @@ function restReportsView(body, info){
   }));
   const out = body.querySelector('#repOut');
   if(from > to){ out.innerHTML = '<div class="r-warn">The "From" day is after the "To" day.</div>'; return; }
-  const F = { pl:restPLReport, sales:restSalesReport, pay:restPayReport, exp:restExpReport, week:restWeekReport, months:restMonthsReport }[type] || restPLReport;
+  const F = { dash:restDashReport, pl:restPLReport, sales:restSalesReport, pay:restPayReport, exp:restExpReport, week:restWeekReport, months:restMonthsReport }[type] || restPLReport;
   Promise.resolve(F(out, info, from, to)).then(r => {
     if(!r || REST.view !== 'reports') return;
     restWireExport(body, r.title + ' — ' + rLong(from) + ' to ' + rLong(to), r.head, r.rows, r.tot, r.cls);
@@ -18077,6 +18083,136 @@ function restDelReqView(body, info){
     if(problems.length) alert('Could not put all of it back:\n\n' + problems.join('\n'));
     after('Put back');
   }));
+}
+
+/* ======================= Dashboard report (month vs month before) ======================= */
+const DASH_PARTS = [   // fixed order and colours (validated categorical palette); profit is always green
+  { key:'cos',    label:'Cost of sales',              color:'#2a78d6', f:p => p.g.cos },
+  { key:'staff',  label:'Staff Cost',                 color:'#eb6834', f:p => p.g.staff },
+  { key:'travel', label:'Travelling and Transport',   color:'#1baf7a', f:p => p.lines['Travelling & Transport'] || 0 },
+  { key:'fixed',  label:'Fixed Commitments',          color:'#eda100', f:p => p.g.util },
+  { key:'prof',   label:'Professional Fees',          color:'#e87ba4', f:p => p.g.prof },
+  { key:'admin',  label:'Other Administrative',       color:'#9aa1ad', f:p => rc(p.g.admin - (p.lines['Travelling & Transport'] || 0)) },
+  { key:'sell',   label:'Selling & Distribution',     color:'#6250d6', f:p => p.g.sell },
+  { key:'fin',    label:'Financial & Other Expenses', color:'#e34948', f:p => p.g.fin },
+];
+function restBalancesAt(day){
+  // latest balance of each account on or before the day
+  const latest = {};
+  REST.balances.filter(b => b.day <= day).forEach(b => { const k = b.account.trim(); if(!latest[k] || b.day > latest[k].day || (b.day === latest[k].day && b.id > latest[k].id)) latest[k] = b; });
+  return Object.values(latest).sort((a, b) => a.account.localeCompare(b.account));
+}
+function restDashReport(out, info, from, to){
+  const m = to.slice(0,7), pm = shiftMonth(m, -1);
+  const p = plCompute(REST, info, monthStart(m), monthEnd(m)), q = plCompute(REST, info, monthStart(pm), monthEnd(pm));
+  const pctOf = (x, rev) => rev ? x / rev : null;
+  const fmtPct = v => v === null || !isFinite(v) ? '—' : (Math.round(v * 1000) / 10) + '%';
+  const change = (a, b) => b ? (a - b) / Math.abs(b) : null;
+  const revImp = change(p.revenue, q.revenue), netImp = change(p.monthlyNet, q.monthlyNet);
+  const ratios = [['Cost of sales', -p.cosT, -q.cosT], ['Gross Profit', p.gp, q.gp], ['Monthly Net Profit', p.monthlyNet, q.monthlyNet]];
+  const asAt = monthEnd(m), bals = restBalancesAt(asAt), petty = pettyBalanceBefore(addDays(asAt, 1));
+  const cashTotal = rc(bals.reduce((a, b) => a + Number(b.amount), 0) + petty);
+  const parts = DASH_PARTS.map(d => ({ ...d, v:d.f(p), pv:d.f(q) }));
+  const colour = v => v === null || !isFinite(v) ? '' : v < 0 ? 'color:#c92a2a' : 'color:#1f7a55';
+  const edit = restEdits(REST.id);
+  // donut: where the month's revenue went (only when there is a profit; with a loss the costs are shown on their own)
+  const slices = parts.filter(x => x.v > 0).map(x => ({ label:x.label, color:x.color, v:x.v }));
+  if(p.monthlyNet > 0) slices.push({ label:'Monthly Net Profit', color:'#008300', v:p.monthlyNet });
+  const tot = slices.reduce((a, x) => a + x.v, 0);
+  let arcs = '', a0 = -Math.PI / 2;
+  const R = 78, r = 48, cx = 100, cy = 100;
+  slices.forEach(x => { const a1 = a0 + (x.v / tot) * Math.PI * 2, gap = slices.length > 1 ? 0.012 : 0;
+    const p1 = [cx + R * Math.cos(a0 + gap), cy + R * Math.sin(a0 + gap)], p2 = [cx + R * Math.cos(a1 - gap), cy + R * Math.sin(a1 - gap)];
+    const p3 = [cx + r * Math.cos(a1 - gap), cy + r * Math.sin(a1 - gap)], p4 = [cx + r * Math.cos(a0 + gap), cy + r * Math.sin(a0 + gap)];
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    arcs += slices.length === 1 ? `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="${x.color}" stroke-width="${R - r}"><title>${esc(x.label)}</title></circle>`
+      : `<path d="M${p1} A${R},${R} 0 ${big} 1 ${p2} L${p3} A${r},${r} 0 ${big} 0 ${p4} Z" fill="${x.color}"><title>${esc(x.label)}: ${esc(rs(x.v))} (${esc(fmtPct(x.v / tot))})</title></path>`;
+    a0 = a1; });
+  const donut = tot ? `<svg viewBox="0 0 200 200" style="width:200px;height:200px;flex:0 0 200px" role="img" aria-label="Where the revenue went">${arcs}
+      <text x="100" y="96" text-anchor="middle" font-size="11" fill="#6b7385">Revenue</text><text x="100" y="114" text-anchor="middle" font-size="13" font-weight="700" fill="#13233a">${esc(rmoney(p.revenue))}</text></svg>`
+    : '<div class="r-muted" style="padding:30px">No figures for this month yet.</div>';
+  const legend = slices.map(x => `<div style="display:flex;gap:8px;align-items:center;font-size:12.5px;margin:4px 0"><i style="width:11px;height:11px;border-radius:3px;background:${x.color};flex:0 0 11px"></i>
+      <span style="flex:1">${esc(x.label)}</span><b>${esc(fmtPct(pctOf(x.v, p.revenue)))}</b></div>`).join('');
+  const kpi = (label, v) => `<tr><td>${esc(label)}</td><td class="n" style="font-weight:700;${colour(v)}">${esc(fmtPct(v))}</td></tr>`;
+  out.innerHTML = `
+    <div class="r-box" style="margin-bottom:14px;background:#13233a;color:#fff;border-color:#13233a">
+      <h3 style="color:#fff"><span>Dashboard — ${esc(info.name)}</span><small style="color:#b9c4d6">${esc(rMonthName(m))} compared with ${esc(rMonthName(pm))}</small></h3></div>
+    <div class="r-grid3 r-compact" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">
+      <div class="r-box"><h3>Page 1 · Performance</h3>
+        <table class="r-table"><tbody>${kpi('Revenue Improvement', revImp)}${kpi('Monthly Net Profit Improvement', netImp)}</tbody></table>
+        <table class="r-table" style="margin-top:12px"><thead><tr><th></th><th class="n">${esc(rMonthName(m).split(' ')[0])}</th><th class="n">${esc(rMonthName(pm).split(' ')[0])}</th></tr></thead><tbody>
+          ${ratios.map(([l, a, b]) => `<tr><td>${esc(l)}</td><td class="n" style="${colour(pctOf(a, p.revenue))}">${esc(fmtPct(pctOf(a, p.revenue)))}</td><td class="n" style="${colour(pctOf(b, q.revenue))}">${esc(fmtPct(pctOf(b, q.revenue)))}</td></tr>`).join('')}
+        </tbody></table>
+        <h3 style="margin-top:16px"><span>Cash &amp; Cash Equivalent Balance <small>as at ${esc(rLong(asAt))}</small></span>${edit ? '<button class="r-link" id="balAdd">＋ Bank balance</button>' : ''}</h3>
+        <table class="r-table"><tbody>
+          ${bals.map(b => `<tr><td>${esc(b.account)}${b.day !== asAt ? `<div class="r-who">balance of ${esc(rLong(b.day))}</div>` : ''}</td><td class="n">${rmoney(b.amount)}</td>
+            <td style="white-space:nowrap;width:1%">${edit ? `<button class="r-btn r-ico" data-bal-edit="${esc(b.id)}" title="Correct">✏️</button>` : ''}${restCanDelete() ? `<button class="r-btn r-ico danger" data-bal-del="${esc(b.id)}" title="Delete">🗑</button>` : ''}</td></tr>`).join('')}
+          <tr><td>Petty cash in hand</td><td class="n">${rmoney(petty)}</td><td></td></tr>
+          <tr class="tot"><td>Total Cash &amp; Cash Equivalent</td><td class="n">${rmoney(cashTotal)}</td><td></td></tr></tbody></table>
+        ${REST.balMissing ? '<div class="r-warn" style="margin-top:8px;font-size:12px">Bank balances need <b>33-supabase-restaurant-cash-balances.sql</b> run in Supabase.</div>' : !bals.length ? '<div class="r-muted" style="font-size:12px;margin-top:6px">No bank balance entered for this month yet.</div>' : ''}
+      </div>
+      <div class="r-box"><h3>Page 2 · Where the revenue went <small>${esc(rMonthName(m))}</small></h3>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">${donut}<div style="flex:1;min-width:180px">${legend}</div></div>
+        ${p.monthlyNet < 0 ? `<div class="r-warn" style="margin-top:10px;font-size:12.5px">Monthly net <b>loss of ${esc(rs(-p.monthlyNet))}</b> — costs were ${esc(fmtPct(pctOf(p.revenue - p.monthlyNet, p.revenue)))} of revenue, so the chart shows how the costs split.</div>` : ''}</div>
+      <div class="r-box"><h3>Page 3 · Share of revenue</h3>
+        <table class="r-table"><thead><tr><th></th><th class="n">${esc(rMonthName(m).split(' ')[0])}</th><th class="n">${esc(rMonthName(pm).split(' ')[0])}</th></tr></thead><tbody>
+          ${parts.map(x => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${x.color};margin-right:6px"></i>${esc(x.label)}</td>
+            <td class="n">${esc(fmtPct(pctOf(-x.v, p.revenue)))}</td><td class="n">${esc(fmtPct(pctOf(-x.pv, q.revenue)))}</td></tr>`).join('')}
+          <tr class="tot"><td>Monthly Net Profit</td><td class="n" style="${colour(p.monthlyNet)}">${esc(fmtPct(pctOf(p.monthlyNet, p.revenue)))}</td><td class="n" style="${colour(q.monthlyNet)}">${esc(fmtPct(pctOf(q.monthlyNet, q.revenue)))}</td></tr>
+        </tbody></table>
+        <div class="r-note" style="font-size:11.5px">Each cost as a share of the month's revenue (costs shown as minus). Revenue ${esc(rs(p.revenue))} this month, ${esc(rs(q.revenue))} the month before. Annual fees are left out of these monthly figures.</div></div>
+    </div>
+    <div class="r-note">Pick the month with the <b>To</b> date (for example "Last month"). Bank balances are entered at month end with "＋ Bank balance".</div>`;
+  const ba = out.querySelector('#balAdd'); if(ba) ba.addEventListener('click', () => restOpenBalance(null, asAt));
+  out.querySelectorAll('[data-bal-edit]').forEach(b => b.addEventListener('click', () => restOpenBalance(REST.balances.find(x => String(x.id) === b.dataset.balEdit), asAt)));
+  out.querySelectorAll('[data-bal-del]').forEach(b => b.addEventListener('click', async () => {
+    if(!confirm('Delete this balance? It goes to Deleted items and can be put back.')) return;
+    const { error } = await sb.from('restaurant_balances').delete().eq('id', b.dataset.balDel);
+    if(error){ alert(error.message || 'Could not delete.'); return; }
+    await restLoad(); renderRest(); restToast('Deleted');
+  }));
+  const head = ['Dashboard', rMonthName(m), rMonthName(pm)];
+  const rows = [['Revenue Improvement', fmtPct(revImp), ''], ['Monthly Net Profit Improvement', fmtPct(netImp), '']]
+    .concat(ratios.map(([l, a, b]) => [l, fmtPct(pctOf(a, p.revenue)), fmtPct(pctOf(b, q.revenue))]))
+    .concat([['', '', ''], ['Cash & Cash Equivalent as at ' + rLong(asAt), '', '']], bals.map(b => [b.account, Number(b.amount), '']), [['Petty cash in hand', petty, ''], ['Total Cash & Cash Equivalent', cashTotal, ''], ['', '', ''], ['Share of revenue', '', '']])
+    .concat(parts.map(x => [x.label, fmtPct(pctOf(-x.v, p.revenue)), fmtPct(pctOf(-x.pv, q.revenue))]), [['Monthly Net Profit', fmtPct(pctOf(p.monthlyNet, p.revenue)), fmtPct(pctOf(q.monthlyNet, q.revenue))]]);
+  return { title:'Dashboard — ' + info.name, head, rows, tot:null };
+}
+function restOpenBalance(row, asAt){
+  let ov = document.getElementById('balOverlay');
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'balOverlay';
+    ov.innerHTML = `<div class="modal r-form" style="max-width:420px;"><h3 id="balTitle">Bank balance</h3>
+      <label for="balAcc">Account</label><input type="text" id="balAcc" maxlength="80" list="balAccList" placeholder="e.g. Sampath Current Account"><datalist id="balAccList"></datalist>
+      <label for="balDay">Balance as at</label><input type="date" id="balDay">
+      <label for="balAmt">Balance (Rs.)</label><input type="number" id="balAmt" step="0.01" inputmode="decimal">
+      <label for="balNote">Note (optional)</label><input type="text" id="balNote" maxlength="200">
+      <div class="r-err" id="balErr"></div>
+      <div class="modal-actions"><span></span><div style="display:flex;gap:8px"><button class="btn btn-cancel" id="balCancel">Cancel</button><button class="btn btn-save" id="balSave">Save</button></div></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#balCancel').addEventListener('click', () => ov.classList.remove('open'));
+  }
+  ov.querySelector('#balTitle').textContent = (row ? 'Correct ' : '') + 'bank balance — ' + restInfo(REST.id).name;
+  ov.querySelector('#balAccList').innerHTML = [...new Set(REST.balances.map(b => b.account))].map(a => `<option value="${esc(a)}">`).join('');
+  ov.querySelector('#balAcc').value = row ? row.account : (REST.balances[0] ? REST.balances[0].account : '');
+  ov.querySelector('#balDay').value = row ? row.day : asAt;
+  ov.querySelector('#balAmt').value = row ? row.amount : '';
+  ov.querySelector('#balNote').value = row ? (row.note || '') : '';
+  ov.querySelector('#balErr').textContent = '';
+  const save = ov.querySelector('#balSave'), fresh = save.cloneNode(true); save.replaceWith(fresh);
+  fresh.addEventListener('click', async () => {
+    const rec = { account:ov.querySelector('#balAcc').value.trim(), day:ov.querySelector('#balDay').value, amount:Number(ov.querySelector('#balAmt').value), note:ov.querySelector('#balNote').value.trim() || null };
+    const err = ov.querySelector('#balErr');
+    if(!rec.account){ err.textContent = 'Write the account name.'; return; }
+    if(!rec.day){ err.textContent = 'Pick the date.'; return; }
+    if(ov.querySelector('#balAmt').value.trim() === '' || !isFinite(rec.amount)){ err.textContent = 'Enter the balance.'; return; }
+    fresh.disabled = true;
+    const res = row ? await sb.from('restaurant_balances').update(rec).eq('id', row.id) : await sb.from('restaurant_balances').insert(Object.assign({ restaurant:REST.id }, rec));
+    fresh.disabled = false;
+    if(res.error){ err.textContent = /restaurant_balances/.test(res.error.message || '') ? 'Run 33-supabase-restaurant-cash-balances.sql in Supabase first.' : (res.error.message || 'Could not save.'); return; }
+    ov.classList.remove('open'); await restLoad(); renderRest(); restToast('✓ Balance saved');
+  });
+  ov.classList.add('open');
 }
 </script>
 </body>
