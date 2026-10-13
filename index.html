@@ -4116,7 +4116,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-loyverse2';
+const APP_VERSION = 'v2026.10.13-dailysales';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -16613,7 +16613,7 @@ const RESTAURANTS_DEF = [
   { id:'sda',  name:'SDA Restaurant ( Mezze )', icon:'🍽' },
   { id:'thai', name:'Thai Charm Restaurant',    icon:'🍜' },
 ];
-const REST_DEFAULTS = { service_rate:10, staff_share:80, petty_allocation:150000, service_included:true, loyverse_store_id:null,
+const REST_DEFAULTS = { service_rate:10, staff_share:80, petty_allocation:150000, service_included:true, loyverse_store_id:null, card_fee:2.5, transfer_fee:2.5, logo:null,
   slots:['08:00 - 11:00','11:00 - 14:00','14:00 - 17:00','17:00 - 20:00','20:00 - 23:00'] };
 const REST_CATEGORIES = ['Groceries','Market Purchase','Kitchen Supplies','Beverages','Gas & Utilities','Cleaning',
                          'Repairs & Maintenance','Transport','Miscellaneous'];
@@ -16628,7 +16628,8 @@ function restEdits(id){ return hasPerm('edit_rest_' + id); }
 function restCanDelete(){ return isAdmin() || canDelete(); }
 function restList(){ return RESTAURANTS_DEF.filter(r => restSees(r.id)); }
 function hasVillaSide(){ return AREAS.some(a => !a.key.startsWith('rest_') && canSee(a.key)); }
-function rs(n){ const v = Math.round(Number(n) || 0); return 'Rs. ' + v.toLocaleString('en-US'); }
+function rs(n){ return 'Rs. ' + rmoney(n); }
+function rmoney(n){ const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('en-US', Number.isInteger(v) ? {} : { minimumFractionDigits:2, maximumFractionDigits:2 }); }
 function rnum(n){ return Math.round(Number(n) || 0).toLocaleString('en-US'); }
 function rDay(iso){ return iso ? parseISO(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : ''; }
 function rLong(iso){ return iso ? parseISO(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : ''; }
@@ -16646,13 +16647,31 @@ function saleIncl(r, info){ const v = r.service_included; return (v === null || 
 function scOf(total, rate, incl){ return incl ? total * rate / (100 + rate) : total * rate / 100; }
 function scWord(info){ return info.service_included !== false ? 'included in prices' : 'added on top'; }
 function saleRate(r, info){ const v = r.service_rate; return (v === null || v === undefined || v === '') ? Number(info.service_rate) : Number(v); }
+function rc(n){ return Math.round((Number(n) || 0) * 100) / 100; }
+function restToast(msg){
+  let t = document.getElementById('restToast');
+  if(!t){ t = document.createElement('div'); t.id = 'restToast'; t.style.cssText = 'position:fixed;right:18px;bottom:18px;background:#1f7a55;color:#fff;font:600 13px Inter,sans-serif;padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:9999;transition:opacity .3s'; document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity = '1'; clearTimeout(t._h); t._h = setTimeout(() => { t.style.opacity = '0'; }, 2600);
+}
+function feeOf(r, key, info){ const v = r[key]; return (v === null || v === undefined || v === '') ? Number(info[key]) : Number(v); }
+/* fee = bank commission on card payments and bank transfers (2.5% unless Makky changes it) */
 function sumSales(rows, info){
-  const o = { cash:0, card:0, transfer:0, total:0, sc:0 };
-  rows.forEach(r => { const t = saleTotal(r); o.cash += Number(r.cash) || 0; o.card += Number(r.card) || 0; o.transfer += Number(r.transfer) || 0;
-    o.total += t; o.sc += scOf(t, saleRate(r, info), saleIncl(r, info)); });
-  o.staff = o.sc * Number(info.staff_share) / 100; o.company = o.sc - o.staff; o.net = o.total - o.sc;
+  const o = { cash:0, card:0, transfer:0, total:0, sc:0, fee:0 };
+  rows.forEach(r => { const t = saleTotal(r), c = Number(r.card) || 0, tr = Number(r.transfer) || 0;
+    o.cash += Number(r.cash) || 0; o.card += c; o.transfer += tr; o.total += t;
+    // each amount is rounded to the cent first, so the printed figures always add up
+    o.sc += rc(scOf(t, saleRate(r, info), saleIncl(r, info)));
+    o.fee += rc(c * feeOf(r, 'card_fee', info) / 100) + rc(tr * feeOf(r, 'transfer_fee', info) / 100); });
+  o.sc = rc(o.sc); o.fee = rc(o.fee);
+  o.staff = rc(o.sc * Number(info.staff_share) / 100); o.company = rc(o.sc - o.staff);
+  o.received = rc(o.total - o.fee);          // what actually reaches the restaurant after the bank's cut
+  o.afterSc = o.total - o.sc;
+  o.net = rc(o.total - o.sc - o.fee);    // after service charge and bank commission
   return o;
 }
+function feeLabel(info){ return Number(info.card_fee) === Number(info.transfer_fee) ? `${info.card_fee}%` : `card ${info.card_fee}%, transfer ${info.transfer_fee}%`; }
+/* A logo is only ever a picture we stored ourselves — never a link or anything else. */
+function restLogoOk(l){ return typeof l === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(l); }
 function salesBetween(from, to){ return REST.sales.filter(r => r.day >= from && r.day <= to); }
 function pettyBetween(from, to){ return REST.petty.filter(r => r.day >= from && r.day <= to); }
 function pettyBalanceBefore(day){
@@ -16762,19 +16781,22 @@ function restSubscribe(){
 function renderRest(){
   const id = REST.id; if(!id) return;
   const info = restInfo(id);
-  document.getElementById('restIcon').textContent = restDef(id).icon;
+  const ic = document.getElementById('restIcon');
+  if(restLogoOk(info.logo)){ ic.innerHTML = ''; const im = document.createElement('img'); im.src = info.logo; im.alt = '';
+    im.style.cssText = 'width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;padding:2px'; ic.appendChild(im); }
+  else ic.textContent = restDef(id).icon;
   document.getElementById('restName').textContent = info.name;
   document.getElementById('restNavSettings').style.display = isAdmin() ? '' : 'none';
   document.querySelectorAll('#restNav [data-rv]').forEach(b => b.classList.toggle('on', b.dataset.rv === REST.view));
   const titles = {
     dashboard:['Welcome to ' + info.name, 'Manage your daily sales, petty cash and service charge easily.'],
-    sales:['Daily Sales', 'Cash, card and bank transfer takings for each time of the day.'],
+    sales:['Daily Sales', 'One line a day: sale total, card and bank transfer — the cash balance is worked out.'],
     petty:['Petty Cash', 'Money given to the restaurant and what it was spent on.'],
     service:['Service Charge', `${info.service_rate}% ${scWord(info)} — ${info.staff_share}% to employees, ${100 - info.staff_share}% to the company.`],
     loyverse:['Loyverse Check', 'Compare what was entered here with Loyverse, day by day, in LKR.'],
     monthly:['Monthly Summary', 'The month at a glance.'],
     reports:['Reports', 'Any period, day by day — print or download.'],
-    settings:['Settings', 'Service charge, staff share, petty cash allocation, time slots and Loyverse.'],
+    settings:['Settings', 'Service charge, bank commission, petty cash allocation, logo and Loyverse.'],
   };
   const [t, s] = titles[REST.view] || titles.dashboard;
   document.getElementById('restTitle').textContent = t;
@@ -16863,12 +16885,6 @@ function restCard(color, icon, label, value, rows){
     <div style="min-width:0"><div class="lbl" style="color:${color}">${label}</div><div class="val">${value}</div></div></div>
     <div class="rows">${rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div></div>`;
 }
-function restSlotRows(day, info){
-  const rows = salesBetween(day, day);
-  const slots = [...info.slots];
-  rows.forEach(r => { if(!slots.includes(r.slot)) slots.push(r.slot); });
-  return slots.map(sl => { const these = rows.filter(r => r.slot === sl); return { slot:sl, rows:these, s:sumSales(these, info) }; });
-}
 function restDashboard(body, info){
   const d = REST.day, ym = d.slice(0,7);
   const today = sumSales(salesBetween(d, d), info);
@@ -16876,7 +16892,6 @@ function restDashboard(body, info){
   const balance = pettyBalanceBefore(addDays(d, 1));
   const days = Array.from({ length:7 }, (_, i) => addDays(d, i - 6));
   const chart = restBarChart(days, info);
-  const slotRows = restSlotRows(d, info).filter(x => x.rows.length || info.slots.includes(x.slot));
   // petty log: this month up to the chosen day, newest last, with running balance
   const mRows = pettyBetween(monthStart(ym), d).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
   let run = pettyBalanceBefore(monthStart(ym));
@@ -16885,10 +16900,10 @@ function restDashboard(body, info){
   const opening = pettyBalanceBefore(monthStart(ym));
   body.innerHTML = `
     <div class="r-cards">
-      ${restCard('#2f9e5b', '💵', 'Total Sales' + (d === todayISO() ? ' (Today)' : ' (' + esc(rDay(d)) + ')'), rs(today.total), [['Cash', rs(today.cash)], ['Card', rs(today.card)], ['Bank transfer', rs(today.transfer)]])}
+      ${restCard('#2f9e5b', '💵', 'Total Sales' + (d === todayISO() ? ' (Today)' : ' (' + esc(rDay(d)) + ')'), rs(today.total), [['Card payment', rs(today.card)], ['Bank transfer', rs(today.transfer)], ['Cash balance', rs(today.cash)]])}
       ${restCard('#2563eb', '💳', `Service Charge (${esc(info.service_rate)}%)`, rs(today.sc), [[`Employees (${esc(info.staff_share)}%)`, rs(today.staff)], [`Company (${esc(100 - info.staff_share)}%)`, rs(today.company)]])}
       ${restCard('#e8890c', '👛', 'Petty Cash Balance', rs(balance), [['Monthly Allocation', rs(info.petty_allocation)], ['Used This Month', rs(usedMonth)]])}
-      ${restCard('#7c3aed', '📈', 'Net Profit' + (d === todayISO() ? ' (Today)' : ' (' + esc(rDay(d)) + ')'), rs(today.net), [['Total Sales - Service Charge', ''], [esc(rs(today.total)) + ' - ' + esc(rnum(today.sc)), '']])}
+      ${restCard('#7c3aed', '📈', 'Net Profit' + (d === todayISO() ? ' (Today)' : ' (' + esc(rDay(d)) + ')'), rs(today.net), [['Sales − Service Charge − Bank commission', ''], [esc(rmoney(today.total)) + ' − ' + esc(rmoney(today.sc)) + ' − ' + esc(rmoney(today.fee)), '']])}
     </div>
     <div class="r-grid2">
       <div class="r-box"><h3><span>Sales Overview <small>(Last 7 Days)</small></span>
@@ -16902,9 +16917,15 @@ function restDashboard(body, info){
     </div>
     <div class="r-grid3">
       <div class="r-box"><h3><span>${d === todayISO() ? "Today's" : esc(rDay(d))} Sales Details</span><button class="r-link" data-go="sales">View All</button></h3>
-        <div class="r-scroll"><table class="r-table"><thead><tr><th>Time</th><th class="n">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Total</th><th class="n">Service</th></tr></thead>
-        <tbody>${slotRows.map(x => `<tr><td>${esc(x.slot)}</td><td class="n">${rnum(x.s.cash)}</td><td class="n">${rnum(x.s.card)}</td><td class="n">${rnum(x.s.transfer)}</td><td class="n">${rnum(x.s.total)}</td><td class="n">${rnum(x.s.sc)}</td></tr>`).join('')}
-        <tr class="tot"><td>Total</td><td class="n">${rnum(today.cash)}</td><td class="n">${rnum(today.card)}</td><td class="n">${rnum(today.transfer)}</td><td class="n">${rnum(today.total)}</td><td class="n">${rnum(today.sc)}</td></tr></tbody></table></div></div>
+        <table class="r-table"><tbody>
+          <tr><td>Sale total</td><td class="n"><b>${rs(today.total)}</b></td></tr>
+          <tr><td>Card payment</td><td class="n">${rs(today.card)}</td></tr>
+          <tr><td>Bank transfer</td><td class="n">${rs(today.transfer)}</td></tr>
+          <tr><td>Cash balance</td><td class="n">${rs(today.cash)}</td></tr>
+          <tr><td>Bank commission (${esc(feeLabel(info))})</td><td class="n" style="color:#c92a2a">− ${rs(today.fee)}</td></tr>
+          <tr class="tot"><td>Net received</td><td class="n">${rs(today.received)}</td></tr>
+          <tr><td>Service charge (${esc(info.service_rate)}%)</td><td class="n">${rs(today.sc)}</td></tr>
+        </tbody></table>${salesBetween(d, d).length ? '' : '<div class="r-muted" style="font-size:12px;margin-top:8px">Nothing entered for this day yet.</div>'}</div>
       <div class="r-box"><h3><span>Petty Cash Log <small>(This Month)</small></span><button class="r-link" data-go="petty">View All</button></h3>
         <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Description</th><th class="n">Amount (Rs.)</th><th class="n">Balance (Rs.)</th></tr></thead>
         <tbody>${logAll.length > log.length ? '' : (opening ? `<tr><td>${esc(rDay(monthStart(ym)))}</td><td>Brought forward</td><td class="n"></td><td class="n">${rnum(opening)}</td></tr>` : '')}
@@ -16926,6 +16947,7 @@ function restMonthSumList(ym, info){
   const row = (bg, ic, label, v) => `<div><span class="b" style="background:${bg}">${ic}</span><span>${label}</span><b>${rs(v)}</b></div>`;
   return `<div class="r-sum">
     ${row('#e8f6ee', '📊', 'Total Sales', s.total)}
+    ${row('#fdecec', '🏦', `Bank Commission (${esc(feeLabel(info))})`, s.fee)}
     ${row('#e8f0fe', '💳', 'Total Service Charge', s.sc)}
     ${row('#f1ebfe', '👥', `Employees Share (${esc(info.staff_share)}%)`, s.staff)}
     ${row('#f1ebfe', '🏢', `Company Share (${esc(100 - info.staff_share)}%)`, s.company)}
@@ -16936,78 +16958,123 @@ function restMonthSummaryBox(ym, info, selId){
   return `<h3><span>Monthly Summary</span><input type="month" id="${selId}" value="${esc(ym)}" style="padding:5px 8px;font-size:12px;"></h3>${restMonthSumList(ym, info)}`;
 }
 
-/* ---- Daily Sales ---- */
+/* ---- Daily Sales: one line a day ---- */
 function restSalesView(body, info){
   const d = REST.day, edit = restEdits(REST.id), del = restCanDelete();
-  const rows = restSlotRows(d, info);
-  const tot = sumSales(salesBetween(d, d), info);
-  const recent = Array.from({ length:14 }, (_, i) => addDays(d, -i));
+  const lines = salesBetween(d, d), t = sumSales(lines, info);
+  const ym = d.slice(0,7), monthDays = restDaysOf(monthStart(ym), monthEnd(ym)).filter(x => salesBetween(x, x).length);
+  const two = v => (Math.round((Number(v) || 0) * 100) / 100).toString();
   body.innerHTML = `
-    <div class="r-box" style="margin-bottom:16px;">
-      <h3><span>Sales for ${esc(rLong(d))}</span>${edit ? '' : '<small>View only</small>'}</h3>
-      <div class="r-scroll"><table class="r-table" id="restSalesTable"><thead><tr><th>Time</th><th class="n">Cash (Rs.)</th><th class="n">Card (Rs.)</th><th class="n">Bank transfer (Rs.)</th>
-        <th class="n">Total Sales</th><th class="n">Service Charge</th><th>Entered by</th>${del ? '<th></th>' : ''}</tr></thead><tbody>
-        ${rows.map((x, i) => { const r = x.rows[0];
-          const c = r ? Number(r.cash) : 0, k = r ? Number(r.card) : 0, t = r ? Number(r.transfer || 0) : 0;
-          return `<tr data-slot="${i}"><td>${esc(x.slot)}</td>
-            <td class="n">${edit ? `<input type="number" min="0" step="1" inputmode="decimal" data-f="cash" value="${r ? esc(c) : ''}" placeholder="0" aria-label="${esc(x.slot)} cash">` : rs(c)}</td>
-            <td class="n">${edit ? `<input type="number" min="0" step="1" inputmode="decimal" data-f="card" value="${r ? esc(k) : ''}" placeholder="0" aria-label="${esc(x.slot)} card">` : rs(k)}</td>
-            <td class="n">${edit ? `<input type="number" min="0" step="1" inputmode="decimal" data-f="transfer" value="${r ? esc(t) : ''}" placeholder="0" aria-label="${esc(x.slot)} bank transfer">` : rs(t)}</td>
-            <td class="n" data-t>${rs(x.s.total)}</td><td class="n" data-sc>${rs(x.s.sc)}</td>
-            <td class="r-muted" style="font-size:11.5px">${r ? esc(r.updated_by_email || r.created_by_email || '') : ''}</td>
-            ${del ? `<td>${r ? `<button class="r-btn danger" data-del-sale="${esc(r.id)}" title="Delete this line">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')}
-        <tr class="tot"><td>Total</td><td class="n" id="rsCash">${rs(tot.cash)}</td><td class="n" id="rsCard">${rs(tot.card)}</td><td class="n" id="rsTr">${rs(tot.transfer)}</td><td class="n" id="rsTot">${rs(tot.total)}</td><td class="n" id="rsSc">${rs(tot.sc)}</td><td></td>${del ? '<td></td>' : ''}</tr>
-      </tbody></table></div>
-      ${edit ? `<div class="r-toolbar" style="margin:14px 0 0;"><span class="sp r-muted" style="font-size:12px;">Leave a time blank if nothing was sold. Service charge: ${esc(info.service_rate)}% ${esc(scWord(info))}.</span>
-        <span class="r-err" id="rsErr" style="margin:0"></span><button class="r-btn primary" id="rsSave">Save ${esc(rDay(d))}</button></div>` : ''}
+    <div class="r-grid2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+      <div class="r-box r-form">
+        <h3><span>Sales for ${esc(rLong(d))}</span>${edit ? '' : '<small>View only</small>'}</h3>
+        ${lines.length > 1 ? `<div class="r-warn" style="margin-bottom:10px;font-size:12.5px">This day has ${lines.length} lines from before (by time). The figures below are the whole day together; saving puts them on one line.</div>` : ''}
+        <label for="dsTotal">Sale total (Rs.)</label>
+        <input type="number" id="dsTotal" min="0" step="0.01" inputmode="decimal" value="${lines.length ? esc(two(t.total)) : ''}" ${edit ? '' : 'disabled'} placeholder="e.g. 102322.50">
+        <label for="dsCard">Card payment (Rs.)</label>
+        <input type="number" id="dsCard" min="0" step="0.01" inputmode="decimal" value="${lines.length ? esc(two(t.card)) : ''}" ${edit ? '' : 'disabled'} placeholder="0">
+        <label for="dsTransfer">Bank transfer (Rs.)</label>
+        <input type="number" id="dsTransfer" min="0" step="0.01" inputmode="decimal" value="${lines.length ? esc(two(t.transfer)) : ''}" ${edit ? '' : 'disabled'} placeholder="0">
+        <table class="r-table" style="margin-top:14px"><tbody>
+          <tr><td>Cash balance <span class="r-muted" style="font-size:11px">(sale total − card − transfer)</span></td><td class="n"><b id="dsCash">${rs(t.cash)}</b></td></tr>
+          <tr><td>Bank commission (${esc(feeLabel(info))} of card + transfer)</td><td class="n" style="color:#c92a2a">− <span id="dsFee">${rs(t.fee)}</span></td></tr>
+          <tr class="tot"><td>Net received</td><td class="n" id="dsNet">${rs(t.received)}</td></tr>
+          <tr><td>Service charge (${esc(info.service_rate)}% ${esc(scWord(info))})</td><td class="n" id="dsSc">${rs(t.sc)}</td></tr>
+        </tbody></table>
+        ${lines.length ? `<div class="r-muted" style="font-size:11.5px;margin-top:6px">Entered by ${esc(lines.map(r => r.updated_by_email || r.created_by_email || '').filter(Boolean).join(', ') || '—')}</div>` : ''}
+        <div class="r-err" id="dsErr"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px">
+          ${del && lines.length ? `<button class="r-btn danger" id="dsDelete">🗑 Delete this day</button>` : ''}
+          <button class="r-btn" id="dsPrintDay" ${lines.length ? '' : 'disabled'}>🖨️ Print this day</button>
+          ${edit ? `<button class="r-btn primary" id="dsSave">Save ${esc(rDay(d))}</button>` : ''}
+        </div>
+      </div>
+      <div class="r-box"><h3><span>How it adds up</span></h3>
+        <div class="r-note" style="margin:0">Enter the <b>sale total</b> for the day, then how much of it was paid by <b>card</b> and by <b>bank transfer</b>.
+        The rest is the <b>cash balance</b>.<br><br>The bank keeps <b>${esc(feeLabel(info))}</b> of card and transfer payments as commission — it is taken off to show what the restaurant really receives.
+        ${isAdmin() ? '<br><br>Makky can change the % in Settings.' : ''}</div></div>
     </div>
-    <div class="r-box"><h3>Last 14 days <small>click a day to open it</small></h3>
-      <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th class="n">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Total Sales</th><th class="n">Service Charge</th><th class="n">After service charge</th></tr></thead><tbody>
-      ${recent.map(x => { const s = sumSales(salesBetween(x, x), info);
-        return `<tr class="click" data-day="${esc(x)}"><td>${esc(rLong(x))}</td><td class="n">${rs(s.cash)}</td><td class="n">${rs(s.card)}</td><td class="n">${rs(s.transfer)}</td><td class="n">${rs(s.total)}</td><td class="n">${rs(s.sc)}</td><td class="n">${rs(s.net)}</td></tr>`; }).join('')}
-      </tbody></table></div></div>`;
-  body.querySelectorAll('tr[data-day]').forEach(tr => tr.addEventListener('click', () => { REST.day = tr.dataset.day; renderRest(); }));
-  body.querySelectorAll('[data-del-sale]').forEach(b => b.addEventListener('click', () => restDelete('restaurant_sales', b.dataset.delSale, 'this sales line')));
-  if(!edit) return;
-  const rate = Number(info.service_rate);
-  const recalc = () => {
-    let C = 0, K = 0, TR = 0, SC = 0;
-    body.querySelectorAll('tr[data-slot]').forEach(tr => {
-      const c = Number(tr.querySelector('[data-f="cash"]').value) || 0, k = Number(tr.querySelector('[data-f="card"]').value) || 0,
-            t = Number(tr.querySelector('[data-f="transfer"]').value) || 0;
-      C += c; K += k; TR += t;
-      tr.querySelector('[data-t]').textContent = rs(c + k + t);
-      const r = rows[+tr.dataset.slot].rows[0];
-      const sc = r ? scOf(c + k + t, saleRate(r, info), saleIncl(r, info)) : scOf(c + k + t, rate, info.service_included !== false); SC += sc;
-      tr.querySelector('[data-sc]').textContent = rs(sc);
-    });
-    document.getElementById('rsSc').textContent = rs(SC);
-    document.getElementById('rsCash').textContent = rs(C); document.getElementById('rsCard').textContent = rs(K);
-    document.getElementById('rsTr').textContent = rs(TR); document.getElementById('rsTot').textContent = rs(C + K + TR);
-  };
-  body.querySelectorAll('#restSalesTable input').forEach(i => i.addEventListener('input', recalc));
-  document.getElementById('rsSave').addEventListener('click', async () => {
-    const err = document.getElementById('rsErr'), btn = document.getElementById('rsSave');
-    err.textContent = '';
-    const jobs = [];
-    for(const tr of body.querySelectorAll('tr[data-slot]')){
-      const x = rows[+tr.dataset.slot], r = x.rows[0];
-      const cv = tr.querySelector('[data-f="cash"]').value.trim(), kv = tr.querySelector('[data-f="card"]').value.trim(),
-            tv = tr.querySelector('[data-f="transfer"]').value.trim();
-      const c = cv === '' ? 0 : Number(cv), k = kv === '' ? 0 : Number(kv), t = tv === '' ? 0 : Number(tv);
-      if(!isFinite(c) || !isFinite(k) || !isFinite(t) || c < 0 || k < 0 || t < 0){ err.textContent = 'Amounts must be 0 or more (' + x.slot + ').'; return; }
-      if(r){ if(c !== Number(r.cash) || k !== Number(r.card) || t !== Number(r.transfer || 0)) jobs.push(sb.from('restaurant_sales').update({ cash:c, card:k, transfer:t }).eq('id', r.id)); }
-      else if(c > 0 || k > 0 || t > 0) jobs.push(sb.from('restaurant_sales').insert({ restaurant:REST.id, day:d, slot:x.slot, cash:c, card:k, transfer:t }));
-    }
-    if(!jobs.length){ err.textContent = 'Nothing changed.'; return; }
-    btn.disabled = true; btn.textContent = 'Saving…';
-    const res = await Promise.all(jobs);
-    const bad = res.find(r => r && r.error);
-    btn.disabled = false; btn.textContent = 'Save ' + rDay(d);
-    if(bad){ err.textContent = 'Could not save — ' + (bad.error.message || 'check the connection.'); return; }
+    <div class="r-box">
+      <div class="r-toolbar" style="margin-bottom:10px"><b style="font-size:15px">${esc(rMonthName(ym))}</b><span class="r-muted" style="font-size:12px">click a day to open it</span><span class="sp"></span>
+        <button class="r-btn" data-print>🖨️ Print the month</button><button class="r-btn" data-csv>⬇ CSV</button></div>
+      <div id="dsMonth"></div>
+    </div>`;
+  const head = ['Date','Sale total','Card','Bank transfer','Cash balance','Bank commission','Net received','Service charge'];
+  const rows = monthDays.map(x => { const s = sumSales(salesBetween(x, x), info); return [rLong(x), s.total, s.card, s.transfer, s.cash, s.fee, s.received, s.sc]; });
+  const m = sumSales(salesBetween(monthStart(ym), monthEnd(ym)), info);
+  const tot = ['Total', m.total, m.card, m.transfer, m.cash, m.fee, m.received, m.sc];
+  body.querySelector('#dsMonth').innerHTML = restTableHTML(head, rows, tot);
+  body.querySelectorAll('#dsMonth tbody tr').forEach((tr, i) => { if(i < monthDays.length){ tr.classList.add('click'); tr.addEventListener('click', () => { REST.day = monthDays[i]; renderRest(); }); } });
+  restWireExport(body, 'Daily sales — ' + rMonthName(ym), head, rows, tot);
+  const printDay = body.querySelector('#dsPrintDay');
+  if(printDay) printDay.addEventListener('click', () => restPrintDay(d, info));
+  const delBtn = body.querySelector('#dsDelete');
+  if(delBtn) delBtn.addEventListener('click', async () => {
+    if(!confirm('Delete the sales for ' + rLong(d) + '? They go to Deleted items and can be put back.')) return;
+    const { error } = await sb.from('restaurant_sales').delete().in('id', lines.map(r => r.id));
+    if(error){ alert('Could not delete — ' + (error.message || 'check the connection.')); return; }
     await restLoad(); renderRest();
-    const ok = document.getElementById('rsErr'); if(ok){ ok.style.color = '#1f7a55'; ok.textContent = '✓ Saved'; }
   });
+  if(!edit) return;
+  const num = id => { const v = body.querySelector(id).value.trim(); return v === '' ? 0 : Number(v); };
+  const recalc = () => {
+    const T = num('#dsTotal'), C = num('#dsCard'), TR = num('#dsTransfer');
+    const fake = { cash:T - C - TR, card:C, transfer:TR };
+    const x = sumSales([fake], info);
+    body.querySelector('#dsCash').textContent = rs(T - C - TR);
+    body.querySelector('#dsCash').style.color = T - C - TR < 0 ? '#c92a2a' : '';
+    body.querySelector('#dsFee').textContent = rs(x.fee);
+    body.querySelector('#dsNet').textContent = rs(T - x.fee);
+    body.querySelector('#dsSc').textContent = rs(x.sc);
+  };
+  ['#dsTotal','#dsCard','#dsTransfer'].forEach(id => body.querySelector(id).addEventListener('input', recalc));
+  body.querySelector('#dsSave').addEventListener('click', async () => {
+    const err = body.querySelector('#dsErr'); err.style.color = ''; err.textContent = '';
+    const T = num('#dsTotal'), C = num('#dsCard'), TR = num('#dsTransfer');
+    if(![T, C, TR].every(v => isFinite(v) && v >= 0)){ err.textContent = 'Amounts must be numbers, 0 or more.'; return; }
+    if(!(T > 0)){ err.textContent = 'Enter the sale total.'; return; }
+    const cash = Math.round((T - C - TR) * 100) / 100;
+    if(cash < 0){ err.textContent = 'Card and transfer together are more than the sale total.'; return; }
+    const rec = { cash, card:Math.round(C * 100) / 100, transfer:Math.round(TR * 100) / 100 };
+    const btn = body.querySelector('#dsSave'); btn.disabled = true;
+    let res;
+    if(lines.length){
+      res = await sb.from('restaurant_sales').update(Object.assign({ slot:'Whole day' }, rec)).eq('id', lines[0].id);
+      // older time-of-day lines for this day are emptied, so the day is counted once
+      for(const r of lines.slice(1)){ if(res.error) break; res = await sb.from('restaurant_sales').update({ cash:0, card:0, transfer:0, note:'Combined into the whole-day line' }).eq('id', r.id); }
+    } else res = await sb.from('restaurant_sales').insert(Object.assign({ restaurant:REST.id, day:d, slot:'Whole day' }, rec));
+    btn.disabled = false;
+    if(res.error){ err.textContent = 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
+    await restLoad(); renderRest(); restToast('✓ Saved ' + rLong(d));
+  });
+}
+/* Printed pages: the restaurant's logo and name at the top of every one. */
+function restPrintPage(title, inner){
+  const info = restInfo(REST.id);
+  const w = window.open('', '_blank'); if(!w) return;
+  const logo = restLogoOk(info.logo) ? `<img src="${info.logo}" alt="" style="max-height:70px;max-width:180px;object-fit:contain">` : '';
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:12px}
+    th,td{border:1px solid #d5dae3;padding:6px 8px}th{background:#f2f4f8;text-align:left}tr.tot td{font-weight:bold;background:#e8f6ee}
+    .hd{display:flex;align-items:center;gap:16px;border-bottom:2px solid #13233a;padding-bottom:12px;margin-bottom:14px}
+    .sig{display:flex;gap:40px;margin-top:48px;font-size:12px}.sig div{flex:1;border-top:1px solid #13233a;padding-top:6px}
+    @media print{body{padding:0}}</style></head>
+    <body><div class="hd">${logo}<div><div style="font-size:18px;font-weight:bold">${esc(info.name)}</div>
+      <div style="font-size:14px;margin-top:2px">${esc(title)}</div><div style="color:#6b7385;font-size:11px;margin-top:2px">Printed ${esc(rLong(todayISO()))}</div></div></div>
+    ${inner}</body></html>`);
+  w.document.close(); setTimeout(() => w.print(), 400);
+}
+function restPrintDay(d, info){
+  const lines = salesBetween(d, d), t = sumSales(lines, info);
+  const row = (k, v, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td>${esc(k)}</td><td style="text-align:right">${esc(v)}</td></tr>`;
+  restPrintPage('Daily sales — ' + rLong(d), `<table style="max-width:460px"><tbody>
+    ${row('Sale total', rs(t.total), 'tot')}${row('Card payment', rs(t.card))}${row('Bank transfer', rs(t.transfer))}${row('Cash balance', rs(t.cash), 'tot')}
+    ${row('Bank commission (' + feeLabel(info) + ')', '− ' + rs(t.fee))}${row('Net received', rs(t.received), 'tot')}
+    ${row('Service charge (' + info.service_rate + '% ' + scWord(info) + ')', rs(t.sc))}
+    ${row('— employees ' + info.staff_share + '%', rs(t.staff))}${row('— company ' + (100 - info.staff_share) + '%', rs(t.company))}
+    </tbody></table>
+    <div style="font-size:11px;color:#6b7385;margin-top:8px">Entered by ${esc(lines.map(r => r.updated_by_email || r.created_by_email || '').filter(Boolean).join(', ') || '—')}</div>
+    <div class="sig"><div>Prepared by</div><div>Checked by</div><div>Cash received by</div></div>`);
 }
 
 /* ---- Petty Cash ---- */
@@ -17139,7 +17206,7 @@ function restServiceView(body, info){
   restWireExport(body, 'Service charge — ' + info.name + ' — ' + rMonthName(ym), head, table, tot);
 }
 function restTableHTML(head, rows, tot){
-  const cell = v => typeof v === 'number' ? `<td class="n">${rs(v)}</td>` : `<td>${esc(v)}</td>`;
+  const cell = v => typeof v === 'number' ? `<td class="n">${rmoney(v)}</td>` : `<td>${esc(v)}</td>`;
   return `<div class="r-scroll"><table class="r-table"><thead><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>
     ${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('') || `<tr><td colspan="${head.length}" class="r-muted">Nothing recorded in this period.</td></tr>`}
     ${tot ? `<tr class="tot">${tot.map(cell).join('')}</tr>` : ''}</tbody></table></div>`;
@@ -17156,14 +17223,10 @@ function restWireExport(body, title, head, rows, tot){
     document.body.appendChild(a); a.click(); a.remove();
   });
   if(p) p.addEventListener('click', () => {
-    const w = window.open('', '_blank'); if(!w) return;
-    const cell = v => typeof v === 'number' ? `<td style="text-align:right">${esc(rs(v))}</td>` : `<td>${esc(v)}</td>`;
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
-      <style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:12px}
-      th,td{border:1px solid #d5dae3;padding:6px 8px}th{background:#f2f4f8;text-align:left}tr:last-child td{font-weight:bold;background:#e8f6ee}</style></head>
-      <body><h2 style="margin:0 0 4px">${esc(title)}</h2><div style="color:#6b7385;font-size:12px;margin-bottom:12px">Printed ${esc(rLong(todayISO()))}</div>
-      <table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${all.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('')}</tbody></table></body></html>`);
-    w.document.close(); setTimeout(() => w.print(), 300);
+    const cell = v => typeof v === 'number' ? `<td style="text-align:right">${esc(rmoney(v))}</td>` : `<td>${esc(v)}</td>`;
+    restPrintPage(title.replace(' — ' + restInfo(REST.id).name, ''), `<table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('')}${tot ? `<tr class="tot">${tot.map(cell).join('')}</tr>` : ''}</tbody></table>
+      <div style="font-size:11px;color:#6b7385;margin-top:6px">All amounts in Rs. (LKR)</div>`);
   });
 }
 
@@ -17171,14 +17234,14 @@ function restWireExport(body, title, head, rows, tot){
 function restMonthlyView(body, info){
   const ym = REST.month, from = monthStart(ym), to = monthEnd(ym);
   const s = sumSales(salesBetween(from, to), info), p = pettySums(pettyBetween(from, to));
-  const head = ['Date','Cash','Card','Transfer','Total Sales','Service Charge','After service charge','Petty cash used'];
+  const head = ['Date','Sale total','Card','Transfer','Cash','Bank commission','Service charge','Net','Petty cash used'];
   const rows = restDaysOf(from, to).map(d => { const x = sumSales(salesBetween(d, d), info), q = pettySums(pettyBetween(d, d));
-    return (x.total || q.out) ? [rLong(d), x.cash, x.card, x.transfer, x.total, x.sc, x.net, q.out] : null; }).filter(Boolean);
-  const tot = ['Total', s.cash, s.card, s.transfer, s.total, s.sc, s.net, p.out];
+    return (x.total || q.out) ? [rLong(d), x.total, x.card, x.transfer, x.cash, x.fee, x.sc, x.net, q.out] : null; }).filter(Boolean);
+  const tot = ['Total', s.total, s.card, s.transfer, s.cash, s.fee, s.sc, s.net, p.out];
   body.innerHTML = restMonthBar('rmMonth', ym) + `
     <div class="r-grid2" style="grid-template-columns:minmax(0,1fr)">
       <div class="r-box" style="max-width:560px"><h3>${esc(rMonthName(ym))}</h3>${restMonthSumList(ym, info)}
-        <div class="r-note">After service charge and petty cash: <b>${rs(s.net - p.out)}</b><br>Days with sales: ${rows.filter(r => r[4] > 0).length} · Average a day: ${rs(rows.filter(r => r[4] > 0).length ? s.total / rows.filter(r => r[4] > 0).length : 0)}</div></div>
+        <div class="r-note">After service charge, bank commission and petty cash: <b>${rs(s.net - p.out)}</b><br>Days with sales: ${rows.filter(r => r[1] > 0).length} · Average a day: ${rs(rows.filter(r => r[1] > 0).length ? s.total / rows.filter(r => r[1] > 0).length : 0)}</div></div>
       <div class="r-box"><h3>Day by day</h3>${restTableHTML(head, rows, tot)}</div>
     </div>`;
   restWireMonthBar(body, 'rmMonth');
@@ -17189,11 +17252,11 @@ function restMonthlyView(body, info){
 function restReportsView(body, info){
   if(!REST.repFrom){ REST.repFrom = monthStart(REST.month); REST.repTo = monthEnd(REST.month); }
   const from = REST.repFrom, to = REST.repTo;
-  const head = ['Date','Cash','Card','Transfer','Total Sales','Service Charge','Employees','Company','Petty cash in','Petty cash used'];
+  const head = ['Date','Sale total','Card','Transfer','Cash','Bank commission','Net received','Service charge','Employees','Company','Petty cash in','Petty cash used'];
   const rows = (from <= to ? restDaysOf(from, to) : []).map(d => { const x = sumSales(salesBetween(d, d), info), q = pettySums(pettyBetween(d, d));
-    return (x.total || q.in || q.out) ? [rLong(d), x.cash, x.card, x.transfer, x.total, x.sc, x.staff, x.company, q.in, q.out] : null; }).filter(Boolean);
+    return (x.total || q.in || q.out) ? [rLong(d), x.total, x.card, x.transfer, x.cash, x.fee, x.received, x.sc, x.staff, x.company, q.in, q.out] : null; }).filter(Boolean);
   const s = sumSales(salesBetween(from, to), info), p = pettySums(pettyBetween(from, to));
-  const tot = ['Total', s.cash, s.card, s.transfer, s.total, s.sc, s.staff, s.company, p.in, p.out];
+  const tot = ['Total', s.total, s.card, s.transfer, s.cash, s.fee, s.received, s.sc, s.staff, s.company, p.in, p.out];
   const both = restList().length > 1;
   body.innerHTML = `
     <div class="r-toolbar">
@@ -17225,13 +17288,13 @@ async function restBothRestaurants(from, to){
       sb.from('restaurant_petty').select('*').eq('restaurant', r.id).gte('day', from).lte('day', to).range(0, 9999)]);
     if(e1 || e2){ out.push([info.name, 'Could not load']); continue; }
     const x = sumSales(s || [], info), q = pettySums(p || []);
-    out.push([info.name, x.total, x.sc, x.net, q.out, x.net - q.out]);
+    out.push([info.name, x.total, x.fee, x.sc, x.net, q.out, x.net - q.out]);
   }
   const el = document.getElementById('rrBoth'); if(!el || REST.repFrom !== from || REST.repTo !== to) return;
   const nums = out.filter(r => r.length > 2);
-  const tot = nums.length ? ['Both', ...[1,2,3,4,5].map(i => nums.reduce((a, r) => a + r[i], 0))] : null;
+  const tot = nums.length ? ['Both', ...[1,2,3,4,5,6].map(i => nums.reduce((a, r) => a + r[i], 0))] : null;
   el.classList.remove('r-muted');
-  el.innerHTML = restTableHTML(['Restaurant','Total Sales','Service Charge','After service charge','Petty cash used','Left after both'], out, tot);
+  el.innerHTML = restTableHTML(['Restaurant','Sale total','Bank commission','Service charge','Net','Petty cash used','Left after petty cash'], out, tot);
 }
 
 /* ---- Settings (Makky) ---- */
@@ -17248,30 +17311,63 @@ function restSettingsView(body, info){
     <div style="display:flex;gap:8px"><select id="rsStore" style="flex:1"><option value="">${info.loyverse_store_id ? 'Saved store (' + esc(String(info.loyverse_store_id).slice(0,8)) + '…)' : 'Not chosen — only needed if Loyverse has more than one store'}</option></select>
       <button class="r-btn" type="button" id="rsStoreLoad" style="white-space:nowrap">Load stores</button></div>
     <div class="r-muted" id="rsStoreMsg" style="font-size:12px;margin-top:4px"></div>
-    <label for="rsSlots">Time slots for daily sales — one per line</label><textarea id="rsSlots" rows="6">${esc(info.slots.join('\n'))}</textarea>
-    <div class="r-note">A change to the service charge % (or to "included in prices") applies to sales entered from now on. Days already entered keep what they were saved with.</div>
+    <label for="rsCardFee">Bank commission on card payments (%)</label><input type="number" id="rsCardFee" min="0" max="20" step="0.1" value="${esc(info.card_fee)}">
+    <label for="rsTrFee">Bank commission on bank transfers (%)</label><input type="number" id="rsTrFee" min="0" max="20" step="0.1" value="${esc(info.transfer_fee)}">
+    <label>Logo — shown in the menu and on every printed report</label>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div id="rsLogoPrev" style="width:120px;height:70px;border:1px dashed var(--r-line);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff;color:var(--r-muted);font-size:11px">No logo</div>
+      <input type="file" id="rsLogoFile" accept="image/png,image/jpeg,image/webp" style="width:auto">
+      <button class="r-btn" type="button" id="rsLogoClear">Remove logo</button></div>
+    <div class="r-note">A change to the service charge or bank commission % applies to sales entered from now on. Days already entered keep what they were saved with.</div>
     <div class="r-err" id="rsSetErr"></div>
     <div style="display:flex;justify-content:flex-end"><button class="r-btn primary" id="rsSetSave">Save settings</button></div></div>`;
+  let logoData = restLogoOk(info.logo) ? info.logo : null;
+  const showLogo = () => { const p = document.getElementById('rsLogoPrev'); p.innerHTML = '';
+    if(logoData){ const im = document.createElement('img'); im.src = logoData; im.alt = 'Logo'; im.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain'; p.appendChild(im); }
+    else p.textContent = 'No logo'; };
+  showLogo();
+  document.getElementById('rsLogoClear').addEventListener('click', () => { logoData = null; document.getElementById('rsLogoFile').value = ''; showLogo(); });
+  document.getElementById('rsLogoFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const err = document.getElementById('rsSetErr'); err.textContent = '';
+    if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ err.textContent = 'Use a PNG, JPG or WebP picture.'; return; }
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      // shrink to at most 400 × 200 so it stays small and loads fast
+      const k = Math.min(1, 400 / img.width, 200 / img.height);
+      const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      let d = c.toDataURL('image/png');
+      if(d.length > 350000) d = c.toDataURL('image/jpeg', 0.85);
+      if(d.length > 380000 || !restLogoOk(d)){ err.textContent = 'That picture is too big — try a smaller logo.'; return; }
+      logoData = d; showLogo();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); err.textContent = 'Could not read that picture.'; };
+    img.src = url;
+  });
   document.getElementById('rsSetSave').addEventListener('click', async () => {
     const err = document.getElementById('rsSetErr'); err.style.color = ''; err.textContent = '';
     const rec = { name:document.getElementById('rsName').value.trim(),
       service_rate:Number(document.getElementById('rsRate').value), staff_share:Number(document.getElementById('rsShare').value),
       petty_allocation:Number(document.getElementById('rsAlloc').value),
       service_included:document.getElementById('rsIncl').checked,
-      slots:[...new Set(document.getElementById('rsSlots').value.split('\n').map(s => s.trim()).filter(Boolean))] };
+      card_fee:Number(document.getElementById('rsCardFee').value), transfer_fee:Number(document.getElementById('rsTrFee').value),
+      logo:logoData };
     if(!rec.name){ err.textContent = 'The name cannot be empty.'; return; }
     if(!(rec.service_rate >= 0 && rec.service_rate <= 100) || !(rec.staff_share >= 0 && rec.staff_share <= 100)){ err.textContent = 'Percentages must be between 0 and 100.'; return; }
     if(!(rec.petty_allocation >= 0)){ err.textContent = 'The allocation cannot be negative.'; return; }
-    if(!rec.slots.length){ err.textContent = 'Keep at least one time slot.'; return; }
+    if(!(rec.card_fee >= 0 && rec.card_fee <= 20) || !(rec.transfer_fee >= 0 && rec.transfer_fee <= 20)){ err.textContent = 'Bank commission must be between 0 and 20%.'; return; }
+    if(rec.logo === info.logo || (rec.logo === null && !info.logo)) delete rec.logo;
     const st = document.getElementById('rsStore').value; if(st) rec.loyverse_store_id = st;
     let { error } = await sb.from('restaurants').update(rec).eq('id', REST.id);
-    if(error && /service_included|loyverse_store_id|transfer/.test(error.message || '')){
+    if(error && /card_fee|transfer_fee|logo/.test(error.message || '')){
+      error = { message:'run 29-supabase-restaurant-commission-logo.sql in Supabase first' };
+    } else if(error && /service_included|loyverse_store_id|transfer/.test(error.message || '')){
       error = { message:'run 28-supabase-restaurants-loyverse.sql in Supabase first' };
     }
     if(error){ err.textContent = 'Could not save — ' + (error.message || 'check the connection.'); return; }
     REST_INFO[REST.id] = Object.assign({}, REST_INFO[REST.id] || {}, rec, { id:REST.id });
-    initAreaSwitch(); renderRest();
-    const e2 = document.getElementById('rsSetErr'); if(e2){ e2.style.color = '#1f7a55'; e2.textContent = '✓ Saved'; }
+    initAreaSwitch(); renderRest(); restToast('✓ Settings saved');
   });
   document.getElementById('rsStoreLoad').addEventListener('click', async () => {
     const msg = document.getElementById('rsStoreMsg'); msg.textContent = 'Asking Loyverse…';
@@ -17422,11 +17518,11 @@ async function restLoyverseCopy(days, lv, info){
   const skipped = days.length - usable.length;
   const otherDays = usable.filter(x => Math.abs(x.b.other) >= 1).length;
   if(!usable.length){ alert('These days have refunds larger than sales in one payment type — enter them by hand.'); return; }
-  if(!confirm(`Copy ${usable.length} day${usable.length > 1 ? 's' : ''} from Loyverse into Daily Sales as "Whole day (Loyverse)"?`
+  if(!confirm(`Copy ${usable.length} day${usable.length > 1 ? 's' : ''} from Loyverse into Daily Sales?`
      + (otherDays ? `\n\n${otherDays} of them have payments Loyverse could not sort (shown as "Other") — those amounts are left out; add them by hand.` : '')
      + (skipped ? `\n\n${skipped} day(s) with more refunds than sales are skipped.` : ''))) return;
   const btn = document.getElementById('lvCopy'); if(btn){ btn.disabled = true; btn.textContent = 'Copying…'; }
-  const rows = usable.map(x => ({ restaurant:REST.id, day:x.d, slot:'Whole day (Loyverse)',
+  const rows = usable.map(x => ({ restaurant:REST.id, day:x.d, slot:'Whole day',
     cash:Math.round(x.b.cash * 100) / 100, card:Math.round(x.b.card * 100) / 100, transfer:Math.round(x.b.transfer * 100) / 100,
     note:`Copied from Loyverse — ${x.b.receipts} receipts` }));
   const { error } = await sb.from('restaurant_sales').insert(rows);
