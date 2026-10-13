@@ -1261,7 +1261,7 @@
   .r-table td{ padding:8px 8px; border-bottom:1px solid var(--r-line); white-space:nowrap; }
   .r-table td.wrap{ white-space:normal; min-width:140px; }
   .r-table .n{ text-align:right; font-variant-numeric:tabular-nums; }
-  .r-table tr.r-sec td{ font-weight:700; background:#f6f8fb; } .r-table tr.r-sub td{ font-weight:600; border-top:1px solid #c9cfdb; }
+  .r-table tr.r-sec td{ font-weight:700; background:#fbe3cf; } .r-table tr.r-gt td{ font-weight:700; background:#fdf0e5; } .r-table tr.r-head td{ font-weight:800; background:#f6d2b5; } .r-table tr.r-sub td{ font-weight:600; border-top:1px solid #c9cfdb; }
   .r-table tr.r-bad td{ background:#fdecec; color:#a61e1e; } .r-table tr.r-miss td{ background:#fff4e0; } .r-table tr.r-ok td{ background:#f6fbf8; }
   .r-table tr.tot td{ background:var(--r-green-bg); font-weight:700; border-bottom:0; }
   .r-table input[type=number], .r-table input[type=text]{ width:110px; font:500 13px Inter,sans-serif; border:1px solid var(--r-line); border-radius:6px; padding:6px 8px; text-align:right; }
@@ -4121,7 +4121,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-pnl';
+const APP_VERSION = 'v2026.10.13-pnl2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -16623,12 +16623,31 @@ const RESTAURANTS_DEF = [
 ];
 const REST_DEFAULTS = { service_rate:10, staff_share:80, petty_allocation:150000, service_included:true, loyverse_store_id:null, card_fee:2.5, transfer_fee:2.5, logo:null,
   slots:['08:00 - 11:00','11:00 - 14:00','14:00 - 17:00','17:00 - 20:00','20:00 - 23:00'] };
-const REST_CATEGORIES = ['Groceries','Market Purchase','Kitchen Supplies','Beverages','Gas & Utilities','Cleaning',
-                         'Repairs & Maintenance','Transport','Miscellaneous'];
-const BILL_CATEGORIES = ['Food & beverage suppliers','Staff salaries & wages','EPF / ETF','Rent','Electricity','Water','Gas','Telephone & internet',
-  'Repairs & maintenance','Cleaning & laundry','Marketing & advertising','Licences, taxes & fees','Software & POS (Loyverse)','Transport','Other'];
-/* What counts as cost of sales (food and drink bought to sell) in the Profit & Loss. Everything else is an operating expense. */
-const COST_OF_SALES = new Set(['Groceries','Market Purchase','Beverages','Food & beverage suppliers']);
+/* The Profit & Loss layout — the same groups and lines as the company's statement.
+   Every petty cash and bill category is one of these lines, so each cost lands in the right place. */
+const PL_GROUPS = [
+  { key:'cos', label:'Cost of Sales', total:'Total Cost of Sales', items:['Groceries','Market Purchase','Beverages','Food & beverage suppliers'] },
+  { key:'staff', label:'Staff Cost', total:'Total Staff Cost', items:['Staff Salary','Wages','Staff Welfare','Staff Meals','EPF Expense (12%)','ETF Expense (3%)',
+      'Allowance','Performance Incentive','Bonus','Travelling Allowance'] },
+  { key:'util', label:'Utilities & Fixed Commitments', total:'Total Utilities & Fixed Commitments', items:['Rent','Electricity','Water','Gas','Telephone & Internet'] },
+  { key:'prof', label:'Professional Fees', total:'Total Professional Fee', items:['Professional Fees','Legal Fees','Software & POS (Loyverse)'] },
+  { key:'admin', label:'Other Administrative Expenses', total:'Total Administrative Expenses', items:['Cleaning','Decoration','Accountancy Fee','House Keeping',
+      'Printing & Stationery','Repair and Maintenance','Garden Maintenance','Kitchen Expense','Travelling & Transport','Postage and Delivery',
+      'Electrical Expense & Wiring','Generator Fuel'] },
+  { key:'sell', label:'Selling & Distribution Expenses', total:'Total Selling & Distribution Cost', items:['Advertising and Promotion','Card Commission','Packing and Material'] },
+  { key:'fin', label:'Financial & Other Expenses', total:'Total Financial and Other Cost', items:['Other Expenses','Bank Service Charges','Penalty & Surcharge','Loss on Sale of Asset'] },
+  { key:'annual', label:'Nonrecurring / Annual', total:'Total of Nonrecurring/Annual Expenses', items:['Annual Accounts and Audit Fee','Annual Secretary Fee','Annual Trade License Fee'] },
+];
+const PL_LINE = Object.fromEntries(PL_GROUPS.flatMap(g => g.items.map(i => [i, g.key])));
+// names used before this layout, so older entries still land on the right line
+const PL_ALIAS = { 'Kitchen Supplies':'Kitchen Expense', 'Gas & Utilities':'Gas', 'Repairs & Maintenance':'Repair and Maintenance', 'Repairs & maintenance':'Repair and Maintenance',
+  'Transport':'Travelling & Transport', 'Miscellaneous':'Other Expenses', 'Staff salaries & wages':'Staff Salary', 'EPF / ETF':'EPF Expense (12%)',
+  'Telephone & internet':'Telephone & Internet', 'Cleaning & laundry':'Cleaning', 'Marketing & advertising':'Advertising and Promotion',
+  'Licences, taxes & fees':'Other Expenses', 'Other':'Other Expenses' };
+function plLineOf(cat){ const c = PL_ALIAS[cat] || cat; return PL_LINE[c] ? c : 'Other Expenses'; }
+const EXPENSE_CATEGORIES = PL_GROUPS.flatMap(g => g.items).filter(i => i !== 'Card Commission');
+const REST_CATEGORIES = EXPENSE_CATEGORIES, BILL_CATEGORIES = EXPENSE_CATEGORIES;
+const COST_OF_SALES = new Set(PL_GROUPS[0].items);
 const PAID_FROM = { bank:'Bank', card:'Card', owner:'Owner (Sharon)', other:'Other' };
 const REST = { id:null, bills:[], billsMissing:false, repType:'pl', plScope:'one', view:'dashboard', day:null, month:null, repFrom:null, repTo:null,
                sales:[], petty:[], loadedFor:null, ready:null, chan:null, villaShown:[], editing:null, kind:'expense' };
@@ -17099,7 +17118,7 @@ function restPrintPage(title, inner){
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:12px}
     th,td{border:1px solid #d5dae3;padding:6px 8px}th{background:#f2f4f8;text-align:left}tr.tot td{font-weight:bold;background:#e8f6ee}
-    tr.r-sec td{font-weight:bold;background:#f2f4f8}tr.r-sub td{font-weight:bold}tr.r-bad td{background:#fdecec;color:#a61e1e}tr.r-miss td{background:#fff4e0}tr.r-ok td{background:#f1faf4}
+    tr.r-sec td{font-weight:bold;background:#fbe3cf}tr.r-gt td{font-weight:bold;background:#fdf0e5}tr.r-head td{font-weight:bold;background:#f6d2b5}tr.r-sub td{font-weight:bold}tr.r-bad td{background:#fdecec;color:#a61e1e}tr.r-miss td{background:#fff4e0}tr.r-ok td{background:#f1faf4}
     .hd{display:flex;align-items:center;gap:16px;border-bottom:2px solid #13233a;padding-bottom:12px;margin-bottom:14px}
     .sig{display:flex;gap:40px;margin-top:48px;font-size:12px}.sig div{flex:1;border-top:1px solid #13233a;padding-top:6px}
     @media print{body{padding:0}}</style></head>
@@ -17187,14 +17206,14 @@ function restOpenPetty(kind, row){
   document.getElementById('rpInvWrap').style.display = kind === 'in' ? 'none' : '';
   document.getElementById('rpPaidWrap').style.display = bill ? '' : 'none';
   document.getElementById('rpPaid').value = row && row.paid_from ? row.paid_from : 'bank';
-  const cats = bill ? BILL_CATEGORIES : REST_CATEGORIES;
+  const cats = EXPENSE_CATEGORIES;
   const cat = document.getElementById('rpCat');
-  cat.innerHTML = cats.map(c => `<option>${esc(c)}</option>`).join('');
+  cat.innerHTML = PL_GROUPS.map(g => `<optgroup label="${esc(g.label)}">${g.items.filter(i => i !== 'Card Commission').map(c => `<option>${esc(c)}</option>`).join('')}</optgroup>`).join('');
   const today = todayISO();
   document.getElementById('rpDay').value = row ? row.day : (REST.month === today.slice(0,7) ? today : monthEnd(REST.month));
   document.getElementById('rpDesc').value = row ? row.description : (kind === 'in' ? 'Petty cash allocation' : '');
   if(row && row.category && !cats.includes(row.category)) cat.insertAdjacentHTML('beforeend', `<option>${esc(row.category)}</option>`);
-  cat.value = row && row.category ? row.category : cats[0];
+  cat.value = row && row.category ? row.category : (bill ? 'Staff Salary' : 'Groceries');
   document.getElementById('rpAmount').value = row ? row.amount : (kind === 'in' ? info.petty_allocation : '');
   document.getElementById('rpInv').value = row ? (row.invoice_no || '') : '';
   document.getElementById('rpNote').value = row ? (row.note || '') : '';
@@ -17736,16 +17755,19 @@ function restPeriodBefore(from, to){
 function plCompute(d, info, from, to){
   const inR = r => r.day >= from && r.day <= to;
   const S = sumSales(d.sales.filter(inR), info);
-  const cos = {}, opex = {};
-  const add = (bag, k, v) => { bag[k] = rc((bag[k] || 0) + v); };
-  d.petty.filter(inR).filter(r => r.kind === 'expense').forEach(r => { const c = r.category || 'Miscellaneous'; add(COST_OF_SALES.has(c) ? cos : opex, c, Number(r.amount)); });
-  d.bills.filter(inR).forEach(r => { const c = r.category || 'Other'; add(COST_OF_SALES.has(c) ? cos : opex, c, Number(r.amount)); });
-  if(S.fee) add(opex, 'Bank commission (card & transfer)', S.fee);
-  const sum = o => rc(Object.values(o).reduce((a, b) => a + b, 0));
-  const netSales = rc(S.total - S.sc), revenue = rc(netSales + S.company), cosT = sum(cos), opexT = sum(opex);
-  const gp = rc(revenue - cosT), net = rc(gp - opexT);
+  const lines = {};
+  const add = (k, v) => { lines[k] = rc((lines[k] || 0) + v); };
+  d.petty.filter(inR).filter(r => r.kind === 'expense').forEach(r => add(plLineOf(r.category), Number(r.amount)));
+  d.bills.filter(inR).forEach(r => add(plLineOf(r.category), Number(r.amount)));
+  if(S.fee) add('Card Commission', S.fee);          // the bank's 2.5% on card and transfer payments
+  const g = {}; PL_GROUPS.forEach(G => { g[G.key] = rc(G.items.reduce((a, i) => a + (lines[i] || 0), 0)); });
+  const netSales = rc(S.total - S.sc), revenue = rc(netSales + S.company);
+  const cosT = g.cos, gp = rc(revenue - cosT);
+  const monthlyExp = rc(g.staff + g.util + g.prof + g.admin + g.sell + g.fin);
+  const monthlyNet = rc(gp - monthlyExp), annualT = g.annual, totalExp = rc(monthlyExp + annualT), net = rc(gp - totalExp);
   const pin = d.petty.filter(inR).filter(r => r.kind === 'in').reduce((a, r) => a + Number(r.amount), 0);
-  return { S, netSales, revenue, cos, opex, cosT, opexT, gp, net, pin, days:new Set(d.sales.filter(inR).map(r => r.day)).size };
+  return { S, lines, g, netSales, revenue, cosT, gp, monthlyExp, monthlyNet, annualT, totalExp, opexT:totalExp, net, pin,
+           days:new Set(d.sales.filter(inR).map(r => r.day)).size };
 }
 async function restRangeData(id, from, to){
   if(id === REST.id) return { sales:REST.sales, petty:REST.petty, bills:REST.bills };
@@ -17753,31 +17775,35 @@ async function restRangeData(id, from, to){
   const [sales, petty, bills] = await Promise.all([get('restaurant_sales'), get('restaurant_petty'), get('restaurant_bills')]);
   return { sales, petty, bills };
 }
-function plRows(cols){
-  // cols: [{ name, p }] — one column of figures per restaurant or period
+function plRows(cols, year){
+  // cols: [{ name, p }] — one column of figures per period or restaurant
   const head = ['Profit & Loss'].concat(cols.map(c => c.name));
   const rows = [], cls = [];
   const line = (label, f, k) => { rows.push([label].concat(cols.map(c => f(c.p)))); cls.push(k || ''); };
   const pct = (a, b) => b ? (Math.round(a / b * 1000) / 10) + '%' : '—';
-  line('Sales (takings, service charge included)', p => p.S.total);
+  line('Revenue', () => '', 'r-sec');
+  line('   Sales (takings, service charge included)', p => p.S.total);
   line('   Less: service charge in the prices', p => -p.S.sc);
-  line('Net sales', p => p.netSales, 'r-sub');
+  line('   Net Sales', p => p.netSales);
   line('   Add: company share of service charge', p => p.S.company);
-  line('TOTAL REVENUE', p => p.revenue, 'tot');
-  line('Cost of sales (food & drink bought)', () => '', 'r-sec');
-  const cosKeys = [...new Set(cols.flatMap(c => Object.keys(c.p.cos)))].sort();
-  cosKeys.forEach(k => line('   ' + k, p => -(p.cos[k] || 0)));
-  if(!cosKeys.length) line('   (none recorded)', () => 0);
-  line('Total cost of sales', p => -p.cosT, 'r-sub');
-  line('GROSS PROFIT', p => p.gp, 'tot');
-  line('   Gross margin', p => pct(p.gp, p.revenue));
-  line('Operating expenses', () => '', 'r-sec');
-  const opKeys = [...new Set(cols.flatMap(c => Object.keys(c.p.opex)))].sort((a, b) => (a.startsWith('Bank') ? 1 : 0) - (b.startsWith('Bank') ? 1 : 0) || a.localeCompare(b));
-  opKeys.forEach(k => line('   ' + k, p => -(p.opex[k] || 0)));
-  if(!opKeys.length) line('   (none recorded)', () => 0);
-  line('Total operating expenses', p => -p.opexT, 'r-sub');
-  line('NET PROFIT / (LOSS)', p => p.net, 'tot');
-  line('   Net margin', p => pct(p.net, p.revenue));
+  line('Total Revenue', p => p.revenue, 'r-gt');
+  PL_GROUPS.forEach(G => {
+    if(G.key === 'annual') return;
+    line(G.label, () => '', 'r-sec');
+    G.items.forEach(i => line('   ' + i, p => p.lines[i] || 0));
+    line(G.total, p => p.g[G.key], 'r-gt');
+    if(G.key === 'cos'){ line('GROSS PROFIT', p => p.gp, 'tot'); line('Expenses', () => '', 'r-head'); }
+  });
+  line('Total Monthly Expenses', p => p.monthlyExp, 'r-gt');
+  line('Monthly Net Operational Profit/(Loss)', p => p.monthlyNet, 'tot');
+  const A = PL_GROUPS.find(G => G.key === 'annual');
+  line('NONRECURRING / ANNUAL', () => '', 'r-sec');
+  A.items.forEach(i => line('   ' + i + (i === 'Annual Accounts and Audit Fee' ? '' : ' – ' + year), p => p.lines[i] || 0));
+  line(A.total, p => p.annualT, 'r-gt');
+  line('Total Expenses', p => p.totalExp, 'r-gt');
+  line('Net Operational Profit/(Loss)', p => p.net, 'tot');
+  line('   Gross Profit Margin', p => pct(p.gp, p.revenue));
+  line('   Net Profit Margin', p => pct(p.net, p.revenue));
   line('For information', () => '', 'r-sec');
   line('   Service charge passed to employees', p => p.S.staff);
   line('   Paid by card / bank transfer / cash', p => `${rmoney(p.S.card)} / ${rmoney(p.S.transfer)} / ${rmoney(p.S.cash)}`);
@@ -17792,12 +17818,12 @@ async function restPLReport(out, info, from, to){
     const list = restList();
     const data = await Promise.all(list.map(r => restRangeData(r.id, from, to)));
     const ps = list.map((r, i) => ({ name:restInfo(r.id).name, p:plCompute(data[i], restInfo(r.id), from, to) }));
-    const total = { S:{}, cos:{}, opex:{} };
+    const total = { S:{}, lines:{}, g:{} };
     // add the restaurants together line by line
     const addObj = (a, b) => { Object.keys(b).forEach(k => { a[k] = rc((a[k] || 0) + b[k]); }); };
     ['total','sc','company','staff','card','transfer','cash','fee'].forEach(k => total.S[k] = rc(ps.reduce((a, c) => a + (c.p.S[k] || 0), 0)));
-    ps.forEach(c => { addObj(total.cos, c.p.cos); addObj(total.opex, c.p.opex); });
-    ['netSales','revenue','cosT','opexT','gp','net','pin','days'].forEach(k => total[k] = rc(ps.reduce((a, c) => a + (c.p[k] || 0), 0)));
+    ps.forEach(c => { addObj(total.lines, c.p.lines); addObj(total.g, c.p.g); });
+    ['netSales','revenue','cosT','gp','monthlyExp','monthlyNet','annualT','totalExp','opexT','net','pin','days'].forEach(k => total[k] = rc(ps.reduce((a, c) => a + (c.p[k] || 0), 0)));
     cols = ps.concat([{ name:'Both', p:total }]); title = 'Profit & Loss — both restaurants';
   } else {
     const [pf, pt] = restPeriodBefore(from, to);
@@ -17807,13 +17833,13 @@ async function restPLReport(out, info, from, to){
     note = 'Second column: the same length of time just before, to compare.';
   }
   if(REST.view !== 'reports' || REST.repType !== 'pl') return null;
-  const t = plRows(cols);
+  const t = plRows(cols, to.slice(0,4));
   const net = cols[cols.length - (cols.length > 2 ? 1 : 2)].p.net;
   out.innerHTML = `<div class="r-box"><h3><span>${esc(title)} <small>${esc(rLong(from))} – ${esc(rLong(to))}</small></span>
       <b style="color:${net >= 0 ? '#1f7a55' : '#c92a2a'}">${net >= 0 ? 'Profit' : 'Loss'} ${esc(rs(Math.abs(net)))}</b></h3>
     ${restTableHTML(t.head, t.rows, null, t.cls)}
     <div class="r-note">How it is worked out: service charge is inside the prices, so it is taken out of sales first; the company keeps ${esc(100 - info.staff_share)}% of it, the employees get ${esc(info.staff_share)}%.
-      <b>Cost of sales</b> = petty cash and bills in the groups Groceries, Market Purchase, Beverages and Food & beverage suppliers. Everything else — including the bank commission — is an <b>operating expense</b>.
+      Each petty cash and bill entry goes on the line of its category. <b>Card Commission</b> is the bank's ${esc(feeLabel(info))} on card and transfer payments, worked out from daily sales.
       Money put into petty cash is not income and not a cost; only what was spent from it counts. ${note ? '<br>' + esc(note) : ''}
       ${REST.billsMissing ? '<br><b>Bills & Expenses is not set up yet (run file 31), so bills paid from the bank are not included.</b>' : ''}</div></div>`;
   return { title, head:t.head, rows:t.rows, tot:null, cls:t.cls };
@@ -17843,12 +17869,12 @@ function restPayReport(out, info, from, to){
 function restExpReport(out, info, from, to){
   const pet = pettyBetween(from, to).filter(r => r.kind === 'expense'), bil = billsBetween(from, to);
   const cats = {};
-  pet.forEach(r => { const c = r.category || 'Miscellaneous'; (cats[c] = cats[c] || { petty:0, bills:0 }).petty += Number(r.amount); });
-  bil.forEach(r => { const c = r.category || 'Other'; (cats[c] = cats[c] || { petty:0, bills:0 }).bills += Number(r.amount); });
+  pet.forEach(r => { const c = plLineOf(r.category); (cats[c] = cats[c] || { petty:0, bills:0 }).petty += Number(r.amount); });
+  bil.forEach(r => { const c = plLineOf(r.category); (cats[c] = cats[c] || { petty:0, bills:0 }).bills += Number(r.amount); });
   const total = rc(Object.values(cats).reduce((a, c) => a + c.petty + c.bills, 0));
   const keys = Object.keys(cats).sort((a, b) => (cats[b].petty + cats[b].bills) - (cats[a].petty + cats[a].bills));
-  const head = ['Category','Type','Petty cash','Bills & expenses','Total','Share'];
-  const rows = keys.map(k => { const c = cats[k], t = rc(c.petty + c.bills); return [k, COST_OF_SALES.has(k) ? 'Cost of sales' : 'Operating', rc(c.petty), rc(c.bills), t, total ? Math.round(t / total * 1000) / 10 + '%' : '—']; });
+  const head = ['Category','P&L group','Petty cash','Bills & expenses','Total','Share'];
+  const rows = keys.map(k => { const c = cats[k], t = rc(c.petty + c.bills); return [k, (PL_GROUPS.find(G => G.key === PL_LINE[k]) || {}).label || '', rc(c.petty), rc(c.bills), t, total ? Math.round(t / total * 1000) / 10 + '%' : '—']; });
   const tot = ['Total', '', rc(pet.reduce((a, r) => a + Number(r.amount), 0)), rc(bil.reduce((a, r) => a + Number(r.amount), 0)), total, total ? '100%' : '—'];
   const lh = ['Date','From','Category','Description','Bill no.','Amount'];
   const lines = pet.map(r => [r.day, 'Petty cash', r.category || '', r.description, r.invoice_no || '', Number(r.amount)])
@@ -17880,17 +17906,17 @@ function restWeekReport(out, info, from, to){
 /* ---- Month by month (12 months up to "To") ---- */
 function restMonthsReport(out, info, from, to){
   const last = to.slice(0,7), months = Array.from({ length:12 }, (_, i) => shiftMonth(last, i - 11));
-  const head = ['Month','Sales','Service charge','Bank commission','Cost of sales','Operating expenses','Net profit','Net margin'];
+  const head = ['Month','Sales','Service charge','Card commission','Cost of sales','Other expenses','Net operational profit','Net margin'];
   const rows = [], cls = [];
   const T = { s:0, sc:0, fee:0, cos:0, op:0, net:0, rev:0 };
   months.forEach(m => { const p = plCompute(REST, info, monthStart(m), monthEnd(m));
-    if(!p.S.total && !p.cosT && !p.opexT) return;
-    rows.push([rMonthName(m), p.S.total, p.S.sc, p.S.fee, p.cosT, rc(p.opexT - p.S.fee), p.net, p.revenue ? Math.round(p.net / p.revenue * 1000) / 10 + '%' : '—']);
+    if(!p.S.total && !p.cosT && !p.totalExp) return;
+    rows.push([rMonthName(m), p.S.total, p.S.sc, p.S.fee, p.cosT, rc(p.totalExp - p.S.fee), p.net, p.revenue ? Math.round(p.net / p.revenue * 1000) / 10 + '%' : '—']);
     cls.push(p.net < 0 ? 'r-bad' : '');
-    T.s += p.S.total; T.sc += p.S.sc; T.fee += p.S.fee; T.cos += p.cosT; T.op += p.opexT - p.S.fee; T.net += p.net; T.rev += p.revenue; });
+    T.s += p.S.total; T.sc += p.S.sc; T.fee += p.S.fee; T.cos += p.cosT; T.op += p.totalExp - p.S.fee; T.net += p.net; T.rev += p.revenue; });
   const tot = ['12 months', rc(T.s), rc(T.sc), rc(T.fee), rc(T.cos), rc(T.op), rc(T.net), T.rev ? Math.round(T.net / T.rev * 1000) / 10 + '%' : '—'];
   out.innerHTML = `<div class="r-box"><h3>Month by month <small>12 months to ${esc(rMonthName(last))}</small></h3>${restTableHTML(head, rows, tot, cls)}
-    <div class="r-note">Red = a month with a loss. Operating expenses here do not include the bank commission, which has its own column.</div></div>`;
+    <div class="r-note">Red = a month with a loss. "Other expenses" are all the expense groups of the Profit & Loss except the card commission, which has its own column.</div></div>`;
   return { title:'Month by month — ' + info.name, head, rows, tot, cls };
 }
 
