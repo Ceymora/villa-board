@@ -933,6 +933,20 @@
   .cancelled-row .manage-guest{ text-decoration:line-through; }
 
   /* Settings panel */
+  .ab-bar{ display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-size:12.5px; color:var(--muted);
+    margin:0 0 10px; padding:8px 12px; border:1px solid var(--board-line); border-left:4px solid var(--airbnb); border-radius:10px; background:var(--airbnb-bg); }
+  .ab-bar .ab-title{ font-weight:700; color:var(--ink); }
+  .ab-bar .ab-v{ color:var(--ink); max-width:100%; overflow-wrap:anywhere; }
+  .ab-bar .ab-v.bad{ color:var(--red); }
+  .ab-bar .ab-btn{ margin-left:auto; border:1px solid var(--airbnb); background:#fff; color:#c92a2a; border-radius:8px; padding:5px 12px; font-weight:600; cursor:pointer; font-size:12.5px; }
+  .ab-bar .ab-btn:disabled{ opacity:.6; cursor:default; }
+  .ab-row{ padding:10px 0; border-top:1px solid var(--board-line); }
+  .ab-row:first-child{ border-top:0; }
+  .ab-row label{ font-weight:600; font-size:13px; display:block; margin-bottom:4px; }
+  .ab-line{ display:flex; gap:8px; flex-wrap:wrap; }
+  .ab-line input{ flex:1 1 260px; min-width:0; font-size:12.5px; }
+  .ab-line button{ padding:6px 12px; border-radius:8px; border:1px solid var(--board-line); background:#fff; cursor:pointer; font-weight:600; }
+  .ab-line .ab-save{ background:var(--airbnb); border-color:var(--airbnb); color:#fff; }
   .set-card{
     background:#fff; border:1px solid var(--board-line); border-radius:12px;
     padding:16px 18px; margin-bottom:16px;
@@ -1621,6 +1635,7 @@
         <button class="add-booking-btn" id="addBookingBtn">+ Add booking</button>
       </div>
 
+      <div class="ab-bar" id="airbnbBar" style="display:none"></div>
       <div class="cal-hint" id="calHint">Click your <b>check-in</b> day, then click the <b>last night</b> the guest stays (not the departure day). Click "+ Add booking" instead if you'd rather type dates directly.</div>
 
       <div class="cal-weekdays">
@@ -2248,6 +2263,15 @@
         <label style="margin-top:14px;">Numbers to add to every guest group</label>
         <input type="text" id="setGroupNumbers" placeholder="+94 77 155 6138, +94 74 410 5189">
         <div class="field-hint">Your own team's numbers, separated by commas. They show on every group so nobody is forgotten.</div>
+      </div>
+
+      <div class="set-card" id="airbnbCard" style="display:none">
+        <h4>Airbnb calendars</h4>
+        <div class="field-hint">Paste each villa's Airbnb calendar link, and its Airbnb bookings come into the Bookings Calendar by themselves.
+          On Airbnb: <b>Calendar → the villa → Availability → Connect calendars → Connect to another website</b>, then copy the link (it ends in <b>.ics?s=…</b>).
+          Airbnb only shares the dates and the reservation code — add the guest's name and price on the booking as before; the sync never overwrites them.
+          Only you can see these links.</div>
+        <div id="airbnbLinks"></div>
       </div>
 
       <div class="set-card">
@@ -3562,7 +3586,7 @@ function checkDeletePassword(){
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
 function rowToBooking(r){ return {
-  id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest,
+  id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, fromAirbnb: !!r.airbnb_uid,
   guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null,
   currency:r.currency||'USD',
   // --- direct booking / invoice fields (all optional; Airbnb bookings simply leave them null) ---
@@ -4236,7 +4260,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.13-security';
+const APP_VERSION = 'v2026.10.15-airbnb';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4733,6 +4757,8 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
     if(tab === 'villareport' && !villaReportInited){ initVillaReport(); }
     if(tab === 'reports' && !reportsInited){ initReports(); }
     if(tab === 'bookings' && typeof renderGuestGroups === 'function') renderGuestGroups();
+    if(tab === 'bookings') airbnbAuto();
+    if(tab === 'settings') renderAirbnbSettings();
     if(tab === 'company' && !companyInited){ initCompany(); }
     if(tab === 'payroll' && !payrollInited){ initPayroll(); }
     if(tab === 'attendance'){ if(!attInited) initAttendance(); else renderAttendance(); }
@@ -6649,7 +6675,7 @@ function renderManageList(villaBookings){
       : `<span class="manage-dates" style="font-style:italic;">no rate set</span>`;
     row.innerHTML = `
       <span class="manage-type-dot ${safeClass(b.type)}"></span>
-      <span class="manage-guest">${esc(b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest'))}</span>
+      <span class="manage-guest">${esc(b.guest ? b.guest : (b.type==='airbnb'?'Airbnb guest':'Direct guest'))}${b.fromAirbnb ? ' <span title="Comes from the Airbnb calendar — dates follow Airbnb">🔗</span>' : ''}${b.fromAirbnb && b.rateUsd == null && b.status !== 'cancelled' ? ' <span class="txn-sub" style="display:inline;color:var(--amber)">· add the price</span>' : ''}</span>
       <span class="manage-dates">${b.checkIn} → ${b.checkOut} · <b>${nights} night${nights===1?'':'s'}</b></span>
       ${moneyHtml}
     `;
@@ -16744,6 +16770,107 @@ function exportCompanyCSV(){
   downloadCSV(`company-accounts-${ymKey(coMonthDate)}.csv`, out);
 }
 
+
+/* ===========================================================================
+   AIRBNB CALENDARS — each villa's Airbnb bookings come in by themselves.
+   The links are kept in the database where only Makky can read them; the "airbnb-sync"
+   function (Supabase) reads Airbnb and adds, moves or cancels the bookings. The page only
+   asks it to run and shows how it went.
+=========================================================================== */
+const AB_LINK_RE = /^https:\/\/([a-z0-9-]+\.)?airbnb\.[a-z.]{2,12}\/calendar\/ical\/[0-9]+\.ics(\?[A-Za-z0-9=&_%.~-]*)?$/;
+let AB_STATUS = null, abBusy = false, abLastAuto = 0;
+function abVillaName(id){ const v = (VILLAS || []).find(x => x.id === id) || (CAL_VILLAS || []).find(x => x.id === id); return v ? v.name : id; }
+function abAgo(iso){
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if(m < 1) return 'just now';
+  if(m < 60) return m + ' min ago';
+  if(m < 24 * 60) return Math.round(m / 60) + ' h ago';
+  return new Date(iso).toLocaleDateString();
+}
+async function abLoadStatus(){
+  if(!sb) return;
+  try{ const { data, error } = await sb.rpc('airbnb_status'); if(error) throw error; AB_STATUS = data || []; }
+  catch(e){ AB_STATUS = null; }
+  renderAirbnbBar();
+}
+function renderAirbnbBar(){
+  const el = document.getElementById('airbnbBar'); if(!el) return;
+  const linked = (AB_STATUS || []).filter(s => s.linked);
+  if(!linked.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = `<span class="ab-title">🔗 Airbnb</span>` + linked.map(s => {
+    const state = !s.last_sync_at ? 'waiting for the first sync'
+      : s.last_ok === false ? '⚠ ' + (s.last_result || 'could not sync')
+      : abAgo(s.last_sync_at) + (s.last_result && s.last_result !== 'Up to date' ? ' · ' + s.last_result : '');
+    return `<span class="ab-v${s.last_ok === false ? ' bad' : ''}" title="${esc(s.last_result || '')}"><b>${esc(abVillaName(s.villa))}</b> ${esc(state)}</span>`;
+  }).join('') + `<button class="ab-btn" id="abSyncBtn"${abBusy ? ' disabled' : ''}>${abBusy ? 'Syncing…' : '↻ Sync Airbnb'}</button>`;
+  el.querySelector('#abSyncBtn').addEventListener('click', () => airbnbSync(true));
+}
+async function airbnbSync(byHand){
+  if(!sb || abBusy) return;
+  abBusy = true; renderAirbnbBar();
+  try{
+    const { data, error } = await sb.functions.invoke('airbnb-sync', { body:{ force: !!byHand } });
+    if(error) throw error;
+    if(data && data.error) throw new Error(data.error);
+    const changed = ((data && data.results) || []).some(r => r && r.ok && (r.added || r.moved || r.cancelled || r.joined || r.back));
+    if(changed && typeof fetchBookings === 'function' && bookingsInited) await fetchBookings();
+  }catch(e){
+    console.error('Airbnb sync', e);
+    if(byHand) alert('Airbnb sync did not work: ' + (e.message || e) + '\n\nIf it is new: the "airbnb-sync" function has to be deployed in Supabase first.');
+  }finally{
+    abBusy = false;
+    await abLoadStatus();
+  }
+}
+// Opening Bookings checks Airbnb (at most every 10 minutes per browser; the function also waits 10 minutes per villa).
+function airbnbAuto(){
+  if(!sb || !currentUser) return;
+  if(Date.now() - abLastAuto < 10 * 60 * 1000){ abLoadStatus(); return; }
+  abLastAuto = Date.now();
+  abLoadStatus().then(() => { if((AB_STATUS || []).some(s => s.linked)) airbnbSync(false); });
+}
+async function renderAirbnbSettings(){
+  const card = document.getElementById('airbnbCard'); if(!card) return;
+  if(!sb || !isAdmin()){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  const box = document.getElementById('airbnbLinks');
+  const { data, error } = await sb.from('airbnb_calendars').select('*');
+  if(error){ box.innerHTML = '<div class="field-hint">Run <b>35-supabase-airbnb-calendars.sql</b> in Supabase first.</div>'; return; }
+  const by = Object.fromEntries((data || []).map(r => [r.villa, r]));
+  const villas = (VILLAS && VILLAS.length ? VILLAS : CAL_VILLAS) || [];
+  box.innerHTML = villas.map(v => {
+    const r = by[v.id];
+    const note = !r ? 'Not linked.'
+      : !r.last_sync_at ? 'Linked — it syncs the next time Bookings is opened.'
+      : (r.last_ok === false ? '⚠ ' : '✓ ') + 'Last sync ' + new Date(r.last_sync_at).toLocaleString() + ' — ' + (r.last_result || '');
+    return `<div class="ab-row" data-ab-villa="${esc(v.id)}">
+      <label>${esc(v.name)}</label>
+      <div class="ab-line"><input type="url" class="ab-url" placeholder="https://www.airbnb.com/calendar/ical/….ics?s=…" value="${esc(r ? r.ical_url : '')}" autocomplete="off" spellcheck="false">
+        <button class="ab-save" type="button">Save</button>${r ? '<button class="ab-del" type="button">Remove</button>' : ''}</div>
+      <div class="field-hint">${esc(note)}</div></div>`;
+  }).join('') || '<div class="field-hint">No villas yet.</div>';
+  box.querySelectorAll('[data-ab-villa]').forEach(row => {
+    const villa = row.dataset.abVilla, input = row.querySelector('.ab-url');
+    row.querySelector('.ab-save').addEventListener('click', async () => {
+      const url = input.value.trim();
+      if(!AB_LINK_RE.test(url)){ alert('That is not an Airbnb calendar link.\n\nIt looks like https://www.airbnb.com/calendar/ical/12345678.ics?s=…'); return; }
+      const { error } = await sb.from('airbnb_calendars').upsert({ villa, ical_url: url }, { onConflict:'villa' });
+      if(error){ alert('Could not save: ' + error.message); return; }
+      logActivity('update', 'airbnb_calendars', 'Airbnb calendar linked for ' + abVillaName(villa));
+      await airbnbSync(true);
+      renderAirbnbSettings();
+    });
+    const del = row.querySelector('.ab-del');
+    if(del) del.addEventListener('click', async () => {
+      if(!confirm(`Stop syncing ${abVillaName(villa)} with Airbnb?\n\nBookings already brought in stay as they are.`)) return;
+      const { error } = await sb.from('airbnb_calendars').delete().eq('villa', villa);
+      if(error){ alert('Could not remove: ' + error.message); return; }
+      logActivity('update', 'airbnb_calendars', 'Airbnb calendar unlinked for ' + abVillaName(villa));
+      abLoadStatus(); renderAirbnbSettings();
+    });
+  });
+}
 
 /* ============================================================================
    RESTAURANTS — SDA Restaurant ( Mezze ) and Thai Charm Restaurant
