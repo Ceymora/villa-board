@@ -3682,7 +3682,9 @@ function rowToBooking(r){ return {
   agreedRate: r.fx_rate !== null && r.fx_rate !== undefined && Number(r.fx_rate) > 0 ? Number(r.fx_rate) : null,
   agreedRateDate: r.fx_rate_date || null,
 }; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:r.employee_name || null, settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, invoiceDate: r.invoice_date || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
+// Advances once recorded for "Unassigned" are the office's money: shown and kept as "Office".
+function advPersonName(n){ const v = String(n || '').trim(); if(!v) return null; return /^unassigned$/i.test(v) ? 'Office' : v; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:advPersonName(r.employee_name), settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, invoiceDate: r.invoice_date || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -4328,7 +4330,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.15-airbnbfile';
+const APP_VERSION = 'v2026.10.15-advances';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -8080,7 +8082,12 @@ const ADVANCE_WALLET_DEFAULTS = [
   { name:'Chathuranga', label:'Chathuranga (Kalava Villa)' },
   { name:'Shanika', label:'Shanika (Brisa Villa)' },
   { name:'Rohan', label:'Rohan (Noelia Villa)' },
+  // Money held for the office, and by Zahny and Buddhini, comes from Petty Cash Ceymora.
+  { name:'Office',   ceymora:true },
+  { name:'Zahny',    ceymora:true },
+  { name:'Buddhini', ceymora:true },
 ];
+function advWalletLabel(d){ return d.label || `${d.name} — ${pettyName('ceymora')}`; }
 
 // A staff advance wallet's balance = every advance they've been given, minus every expense
 // that was explicitly marked as "funded from their advance" (rather than paid fresh from a
@@ -8126,7 +8133,7 @@ function renderAdvanceWallets(){
       ? 'linear-gradient(135deg, #e03131, #8a1f1f)'
       : 'linear-gradient(135deg, #7048e8, #4425a1)';
     card.innerHTML = `
-      <div class="cash-card-label">${esc(defaultInfo ? defaultInfo.label : name)}</div>
+      <div class="cash-card-label">${esc(defaultInfo ? advWalletLabel(defaultInfo) : name)}</div>
       <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
       <div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap to settle or see his statement</span></div>
@@ -9168,7 +9175,7 @@ function openAdvanceModal(record){
   try{
     const g = id => document.getElementById(id);
     const dl = g('staffNameList');
-    const names = new Set([...STAFF.map(s=>s.name), ...allAppUsers.map(u => u.full_name || u.email)]);
+    const names = new Set([...ADVANCE_WALLET_DEFAULTS.map(d => d.name), ...STAFF.map(s=>s.name), ...allAppUsers.map(u => u.full_name || u.email)]);
     dl.innerHTML = [...names].map(n=>`<option value="${esc(n)}">`).join('');
 
     g('advDate').value = record ? record.date : todayISO();
