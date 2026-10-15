@@ -841,6 +841,8 @@
 
   /* ===================== DIRECT BOOKINGS / INVOICES ===================== */
   .modal.modal-wide{ width:560px; }
+  #villaDetailModalOverlay .modal.vd-big{ width:min(920px, 96vw) !important; max-height:92vh !important; padding:24px 28px; }
+  #villaDetailModalOverlay .modal.vd-big .sa-grid{ grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); }
   .modal textarea{
     width:100%; padding:7px 9px; border:1px solid var(--board-line); border-radius:7px;
     font-size:13px; font-family:inherit; resize:vertical; min-height:56px;
@@ -4330,7 +4332,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.15-advances';
+const APP_VERSION = 'v2026.10.15-advances2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -8094,56 +8096,88 @@ function advWalletLabel(d){ return d.label || `${d.name} — ${pettyName('ceymor
 // card). Both live on the same petty_cash_transactions table, tied together by employee_name.
 function computeAdvanceWallets(){
   const wallets = {};
-  const blank = () => ({ given:0, spent:0, returned:0, givenBank:0, givenCash:0, spentBank:0, spentCash:0 });
+  const blank = () => ({ given:0, spent:0, returned:0, givenBank:0, givenCash:0, spentBank:0, spentCash:0, cey:0 });
+  const cey = t => t.card === 'ceymora';      // money that came out of Petty Cash Ceymora
   for(const t of allCashTxns){
     const bank = t.card === 'bank';
     if(t.type === 'advance' && t.employeeName){
       const w = wallets[t.employeeName] || (wallets[t.employeeName] = blank());
       w.given += t.amount;
+      if(cey(t)) w.cey += t.amount;
       if(bank) w.givenBank += t.amount; else w.givenCash += t.amount;
     } else if(t.type === 'expense' && t.employeeName){
       const w = wallets[t.employeeName] || (wallets[t.employeeName] = blank());
       w.spent += t.amount;
+      if(cey(t)) w.cey -= t.amount;
       if(bank) w.spentBank += t.amount; else w.spentCash += t.amount;
     } else if(t.type === 'income' && t.advanceId && t.employeeName){
       const w = wallets[t.employeeName] || (wallets[t.employeeName] = blank());
       w.returned += t.amount;
+      if(cey(t)) w.cey -= t.amount;
     }
   }
   for(const name in wallets){ wallets[name].balance = wallets[name].given - wallets[name].spent - (wallets[name].returned || 0); }
   return wallets;
 }
 
+/* Petty Cash Ceymora = the cash still in the office + what each person is holding from it.
+   So the Ceymora card is always exactly Anuja + Chathuranga + Shanika + Rohan + Office +
+   Zahny + Buddhini (+ anyone else holding an advance). "Office" is the cash in the office
+   box, plus any advance given to the office itself. */
 function renderAdvanceWallets(){
   const wrap = document.getElementById('advanceWalletsSummary');
   if(!wrap) return;
   const wallets = computeAdvanceWallets();
   const names = new Set(ADVANCE_WALLET_DEFAULTS.map(d=>d.name));
   Object.keys(wallets).forEach(n=>names.add(n));
+  let box = 0;
+  for(const t of allCashTxns) if(t.card === 'ceymora') box += cardEffect(t);
+  const fmt = n => 'LKR ' + Math.round(n).toLocaleString();
   wrap.innerHTML = '';
+  const parts = [];
   for(const name of names){
-    const w = wallets[name] || { given:0, spent:0, balance:0 };
+    const w = wallets[name] || { given:0, spent:0, returned:0, balance:0, cey:0 };
+    const isOffice = name === 'Office';
+    const shown = isOffice ? box + w.balance : w.balance;
+    const ceyPart = isOffice ? box + w.cey : w.cey;
+    parts.push([name, ceyPart]);
     const defaultInfo = ADVANCE_WALLET_DEFAULTS.find(d=>d.name===name);
     const gap = allCashTxns.filter(t => isAdvanceParent(t) && t.settled && t.employeeName === name)
       .reduce((sum,t)=> sum + advFigures(t).left, 0);
     const openCount = allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name).length;
     const card = document.createElement('div');
     card.className = 'cash-card';
-    card.style.background = w.balance < 0
+    card.style.background = shown < 0
       ? 'linear-gradient(135deg, #e03131, #8a1f1f)'
       : 'linear-gradient(135deg, #7048e8, #4425a1)';
     card.innerHTML = `
       <div class="cash-card-label">${esc(defaultInfo ? advWalletLabel(defaultInfo) : name)}</div>
-      <div class="cash-card-balance">LKR ${w.balance.toLocaleString()}</div>
-      <div style="font-size:11px; opacity:0.85; margin-top:4px;">Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>
-      <div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap to settle or see his statement</span></div>
+      <div class="cash-card-balance">LKR ${Math.round(shown).toLocaleString()}</div>
+      ${isOffice ? `<div style="font-size:11px; opacity:0.9; margin-top:4px;">Cash in the office ${fmt(box)}${w.given || w.spent || w.returned ? ` + office advances ${fmt(w.balance)}` : ''}</div>` : ''}
+      ${!isOffice || w.given ? `<div style="font-size:11px; opacity:0.85; margin-top:4px;">${isOffice ? 'Advances: ' : ''}Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>` : ''}
+      ${Math.round(ceyPart) !== Math.round(shown) ? `<div style="font-size:11px; opacity:0.95; margin-top:2px;">of which from ${esc(pettyName('ceymora'))} ${fmt(ceyPart)}</div>` : ''}
+      ${!isOffice ? `<div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap to open</span></div>` : '<div style="font-size:11px; opacity:0.8; margin-top:2px;">tap to open</div>'}
       ${openCount ? `<div style="font-size:11.5px; margin-top:6px; font-weight:700;">${openCount} advance${openCount === 1 ? '' : 's'} open — tap to settle</div>` : ''}
-      ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} still to recover from settled advance${Math.abs(gap) && openCount ? 's' : 's'} — click to see</div>` : ''}
+      ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} still to recover from settled advances — click to see</div>` : ''}
     `;
     card.style.cursor = 'pointer';
     card.addEventListener('click', ()=> openStaffAdvanceStatement(name));
     wrap.appendChild(card);
   }
+  // The Ceymora card shows the whole float; the line under the cards shows it adds up.
+  const total = parts.reduce((a, [, v]) => a + v, 0);
+  const balEl = document.getElementById('ceymoraBalance');
+  if(balEl){
+    balEl.textContent = fmt(total);
+    let sub = document.getElementById('ceymoraSplit');
+    if(!sub){ sub = document.createElement('div'); sub.id = 'ceymoraSplit'; sub.style.cssText = 'font-size:11.5px; opacity:.9; margin-top:4px;'; balEl.after(sub); }
+    sub.textContent = `Cash in the office ${fmt(box)} · out as advances ${fmt(total - box)}`;
+  }
+  let chk = document.getElementById('advCeymoraCheck');
+  if(!chk){ chk = document.createElement('div'); chk.id = 'advCeymoraCheck'; chk.className = 'field-hint'; chk.style.margin = '8px 0 0'; wrap.after(chk); }
+  chk.innerHTML = `<b>${esc(pettyName('ceymora'))} ${fmt(total)}</b> = ` +
+    parts.filter(([n, v]) => Math.round(v) !== 0 || ADVANCE_WALLET_DEFAULTS.some(d => d.name === n))
+         .map(([n, v]) => `${esc(n)} ${fmt(v)}`).join(' + ') + ' ✓';
 }
 
 // Populates the "Funded from a staff advance?" dropdown in the expense form with every
@@ -8594,7 +8628,7 @@ function openBossDetail(){
       downloadCSV('spent-for-sharon.csv', out);
     });
   }
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
 }
 document.getElementById('bossSpendCard').addEventListener('click', openBossDetail);
 
@@ -10428,7 +10462,7 @@ function openCardBalanceDetail(card){
         ${topUps === 0 ? '<br><br>Nothing at all has been recorded as money received on this card.' : ''}
       </div>` : ''}
     <div class="field-hint" style="margin-top:8px;">${rows.length} transaction${rows.length===1?'':'s'} on this card, all time.</div>`;
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
 }
 function openDirectPurchasesDetail(card){
   const cardLabel = CARD_LABELS[card] || card;
@@ -10465,14 +10499,14 @@ function openDirectPurchasesDetail(card){
     html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total, all villas: LKR ${total.toLocaleString()}</div>`;
   }
   document.getElementById('villaDetailBody').innerHTML = html;
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
 }
 
 function openVillaDetail(loc){
   document.getElementById('villaDetailTitle').textContent =
     `${INV_LOCATION_LABELS[loc]} — ${invMonthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`;
   document.getElementById('villaDetailBody').innerHTML = buildVillaReportHTML(loc, invMonthDate);
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
 }
 document.getElementById('villaDetailClose').addEventListener('click', ()=> document.getElementById('villaDetailModalOverlay').classList.remove('open'));
 document.getElementById('villaDetailModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='villaDetailModalOverlay') e.currentTarget.classList.remove('open'); });
@@ -11703,7 +11737,7 @@ function openBankToStaffDetail(){
   }
   document.getElementById('villaDetailTitle').textContent = 'Bank transfers to staff';
   document.getElementById('villaDetailBody').innerHTML = html;
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
   document.querySelectorAll('#villaDetailBody [data-staff-stmt]').forEach(el=>{
     el.addEventListener('click', ()=> openStaffAdvanceStatement(el.dataset.staffStmt));
   });
@@ -11732,13 +11766,19 @@ function openBankTransferDetail(placeId){
     html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${Math.round(total).toLocaleString()}</div>`;
   }
   document.getElementById('villaDetailBody').innerHTML = html;
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
 }
 
 // One person's whole advance position on a single page: every rupee that reached him
 // (by bank transfer or as cash off a card), every invoice he brought back and which
 // villa it was charged to, and any cash he handed in. The three have to agree with the
 // balance still showing against his name — which is the check Sharon asked for.
+// The detail window is small for quick looks; a person's advance statement opens it large.
+function showDetailModal(big){
+  const ov = document.getElementById('villaDetailModalOverlay');
+  ov.querySelector('.modal').classList.toggle('vd-big', !!big);
+  ov.classList.add('open');
+}
 function openStaffAdvanceStatement(name){
   const w = computeAdvanceWallets()[name] || { given:0, spent:0, returned:0, givenBank:0, givenCash:0 };
   const mine = allCashTxns.filter(t => t.employeeName === name);
@@ -11845,7 +11885,7 @@ function openStaffAdvanceStatement(name){
   html += '</details>';
   document.getElementById('villaDetailTitle').textContent = `Advances — ${name}`;
   document.getElementById('villaDetailBody').innerHTML = html;
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal(true);
   wireSimpleAdvance(name);
 }
 
@@ -12034,7 +12074,7 @@ function openSharonExpenseDetail(villaId){
     html += `</div><div style="text-align:right; font-weight:700; margin-top:8px; font-size:13px;">Total: LKR ${total.toLocaleString()}</div>`;
   }
   document.getElementById('villaDetailBody').innerHTML = html;
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
 }
 
 function renderMyPurchasesSummary(){
@@ -13301,7 +13341,7 @@ async function openSettingsHistory(){
   document.getElementById('villaDetailTitle').textContent = 'Earlier versions of Invoices & Setup';
   const body = document.getElementById('villaDetailBody');
   body.innerHTML = '<div class="manage-empty">Loading…</div>';
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
   const { data, error } = await sb.from('app_settings_history').select('*').eq('key','main').order('saved_at', { ascending:false }).limit(60);
   if(error){ body.innerHTML = '<div class="adv-status warn">Earlier versions are not being kept yet. Run <b>17-supabase-setup-history.sql</b> in Supabase once — from then on every change can be undone here.</div>'; return; }
   if(!data || !data.length){ body.innerHTML = '<div class="manage-empty">No earlier versions yet — one is kept each time the setup is saved from now on.</div>'; return; }
@@ -13509,7 +13549,7 @@ async function openBrandPicker(title, onPick){
   document.getElementById('villaDetailTitle').textContent = title + ' — pick a picture';
   const body = document.getElementById('villaDetailBody');
   body.innerHTML = '<div class="manage-empty">Looking for pictures uploaded before…</div>';
-  document.getElementById('villaDetailModalOverlay').classList.add('open');
+  showDetailModal();
   let pics = [];
   try{ pics = await listBrandImages(); }catch(e){ console.error(e); }
   if(!pics.length){ body.innerHTML = '<div class="manage-empty">No pictures found in storage. Upload the photo again with “Choose file”.</div>'; return; }
