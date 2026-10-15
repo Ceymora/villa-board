@@ -933,6 +933,45 @@
   .cancelled-row .manage-guest{ text-decoration:line-through; }
 
   /* Settings panel */
+  .srch-open-btn{ margin-left:auto; align-self:center; font-weight:700; font-size:14px; padding:6px 14px; border-radius:20px;
+    border:1px solid var(--board-line); background:#fff; color:var(--ink); cursor:pointer; white-space:nowrap; }
+  .srch-open-btn:hover{ border-color:var(--frame); }
+  .srch-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:60; align-items:flex-start; justify-content:center; padding:4vh 12px; }
+  .srch-overlay.open{ display:flex; }
+  .srch-box{ background:#fff; border-radius:14px; width:min(920px, 100%); max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+  .srch-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .srch-head h3{ margin:0; font-size:19px; }
+  .srch-x{ border:none; background:none; font-size:20px; cursor:pointer; color:var(--muted); }
+  .srch-bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+  .srch-bar .srch-q{ flex:1 1 280px; min-width:0; font-size:16px; padding:10px 12px; border:2px solid var(--board-line); border-radius:10px; }
+  .srch-bar .srch-q:focus{ outline:none; border-color:var(--frame); }
+  .srch-bar label{ font-size:11px; font-weight:600; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
+  .srch-bar select, .srch-bar input[type=date]{ padding:7px 8px; border:1px solid var(--board-line); border-radius:8px; font-size:13px; }
+  .srch-hint{ font-size:12px; color:var(--muted); margin:8px 0 4px; }
+  .srch-group{ margin-top:16px; }
+  .srch-group h4{ margin:0 0 6px; font-size:14px; display:flex; gap:8px; align-items:baseline; }
+  .srch-group h4 span{ font-weight:400; color:var(--muted); font-size:12px; }
+  .srch-item{ border:1px solid var(--board-line); border-radius:10px; margin:6px 0; background:#fff; }
+  .srch-item summary{ list-style:none; cursor:pointer; padding:9px 12px; display:grid; grid-template-columns:105px 1fr auto; gap:10px; align-items:baseline; }
+  .srch-item summary::-webkit-details-marker{ display:none; }
+  .srch-item[open] summary{ border-bottom:1px solid var(--board-line); background:#faf8f3; border-radius:10px 10px 0 0; }
+  .srch-item .d{ color:var(--muted); font-size:12.5px; white-space:nowrap; }
+  .srch-item .t{ font-weight:600; overflow-wrap:anywhere; }
+  .srch-item .t small{ display:block; font-weight:400; color:var(--muted); font-size:12px; }
+  .srch-item .a{ font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap; }
+  .srch-det{ padding:8px 12px 12px; }
+  .srch-det table{ border-collapse:collapse; width:100%; font-size:13px; }
+  .srch-det th{ text-align:left; color:var(--muted); font-weight:600; padding:3px 12px 3px 0; width:150px; vertical-align:top; }
+  .srch-det td{ padding:3px 0; overflow-wrap:anywhere; }
+  .srch-det .files a{ margin-right:10px; }
+  .srch-more{ font-size:12px; color:var(--muted); margin:4px 2px; }
+  @media (max-width:600px){
+    .srch-overlay{ padding:0; }
+    .srch-box{ border-radius:0; max-height:100vh; height:100vh; padding:14px; }
+    .srch-item summary{ grid-template-columns:1fr auto; }
+    .srch-item .d{ grid-column:1 / -1; }
+    .srch-det th{ width:110px; }
+  }
   .ab-bar{ display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-size:12.5px; color:var(--muted);
     margin:0 0 10px; padding:8px 12px; border:1px solid var(--board-line); border-left:4px solid var(--airbnb); border-radius:10px; background:var(--airbnb-bg); }
   .ab-bar .ab-title{ font-weight:700; color:var(--ink); }
@@ -1505,6 +1544,7 @@
       <button class="maintab-btn" data-tab="attendance" id="attendanceTabBtn" style="display:none">🗓️ Attendance</button>
       <button class="maintab-btn" data-tab="users" id="usersTabBtn" style="display:none">👤 Users</button>
       <button class="maintab-btn" data-tab="settings" id="settingsTabBtn" style="display:none">🧾 Invoices &amp; Setup</button>
+      <button type="button" class="srch-open-btn" id="searchOpenBtn" title="Search everything you can see — names, items, dates, amounts">🔍 Search</button>
     </div>
 
     <!-- ===================== VILLA EXPENSES PANEL =====================
@@ -1878,6 +1918,7 @@
           <button data-rv="monthly"><span class="i">📊</span>Monthly Summary</button>
           <button data-rv="reports"><span class="i">📄</span>Reports</button>
           <button data-rv="loyverse"><span class="i">🔄</span>Loyverse Check</button>
+          <button data-rv="search"><span class="i">🔍</span>Search</button>
           <button data-rv="history"><span class="i">🕘</span>Change History</button>
           <button data-rv="delreq"><span class="i">🗂</span>Delete Requests</button>
           <button data-rv="settings" id="restNavSettings"><span class="i">⚙️</span>Settings</button>
@@ -3176,6 +3217,12 @@
   </div>
 </div>
 
+<div class="srch-overlay" id="searchOverlay" role="dialog" aria-modal="true" aria-label="Search">
+  <div class="srch-box">
+    <div class="srch-head"><h3>🔍 Search</h3><button type="button" class="srch-x" id="searchClose" aria-label="Close">✕</button></div>
+    <div id="searchMount"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="userModalOverlay">
   <div class="modal"><div class="modal-scroll">
     <h3 id="userModalTitle">Add user</h3>
@@ -4260,7 +4307,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.15-airbnb';
+const APP_VERSION = 'v2026.10.15-search';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -16772,6 +16819,234 @@ function exportCompanyCSV(){
 
 
 /* ===========================================================================
+   SEARCH — one box that finds anything the signed-in person is allowed to see:
+   an item bought in August, a guest's name, an invoice number, an amount.
+   Every word typed must appear somewhere in the line (its text, its date written any
+   common way — "August", "Aug 2026", "12/08/2026", "2026-08-12" — or its amount).
+   The database decides what can be read, so a search never shows more than the tabs do.
+=========================================================================== */
+const SR_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+const SR_MON = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function srDateText(d){
+  const v = String(d || '').slice(0, 10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+  const [y, m, dd] = v.split('-'), mi = +m - 1, M = SR_MONTHS[mi], Mo = SR_MON[mi];
+  return [v, `${+dd} ${Mo} ${y}`, `${dd} ${Mo} ${y}`, `${+dd} ${M} ${y}`, `${dd}/${m}/${y}`, `${+dd}/${+m}/${y}`,
+          `${M} ${y}`, `${Mo} ${y}`, `${Mo}-${y.slice(2)}`, `${y}-${m}`].join(' | ');
+}
+function srNumText(n){
+  if(n === null || n === undefined || n === '') return '';
+  const v = Number(n); if(!isFinite(v)) return '';
+  return [String(v), v.toFixed(2), String(Math.round(v))].join(' | ');
+}
+function srTerms(q){ return String(q || '').toLowerCase().replace(/,/g, '').split(/\s+/).filter(Boolean).slice(0, 10); }
+function srFmtDate(d){
+  const v = String(d || '').slice(0, 10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return v || '—';
+  const [y, m, dd] = v.split('-'); return `${dd} ${SR_MON[+m - 1][0].toUpperCase() + SR_MON[+m - 1].slice(1)} ${y}`;
+}
+function srMoney(n, cur){ if(n === null || n === undefined || n === '' || !isFinite(Number(n))) return ''; return (cur ? cur + ' ' : '') + Number(n).toLocaleString('en-US', { maximumFractionDigits:2 }); }
+function srWhen(iso){ if(!iso) return ''; const d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleString(); }
+function srPlace(id){ if(!id) return ''; return FOR_LABELS[id] || INV_LOCATION_LABELS[id] || abVillaName(id); }
+function srFiles(...lists){ const out = []; lists.forEach(l => { if(Array.isArray(l)) out.push(...l); else if(l) out.push(l); }); return out.filter(Boolean).map(String); }
+function srRestName(id){ return (typeof restInfo === 'function' ? restInfo(id).name : id); }
+
+// Everything that can be searched. Each says who may see it, how to load it and what to show.
+function srVillaSources(){
+  return [
+    { key:'petty', icon:'💰', label:'Petty Cash', can:() => canSee('pettycash'), table:'petty_cash_transactions', order:'date',
+      date:r => r.date,
+      title:r => (r.type === 'income' ? 'Money in' : r.type === 'advance' ? 'Advance' + (r.employee_name ? ' — ' + r.employee_name : '') : r.type === 'transfer' ? 'Transfer' : 'Expense')
+                 + (r.purpose ? ': ' + r.purpose : ''),
+      sub:r => [srPlace(r.for), r.note].filter(Boolean).join(' · '),
+      amount:r => srMoney(r.amount, 'LKR'),
+      details:r => [['Date', srFmtDate(r.date)], ['Type', r.type], ['What for', r.purpose], ['Villa / place', srPlace(r.for)],
+                    ['Amount', srMoney(r.amount, 'LKR')], ['Paid from', typeof payLabel === 'function' ? payLabel(r) : r.card],
+                    ['Staff', r.employee_name], ['Bought by', r.purchased_by], ['Invoice no.', r.invoice_no], ['Invoice date', r.invoice_date ? srFmtDate(r.invoice_date) : ''],
+                    ['Voucher no.', r.voucher_no], ['Account', r.account_code], ['Note', r.note],
+                    ['Settled', r.type === 'advance' ? (r.settled ? 'Yes' + (r.settled_date ? ', ' + srFmtDate(r.settled_date) : '') + (r.settled_by ? ' by ' + r.settled_by : '') : 'No') : ''],
+                    ['Settlement note', r.settled_note]],
+      files:r => srFiles(r.invoice_url, r.invoice_urls, r.settled_invoice_urls) },
+    { key:'inv', icon:'📦', label:'Inventory', can:() => canSee('inventory'), table:'inventory_transactions', order:'date',
+      date:r => r.date,
+      title:r => (r.type === 'purchase' ? 'Bought: ' : 'Sent to ' + srPlace(r.to_villa) + ': ') + (r.item || '') + (r.qty != null ? ' × ' + r.qty : ''),
+      sub:r => r.note || '', amount:r => srMoney(r.amount, r.amount ? 'LKR' : ''),
+      details:r => [['Date', srFmtDate(r.date)], ['Type', r.type === 'purchase' ? 'Purchase' : 'Sent to a villa'], ['Item', r.item], ['Quantity', r.qty],
+                    ['Sent to', srPlace(r.to_villa)], ['Amount', srMoney(r.amount, 'LKR')], ['Note', r.note]] },
+    { key:'vexp', icon:'💸', label:'Villa Expenses', can:() => canSee('expenses') || canSee('villareport'), table:'villa_operating_expenses', order:'date',
+      date:r => r.date, title:r => (r.category || 'Expense') + ' — ' + srPlace(r.villa_id), sub:r => r.note || '',
+      amount:r => srMoney(r.amount, 'LKR'),
+      details:r => [['Date', srFmtDate(r.date)], ['Villa', srPlace(r.villa_id)], ['Category', r.category], ['Amount', srMoney(r.amount, 'LKR')], ['Note', r.note]] },
+    { key:'book', icon:'📅', label:'Bookings', can:() => canSee('bookings'), table:'villa_bookings', order:'check_in',
+      date:r => r.check_in, extraDates:r => [r.check_out, r.booking_date, r.paid_on, r.cancelled_on],
+      title:r => (r.guest_full_name || r.guest || (r.type === 'airbnb' ? 'Airbnb guest' : 'Direct guest')) + ' — ' + srPlace(r.villa),
+      sub:r => `${srFmtDate(r.check_in)} → ${srFmtDate(r.check_out)} · ${r.type === 'airbnb' ? 'Airbnb' : 'Direct'}${r.status && r.status !== 'confirmed' ? ' · ' + r.status : ''}`,
+      amount:r => r.rate_usd != null ? srMoney(r.rate_usd, r.currency || 'USD') + '/night' : '',
+      details:r => [['Guest', r.guest], ['Full name', r.guest_full_name], ['Villa', srPlace(r.villa)], ['Check-in', srFmtDate(r.check_in)], ['Check-out', srFmtDate(r.check_out)],
+                    ['Booking type', r.type === 'airbnb' ? 'Airbnb' + (r.airbnb_uid ? ' (from the Airbnb calendar)' : '') : 'Direct'], ['Status', r.status],
+                    ['Guests', r.guests], ['Rate per night', r.rate_usd != null ? srMoney(r.rate_usd, r.currency || 'USD') : ''],
+                    ['Amount paid', r.amount_paid ? srMoney(r.amount_paid, r.currency || 'USD') : ''], ['Paid on', r.paid_on ? srFmtDate(r.paid_on) : ''],
+                    ['Email', r.guest_email], ['Phone', r.guest_phone], ['Address', r.guest_address], ['Booked on', r.booking_date ? srFmtDate(r.booking_date) : ''],
+                    ['Special requests', r.special_requests], ['Invoice (company)', r.invoice_no_company], ['Invoice (villa)', r.invoice_no_villa],
+                    ['Cancelled', r.cancelled_on ? srFmtDate(r.cancelled_on) + (r.cancel_reason ? ' — ' + r.cancel_reason : '') : ''], ['Cancel note', r.cancel_note]] },
+    { key:'owner', icon:'🏘️', label:'Owner Payments', can:() => canSee('villareport'), table:'owner_payments', order:'date',
+      date:r => r.date, title:r => 'Owner payment — ' + srPlace(r.villa) + (r.period ? ' (' + r.period + ')' : ''), sub:r => [r.method, r.note].filter(Boolean).join(' · '),
+      amount:r => srMoney(r.amount, 'LKR'),
+      details:r => [['Date', srFmtDate(r.date)], ['Villa', srPlace(r.villa)], ['For', r.period], ['Amount', srMoney(r.amount, 'LKR')], ['How paid', r.method], ['Note', r.note], ['Entered by', r.created_by]],
+      files:r => srFiles(r.invoice_urls) },
+    { key:'company', icon:'🏢', label:'Company Accounts', can:() => canSee('company'), table:'company_entries', order:'date',
+      date:r => r.date, extraDates:r => [r.due_date],
+      title:r => r.description || r.account_code || r.kind, sub:r => [r.kind, r.account_code, r.paid_via].filter(Boolean).join(' · '),
+      amount:r => srMoney(r.amount, 'LKR'),
+      details:r => [['Date', srFmtDate(r.date)], ['Kind', r.kind], ['Description', r.description], ['Account', r.account_code], ['Amount', srMoney(r.amount, 'LKR')],
+                    ['Paid via', r.paid_via], ['Paid', r.paid === false ? 'Not yet' : r.paid ? 'Yes' : ''], ['Due', r.due_date ? srFmtDate(r.due_date) : '']],
+      files:r => srFiles(r.invoice_urls) },
+    { key:'payroll', icon:'🧑‍💼', label:'Payroll', can:() => canSee('payroll'), table:'payroll_entries', order:'period',
+      date:r => r.paid_on || (/^\d{4}-\d{2}$/.test(r.period || '') ? r.period + '-01' : null),
+      title:r => (r.name || 'Staff') + ' — salary ' + (r.period || ''), sub:r => [r.designation, r.paid_via].filter(Boolean).join(' · '),
+      amount:r => srMoney(r.basic, 'LKR'),
+      details:r => [['Name', r.name], ['Designation', r.designation], ['Month', r.period], ['Basic', srMoney(r.basic, 'LKR')], ['Allowance', srMoney(r.allowance, '')],
+                    ['Travelling', srMoney(r.travelling_allowance, '')], ['Overtime', srMoney(r.overtime, '')], ['Bonus', srMoney(r.bonus, '')],
+                    ['Salary advance', srMoney(r.salary_advance, '')], ['Other deductions', srMoney(r.other_deductions, '') + (r.other_deductions_note ? ' — ' + r.other_deductions_note : '')],
+                    ['Paid on', r.paid_on ? srFmtDate(r.paid_on) : ''], ['Paid via', r.paid_via], ['Paid by', r.paid_by], ['Note', r.note]] },
+  ];
+}
+function srRestSources(onlyId){
+  const mine = r => (!onlyId || r.restaurant === onlyId);
+  const who = r => [r.created_by_email ? 'Entered by ' + r.created_by_email : '', r.updated_by_email ? 'changed by ' + r.updated_by_email + (r.updated_at ? ' ' + srWhen(r.updated_at) : '') : ''].filter(Boolean).join(', ');
+  const can = () => (typeof restList === 'function') && restList().length > 0 && (!onlyId || restSees(onlyId));
+  const multi = () => !onlyId && restList().length > 1;
+  const rn = r => multi() ? ' — ' + srRestName(r.restaurant) : '';
+  return [
+    { key:'rsales', icon:'🧾', label:onlyId ? 'Daily Sales' : 'Restaurant Daily Sales', can, table:'restaurant_sales', order:'day', filter:mine,
+      date:r => r.day,
+      title:r => 'Daily sales' + rn(r), sub:r => `Card ${srMoney(r.card)} · Transfer ${srMoney(r.transfer)} · Cash ${srMoney(r.cash)}${r.note ? ' · ' + r.note : ''}`,
+      amount:r => srMoney((+r.cash || 0) + (+r.card || 0) + (+r.transfer || 0), 'Rs.'),
+      extraText:r => [srNumText(r.cash), srNumText(r.card), srNumText(r.transfer), srNumText((+r.cash || 0) + (+r.card || 0) + (+r.transfer || 0))].join(' '),
+      details:r => [['Day', srFmtDate(r.day)], ['Restaurant', srRestName(r.restaurant)], ['Sale total', srMoney((+r.cash || 0) + (+r.card || 0) + (+r.transfer || 0), 'Rs.')],
+                    ['Card', srMoney(r.card, 'Rs.')], ['Bank transfer', srMoney(r.transfer, 'Rs.')], ['Cash', srMoney(r.cash, 'Rs.')],
+                    ['Service charge %', r.service_rate], ['Card / transfer commission %', [r.card_fee, r.transfer_fee].filter(x => x != null).join(' / ')],
+                    ['Note', r.note], ['Who', who(r)]] },
+    { key:'rpetty', icon:'👛', label:onlyId ? 'Petty Cash' : 'Restaurant Petty Cash', can, table:'restaurant_petty', order:'day', filter:mine,
+      date:r => r.day, title:r => (r.kind === 'in' ? 'Money in: ' : 'Expense: ') + (r.description || '') + rn(r),
+      sub:r => [r.category, r.invoice_no ? 'Invoice ' + r.invoice_no : '', r.note].filter(Boolean).join(' · '), amount:r => srMoney(r.amount, 'Rs.'),
+      details:r => [['Day', srFmtDate(r.day)], ['Restaurant', srRestName(r.restaurant)], ['Type', r.kind === 'in' ? 'Money in' : 'Expense'], ['Description', r.description],
+                    ['Category', r.category], ['Amount', srMoney(r.amount, 'Rs.')], ['Invoice no.', r.invoice_no], ['Note', r.note], ['Who', who(r)]] },
+    { key:'rbills', icon:'🧾', label:onlyId ? 'Bills & Expenses' : 'Restaurant Bills & Expenses', can, table:'restaurant_bills', order:'day', filter:mine,
+      date:r => r.day, title:r => (r.description || '') + rn(r), sub:r => [r.category, PAID_FROM[r.paid_from] || r.paid_from, r.invoice_no ? 'Invoice ' + r.invoice_no : ''].filter(Boolean).join(' · '),
+      amount:r => srMoney(r.amount, 'Rs.'),
+      details:r => [['Day', srFmtDate(r.day)], ['Restaurant', srRestName(r.restaurant)], ['Category', r.category], ['Description', r.description], ['Amount', srMoney(r.amount, 'Rs.')],
+                    ['Paid from', PAID_FROM[r.paid_from] || r.paid_from], ['Invoice no.', r.invoice_no], ['Note', r.note], ['Who', who(r)]] },
+    { key:'rbal', icon:'🏦', label:onlyId ? 'Bank Balances' : 'Restaurant Bank Balances', can, table:'restaurant_balances', order:'day', filter:mine,
+      date:r => r.day, title:r => (r.account || 'Account') + rn(r), sub:r => r.note || '', amount:r => srMoney(r.amount, 'Rs.'),
+      details:r => [['As at', srFmtDate(r.day)], ['Restaurant', srRestName(r.restaurant)], ['Account', r.account], ['Balance', srMoney(r.amount, 'Rs.')], ['Note', r.note], ['Who', who(r)]] },
+  ];
+}
+
+const SR_CACHE = {};
+async function srLoad(src){
+  const c = SR_CACHE[src.table];
+  if(c && Date.now() - c.at < 60000) return c.rows;
+  const { data, error } = await fetchAllRows(src.table, src.order);
+  if(error) throw error;
+  SR_CACHE[src.table] = { at: Date.now(), rows: data || [] };
+  return data || [];
+}
+const SR_HAY = new WeakMap();
+function srHay(src, r){
+  let h = SR_HAY.get(r);
+  if(h && h.k === src.key) return h.v;
+  const parts = [src.title(r), src.sub ? src.sub(r) : '', src.extraText ? src.extraText(r) : '',
+                 srDateText(src.date(r)), ...(src.extraDates ? src.extraDates(r).map(srDateText) : [])];
+  for(const [, v] of src.details(r)) parts.push(v == null ? '' : String(v));
+  for(const v of Object.values(r)) if(typeof v === 'number') parts.push(srNumText(v));
+  const v = parts.join(' | ').toLowerCase().replace(/,/g, '');
+  SR_HAY.set(r, { k: src.key, v });
+  return v;
+}
+function srItemHTML(src, r){
+  const det = src.details(r).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '');
+  const files = src.files ? src.files(r) : [];
+  return `<details class="srch-item"><summary><span class="d">${esc(srFmtDate(src.date(r)))}</span>
+      <span class="t">${esc(src.title(r))}${src.sub && src.sub(r) ? `<small>${esc(src.sub(r))}</small>` : ''}</span>
+      <span class="a">${esc(src.amount ? src.amount(r) : '')}</span></summary>
+    <div class="srch-det"><table>${det.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>
+      ${files.length ? `<div class="files" style="margin-top:6px"><b style="font-size:12px;color:var(--muted)">Attachments:</b> ${files.map((u, i) => `<a href="#" data-receipt="${esc(u)}">📎 ${i + 1}</a>`).join('')}</div>` : ''}
+    </div></details>`;
+}
+/* Builds the search box and results inside `mount`. getSources() is asked each time, so
+   permissions and the chosen restaurant are always current. */
+function srMount(mount, getSources, opts){
+  opts = opts || {};
+  const srcs0 = getSources().filter(s => s.can());
+  mount.innerHTML = `<div class="srch-bar">
+      <input type="search" class="srch-q" placeholder="${esc(opts.placeholder || 'Item, name, invoice no., amount, or a date like “august” or “12/08/2026”')}" autocomplete="off" aria-label="Search">
+      <label>Where<select class="srch-in"><option value="">Everywhere</option>${srcs0.map(s => `<option value="${esc(s.key)}">${esc(s.label)}</option>`).join('')}</select></label>
+      <label>From<input type="date" class="srch-from"></label>
+      <label>To<input type="date" class="srch-to"></label>
+    </div>
+    <div class="srch-hint">Every word must match. Try <b>sugar august</b>, a guest's name, an invoice number, or an amount like <b>2500</b>. Tap a result to see all its details.</div>
+    <div class="srch-out"></div>`;
+  const q = mount.querySelector('.srch-q'), sel = mount.querySelector('.srch-in'), from = mount.querySelector('.srch-from'), to = mount.querySelector('.srch-to'), out = mount.querySelector('.srch-out');
+  let seq = 0, timer = null;
+  async function run(){
+    const my = ++seq;
+    const terms = srTerms(q.value), f = from.value, t = to.value;
+    if(!terms.length && !f && !t){ out.innerHTML = ''; return; }
+    const srcs = getSources().filter(s => s.can() && (!sel.value || s.key === sel.value));
+    out.innerHTML = '<div class="srch-hint">Searching…</div>';
+    const parts = [];
+    let total = 0;
+    for(const src of srcs){
+      let rows;
+      try{ rows = await srLoad(src); }catch(e){ console.error('search', src.table, e); continue; }
+      if(my !== seq) return;
+      const hits = rows.filter(r => {
+        if(src.filter && !src.filter(r)) return false;
+        const d = String(src.date(r) || '').slice(0, 10);
+        if(f && (!d || d < f)) return false;
+        if(t && (!d || d > t)) return false;
+        if(!terms.length) return true;
+        const h = srHay(src, r);
+        return terms.every(w => h.includes(w));
+      }).sort((a, b) => String(src.date(b) || '').localeCompare(String(src.date(a) || '')));
+      if(!hits.length) continue;
+      total += hits.length;
+      const shown = hits.slice(0, 150);
+      parts.push(`<div class="srch-group"><h4>${src.icon} ${esc(src.label)} <span>${hits.length} found</span></h4>
+        ${shown.map(r => srItemHTML(src, r)).join('')}
+        ${hits.length > shown.length ? `<div class="srch-more">Showing the newest ${shown.length} of ${hits.length} — add another word or a date range to narrow it down.</div>` : ''}</div>`);
+    }
+    if(my !== seq) return;
+    out.innerHTML = parts.length ? `<div class="srch-hint">${total} found</div>` + parts.join('') : '<div class="srch-hint">Nothing found. Check the spelling, or try fewer words.</div>';
+    const first = out.querySelector('.srch-item'); if(first && total === 1) first.open = true;
+  }
+  const later = () => { clearTimeout(timer); timer = setTimeout(run, 250); };
+  q.addEventListener('input', later);
+  [sel, from, to].forEach(el => el.addEventListener('change', run));
+  q.addEventListener('keydown', e => { if(e.key === 'Enter'){ clearTimeout(timer); run(); } });
+  return { focus: () => q.focus(), run };
+}
+function openSearch(){
+  const ov = document.getElementById('searchOverlay');
+  Object.keys(SR_CACHE).forEach(k => delete SR_CACHE[k]);    // fresh figures every time it opens
+  const box = document.getElementById('searchMount');
+  if(!box.dataset.mounted){
+    box.dataset.mounted = '1';
+    box._sr = srMount(box, () => srVillaSources().concat(srRestSources(null)));
+  }
+  ov.classList.add('open');
+  setTimeout(() => box._sr && box._sr.focus(), 30);
+}
+function closeSearch(){ document.getElementById('searchOverlay').classList.remove('open'); }
+document.getElementById('searchOpenBtn').addEventListener('click', openSearch);
+document.getElementById('searchClose').addEventListener('click', closeSearch);
+document.getElementById('searchOverlay').addEventListener('click', e => { if(e.target.id === 'searchOverlay') closeSearch(); });
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.getElementById('searchOverlay').classList.contains('open')) closeSearch();
+});
+
+/* ===========================================================================
    AIRBNB CALENDARS — each villa's Airbnb bookings come in by themselves.
    The links are kept in the database where only Makky can read them; the "airbnb-sync"
    function (Supabase) reads Airbnb and adds, moves or cancels the bookings. The page only
@@ -17104,6 +17379,7 @@ function renderRest(){
     bills:['Bills & Expenses', 'Costs paid from the bank, by card or by the owner — rent, salaries, suppliers, electricity …'],
     delreq:['Delete Requests', 'Lines staff asked Makky to delete — approve, reject, or undo.'],
     history:['Change History', 'Who entered, changed or deleted each figure — and what it was before and after.'],
+    search:['Search', 'Find any sale, petty cash line, bill or balance — by name, item, date or amount.'],
     monthly:['Monthly Summary', 'The month at a glance.'],
     reports:['Reports', 'Profit & Loss and other reports — any period, print or download.'],
     settings:['Settings', 'Service charge, bank commission, petty cash allocation, logo and Loyverse.'],
@@ -17121,10 +17397,24 @@ function renderRest(){
   }
   if(REST.loadedFor !== id){ body.innerHTML = `<div class="r-muted" style="padding:30px 4px;">${REST.loadError ? esc(REST.loadError) : 'Loading…'}</div>`; return; }
   const V = { dashboard:restDashboard, sales:restSalesView, petty:restPettyView, service:restServiceView,
-              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView, history:restHistoryView, bills:restBillsView, delreq:restDelReqView };
+              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView, history:restHistoryView, bills:restBillsView, delreq:restDelReqView, search:restSearchView };
   Promise.resolve((V[REST.view] || restDashboard)(body, info)).then(() => restMarkPending(body));
   const waitingN = REST.dreqs.filter(q => q.status === 'pending').length, nb = document.querySelector('#restNav [data-rv="delreq"]');
   if(nb) nb.innerHTML = `<span class="i">🗂</span>Delete Requests${waitingN ? ` <span style="background:#c92a2a;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;margin-left:4px">${waitingN}</span>` : ''}`;
+}
+function restSearchView(body, info){
+  const scope = REST.searchScope || 'one';
+  const many = restList().length > 1;
+  body.innerHTML = `<div class="r-card" style="padding:16px">
+      ${many ? `<div class="r-toolbar" style="gap:6px;margin-bottom:10px"><button class="r-btn${scope === 'one' ? ' primary' : ''}" data-sscope="one">${esc(info.name)}</button><button class="r-btn${scope === 'all' ? ' primary' : ''}" data-sscope="all">Both restaurants</button></div>` : ''}
+      <div id="restSearchMount"></div></div>`;
+  body.querySelectorAll('[data-sscope]').forEach(b => b.addEventListener('click', () => { REST.searchScope = b.dataset.sscope; renderRest(); }));
+  Object.keys(SR_CACHE).filter(k => k.startsWith('restaurant_')).forEach(k => delete SR_CACHE[k]);
+  const m = srMount(body.querySelector('#restSearchMount'), () => srRestSources(scope === 'all' ? null : REST.id),
+                    { placeholder:'Item, description, invoice no., amount, or a date like “august”' });
+  if(REST.searchText){ const qi = body.querySelector('.srch-q'); qi.value = REST.searchText; m.run(); }
+  body.querySelector('.srch-q').addEventListener('input', e => { REST.searchText = e.target.value; });
+  setTimeout(() => m.focus(), 30);
 }
 function restGo(view){ REST.view = view; renderRest(); document.querySelector('.rest-main').scrollIntoView({ block:'nearest' }); }
 
