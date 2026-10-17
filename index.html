@@ -4358,7 +4358,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.16-ask';
+const APP_VERSION = 'v2026.10.17-ask2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -17159,6 +17159,9 @@ function askPeriod(q, future){
   const t = todayISO(), now = new Date(t + 'T00:00:00'), Y = now.getFullYear(), M = now.getMonth();
   let m;
   const cut = re => { q = q.replace(re, ' '); };
+  // "from the beginning to now", "so far", "all time", "till date" … = everything ever recorded
+  const ALL = /\b(from\s+(the\s+)?(beginn?ing|begining|start)(\s+(to|till|until|up\s*to)\s+(now|today|date))?|so\s+far|all\s+time|ever|till\s+(now|date|today)|until\s+(now|today)|to\s+date|up\s*to\s+(now|date|today)|since\s+(the\s+)?(beginn?ing|begining|start))\b/g;
+  if(ALL.test(q)){ q = q.replace(ALL, ' '); return { q, p:null, all:true }; }
   if(/\btoday\b/.test(q)){ cut(/\btoday\b/); return { q, p:{ from:t, to:t, label:'today' } }; }
   if(/\byesterday\b/.test(q)){ cut(/\byesterday\b/); const d = askAddDays(t, -1); return { q, p:{ from:d, to:d, label:'yesterday' } }; }
   if(/\btomorrow\b/.test(q)){ cut(/\btomorrow\b/); const d = askAddDays(t, 1); return { q, p:{ from:d, to:d, label:'tomorrow' } }; }
@@ -17210,7 +17213,11 @@ function askFindVilla(q){
 }
 const ASK_STOP = new Set(('how much many did we do does i you spend spent spending spends on for in at of the a an what was were is are '
   + 'total cost costs costing expense expenses buy bought buying purchase purchased purchases paid pay payment payments villa villas '
-  + 'and show me list all petty cash give tell find get our there any please from to with by this that has have had money lkr rs').split(' '));
+  + 'and show me list all petty cash give tell find get our there any please from to with by this that has have had money lkr rs '
+  + 'us we our ours it its so far ever since till until upto up now date today begin beginning begining begin start started starting '
+  + 'whole entire full overall altogether grand sum totals expenditure expenditures expence expences expens spendings recorded record records '
+  + 'entered entry entries added kept made happened done can could would should tell know see check want need much many amount amounts '
+  + 'value values figure figures number numbers there their them they which who where when why been being will any every each per').split(' '));
 function askTerms(q){ return q.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, ' ').split(/\s+/).filter(w => w && !ASK_STOP.has(w) && w.length > 1); }
 function askTable(head, rows, numCols){
   numCols = numCols || [];
@@ -17299,7 +17306,9 @@ async function askVilla(text){
   // Bookings, nights, revenue
   if(/booking|nights|occupancy|revenue|earn|income/.test(q)){
     if(!canSee('bookings')) return ASK_NO('Bookings');
-    const p = pp.p || askMonthRange(new Date().getFullYear(), new Date().getMonth());
+    const allB0 = (await askBookings()).filter(b => b.status !== 'cancelled');
+    const first = allB0.reduce((m, b) => (!m || b.checkIn < m) ? b.checkIn : m, null) || todayISO();
+    const p = pp.p || (pp.all ? { from:first, to:todayISO(), label:'everything so far' } : askMonthRange(new Date().getFullYear(), new Date().getMonth()));
     const days = Math.round((Date.parse(p.to) - Date.parse(p.from)) / 86400000) + 1;
     const all = (await askBookings()).filter(b => b.status !== 'cancelled' && (!villa || b.villa === villa));
     const vids = villa ? [villa] : [...new Set(all.map(b => b.villa))];
@@ -17321,12 +17330,25 @@ async function askVilla(text){
 
   // Spending (petty cash + villa expenses + inventory purchases). Asked plainly ("gas at Brisa
   // August") it is tried too, and only if nothing was spent does the search take over.
-  const askedSpend = /spen|spent|cost|expense|bought|buy|purchas|paid for|pay for/.test(q) || /\bon\b/.test(q);
+  const askedSpend = /spen|spent|cost|expen|bought|buy|purchas|paid for|pay for|outgoing/.test(q) || /\bon\b/.test(q);
   if(askedSpend || askTerms(q).length){
-    const terms = askTerms(q);
+    let terms = askTerms(q);
     const p = pp.p;
-    const hit = (txt) => terms.every(w => txt.toLowerCase().includes(w));
+    let hit = (txt) => terms.every(w => txt.toLowerCase().includes(w));
     const lines = [];
+    // Words that match no spending line at all (a typo, a filler word) are left out — as long as
+    // something else in the question does match; then the answer says which words were skipped.
+    let skipped = [];
+    if(terms.length){
+      const pool = [];
+      if(canSee('pettycash') || canSee('expenses')) (await askCash()).forEach(t => { if(t.type === 'expense') pool.push([t.purpose, t.note, t.accountCode, t.employeeName, t.invoiceNo].join(' ').toLowerCase()); });
+      if(canSee('expenses') || canSee('villareport')) (await askVillaExp()).forEach(r => pool.push([r.category, r.note].join(' ').toLowerCase()));
+      if(canSee('inventory')) (await askInventory()).forEach(r => pool.push([r.item, r.note].join(' ').toLowerCase()));
+      const known = terms.filter(w => pool.some(x => x.includes(w)));
+      if(known.length && known.length < terms.length){ skipped = terms.filter(w => !known.includes(w)); terms = known; }
+      else if(!known.length && (villa || pp.p || pp.all) && terms.every(w => w.length <= 12)){ skipped = terms; terms = []; }
+      hit = (txt) => terms.every(w => txt.toLowerCase().includes(w));
+    }
     if(canSee('pettycash') || canSee('expenses')){
       (await askCash()).filter(t => t.type === 'expense' && (!villa || t.for === villa) && (!p || (t.date >= p.from && t.date <= p.to)))
         .forEach(t => { const txt = [t.purpose, t.note, t.accountCode, t.employeeName, t.invoiceNo].join(' ');
@@ -17346,7 +17368,14 @@ async function askVilla(text){
     if(!lines.length) return `Nothing spent on ${esc(what)}${inV}${p ? ' in ' + esc(p.label) : ''}.`;
     lines.sort((a, c) => c[0].localeCompare(a[0]));
     const total = lines.reduce((a, l) => a + l[4], 0);
-    return `Spent on ${esc(what)}${inV}${p ? ' — ' + esc(p.label) : ' (all time)'}: <span class="big">${askFmt(total)}</span><span class="muted">${lines.length} line(s)</span>` +
+    const byMonth = {}; lines.forEach(l => { const k = l[0].slice(0, 7); byMonth[k] = (byMonth[k] || 0) + l[4]; });
+    const months = Object.keys(byMonth).sort().reverse();
+    const bySrc = {}; lines.forEach(l => { bySrc[l[3]] = (bySrc[l[3]] || 0) + l[4]; });
+    return `Spent on ${esc(what)}${inV}${p ? ' — ' + esc(p.label) : ' (everything recorded)'}: <span class="big">${askFmt(total)}</span><span class="muted">${lines.length} line(s)${
+        Object.keys(bySrc).length > 1 ? ' · ' + Object.entries(bySrc).map(([k, v]) => esc(k) + ' ' + askFmt(v)).join(' · ') : ''}${
+        skipped.length ? ' · I left out “' + esc(skipped.join(' ')) + '” (nothing recorded with that word)' : ''}</span>` +
+      (months.length > 1 ? '<b style="display:block;margin-top:8px">By month</b>' + askTable(['Month', 'Spent'], months.slice(0, 24).map(k => [srFmtDate(k + '-01').slice(3), askFmt(byMonth[k])]), [1]) : '') +
+      '<b style="display:block;margin-top:8px">Latest lines</b>' +
       askTable(['Date', 'What', 'For', 'From', 'Amount'], lines.slice(0, 30).map(l => [askDay(l[0]), l[1], l[2], l[3], askFmt(l[4])]), [4]) +
       (lines.length > 30 ? `<span class="muted">Showing the newest 30 of ${lines.length}. Use 🔍 Search for the full list.</span>` : '');
   }
@@ -17388,7 +17417,7 @@ async function askRest(text){
   if(/^\s*(help|\?|hi|hello|what can you)/.test(q)) return askRestHelp(info);
   const pp = askPeriod(q, false); q = pp.q;
   const today = todayISO();
-  const p = pp.p || askMonthRange(new Date().getFullYear(), new Date().getMonth());
+  const p = pp.p || (pp.all ? { from:'0000-01-01', to:'9999-12-31', label:'everything recorded' } : askMonthRange(new Date().getFullYear(), new Date().getMonth()));
   if(/service/.test(q)){
     const o = sumSales(salesBetween(p.from, p.to), info);
     return `Service charge at ${esc(info.name)} — ${esc(p.label)}: <span class="big">${askFmt(o.sc, 'Rs.')}</span>
@@ -17413,9 +17442,16 @@ async function askRest(text){
         ['Bank commission', '− ' + askFmt(o.fee, 'Rs.')], ['Service charge', '− ' + askFmt(o.sc, 'Rs.')], ['After both', askFmt(o.net, 'Rs.')],
         ['Best day', askDay(days[0][0]) + ' — ' + askFmt(days[0][1], 'Rs.')]], [1]);
   }
-  const askedSpendR = /spen|spent|cost|expense|bought|buy|purchas|paid|bill/.test(q) || /\bon\b/.test(q);
+  const askedSpendR = /spen|spent|cost|expen|bought|buy|purchas|paid|bill|outgoing/.test(q) || /\bon\b/.test(q);
   if(askedSpendR || askTerms(q).length){
-    const terms = askTerms(q).filter(w => !['bill', 'bills'].includes(w));
+    let terms = askTerms(q).filter(w => !['bill', 'bills'].includes(w));
+    let skippedR = [];
+    if(terms.length){
+      const pool = REST.petty.filter(r => r.kind !== 'in').concat(REST.bills).map(r => [r.description, r.category, r.note, r.invoice_no].join(' ').toLowerCase());
+      const known = terms.filter(w => pool.some(x => x.includes(w)));
+      if(known.length && known.length < terms.length){ skippedR = terms.filter(w => !known.includes(w)); terms = known; }
+      else if(!known.length && (pp.p || pp.all)){ skippedR = terms; terms = []; }
+    }
     const hit = txt => terms.every(w => txt.toLowerCase().includes(w));
     const lines = [];
     pettyBetween(pp.p ? p.from : '0000', pp.p ? p.to : '9999').filter(r => r.kind !== 'in')
@@ -17427,7 +17463,7 @@ async function askRest(text){
     if(!lines.length) return `Nothing spent on ${esc(what)} at ${esc(info.name)}${pp.p ? ' in ' + esc(p.label) : ''}.`;
     lines.sort((a, c) => c[0].localeCompare(a[0]));
     const total = lines.reduce((a, l) => a + l[3], 0);
-    return `Spent on ${esc(what)} at ${esc(info.name)}${pp.p ? ' — ' + esc(p.label) : ' (all time)'}: <span class="big">${askFmt(total, 'Rs.')}</span><span class="muted">${lines.length} line(s)</span>` +
+    return `Spent on ${esc(what)} at ${esc(info.name)}${pp.p ? ' — ' + esc(p.label) : ' (everything recorded)'}: <span class="big">${askFmt(total, 'Rs.')}</span><span class="muted">${lines.length} line(s)${skippedR.length ? ' · I left out “' + esc(skippedR.join(' ')) + '” (nothing recorded with that word)' : ''}</span>` +
       askTable(['Date', 'What', 'From', 'Amount'], lines.slice(0, 30).map(l => [askDay(l[0]), l[1], l[2], askFmt(l[3], 'Rs.')]), [3]);
   }
   return await askFallbackSearch(text, srRestSources(REST.id));
