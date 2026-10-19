@@ -3690,9 +3690,23 @@ function checkDeletePassword(){
 }
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
+/* Airbnb prices: every report counts what Airbnb pays you. A price not yet confirmed as that
+   (typed as the guest's price, Airbnb's fee still in it) is counted with the villa's Airbnb fee
+   taken off — so $546 counts as $461.37 everywhere, even before "💲 Fix Airbnb prices" is used.
+   Only once file 37 has added the "confirmed" tick; before that, prices are used as typed. */
+function abRateEstimated(r){
+  return r.type === 'airbnb' && ('rate_is_payout' in r) && r.rate_is_payout !== true
+      && r.rate_usd !== null && r.rate_usd !== undefined && Number(r.rate_usd) > 0;
+}
+function bookingPayoutRate(r){
+  if(r.rate_usd === null || r.rate_usd === undefined) return null;
+  const v = Number(r.rate_usd);
+  return abRateEstimated(r) ? Math.round(v * (1 - abFeeRate(r.villa)) * 10000) / 10000 : v;
+}
 function rowToBooking(r){ return {
   id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, fromAirbnb: !!r.airbnb_uid, airbnbCode: r.airbnb_code || null, rateIsPayout: r.rate_is_payout === true,
-  guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null,
+  guests:r.guests, rateUsd:bookingPayoutRate(r), rateRaw:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null,
+  rateEstimated: abRateEstimated(r),
   currency:r.currency||'USD',
   // --- direct booking / invoice fields (all optional; Airbnb bookings simply leave them null) ---
   status: r.status || 'confirmed',
@@ -4371,7 +4385,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.19-airbnbfees';
+const APP_VERSION = 'v2026.10.19-airbnbfees2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -6545,6 +6559,7 @@ function initBookings(){
 async function fetchBookings(){
   const { data, error } = await fetchAllRows('villa_bookings', 'check_in');
   if(error){ bookingStatusMsg.textContent='Connection error'; console.error(error); return; }
+  if(data.length) AB_HAS_PAYOUT = ('rate_is_payout' in data[0]);
   let rows = data.map(rowToBooking);
 
   /* A villa-scoped person sees only their villa. This filter is the tidy-up, not the
@@ -7026,7 +7041,7 @@ async function renderEarnings(){
       guest: b.guest, type: b.type, checkIn: b.checkIn, checkOut: b.checkOut,
       nights, rate: b.rateUsd, currency: bookingCurrency, gross,
       grossLkr: lkrValue, grossShow: showValue, fxRate: rate, fxDate: fxDateOf(b), fxBasis: fxBasisLabel(b),
-      ciRate, moveShow, abPaid, abFee: abPaid !== null ? abPaid - gross : null, villa: b.villa, checked: b.rateIsPayout,
+      ciRate, moveShow, abPaid, abFee: abPaid !== null ? abPaid - gross : null, villa: b.villa, checked: !b.rateEstimated,
     });
   }
 
@@ -7140,7 +7155,7 @@ function renderEarningsDetail(rows){
       <td class="num">${r.abPaid != null ? money2(r.abPaid, r.currency) : '<span class="dim">—</span>'}</td>
       <td class="num" style="color:var(--red);">${r.abFee != null ? '− ' + money2(r.abFee, r.currency) : '<span class="dim">—</span>'}</td>
       <td class="num">${money2(r.rate, r.currency)}</td>
-      <td class="num" style="font-weight:700;">${money2(r.gross, r.currency)}${r.type === 'airbnb' && !r.checked ? '<div class="ce-sub" style="color:var(--amber)" title="This price has not been checked yet — use 💲 Fix Airbnb prices in Bookings">⚠ not checked</div>' : ''}</td>
+      <td class="num" style="font-weight:700;">${money2(r.gross, r.currency)}${r.type === 'airbnb' && !r.checked ? '<div class="ce-sub" style="color:var(--amber)" title="Typed as the guest\'s price; Airbnb\'s fee is taken off here. Confirm it with 💲 Fix Airbnb prices in Bookings.">fee taken off · confirm in 💲</div>' : ''}</td>
       <td class="num" style="font-size:12px;">${rateTxt(r)}</td>
       <td class="num ${!r.grossShow?'zero':''}">${fmtShow(r.grossShow, show)}</td>
       ${moveCells}
@@ -7607,6 +7622,8 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
     villa: villaId, check_in: ci, check_out: co, type, guest,
     guests: guestsRaw ? parseInt(guestsRaw, 10) : null,
     rate_usd: rateRaw ? parseFloat(rateRaw) : null,
+    // the form shows (and saves) what Airbnb pays you, so it is marked as confirmed
+    ...(AB_HAS_PAYOUT && type === 'airbnb' && rateRaw ? { rate_is_payout:true } : {}),
     currency,
     status: 'confirmed',
     // Staff can log a contact number for either booking type — for Airbnb it's kept
@@ -17739,10 +17756,10 @@ function abPlan(rows, map, replace){
       // The price is always what Airbnb pays you ("Earnings" ÷ nights) — a guest price typed
       // earlier (Airbnb's fee still in it) is replaced, so only the money you get is counted.
       if(rate && AB_HAS_PAYOUT && !b.rateIsPayout) pay.rate_is_payout = true;
-      if(rate && (!b.rateUsd || Math.abs(b.rateUsd - rate) > 0.005)){
+      if(rate && (!b.rateUsd || !b.rateIsPayout || Math.abs((b.rateRaw || 0) - rate) > 0.005)){
         pay.rate_usd = rate;
         if(r.currency && b.currency !== r.currency) pay.currency = r.currency;
-        if(b.rateUsd) p.priceWas = b.rateUsd;
+        if(b.rateRaw && Math.abs(b.rateRaw - rate) > 0.005) p.priceWas = b.rateRaw;
       }
     }
     const keys = Object.keys(pay).filter(k => k !== 'airbnb_code' && k !== 'rate_is_payout');
@@ -17831,7 +17848,7 @@ async function abFixOpen(){
   out.innerHTML = '<div class="srch-hint">Loading…</div>';
   if(!await abCheckPayoutCol()){ out.innerHTML = '<div class="srch-hint" style="color:var(--red)">Run <b>37-supabase-airbnb-payout-flag.sql</b> in Supabase first, then reload the page.</div>'; return; }
   await fetchBookings();
-  const list = allBookingsRaw.filter(b => b.type === 'airbnb' && b.status !== 'cancelled' && b.rateUsd > 0 && !b.rateIsPayout)
+  const list = allBookingsRaw.filter(b => b.type === 'airbnb' && b.status !== 'cancelled' && b.rateRaw > 0 && !b.rateIsPayout)
     .sort((a, c) => a.checkIn.localeCompare(c.checkIn));
   if(!list.length){ out.innerHTML = '<div class="srch-hint">✓ Every Airbnb price is already what Airbnb pays you. Nothing to fix.</div>'; return; }
   const kOf = b => 1 - abFeeRate(b.villa), nn = b => askNights(b);
@@ -17841,8 +17858,8 @@ async function abFixOpen(){
     <div class="abi-wrap"><table class="abi-tbl"><thead><tr><th></th><th>Guest</th><th>Villa</th><th>Dates</th><th style="text-align:right">Now (total)</th><th style="text-align:right">Becomes (total)</th></tr></thead><tbody>
     ${list.map((b, i) => `<tr><td><input type="checkbox" data-abf="${i}" checked></td><td>${esc(b.fullName || b.guest || 'Airbnb guest')}</td><td>${esc(abVillaName(b.villa))}</td>
       <td style="white-space:nowrap">${esc(srFmtDate(b.checkIn))} → ${esc(srFmtDate(b.checkOut))} · ${nn(b)} n</td>
-      <td class="n">${esc(money2(b.rateUsd, b.currency))}/n<br><span class="srch-hint">${esc(money2(b.rateUsd * nn(b), b.currency))}</span></td>
-      <td class="n act-add">${esc(money2(Math.round(b.rateUsd * kOf(b) * 10000) / 10000, b.currency))}/n<br><span class="srch-hint">${esc(money2(Math.round(b.rateUsd * nn(b) * kOf(b) * 100) / 100, b.currency))}</span></td></tr>`).join('')}
+      <td class="n">${esc(money2(b.rateRaw, b.currency))}/n<br><span class="srch-hint">${esc(money2(b.rateRaw * nn(b), b.currency))}</span></td>
+      <td class="n act-add">${esc(money2(Math.round(b.rateRaw * kOf(b) * 10000) / 10000, b.currency))}/n<br><span class="srch-hint">${esc(money2(Math.round(b.rateRaw * nn(b) * kOf(b) * 100) / 100, b.currency))}</span></td></tr>`).join('')}
     </tbody></table></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <button class="abi-go" id="abfGo">Take Airbnb's fee off the ticked ones</button>
@@ -17858,7 +17875,7 @@ async function abFixOpen(){
     out.querySelectorAll('button.abi-go').forEach(x => { x.disabled = true; });
     for(const b of pick){
       msg.textContent = `Saving ${ok + bad.length + 1} of ${pick.length}…`;
-      const payload = reduce ? { rate_usd: Math.round(b.rateUsd * kOf(b) * 10000) / 10000, rate_is_payout:true } : { rate_is_payout:true };
+      const payload = reduce ? { rate_usd: Math.round(b.rateRaw * kOf(b) * 10000) / 10000, rate_is_payout:true } : { rate_is_payout:true };
       const { error } = await sb.from('villa_bookings').update(payload).eq('id', b.id);
       if(error){ bad.push((b.guest || '') + ': ' + error.message); console.error(error); } else ok++;
     }
