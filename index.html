@@ -1756,6 +1756,8 @@
             <tr>
               <th>Villa</th>
               <th style="text-align:center">Nights</th>
+              <th style="text-align:center">Guests paid on Airbnb</th>
+              <th style="text-align:center">Airbnb fee</th>
               <th style="text-align:center">Gross (native currency)</th>
               <th style="text-align:center">Gross (<span class="earnShowCurLabel">LKR</span>)</th>
               <th style="text-align:center">Ceymora fee (<span class="earnShowCurLabel">LKR</span>)</th>
@@ -2548,7 +2550,7 @@
     <label>Rate per night, <span id="fRateCurrencyLabel">USD</span> (optional)</label>
     <input type="number" id="fRateUsd" min="0" step="0.01" placeholder="e.g. 150">
     <div class="field-hint" id="fRateAirbnbHint" style="display:none">Airbnb: enter <b>what Airbnb pays you</b> per night (after Airbnb's fee), not what the guest pays.
-      Only have the guest's price? <a href="#" id="fRateTakeFee">Take off Airbnb's 15.5%</a></div>
+      Only have the guest's price? <a href="#" id="fRateTakeFee">Take off Airbnb's fee</a> <span id="fRateFeeTxt"></span></div>
 
     <!-- ============ DIRECT BOOKING DETAILS (shown only when type = Direct) ============ -->
     <div class="direct-block" id="directFields" style="display:none">
@@ -3765,6 +3767,10 @@ function normaliseVilla(v){
     color: v.color || d.color || '#495057',
     currency: (v.currency || d.currency || 'USD').toUpperCase(),
     sortOrder: (v.sort_order !== undefined && v.sort_order !== null) ? Number(v.sort_order) : 100,
+    // Airbnb's host fee for this villa's listing, and any VAT Airbnb charges on that fee
+    // (Brisa: 15.5% + 21% Spanish VAT on the fee = 18.755% of the guest price).
+    airbnbFee: v.airbnb_fee != null && v.airbnb_fee !== '' ? Number(v.airbnb_fee) : 15.5,
+    airbnbFeeVat: v.airbnb_fee_vat != null && v.airbnb_fee_vat !== '' ? Number(v.airbnb_fee_vat) : (v.id === 'brisa' ? 21 : 0),
   };
 }
 
@@ -4365,7 +4371,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.17-airbnbfix';
+const APP_VERSION = 'v2026.10.19-airbnbfees';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -6988,7 +6994,7 @@ async function renderEarnings(){
   const totals = {}; // villaId -> { nights, gross, currency, grossLkr, grossShow }
   const details = {}; // villaId -> [ per-booking rows, for the breakdown table below ]
   const earnVillas = visibleCalVillas();
-  for(const v of earnVillas){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0, grossShow:0 }; details[v.id] = []; }
+  for(const v of earnVillas){ totals[v.id] = { nights:0, gross:0, currency:v.currency, grossLkr:0, grossShow:0, abGuest:0, abFee:0 }; details[v.id] = []; }
   let missing = 0;
 
   for(const b of relevant){
@@ -7003,7 +7009,9 @@ async function renderEarnings(){
     if(earnShowFxMove && b.type !== 'airbnb' && bookingCurrency !== 'LKR') ciRate = await getFxRate(b.checkIn, bookingCurrency);
     if(myToken !== earningsRenderToken) return; // a newer render started, abandon this one
     if(!rate || showValue === null) missing++;
-    if(!totals[b.villa]) totals[b.villa] = { nights:0, gross:0, currency:bookingCurrency, grossLkr:0, grossShow:0 };
+    if(!totals[b.villa]) totals[b.villa] = { nights:0, gross:0, currency:bookingCurrency, grossLkr:0, grossShow:0, abGuest:0, abFee:0 };
+    const abPaid = b.type === 'airbnb' ? abGuestPaid(gross, b.villa) : null;
+    if(abPaid !== null){ totals[b.villa].abGuest += abPaid; totals[b.villa].abFee += abPaid - gross; }
     if(!details[b.villa]) details[b.villa] = [];
     totals[b.villa].nights += nights;
     totals[b.villa].gross += gross;
@@ -7018,13 +7026,14 @@ async function renderEarnings(){
       guest: b.guest, type: b.type, checkIn: b.checkIn, checkOut: b.checkOut,
       nights, rate: b.rateUsd, currency: bookingCurrency, gross,
       grossLkr: lkrValue, grossShow: showValue, fxRate: rate, fxDate: fxDateOf(b), fxBasis: fxBasisLabel(b),
-      ciRate, moveShow,
+      ciRate, moveShow, abPaid, abFee: abPaid !== null ? abPaid - gross : null, villa: b.villa, checked: b.rateIsPayout,
     });
   }
 
   statusEl.innerHTML = relevant.length === 0
     ? 'No bookings with a nightly rate set for this month yet — add one via the Rate per night field.'
-    : 'Direct bookings are converted at the rate on the day they were <b>booked</b> (the price the guest agreed); '
+    : 'Airbnb bookings count <b>what Airbnb pays you</b>; "Guests paid on Airbnb" and "Airbnb fee" show what the guest paid and what Airbnb kept (each villa\'s fee is set in Invoices &amp; Setup → Airbnb calendars). '
+      + 'Direct bookings are converted at the rate on the day they were <b>booked</b> (the price the guest agreed); '
       + 'Airbnb bookings at the rate on the <b>check-in</b> day, when Airbnb pays out. A day still to come uses today\'s rate.'
       + (missing ? ` <b>${missing} booking${missing===1?'':'s'} could not be converted</b> — no rate could be fetched.` : '');
   document.querySelectorAll('.earnShowCurLabel').forEach(el => el.textContent = show);
@@ -7046,7 +7055,9 @@ async function renderEarnings(){
     tr.innerHTML = `
       <td style="font-weight:600;">${esc(v.name)}</td>
       <td class="num ${t.nights===0?'zero':''}">${t.nights}</td>
-      <td class="num ${t.gross===0?'zero':''}">${t.currency} ${t.gross.toLocaleString()}</td>
+      <td class="num ${t.abGuest===0?'zero':''}">${t.currency} ${Math.round(t.abGuest).toLocaleString()}</td>
+      <td class="num ${t.abFee===0?'zero':''}" style="${t.abFee ? 'color:var(--red)' : ''}" title="Airbnb keeps ${esc(abFeeText(v.id))}">${t.abFee ? '− ' : ''}${t.currency} ${Math.round(t.abFee).toLocaleString()}</td>
+      <td class="num ${t.gross===0?'zero':''}">${t.currency} ${Math.round(t.gross * 100 / 100).toLocaleString()}</td>
       <td class="num ${t.grossShow===0?'zero':''}">${fmtShow(t.grossShow, show)}</td>
       <td class="num ${fee===0?'zero':''}">${fmtShow(fee, show)}</td>
       <td class="num ${net===0?'zero':''}">${fmtShow(net, show)}</td>
@@ -7058,7 +7069,7 @@ async function renderEarnings(){
   totalTr.style.borderTop = '2px solid var(--board-line)';
   totalTr.innerHTML = `
     <td>Total Ceymora commission</td>
-    <td></td><td></td>
+    <td></td><td></td><td></td><td></td>
     <td class="num">${fmtShow(grandGrossLkr, show)}</td>
     <td class="num" style="color:var(--green);">${fmtShow(grandFeeLkr, show)}</td>
     <td class="num">${fmtShow(grandNetLkr, show)}</td>
@@ -7083,12 +7094,13 @@ function renderEarningsDetail(rows){
   titleEl.textContent = `Breakdown — ${villa.name} · ${monthName}`;
   if(head) head.innerHTML = `<tr>
       <th>Guest</th><th>Dates</th><th style="text-align:center">Nights</th>
-      <th style="text-align:center">Per night</th><th style="text-align:center">Total</th>
+      <th style="text-align:center">Guest paid (Airbnb)</th><th style="text-align:center">Airbnb fee</th>
+      <th style="text-align:center">Per night</th><th style="text-align:center">You get</th>
       <th style="text-align:center">Rate used (LKR)</th>
       <th style="text-align:center">Total (${esc(show)})</th>
       ${move ? `<th style="text-align:center">Rate on check-in day</th><th style="text-align:center">Rate change effect (${esc(show)})</th>` : ''}
     </tr>`;
-  const cols = move ? 9 : 7;
+  const cols = move ? 11 : 9;
 
   body.innerHTML = '';
   if(rows.length === 0){
@@ -7098,13 +7110,14 @@ function renderEarningsDetail(rows){
   }
 
   const sorted = [...rows].sort((a,b)=> a.checkIn.localeCompare(b.checkIn));
-  let sumNights = 0, sumGross = 0, sumShow = 0, sumMove = 0;
+  let sumNights = 0, sumGross = 0, sumShow = 0, sumMove = 0, sumPaid = 0, sumFee = 0;
   const cur = sorted[0].currency;
   const rateTxt = r => r.currency === 'LKR' ? '—'
     : (r.fxRate ? `${r.fxRate.toFixed(2)}<div class="ce-sub">${esc(r.fxBasis)} · ${esc(fmtDay(r.fxDate))}</div>` : '<span class="dim">no rate</span>');
 
   for(const r of sorted){
     sumNights += r.nights; sumGross += r.gross; sumShow += r.grossShow || 0; sumMove += r.moveShow || 0;
+    if(r.abPaid !== null && r.abPaid !== undefined){ sumPaid += r.abPaid; sumFee += r.abFee; }
     let moveCells = '';
     if(move){
       if(r.type === 'airbnb' || r.currency === 'LKR') moveCells = '<td class="num dim">same day</td><td class="num dim">—</td>';
@@ -7124,8 +7137,10 @@ function renderEarningsDetail(rows){
       </td>
       <td style="color:var(--muted); font-size:12px;">${r.checkIn} → ${r.checkOut}</td>
       <td class="num">${r.nights}</td>
-      <td class="num">${moneyFull(r.rate, r.currency)}</td>
-      <td class="num" style="color:var(--red);">${moneyFull(r.gross, r.currency)}</td>
+      <td class="num">${r.abPaid != null ? money2(r.abPaid, r.currency) : '<span class="dim">—</span>'}</td>
+      <td class="num" style="color:var(--red);">${r.abFee != null ? '− ' + money2(r.abFee, r.currency) : '<span class="dim">—</span>'}</td>
+      <td class="num">${money2(r.rate, r.currency)}</td>
+      <td class="num" style="font-weight:700;">${money2(r.gross, r.currency)}${r.type === 'airbnb' && !r.checked ? '<div class="ce-sub" style="color:var(--amber)" title="This price has not been checked yet — use 💲 Fix Airbnb prices in Bookings">⚠ not checked</div>' : ''}</td>
       <td class="num" style="font-size:12px;">${rateTxt(r)}</td>
       <td class="num ${!r.grossShow?'zero':''}">${fmtShow(r.grossShow, show)}</td>
       ${moveCells}
@@ -7139,8 +7154,10 @@ function renderEarningsDetail(rows){
     <td>${sorted.length} booking${sorted.length===1?'':'s'}</td>
     <td></td>
     <td class="num">${sumNights}</td>
+    <td class="num">${sumPaid ? money2(sumPaid, cur) : ''}</td>
+    <td class="num" style="color:var(--red);">${sumFee ? '− ' + money2(sumFee, cur) : ''}</td>
     <td></td>
-    <td class="num" style="color:var(--red);">${moneyFull(sumGross, cur)}</td>
+    <td class="num">${money2(sumGross, cur)}</td>
     <td></td>
     <td class="num">${fmtShow(sumShow, show)}</td>
     ${move ? `<td></td><td class="num" style="color:${sumMove>=0?'var(--green)':'var(--red)'};">${sumMove>=0?'+':'−'}${fmtShow(Math.abs(sumMove), show)}</td>` : ''}
@@ -7535,7 +7552,9 @@ function closeModal(){ overlay.classList.remove('open'); resetSelection(); rende
 function setTypeUI(type){
   document.querySelectorAll('input[name=btype]').forEach(r=> r.checked = (r.value===type));
   lblAirbnb.classList.toggle('sel-airbnb', type==='airbnb');
-  { const h = document.getElementById('fRateAirbnbHint'); if(h) h.style.display = type === 'airbnb' ? '' : 'none'; }
+  { const h = document.getElementById('fRateAirbnbHint'); if(h) h.style.display = type === 'airbnb' ? '' : 'none';
+    const ft = document.getElementById('fRateFeeTxt'); const vv = document.getElementById('fVilla');
+    if(ft && vv) ft.textContent = '(' + abFeeText(vv.value || editingBookingVilla) + ')'; }
   lblDirect.classList.toggle('sel-direct', type==='direct');
   // The whole invoicing half of the form only applies to direct bookings.
   const isDirect = type === 'direct';
@@ -17516,7 +17535,7 @@ function openAsk(){
 document.getElementById('askOpenBtn').addEventListener('click', openAsk);
 document.getElementById('askClose').addEventListener('click', () => document.getElementById('askOverlay').classList.remove('open'));
 document.getElementById('askOverlay').addEventListener('click', e => { if(e.target.id === 'askOverlay') e.currentTarget.classList.remove('open'); });
-document.addEventListener('keydown', e => { if(e.key === 'Escape') document.getElementById('askOverlay').classList.remove('open'); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') ['askOverlay','abImportOverlay','abFixOverlay'].forEach(id => { const o = document.getElementById(id); if(o) o.classList.remove('open'); }); });
 
 /* ===========================================================================
    AIRBNB CALENDARS — each villa's Airbnb bookings come in by themselves.
@@ -17650,7 +17669,18 @@ function abParseFile(text){
   }).filter(r => r.code && r.start && r.end && r.end > r.start);
 }
 let AB_IMPORT = null;
-const AIRBNB_HOST_FEE = 0.155;   // Airbnb's host fee: guest price × (1 − 15.5%) = what Airbnb pays you
+const AIRBNB_HOST_FEE = 0.155;   // Airbnb's usual host fee: guest price × (1 − 15.5%) = what Airbnb pays you
+// The share of the guest's price Airbnb keeps for one villa: its fee plus VAT on the fee.
+function abFeeRate(villaId){
+  const v = (VILLAS || []).find(x => x.id === villaId) || normaliseVilla({ id: villaId });
+  return (Number(v.airbnbFee) || 0) / 100 * (1 + (Number(v.airbnbFeeVat) || 0) / 100);
+}
+function abFeeText(villaId){
+  const v = (VILLAS || []).find(x => x.id === villaId) || normaliseVilla({ id: villaId });
+  return `${v.airbnbFee}%${v.airbnbFeeVat ? ` + ${v.airbnbFeeVat}% VAT on the fee = ${Math.round(abFeeRate(villaId) * 100000) / 1000}%` : ''}`;
+}
+// What the guest paid on Airbnb, worked back from what Airbnb pays you.
+function abGuestPaid(payout, villaId){ const f = abFeeRate(villaId); return f < 1 ? payout / (1 - f) : payout; }
 function abListingMapLoad(){ try{ return JSON.parse(localStorage.getItem('abListingMap') || '{}') || {}; }catch(e){ return {}; } }
 function abListingMapSave(m){ try{ localStorage.setItem('abListingMap', JSON.stringify(m)); }catch(e){} }
 function abGuessVilla(listing, rows){
@@ -17780,7 +17810,8 @@ document.getElementById('fRateTakeFee').addEventListener('click', e => {
   e.preventDefault();
   const el = document.getElementById('fRateUsd'), v = Number(el.value);
   if(!(v > 0)){ alert('Type the guest\'s nightly price first, then press this.'); return; }
-  el.value = (Math.round(v * (1 - AIRBNB_HOST_FEE) * 100) / 100).toFixed(2);
+  const villa = document.getElementById('fVilla').value || editingBookingVilla;
+  el.value = (Math.round(v * (1 - abFeeRate(villa)) * 100) / 100).toFixed(2);
   el.dispatchEvent(new Event('input', { bubbles:true }));
 });
 /* ---- Fix Airbnb prices: prices typed with Airbnb's 15.5% fee still in them ----
@@ -17803,18 +17834,18 @@ async function abFixOpen(){
   const list = allBookingsRaw.filter(b => b.type === 'airbnb' && b.status !== 'cancelled' && b.rateUsd > 0 && !b.rateIsPayout)
     .sort((a, c) => a.checkIn.localeCompare(c.checkIn));
   if(!list.length){ out.innerHTML = '<div class="srch-hint">✓ Every Airbnb price is already what Airbnb pays you. Nothing to fix.</div>'; return; }
-  const k = 1 - AIRBNB_HOST_FEE, nn = b => askNights(b);
-  out.innerHTML = `<div class="srch-hint">These Airbnb bookings still have a price that may include Airbnb's ${Math.round(AIRBNB_HOST_FEE * 1000) / 10}% fee.
+  const kOf = b => 1 - abFeeRate(b.villa), nn = b => askNights(b);
+  out.innerHTML = `<div class="srch-hint">These Airbnb bookings still have a price that may include Airbnb's fee (each villa's own fee: ${[...new Set(list.map(b => b.villa))].map(v => esc(abVillaName(v)) + ' ' + esc(abFeeText(v))).join(' · ')}).
       Tick the ones typed as <b>the guest's price</b> — they become what Airbnb pays you. Untick any that are already right, then press the second button for them.</div>
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:8px 0"><input type="checkbox" id="abfAll" checked> Tick all</label>
     <div class="abi-wrap"><table class="abi-tbl"><thead><tr><th></th><th>Guest</th><th>Villa</th><th>Dates</th><th style="text-align:right">Now (total)</th><th style="text-align:right">Becomes (total)</th></tr></thead><tbody>
     ${list.map((b, i) => `<tr><td><input type="checkbox" data-abf="${i}" checked></td><td>${esc(b.fullName || b.guest || 'Airbnb guest')}</td><td>${esc(abVillaName(b.villa))}</td>
       <td style="white-space:nowrap">${esc(srFmtDate(b.checkIn))} → ${esc(srFmtDate(b.checkOut))} · ${nn(b)} n</td>
       <td class="n">${esc(money2(b.rateUsd, b.currency))}/n<br><span class="srch-hint">${esc(money2(b.rateUsd * nn(b), b.currency))}</span></td>
-      <td class="n act-add">${esc(money2(Math.round(b.rateUsd * k * 10000) / 10000, b.currency))}/n<br><span class="srch-hint">${esc(money2(Math.round(b.rateUsd * nn(b) * k * 100) / 100, b.currency))}</span></td></tr>`).join('')}
+      <td class="n act-add">${esc(money2(Math.round(b.rateUsd * kOf(b) * 10000) / 10000, b.currency))}/n<br><span class="srch-hint">${esc(money2(Math.round(b.rateUsd * nn(b) * kOf(b) * 100) / 100, b.currency))}</span></td></tr>`).join('')}
     </tbody></table></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <button class="abi-go" id="abfGo">Take 15.5% off the ticked ones</button>
+      <button class="abi-go" id="abfGo">Take Airbnb's fee off the ticked ones</button>
       <button class="abi-go" id="abfOk" style="background:#fff;color:var(--ink);border:1px solid var(--board-line)">Ticked ones are already right — just mark them</button>
       <span class="srch-hint" id="abfMsg"></span></div>`;
   const boxes = [...out.querySelectorAll('[data-abf]')];
@@ -17822,16 +17853,16 @@ async function abFixOpen(){
   const run = async reduce => {
     const pick = boxes.filter(x => x.checked).map(x => list[+x.dataset.abf]);
     if(!pick.length){ alert('Tick at least one booking.'); return; }
-    if(reduce && !confirm(`Take ${Math.round(AIRBNB_HOST_FEE * 1000) / 10}% off the price of ${pick.length} Airbnb booking(s)?\n\nEach is changed once and marked, so it is never reduced again.`)) return;
+    if(reduce && !confirm(`Take Airbnb's fee off the price of ${pick.length} Airbnb booking(s)?\n\nEach is changed once and marked, so it is never reduced again.`)) return;
     const msg = out.querySelector('#abfMsg'); let ok = 0; const bad = [];
     out.querySelectorAll('button.abi-go').forEach(x => { x.disabled = true; });
     for(const b of pick){
       msg.textContent = `Saving ${ok + bad.length + 1} of ${pick.length}…`;
-      const payload = reduce ? { rate_usd: Math.round(b.rateUsd * k * 10000) / 10000, rate_is_payout:true } : { rate_is_payout:true };
+      const payload = reduce ? { rate_usd: Math.round(b.rateUsd * kOf(b) * 10000) / 10000, rate_is_payout:true } : { rate_is_payout:true };
       const { error } = await sb.from('villa_bookings').update(payload).eq('id', b.id);
       if(error){ bad.push((b.guest || '') + ': ' + error.message); console.error(error); } else ok++;
     }
-    logActivity('update', 'villa_bookings', reduce ? `Airbnb prices changed to what Airbnb pays (−15.5%): ${ok} booking(s)` : `Airbnb prices confirmed as what Airbnb pays: ${ok} booking(s)`);
+    logActivity('update', 'villa_bookings', reduce ? `Airbnb prices changed to what Airbnb pays (Airbnb's fee taken off): ${ok} booking(s)` : `Airbnb prices confirmed as what Airbnb pays: ${ok} booking(s)`);
     if(bad.length) alert('Some could not be saved:\n\n' + bad.slice(0, 10).join('\n'));
     await abFixOpen();
   };
@@ -17889,7 +17920,12 @@ async function renderAirbnbSettings(){
       <label>${esc(v.name)}</label>
       <div class="ab-line"><input type="url" class="ab-url" placeholder="https://www.airbnb.com/calendar/ical/….ics?s=…" value="${esc(r ? r.ical_url : '')}" autocomplete="off" spellcheck="false">
         <button class="ab-save" type="button">Save</button>${r ? '<button class="ab-del" type="button">Remove</button>' : ''}</div>
-      <div class="field-hint">${esc(note)}</div></div>`;
+      <div class="field-hint">${esc(note)}</div>
+      <div class="ab-line" style="margin-top:6px;align-items:center;font-size:12.5px">Airbnb host fee
+        <input type="number" class="ab-fee" min="0" max="50" step="0.01" value="${esc(v.airbnbFee)}" style="flex:0 0 80px"> %
+        &nbsp;VAT on the fee <input type="number" class="ab-vat" min="0" max="50" step="0.01" value="${esc(v.airbnbFeeVat)}" style="flex:0 0 80px"> %
+        <button class="ab-fee-save" type="button">Save fee</button>
+        <span class="srch-hint">Airbnb keeps ${esc(abFeeText(v.id))} of the guest's price.</span></div></div>`;
   }).join('') || '<div class="field-hint">No villas yet.</div>';
   box.querySelectorAll('[data-ab-villa]').forEach(row => {
     const villa = row.dataset.abVilla, input = row.querySelector('.ab-url');
@@ -17901,6 +17937,15 @@ async function renderAirbnbSettings(){
       logActivity('update', 'airbnb_calendars', 'Airbnb calendar linked for ' + abVillaName(villa));
       await airbnbSync(true);
       renderAirbnbSettings();
+    });
+    row.querySelector('.ab-fee-save').addEventListener('click', async () => {
+      const fee = Number(row.querySelector('.ab-fee').value), vat = Number(row.querySelector('.ab-vat').value);
+      if(!(fee >= 0 && fee <= 50) || !(vat >= 0 && vat <= 50)){ alert('Enter a fee and a VAT between 0 and 50 %.'); return; }
+      const { error } = await sb.from('villas').update({ airbnb_fee: fee, airbnb_fee_vat: vat }).eq('id', villa);
+      if(error){ alert(/airbnb_fee/.test(error.message) ? 'Run 38-supabase-airbnb-fee-per-villa.sql in Supabase first.' : 'Could not save: ' + error.message); return; }
+      const vv = VILLAS.find(x => x.id === villa); if(vv){ vv.airbnbFee = fee; vv.airbnbFeeVat = vat; }
+      logActivity('update', 'villas', `Airbnb fee for ${abVillaName(villa)} set to ${fee}% + ${vat}% VAT`);
+      renderAirbnbSettings(); if(typeof renderEarnings === 'function') try{ renderEarnings(); }catch(e){}
     });
     const del = row.querySelector('.ab-del');
     if(del) del.addEventListener('click', async () => {
