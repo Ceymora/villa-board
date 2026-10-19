@@ -1703,6 +1703,7 @@
           <span><span class="swatch" style="background:var(--direct)"></span>Direct booking</span>
         </div>
         <button class="add-booking-btn" data-bin-open="bookings" style="display:none;">🗑 Deleted <span class="bin-count"></span></button>
+        <button class="add-booking-btn" id="abFixBtn" style="display:none" title="Airbnb prices typed with Airbnb's fee still in them → what Airbnb pays you">💲 Fix Airbnb prices</button>
         <button class="add-booking-btn" id="abImportBtn" style="display:none" title="Prices, guest names and phone numbers from Airbnb's reservations file">⬆ Import Airbnb file</button>
         <button class="add-booking-btn" id="addBookingBtn">+ Add booking</button>
       </div>
@@ -3252,6 +3253,12 @@
   </div>
 </div>
 
+<div class="srch-overlay" id="abFixOverlay" role="dialog" aria-modal="true" aria-label="Fix Airbnb prices">
+  <div class="srch-box">
+    <div class="srch-head"><h3>💲 Fix Airbnb prices</h3><button type="button" class="srch-x" id="abFixClose" aria-label="Close">✕</button></div>
+    <div id="abFixOut"></div>
+  </div>
+</div>
 <div class="srch-overlay" id="abImportOverlay" role="dialog" aria-modal="true" aria-label="Import Airbnb reservations">
   <div class="srch-box">
     <div class="srch-head"><h3>⬆ Import Airbnb reservations</h3><button type="button" class="srch-x" id="abImportClose" aria-label="Close">✕</button></div>
@@ -3682,7 +3689,7 @@ function checkDeletePassword(){
 
 // Row <-> JS object mapping helpers (Postgres uses snake_case columns)
 function rowToBooking(r){ return {
-  id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, fromAirbnb: !!r.airbnb_uid, airbnbCode: r.airbnb_code || null,
+  id:r.id, villa:r.villa, checkIn:r.check_in, checkOut:r.check_out, type:r.type, guest:r.guest, fromAirbnb: !!r.airbnb_uid, airbnbCode: r.airbnb_code || null, rateIsPayout: r.rate_is_payout === true,
   guests:r.guests, rateUsd:r.rate_usd!==null&&r.rate_usd!==undefined?Number(r.rate_usd):null,
   currency:r.currency||'USD',
   // --- direct booking / invoice fields (all optional; Airbnb bookings simply leave them null) ---
@@ -4358,7 +4365,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.17-ask2';
+const APP_VERSION = 'v2026.10.17-airbnbfix';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -17683,7 +17690,7 @@ function abPlan(rows, map, replace){
       if(r.cancelled){ p.label = 'Cancelled on Airbnb — not in the calendar, nothing to do'; return p; }
       if(!villa){ p.label = 'Choose the villa for this listing above'; return p; }
       p.action = 'add'; p.label = 'Add as a new booking';
-      p.payload = { villa, check_in:r.start, check_out:r.end, type:'airbnb', status:'confirmed', guest:r.guest || ('Airbnb · ' + r.code),
+      p.payload = { ...(AB_HAS_PAYOUT && rate ? { rate_is_payout:true } : {}), villa, check_in:r.start, check_out:r.end, type:'airbnb', status:'confirmed', guest:r.guest || ('Airbnb · ' + r.code),
                     guest_full_name:r.guest || null, guest_phone:r.phone || null, guests:r.guests, booking_date:r.booked || null,
                     rate_usd:rate, currency:r.currency || 'USD', airbnb_code:r.code };
       return p;
@@ -17701,21 +17708,22 @@ function abPlan(rows, map, replace){
       if(r.booked && !b.bookingDate) pay.booking_date = r.booked;
       // The price is always what Airbnb pays you ("Earnings" ÷ nights) — a guest price typed
       // earlier (Airbnb's fee still in it) is replaced, so only the money you get is counted.
+      if(rate && AB_HAS_PAYOUT && !b.rateIsPayout) pay.rate_is_payout = true;
       if(rate && (!b.rateUsd || Math.abs(b.rateUsd - rate) > 0.005)){
         pay.rate_usd = rate;
         if(r.currency && b.currency !== r.currency) pay.currency = r.currency;
         if(b.rateUsd) p.priceWas = b.rateUsd;
       }
     }
-    const keys = Object.keys(pay).filter(k => k !== 'airbnb_code');
-    if(!keys.length && !pay.airbnb_code){ p.label = 'Already up to date'; return p; }
+    const keys = Object.keys(pay).filter(k => k !== 'airbnb_code' && k !== 'rate_is_payout');
+    if(!keys.length && !pay.airbnb_code && !pay.rate_is_payout){ p.label = 'Already up to date'; return p; }
     p.payload = pay;
     p.action = pay.status === 'cancelled' ? 'cancel' : keys.length ? 'update' : 'code';
     const priceNote = p.priceWas ? ` (price ${moneyFull(p.priceWas, b.currency)} → ${moneyFull(pay.rate_usd, pay.currency || b.currency)} a night, what Airbnb pays you)` : '';
     p.label = pay.status === 'cancelled' ? 'Mark cancelled' + (pay.retained_amount ? ' (keeps ' + moneyFull(pay.retained_amount, pay.currency || b.currency) + ')' : '')
       : keys.length ? 'Fill in: ' + keys.map(k => ({ guest:'name', guest_full_name:'full name', guest_phone:'phone', guests:'guests', booking_date:'booked on', rate_usd:'price', currency:'currency', retained_amount:'amount kept' })[k] || k)
                          .filter((x, i, a) => a.indexOf(x) === i).join(', ')
-      : 'Link to Airbnb code';
+      : pay.airbnb_code ? 'Link to Airbnb code' : 'Price confirmed as what Airbnb pays you';
     p.label += priceNote;
     return p;
   });
@@ -17775,9 +17783,69 @@ document.getElementById('fRateTakeFee').addEventListener('click', e => {
   el.value = (Math.round(v * (1 - AIRBNB_HOST_FEE) * 100) / 100).toFixed(2);
   el.dispatchEvent(new Event('input', { bubbles:true }));
 });
+/* ---- Fix Airbnb prices: prices typed with Airbnb's 15.5% fee still in them ----
+   Airbnb shows the guest's price ($546) and what it pays you ($461.37 = 546 − 15.5%).
+   Every Airbnb booking whose price is not yet marked "what Airbnb pays" is listed; the ticked
+   ones are reduced by 15.5% once and marked, so they are never reduced twice. */
+let AB_HAS_PAYOUT = false;
+async function abCheckPayoutCol(){
+  if(!sb) return false;
+  try{ const { error } = await sb.from('villa_bookings').select('rate_is_payout').limit(1); AB_HAS_PAYOUT = !error; }catch(e){ AB_HAS_PAYOUT = false; }
+  return AB_HAS_PAYOUT;
+}
+function money2(n, cur){ return curSymbol(cur || 'USD') + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+async function abFixOpen(){
+  const out = document.getElementById('abFixOut');
+  document.getElementById('abFixOverlay').classList.add('open');
+  out.innerHTML = '<div class="srch-hint">Loading…</div>';
+  if(!await abCheckPayoutCol()){ out.innerHTML = '<div class="srch-hint" style="color:var(--red)">Run <b>37-supabase-airbnb-payout-flag.sql</b> in Supabase first, then reload the page.</div>'; return; }
+  await fetchBookings();
+  const list = allBookingsRaw.filter(b => b.type === 'airbnb' && b.status !== 'cancelled' && b.rateUsd > 0 && !b.rateIsPayout)
+    .sort((a, c) => a.checkIn.localeCompare(c.checkIn));
+  if(!list.length){ out.innerHTML = '<div class="srch-hint">✓ Every Airbnb price is already what Airbnb pays you. Nothing to fix.</div>'; return; }
+  const k = 1 - AIRBNB_HOST_FEE, nn = b => askNights(b);
+  out.innerHTML = `<div class="srch-hint">These Airbnb bookings still have a price that may include Airbnb's ${Math.round(AIRBNB_HOST_FEE * 1000) / 10}% fee.
+      Tick the ones typed as <b>the guest's price</b> — they become what Airbnb pays you. Untick any that are already right, then press the second button for them.</div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:8px 0"><input type="checkbox" id="abfAll" checked> Tick all</label>
+    <div class="abi-wrap"><table class="abi-tbl"><thead><tr><th></th><th>Guest</th><th>Villa</th><th>Dates</th><th style="text-align:right">Now (total)</th><th style="text-align:right">Becomes (total)</th></tr></thead><tbody>
+    ${list.map((b, i) => `<tr><td><input type="checkbox" data-abf="${i}" checked></td><td>${esc(b.fullName || b.guest || 'Airbnb guest')}</td><td>${esc(abVillaName(b.villa))}</td>
+      <td style="white-space:nowrap">${esc(srFmtDate(b.checkIn))} → ${esc(srFmtDate(b.checkOut))} · ${nn(b)} n</td>
+      <td class="n">${esc(money2(b.rateUsd, b.currency))}/n<br><span class="srch-hint">${esc(money2(b.rateUsd * nn(b), b.currency))}</span></td>
+      <td class="n act-add">${esc(money2(Math.round(b.rateUsd * k * 10000) / 10000, b.currency))}/n<br><span class="srch-hint">${esc(money2(Math.round(b.rateUsd * nn(b) * k * 100) / 100, b.currency))}</span></td></tr>`).join('')}
+    </tbody></table></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="abi-go" id="abfGo">Take 15.5% off the ticked ones</button>
+      <button class="abi-go" id="abfOk" style="background:#fff;color:var(--ink);border:1px solid var(--board-line)">Ticked ones are already right — just mark them</button>
+      <span class="srch-hint" id="abfMsg"></span></div>`;
+  const boxes = [...out.querySelectorAll('[data-abf]')];
+  out.querySelector('#abfAll').addEventListener('change', e => boxes.forEach(x => { x.checked = e.target.checked; }));
+  const run = async reduce => {
+    const pick = boxes.filter(x => x.checked).map(x => list[+x.dataset.abf]);
+    if(!pick.length){ alert('Tick at least one booking.'); return; }
+    if(reduce && !confirm(`Take ${Math.round(AIRBNB_HOST_FEE * 1000) / 10}% off the price of ${pick.length} Airbnb booking(s)?\n\nEach is changed once and marked, so it is never reduced again.`)) return;
+    const msg = out.querySelector('#abfMsg'); let ok = 0; const bad = [];
+    out.querySelectorAll('button.abi-go').forEach(x => { x.disabled = true; });
+    for(const b of pick){
+      msg.textContent = `Saving ${ok + bad.length + 1} of ${pick.length}…`;
+      const payload = reduce ? { rate_usd: Math.round(b.rateUsd * k * 10000) / 10000, rate_is_payout:true } : { rate_is_payout:true };
+      const { error } = await sb.from('villa_bookings').update(payload).eq('id', b.id);
+      if(error){ bad.push((b.guest || '') + ': ' + error.message); console.error(error); } else ok++;
+    }
+    logActivity('update', 'villa_bookings', reduce ? `Airbnb prices changed to what Airbnb pays (−15.5%): ${ok} booking(s)` : `Airbnb prices confirmed as what Airbnb pays: ${ok} booking(s)`);
+    if(bad.length) alert('Some could not be saved:\n\n' + bad.slice(0, 10).join('\n'));
+    await abFixOpen();
+  };
+  out.querySelector('#abfGo').addEventListener('click', () => run(true));
+  out.querySelector('#abfOk').addEventListener('click', () => run(false));
+}
+document.getElementById('abFixBtn').addEventListener('click', () => { if(canChange('bookings')) abFixOpen(); });
+document.getElementById('abFixClose').addEventListener('click', () => document.getElementById('abFixOverlay').classList.remove('open'));
+document.getElementById('abFixOverlay').addEventListener('click', e => { if(e.target.id === 'abFixOverlay') e.currentTarget.classList.remove('open'); });
 function abImportButton(){
   const b = document.getElementById('abImportBtn');
   if(b) b.style.display = (sb && canChange('bookings')) ? '' : 'none';
+  const f = document.getElementById('abFixBtn');
+  if(f) f.style.display = (sb && canChange('bookings')) ? '' : 'none';
 }
 document.getElementById('abImportBtn').addEventListener('click', () => {
   if(!canChange('bookings')) return;
@@ -17791,6 +17859,7 @@ document.getElementById('abImportFile').addEventListener('change', async e => {
   const out = document.getElementById('abImportOut');
   try{
     if(f.size > 5 * 1024 * 1024) throw new Error('That file is too big for a reservations file.');
+    await abCheckPayoutCol();
     const rows = abParseFile(await f.text());
     if(!rows.length) throw new Error('No reservations found in the file.');
     if(!bookingsInited) initBookings();
