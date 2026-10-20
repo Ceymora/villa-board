@@ -1827,6 +1827,7 @@
           <button class="add-booking-btn" id="addIncomeBtn">+ Petty Cash Money Received</button>
           <button class="add-booking-btn" id="addExpenseBtn">+ Expenses</button>
           <button class="add-booking-btn" data-vc="diesel" style="display:none">⛽ Diesel / petrol</button>
+          <button class="add-booking-btn" data-vc="laundry" data-vc-petty="1" style="display:none">🧺 Laundry</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
         </div>
       </div>
@@ -10645,7 +10646,8 @@ function vcCan(kind){
 function vcApplyButtons(){
   document.querySelectorAll('[data-vc]').forEach(b => {
     if(b.closest('#vcModalOverlay')) return;
-    b.style.display = vcCan(b.dataset.vc) ? '' : 'none';
+    const ok = vcCan(b.dataset.vc) && (b.dataset.vcPetty !== '1' || canChange('pettycash'));
+    b.style.display = ok ? '' : 'none';
   });
 }
 function vcToolbarHTML(){
@@ -10665,6 +10667,8 @@ async function fetchVillaCosts(){
   allFuel = (F.data || []).map(r => ({ id:r.id, villaId:r.villa_id, date:String(r.log_date).slice(0,10), kind:r.kind,
     fuelType:r.fuel_type || 'diesel', litres:Number(r.litres) || 0, amount:Number(r.amount) || 0,
     hours: r.hours == null ? null : Number(r.hours), pettyId: r.petty_cash_id || null, note: r.note || '' }));
+  allLaundry.forEach(l => { l.pettyId = null; });
+  (L.data || []).forEach(r => { const l = allLaundry.find(x => String(x.id) === String(r.id)); if(l) l.pettyId = r.petty_cash_id || null; });
   vcApplyButtons();
   vcRefreshViews();
 }
@@ -10718,7 +10722,9 @@ function sharedCostsFor(villaId, fromISO, toExcl){
   const share = total ? nights / total : 0;
   const trips = allLaundry.filter(l => l.villaId === villaId && l.date >= fromISO && l.date < toExcl);
   return { adminTotal, nights, nightsTotal: total, share, adminShare: adminTotal * share,
-           laundry: trips.reduce((x, l) => x + l.amount, 0), laundryTrips: trips.length };
+           // Laundry paid from petty cash is already in the petty cash spending, so it is not counted twice here.
+           laundry: trips.filter(l => !l.pettyId).reduce((x, l) => x + l.amount, 0),
+           laundryAll: trips.reduce((x, l) => x + l.amount, 0), laundryTrips: trips.length };
 }
 function powerCutsFor(villaId, fromISO, toExcl){
   const rows = allFuel.filter(f => f.villaId === villaId && f.date >= fromISO && f.date < toExcl);
@@ -10756,7 +10762,8 @@ function ensureVcModal(){
   ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
   document.getElementById('vcSave').addEventListener('click', vcSave);
 }
-function vcOpenModal(kind){
+function vcOpenModal(kind, fromPetty){
+  if(fromPetty && !canChange('pettycash')){ alert('You are not allowed to record petty cash.'); return; }
   if(!vcCan(kind)){ alert('You are not allowed to record this.'); return; }
   if(!sb){ alert('Not connected to Supabase yet.'); return; }
   ensureVcModal();
@@ -10766,13 +10773,17 @@ function vcOpenModal(kind){
   const noteRow  = `<label>Note (optional)</label><input type="text" id="vcNote">`;
   const spec = {
     laundry: { title:'Laundry sent out',
-      hint:'One entry per trip. Record laundry here, not as a petty cash expense, or it will be counted twice.',
+      hint: fromPetty
+        ? 'Paid from petty cash: this is also recorded as a petty cash expense for the villa, so the card balance goes down.'
+        : 'One entry per trip, paid outside petty cash. If it was paid from petty cash, use the 🧺 Laundry button in Petty Cash instead.',
       fields: dateRow + villaRow
         + `<label>Bedsheets</label><input type="number" id="vcBed" min="0" step="1" value="0">`
         + `<label>Towels</label><input type="number" id="vcTowel" min="0" step="1" value="0">`
         + `<label>Duvet covers</label><input type="number" id="vcDuvet" min="0" step="1" value="0">`
         + `<label>Other items (pillows, mats, curtains…)</label><input type="number" id="vcOther" min="0" step="1" value="0">`
-        + `<label>Total paid (LKR)</label><input type="number" id="vcCost" min="0" step="1">` + noteRow },
+        + `<label>Total paid (LKR)</label><input type="number" id="vcCost" min="0" step="1">`
+        + (fromPetty ? `<label>Paid from</label><select id="vcCard">${VC_CARDS.map(([k,l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select>` : '')
+        + noteRow },
     diesel: { title:'Diesel / petrol bought',
       hint:'This is also recorded as a petty cash expense for the villa, so the petty cash balance goes down.',
       fields: dateRow + villaRow
@@ -10788,7 +10799,7 @@ function vcOpenModal(kind){
         + `<label>Litres used (optional)</label><input type="number" id="vcLitres" min="0" step="0.1">`
         + noteRow },
   }[kind];
-  vcState = { kind };
+  vcState = { kind, fromPetty: !!fromPetty };
   document.getElementById('vcTitle').textContent = spec.title;
   document.getElementById('vcHint').textContent = spec.hint;
   document.getElementById('vcFields').innerHTML = spec.fields;
@@ -10811,10 +10822,22 @@ async function vcSave(){
     if(kind === 'laundry'){
       const bed = num('vcBed'), towel = num('vcTowel'), duvet = num('vcDuvet'), other = num('vcOther'), cost = num('vcCost');
       if(bed + towel + duvet + other <= 0 && cost <= 0) return fail('Enter the items sent, or what was paid.');
+      let pettyId = null;
+      if(vcState.fromPetty){
+        if(!(cost > 0)) return fail('Enter what was paid — it comes out of petty cash.');
+        // Paid from petty cash: recorded as an expense for this villa, so the card balance goes down.
+        const { data: pRow, error: pErr } = await sb.from('petty_cash_transactions').insert({
+          type:'expense', date, card: val('vcCard'), for: villa, amount: cost, linked_inventory: false, invoice_urls: [], note,
+          purpose: `Laundry: ${bed} bedsheets, ${towel} towels, ${duvet} duvet covers, ${other} other`
+        }).select().single();
+        if(pErr) throw pErr;
+        pettyId = String(pRow.id);
+      }
       const { error } = await sb.from('villa_laundry').insert({ villa_id:villa, trip_date:date, bedsheets:bed, towels:towel,
-        duvet_covers:duvet, other_items:other, amount:cost, note });
-      if(error) throw error;
-      logActivity('create', 'villa_laundry', `Laundry sent for ${vcVillaName(villa)}: ${bed} bedsheets, ${towel} towels, ${duvet} duvet covers, ${other} other — LKR ${cost.toLocaleString()}`);
+        duvet_covers:duvet, other_items:other, amount:cost, note, petty_cash_id: pettyId });
+      if(error){ if(pettyId) await sb.from('petty_cash_transactions').delete().eq('id', pettyId); throw error; }
+      if(pettyId){ try{ await fetchCash(); }catch(_e){ console.error(_e); } }
+      logActivity('create', 'villa_laundry', `Laundry sent for ${vcVillaName(villa)}: ${bed} bedsheets, ${towel} towels, ${duvet} duvet covers, ${other} other — LKR ${cost.toLocaleString()}${pettyId ? ', paid from petty cash' : ''}`);
     } else if(kind === 'diesel'){
       const litres = num('vcLitres'), cost = num('vcCost'), fuel = val('vcFuel'), card = val('vcCard');
       if(!(litres > 0)) return fail('Enter how many litres were bought.');
@@ -10849,7 +10872,9 @@ async function vcDelete(kind, id){
   if(!confirm('Delete this entry?')) return;
   try{
     if(kind === 'laundry'){
+      const l = allLaundry.find(x => String(x.id) === String(id));
       await delRows('villa_laundry', 'id', id);
+      if(l && l.pettyId){ try{ await delRows('petty_cash_transactions', 'id', l.pettyId); }catch(_e){ console.error(_e); } try{ await fetchCash(); }catch(_e){} }
       logActivity('delete', 'villa_laundry', 'Deleted a laundry entry');
     } else {
       const f = allFuel.find(x => String(x.id) === String(id));
@@ -10864,7 +10889,7 @@ async function vcDelete(kind, id){
 }
 document.addEventListener('click', e => {
   const add = e.target.closest && e.target.closest('[data-vc]');
-  if(add){ vcOpenModal(add.dataset.vc); return; }
+  if(add){ vcOpenModal(add.dataset.vc, add.dataset.vcPetty === '1'); return; }
   const del = e.target.closest && e.target.closest('[data-vc-del]');
   if(del){ vcDelete(del.dataset.vcKind, del.dataset.vcDel); }
 });
@@ -10883,7 +10908,7 @@ function vcReportHTML(fromISO, toExcl){
   const delBtn = (kind, id) => canDel ? `<button class="manage-del no-print" data-vc-del="${esc(id)}" data-vc-kind="${kind}">Delete</button>` : '';
 
   const totals = rows.reduce((t, r) => ({
-    ox: t.ox + r.ox, admin: t.admin + r.sc.adminShare, laundry: t.laundry + r.sc.laundry, laundryTrips: t.laundryTrips + r.sc.laundryTrips,
+    ox: t.ox + r.ox, admin: t.admin + r.sc.adminShare, laundry: t.laundry + r.sc.laundryAll, laundryTrips: t.laundryTrips + r.sc.laundryTrips,
     bought: t.bought + r.pc.boughtLitres, cost: t.cost + r.pc.boughtCost, cutDays: t.cutDays + r.pc.cutDays, hours: t.hours + r.pc.hours,
   }), { ox:0, admin:0, laundry:0, laundryTrips:0, bought:0, cost:0, cutDays:0, hours:0 });
 
@@ -10898,7 +10923,7 @@ function vcReportHTML(fromISO, toExcl){
         <td>${esc(r.v.name)}</td>
         <td class="r">${money(r.ox)}</td>
         <td class="r">${money(r.sc.adminShare)}</td>
-        <td class="r">${r.sc.laundryTrips ? r.sc.laundryTrips + ' trip' + (r.sc.laundryTrips === 1 ? '' : 's') + ' · ' + money(r.sc.laundry) : '—'}</td>
+        <td class="r">${r.sc.laundryTrips ? r.sc.laundryTrips + ' trip' + (r.sc.laundryTrips === 1 ? '' : 's') + ' · ' + money(r.sc.laundryAll) : '—'}</td>
         <td class="r">${r.pc.boughtLitres ? vcLitres(r.pc.boughtLitres) + ' L · ' + money(r.pc.boughtCost) : '—'}</td>
         <td class="r">${r.pc.cutDays || '—'}</td>
         <td class="r">${r.pc.hours ? vcLitres(r.pc.hours) : '—'}</td>
