@@ -10633,7 +10633,13 @@ async function fetchOpEx(){
    Company administrative expenses (Company Accounts) are shared between villas by the nights
    each villa had booked in the period.                                                       */
 let allLaundry = [], allFuel = [], vcInited = false;
-const VC_CARDS = [['ceymora','Ceymora Card'],['kalava_card','Kalava Villa Card'],['sharon','Paid by Sharon personally']];
+const VC_CARDS = [['ceymora','Ceymora Card'],['kalava_card','Kalava Villa Card'],['sharon','Paid by Sharon personally'],
+                  ['bank:ceymora','Bank transfer from Ceymora'],['bank:kalava','Bank transfer from Kalava Villa']];
+// Card or bank transfer, saved the same way petty cash saves it (bank rows also name the account).
+async function vcPayFields(choice){
+  const { card, bankAccount } = splitPay(choice);
+  return { card, ...((await pcColsReady()) ? { bank_account: card === 'bank' ? bankAccount : null } : {}) };
+}
 const VC_FUEL_LABEL = { diesel:'Diesel', petrol:'Petrol' };
 const vcVillas = () => CAL_VILLAS.map(v => ({ id:v.id, name:v.name }));
 const vcVillaName = id => (CAL_VILLAS.find(v => v.id === id) || {}).name || id;
@@ -10828,7 +10834,7 @@ async function vcSave(){
         if(!(cost > 0)) return fail('Enter what was paid — it comes out of petty cash.');
         // Paid from petty cash: recorded as an expense for this villa, so the card balance goes down.
         const { data: pRow, error: pErr } = await sb.from('petty_cash_transactions').insert({
-          type:'expense', date, card: val('vcCard'), for: villa, amount: cost, linked_inventory: false, invoice_urls: [], note,
+          type:'expense', date, ...(await vcPayFields(val('vcCard'))), for: villa, amount: cost, linked_inventory: false, invoice_urls: [], note,
           purpose: `Laundry: ${bed} bedsheets, ${towel} towels, ${duvet} duvet covers, ${other} other`
         }).select().single();
         if(pErr) throw pErr;
@@ -10846,7 +10852,7 @@ async function vcSave(){
       const label = `${VC_FUEL_LABEL[fuel] || 'Fuel'} ${vcLitres(litres)} L`;
       // The money comes out of petty cash, so it is recorded there too, for this villa.
       const { data: pRow, error: pErr } = await sb.from('petty_cash_transactions').insert({
-        type:'expense', date, card, for: villa, purpose: label, amount: cost, note, linked_inventory: false, invoice_urls: []
+        type:'expense', date, ...(await vcPayFields(card)), for: villa, purpose: label, amount: cost, note, linked_inventory: false, invoice_urls: []
       }).select().single();
       if(pErr) throw pErr;
       const { error } = await sb.from('fuel_log').insert({ villa_id:villa, log_date:date, kind:'buy', fuel_type:fuel,
