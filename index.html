@@ -1826,6 +1826,7 @@
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addIncomeBtn">+ Petty Cash Money Received</button>
           <button class="add-booking-btn" id="addExpenseBtn">+ Expenses</button>
+          <button class="add-booking-btn" data-vc="diesel" style="display:none">⛽ Diesel / petrol</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
         </div>
       </div>
@@ -2639,6 +2640,7 @@
     <div class="modal-error" id="modalError">Check-out must be after check-in.</div>
     <div class="modal-actions">
       <button class="btn btn-delete" id="btnDelete" style="display:none">Delete</button>
+      <button class="btn btn-delete" id="btnAskDelete" style="display:none">Ask Makky to delete</button>
       <button class="btn" id="btnInvoice" style="display:none; background:var(--direct); color:#fff;">🧾 Invoice</button>
       <div style="flex:1"></div>
       <button class="btn btn-cancel" id="btnCancel">Cancel</button>
@@ -4301,8 +4303,8 @@ const AREAS = [
     changeLabel:'record expenses, money in, advances, transfers', panel:'pettyCashPanel' },
   { key:'inventory',    label:'Inventory',         see:'tab_inventory',    change:'edit_inventory',
     changeLabel:'record purchases and send stock to villas',     panel:'inventoryPanel' },
-  { key:'expenses',     label:'Villa Expenses',    see:'tab_expenses',     change:null,
-    changeLabel:'',                                              panel:'expensesPanel' },
+  { key:'expenses',     label:'Villa Expenses',    see:'tab_expenses',     change:'edit_expenses',
+    changeLabel:'laundry, diesel and power-cut records',         panel:'expensesPanel' },
   { key:'villareport',  label:'Villa Report',      see:'tab_villareport',  change:'edit_villareport',
     changeLabel:'owner payments, direct payments, villa bills',  panel:'villaReportPanel' },
   { key:'reports',      label:'Reports',           see:'tab_reports',      change:null,
@@ -4330,6 +4332,7 @@ const TRUSTED_PERMS = [
   { key:'delete_records', label:'Delete records' },
   { key:'backup',         label:'Download a full backup of everything' },
   { key:'restore_deleted', label:'See deleted records and restore them' },
+  { key:'delete_airbnb',  label:'Ask Makky to delete Airbnb bookings entered wrongly' },
   { key:'admin',          label:'Full admin — everything, always', master:true },
 ];
 // Kept in the old shape for the summaries elsewhere in the app.
@@ -4385,7 +4388,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.19-airbnbfees2';
+const APP_VERSION = 'v2026.10.20-villacosts1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4902,10 +4905,11 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
 const DR_TABLES = {
   petty_cash_transactions: { label:'Petty cash', edit:'edit_cash',      bar:'cashSelBar' },
   inventory_transactions:  { label:'Inventory',  edit:'edit_inventory', bar:'invSelBar' },
+  villa_bookings:          { label:'Airbnb booking', edit:'delete_airbnb', bar:null },
 };
 let allDelReqs = [], drReady = null;
-const DELSEL = { petty_cash_transactions: new Set(), inventory_transactions: new Set() };
-const DR_PICKING = { petty_cash_transactions: false, inventory_transactions: false };   // tick boxes shown only after "Select lines to delete"
+const DELSEL = { petty_cash_transactions: new Set(), inventory_transactions: new Set(), villa_bookings: new Set() };
+const DR_PICKING = { petty_cash_transactions: false, inventory_transactions: false, villa_bookings: false };   // tick boxes shown only after "Select lines to delete"
 const drMe = () => (currentUser && currentUser.email || '').toLowerCase();
 const drWho = e => { const p = (typeof allAppUsers !== 'undefined' ? allAppUsers : []).find(u => (u.email || '').toLowerCase() === (e || '').toLowerCase());
   return p && p.full_name ? p.full_name : (e || '').split('@')[0] || '—'; };
@@ -4921,6 +4925,7 @@ async function fetchDelReqs(){
 function drPending(table, id){ return allDelReqs.find(r => r.table_name === table && String(r.row_id) === String(id) && r.status === 'pending') || null; }
 function drCanAsk(table){ return hasPerm(DR_TABLES[table].edit) || isAdmin(); }
 function drRowOf(table, id){
+  if(table === 'villa_bookings') return allBookingsRaw.find(t => String(t.id) === String(id));
   return table === 'petty_cash_transactions' ? allCashTxns.find(t => String(t.id) === String(id)) : allInvTxns.find(t => String(t.id) === String(id));
 }
 // Lines that belong to an advance are changed on the advance's own page instead.
@@ -4935,6 +4940,7 @@ function drSelectable(table, t){
 }
 function drSummary(table, t){
   if(!t) return '(gone)';
+  if(table === 'villa_bookings') return `${t.checkIn} → ${t.checkOut} · ${t.guest || 'guest'} · ${(CAL_VILLAS.find(v => v.id === t.villa) || {}).name || t.villa}${t.rateUsd ? ' · ' + t.rateUsd : ''}`;
   if(table === 'petty_cash_transactions') return `${t.date} · ${t.type === 'income' ? 'Money received' : (t.purpose || 'Expense')} · ${FOR_LABELS[t.for] || t.for || ''} · LKR ${Number(t.amount || 0).toLocaleString()}`;
   return `${t.date} · ${t.type === 'purchase' ? 'Purchase' : 'Sent to ' + (INV_LOCATION_LABELS[t.toVilla] || t.toVilla)}: ${t.item} × ${t.qty}${t.amount ? ' · LKR ' + Number(t.amount).toLocaleString() : ''}`;
 }
@@ -5093,7 +5099,7 @@ async function drAfterChange(tables){
 }
 function drRefreshViews(){
   const pend = t => allDelReqs.filter(r => r.status === 'pending' && r.table_name === t).length;
-  document.querySelectorAll('.delreq-count').forEach(el => { const n = pend('petty_cash_transactions') + pend('inventory_transactions'); el.textContent = n ? '· ' + n + ' waiting' : ''; });
+  document.querySelectorAll('.delreq-count').forEach(el => { const n = pend('petty_cash_transactions') + pend('inventory_transactions') + (isAdmin() ? pend('villa_bookings') : 0); el.textContent = n ? '· ' + n + ' waiting' : ''; });
   ['delReqBtnCash','delReqBtnInv'].forEach(id => { const b = document.getElementById(id); if(b) b.style.display = drReady && (isAdmin() || canRestore() || drCanAsk(id === 'delReqBtnCash' ? 'petty_cash_transactions' : 'inventory_transactions')) ? '' : 'none'; });
   const it = document.querySelector('.maintab-btn[data-tab="inventory"]');
   if(it){ if(!it.dataset.base) it.dataset.base = it.textContent; const n = isAdmin() ? pend('inventory_transactions') : 0; it.textContent = it.dataset.base + (n ? ` 🔔${n}` : ''); }
@@ -6018,7 +6024,7 @@ function renderVillaExpensesIn(curNote){
         <span class="rpt-section-count">stock sent from Store with + Distribute</span></div>${exStoreBlock(exStoreLines(), false)}`;
     }
   }
-  document.getElementById('exBody').innerHTML = html;
+  document.getElementById('exBody').innerHTML = vcToolbarHTML() + html;
 }
 
 /* Day by day: each date with what was spent and what Store sent, newest first. */
@@ -6133,6 +6139,7 @@ function exportVillaExpensesCSV(){
 }
 
 function initVillaExpenses(){
+  ensureVillaCosts();
   if(typeof invInited !== 'undefined' && !invInited && typeof initInventory === 'function') initInventory();
   if(!exInited){
     exInited = true;
@@ -7221,6 +7228,19 @@ const lblAirbnb = document.getElementById('lblAirbnb');
 const lblDirect = document.getElementById('lblDirect');
 const modalError = document.getElementById('modalError');
 const btnDelete = document.getElementById('btnDelete');
+const btnAskDelete = document.getElementById('btnAskDelete');
+// Someone with the "ask Makky" permission (not full delete rights) asks for an Airbnb booking
+// to be deleted; it stays until Makky approves on the Delete requests screen. A second press
+// withdraws the request.
+function drRefreshAskBtn(id){
+  const p = drReady ? drPending('villa_bookings', id) : null;
+  btnAskDelete.textContent = p ? 'Undo delete request' : 'Ask Makky to delete';
+}
+btnAskDelete.addEventListener('click', ()=>{
+  if(!editingBookingId) return;
+  const p = drReady ? drPending('villa_bookings', editingBookingId) : null;
+  if(p) drCancel(p.id); else drAsk('villa_bookings', [editingBookingId]);
+});
 
 let editingBookingVilla = null;   // the villa a booking being edited belongs to
 let editingBookingRef = null;     // the full booking object, so the Invoice button can print it
@@ -7270,7 +7290,11 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     document.getElementById('fGuests').value = booking.guests || '';
     document.getElementById('fRateUsd').value = booking.rateUsd || '';
     setTypeUI(booking.type);
-    btnDelete.style.display = '';
+    // An Airbnb booking, opened by someone without full delete rights: they can only ask Makky.
+    const askOnly = !!booking.fromAirbnb && !canDelete();
+    btnDelete.style.display = askOnly ? 'none' : '';
+    btnAskDelete.style.display = askOnly && hasPerm('delete_airbnb') ? '' : 'none';
+    drRefreshAskBtn(booking.id);
   } else {
     const ci = presetCheckInISO || todayISO();
     const co = presetCheckOutISO || toISO((()=>{ const d=parseISO(ci); d.setDate(d.getDate()+1); return d; })());
@@ -7282,6 +7306,7 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     document.getElementById('fRateUsd').value = '';
     setTypeUI('airbnb');
     btnDelete.style.display = 'none';
+    btnAskDelete.style.display = 'none';
   }
 
   populateVillaSelect(editingBookingVilla);
@@ -8333,6 +8358,7 @@ let allCashTxns = [];
 const cashStatusMsg = document.getElementById('cashStatusMsg');
 
 function initPettyCash(){
+  ensureVillaCosts();
   cashInited = true;
   if(!sb){ cashStatusMsg.textContent = 'Not connected to Supabase yet'; renderCash(); return; }
   cashStatusMsg.textContent = 'Loading…';
@@ -10242,6 +10268,7 @@ let repMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 function initReports(){
   reportsInited = true;
+  ensureVillaCosts();
   document.getElementById('repLocationSelect').addEventListener('change', renderReports);
   document.getElementById('repPrevMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()-1); renderReports(); });
   document.getElementById('repNextMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()+1); renderReports(); });
@@ -10297,7 +10324,7 @@ function renderReports(){
   // dropdown, instead of every location crammed into one table.
   const loc = document.getElementById('repLocationSelect').value || firstVillaId();
   const body = document.getElementById('repReportBody');
-  body.innerHTML = buildVillaReportHTML(loc, repMonthDate);
+  body.innerHTML = buildVillaReportHTML(loc, repMonthDate) + vcReportHTML(monthStartISO, monthEndISO);
   wireReportSections('repSections', 'repReportBody');
   applyReportSections('repSections', 'repReportBody');
 }
@@ -10596,8 +10623,335 @@ async function fetchOpEx(){
   renderVillaReport();
 }
 
+/* ==================== VILLA COSTS: laundry, diesel & power cuts ====================
+   Kept per villa:
+     • laundry trips — bedsheets, towels, duvet covers, other items, and what was paid;
+     • diesel / petrol bought — litres and cost. Each purchase is also a petty cash expense
+       for the villa, so the petty cash balance goes down when fuel is bought;
+     • power cuts — each day the generator ran (hours off, and litres used if known).
+   Company administrative expenses (Company Accounts) are shared between villas by the nights
+   each villa had booked in the period.                                                       */
+let allLaundry = [], allFuel = [], vcInited = false;
+const VC_CARDS = [['ceymora','Ceymora Card'],['kalava_card','Kalava Villa Card'],['sharon','Paid by Sharon personally']];
+const VC_FUEL_LABEL = { diesel:'Diesel', petrol:'Petrol' };
+const vcVillas = () => CAL_VILLAS.map(v => ({ id:v.id, name:v.name }));
+const vcVillaName = id => (CAL_VILLAS.find(v => v.id === id) || {}).name || id;
+const vcLitres = n => Math.round((Number(n) || 0) * 10) / 10;
+
+function vcCan(kind){
+  if(kind === 'diesel') return canChange('expenses') && canChange('pettycash');
+  return canChange('expenses');
+}
+function vcApplyButtons(){
+  document.querySelectorAll('[data-vc]').forEach(b => {
+    if(b.closest('#vcModalOverlay')) return;
+    b.style.display = vcCan(b.dataset.vc) ? '' : 'none';
+  });
+}
+function vcToolbarHTML(){
+  const btns = [['laundry','🧺 + Laundry sent'], ['diesel','⛽ + Diesel / petrol bought'], ['power','🔌 + Power cut (generator used)']]
+    .filter(([k]) => vcCan(k))
+    .map(([k,l]) => `<button class="add-booking-btn no-print" data-vc="${k}">${l}</button>`).join(' ');
+  return btns ? `<div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${btns}</div>` : '';
+}
+
+async function fetchVillaCosts(){
+  if(!sb) return;
+  const [L, F] = await Promise.all([fetchAllRows('villa_laundry', 'trip_date'), fetchAllRows('fuel_log', 'log_date')]);
+  if(L.error || F.error){ console.error(L.error || F.error); return; }
+  allLaundry = (L.data || []).map(r => ({ id:r.id, villaId:r.villa_id, date:String(r.trip_date).slice(0,10),
+    bedsheets:Number(r.bedsheets) || 0, towels:Number(r.towels) || 0, duvetCovers:Number(r.duvet_covers) || 0,
+    otherItems:Number(r.other_items) || 0, amount:Number(r.amount) || 0, note:r.note || '' }));
+  allFuel = (F.data || []).map(r => ({ id:r.id, villaId:r.villa_id, date:String(r.log_date).slice(0,10), kind:r.kind,
+    fuelType:r.fuel_type || 'diesel', litres:Number(r.litres) || 0, amount:Number(r.amount) || 0,
+    hours: r.hours == null ? null : Number(r.hours), pettyId: r.petty_cash_id || null, note: r.note || '' }));
+  vcApplyButtons();
+  vcRefreshViews();
+}
+function vcRefreshViews(){
+  if(villaReportInited && typeof renderVillaReport === 'function') renderVillaReport();
+  if(reportsInited && typeof renderReports === 'function') renderReports();
+  if(document.getElementById('exBody') && typeof renderVillaExpenses === 'function') renderVillaExpenses();
+}
+// The company's administrative figures are shared into the villa reports, so they are loaded
+// here too — the Company Accounts screen is not always opened before a report is.
+async function fetchCoAndRefresh(){
+  if(typeof fetchCompany === 'function') await fetchCompany();
+  vcRefreshViews();
+}
+function ensureVillaCosts(){
+  vcApplyButtons();
+  if(vcInited || !sb) return;
+  vcInited = true;
+  fetchVillaCosts();
+  if(!companyInited) fetchCoAndRefresh();
+  sb.channel('villa_costs_changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'villa_laundry' }, fetchVillaCosts)
+    .on('postgres_changes', { event:'*', schema:'public', table:'fuel_log' }, fetchVillaCosts)
+    .on('postgres_changes', { event:'*', schema:'public', table:'company_monthly_accounts' }, fetchCoAndRefresh)
+    .subscribe();
+}
+
+/* ---- shared costs and the figures behind them ---- */
+const nightsBetween = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 86400000);
+// Company administrative expenses for the months that overlap the period (all villas together).
+function companyAdminFor(fromISO, toExcl){
+  const monthFrom = fromISO.slice(0,8) + '01';
+  return allCoRows.filter(r => r.section === 'expense' && r.period >= monthFrom && r.period < toExcl
+      && (CO_CAT_INDEX[r.category] || {}).group === 'admin')
+    .reduce((x, r) => x + r.amount, 0);
+}
+function nightsByVillaIn(fromISO, toExcl){
+  const byVilla = {}; let total = 0;
+  for(const b of allBookings){
+    if(b.checkIn < fromISO || b.checkIn >= toExcl) continue;
+    const n = nightsBetween(b.checkIn, b.checkOut);
+    if(n <= 0) continue;
+    byVilla[b.villa] = (byVilla[b.villa] || 0) + n; total += n;
+  }
+  return { byVilla, total };
+}
+function sharedCostsFor(villaId, fromISO, toExcl){
+  const adminTotal = companyAdminFor(fromISO, toExcl);
+  const { byVilla, total } = nightsByVillaIn(fromISO, toExcl);
+  const nights = byVilla[villaId] || 0;
+  const share = total ? nights / total : 0;
+  const trips = allLaundry.filter(l => l.villaId === villaId && l.date >= fromISO && l.date < toExcl);
+  return { adminTotal, nights, nightsTotal: total, share, adminShare: adminTotal * share,
+           laundry: trips.reduce((x, l) => x + l.amount, 0), laundryTrips: trips.length };
+}
+function powerCutsFor(villaId, fromISO, toExcl){
+  const rows = allFuel.filter(f => f.villaId === villaId && f.date >= fromISO && f.date < toExcl);
+  const cuts = rows.filter(f => f.kind === 'use'), buys = rows.filter(f => f.kind === 'buy');
+  return { cuts, buys, cutDays: new Set(cuts.map(f => f.date)).size,
+           hours: cuts.reduce((x, f) => x + (f.hours || 0), 0),
+           usedLitres: cuts.reduce((x, f) => x + f.litres, 0),
+           boughtLitres: buys.reduce((x, f) => x + f.litres, 0),
+           boughtCost: buys.reduce((x, f) => x + f.amount, 0) };
+}
+// Diesel left in a villa's tank, all time: everything bought less everything used on power cuts.
+function fuelBalanceFor(villaId){
+  let bought = 0, used = 0;
+  for(const f of allFuel){ if(f.villaId !== villaId) continue; if(f.kind === 'buy') bought += f.litres; else used += f.litres; }
+  return { bought, used, left: bought - used };
+}
+
+/* ---- entry: one small form for each kind ---- */
+let vcState = null;
+function ensureVcModal(){
+  if(document.getElementById('vcModalOverlay')) return;
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay'; ov.id = 'vcModalOverlay';
+  ov.innerHTML = `<div class="modal">
+      <h3 id="vcTitle"></h3>
+      <div id="vcFields"></div>
+      <div class="field-hint" id="vcHint"></div>
+      <div class="modal-error" id="vcError"></div>
+      <div class="modal-actions"><div style="flex:1"></div>
+        <button class="btn btn-cancel" id="vcCancel">Cancel</button>
+        <button class="btn btn-save" id="vcSave">Save</button></div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('vcCancel').addEventListener('click', ()=> ov.classList.remove('open'));
+  ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
+  document.getElementById('vcSave').addEventListener('click', vcSave);
+}
+function vcOpenModal(kind){
+  if(!vcCan(kind)){ alert('You are not allowed to record this.'); return; }
+  if(!sb){ alert('Not connected to Supabase yet.'); return; }
+  ensureVcModal();
+  const villaOpts = vcVillas().map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+  const dateRow  = `<label>Date</label><input type="date" id="vcDate" value="${todayISO()}">`;
+  const villaRow = `<label>Villa</label><select id="vcVilla">${villaOpts}</select>`;
+  const noteRow  = `<label>Note (optional)</label><input type="text" id="vcNote">`;
+  const spec = {
+    laundry: { title:'Laundry sent out',
+      hint:'One entry per trip. Record laundry here, not as a petty cash expense, or it will be counted twice.',
+      fields: dateRow + villaRow
+        + `<label>Bedsheets</label><input type="number" id="vcBed" min="0" step="1" value="0">`
+        + `<label>Towels</label><input type="number" id="vcTowel" min="0" step="1" value="0">`
+        + `<label>Duvet covers</label><input type="number" id="vcDuvet" min="0" step="1" value="0">`
+        + `<label>Other items (pillows, mats, curtains…)</label><input type="number" id="vcOther" min="0" step="1" value="0">`
+        + `<label>Total paid (LKR)</label><input type="number" id="vcCost" min="0" step="1">` + noteRow },
+    diesel: { title:'Diesel / petrol bought',
+      hint:'This is also recorded as a petty cash expense for the villa, so the petty cash balance goes down.',
+      fields: dateRow + villaRow
+        + `<label>Fuel</label><select id="vcFuel"><option value="diesel">Diesel</option><option value="petrol">Petrol</option></select>`
+        + `<label>Litres bought</label><input type="number" id="vcLitres" min="0" step="0.1">`
+        + `<label>Cost (LKR)</label><input type="number" id="vcCost" min="0" step="1">`
+        + `<label>Paid from</label><select id="vcCard">${VC_CARDS.map(([k,l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select>`
+        + noteRow },
+    power: { title:'Power cut — generator used',
+      hint:'Enter each day the generator ran. Hours and litres are optional; litres given here reduce the diesel left in the tank.',
+      fields: dateRow + villaRow
+        + `<label>Hours without power (optional)</label><input type="number" id="vcHours" min="0" step="0.5">`
+        + `<label>Litres used (optional)</label><input type="number" id="vcLitres" min="0" step="0.1">`
+        + noteRow },
+  }[kind];
+  vcState = { kind };
+  document.getElementById('vcTitle').textContent = spec.title;
+  document.getElementById('vcHint').textContent = spec.hint;
+  document.getElementById('vcFields').innerHTML = spec.fields;
+  document.getElementById('vcError').style.display = 'none';
+  document.getElementById('vcModalOverlay').classList.add('open');
+}
+async function vcSave(){
+  const err = document.getElementById('vcError');
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
+  if(!vcState) return;
+  const kind = vcState.kind;
+  const val = id => document.getElementById(id).value;
+  const num = id => parseFloat(val(id)) || 0;
+  const date = val('vcDate'), villa = val('vcVilla'), note = val('vcNote').trim() || null;
+  if(!date || !villa) return fail('Choose a date and a villa.');
+  if(!vcCan(kind)) return fail('You are not allowed to record this.');
+  const btn = document.getElementById('vcSave'); btn.disabled = true;
+  try{
+    if(kind === 'laundry'){
+      const bed = num('vcBed'), towel = num('vcTowel'), duvet = num('vcDuvet'), other = num('vcOther'), cost = num('vcCost');
+      if(bed + towel + duvet + other <= 0 && cost <= 0) return fail('Enter the items sent, or what was paid.');
+      const { error } = await sb.from('villa_laundry').insert({ villa_id:villa, trip_date:date, bedsheets:bed, towels:towel,
+        duvet_covers:duvet, other_items:other, amount:cost, note });
+      if(error) throw error;
+      logActivity('create', 'villa_laundry', `Laundry sent for ${vcVillaName(villa)}: ${bed} bedsheets, ${towel} towels, ${duvet} duvet covers, ${other} other — LKR ${cost.toLocaleString()}`);
+    } else if(kind === 'diesel'){
+      const litres = num('vcLitres'), cost = num('vcCost'), fuel = val('vcFuel'), card = val('vcCard');
+      if(!(litres > 0)) return fail('Enter how many litres were bought.');
+      if(!(cost > 0)) return fail('Enter what was paid.');
+      const label = `${VC_FUEL_LABEL[fuel] || 'Fuel'} ${vcLitres(litres)} L`;
+      // The money comes out of petty cash, so it is recorded there too, for this villa.
+      const { data: pRow, error: pErr } = await sb.from('petty_cash_transactions').insert({
+        type:'expense', date, card, for: villa, purpose: label, amount: cost, note, linked_inventory: false, invoice_urls: []
+      }).select().single();
+      if(pErr) throw pErr;
+      const { error } = await sb.from('fuel_log').insert({ villa_id:villa, log_date:date, kind:'buy', fuel_type:fuel,
+        litres, amount:cost, petty_cash_id:String(pRow.id), note });
+      if(error){ await sb.from('petty_cash_transactions').delete().eq('id', pRow.id); throw error; }
+      logActivity('create', 'fuel_log', `${label} bought for ${vcVillaName(villa)} — LKR ${cost.toLocaleString()}, paid from petty cash`);
+      try{ await fetchCash(); }catch(_e){ console.error(_e); }
+    } else {
+      const hours = num('vcHours'), litres = num('vcLitres');
+      const { error } = await sb.from('fuel_log').insert({ villa_id:villa, log_date:date, kind:'use',
+        hours: hours > 0 ? hours : null, litres: litres > 0 ? litres : 0, note });
+      if(error) throw error;
+      logActivity('create', 'fuel_log', `Power cut for ${vcVillaName(villa)}${hours ? ' — ' + hours + ' h' : ''}${litres ? ', ' + vcLitres(litres) + ' L used' : ''}`);
+    }
+    document.getElementById('vcModalOverlay').classList.remove('open');
+    await fetchVillaCosts();
+  }catch(e){ console.error(e); fail('Could not save — ' + ((e && e.message) || 'check the connection.')); }
+  finally{ btn.disabled = false; }
+}
+
+async function vcDelete(kind, id){
+  if(!canDelete()){ alert('Only someone who can delete records can remove this.'); return; }
+  if(!checkDeletePassword()) return;
+  if(!confirm('Delete this entry?')) return;
+  try{
+    if(kind === 'laundry'){
+      await delRows('villa_laundry', 'id', id);
+      logActivity('delete', 'villa_laundry', 'Deleted a laundry entry');
+    } else {
+      const f = allFuel.find(x => String(x.id) === String(id));
+      await delRows('fuel_log', 'id', id);
+      if(f && f.pettyId){ try{ await delRows('petty_cash_transactions', 'id', f.pettyId); }catch(_e){ console.error(_e); } }
+      logActivity('delete', 'fuel_log', 'Deleted a fuel or power-cut entry');
+      try{ await fetchCash(); }catch(_e){ console.error(_e); }
+    }
+    await afterDelete(kind === 'laundry' ? 'villa_laundry' : 'fuel_log');
+    await fetchVillaCosts();
+  }catch(e){ delFailed(e); }
+}
+document.addEventListener('click', e => {
+  const add = e.target.closest && e.target.closest('[data-vc]');
+  if(add){ vcOpenModal(add.dataset.vc); return; }
+  const del = e.target.closest && e.target.closest('[data-vc-del]');
+  if(del){ vcDelete(del.dataset.vcKind, del.dataset.vcDel); }
+});
+
+/* ---- the report: every villa for the month, then the detail lines ---- */
+function vcReportHTML(fromISO, toExcl){
+  const villas = vcVillas();
+  const money = n => n ? rn(n) : '—';
+  const rows = villas.map(v => ({ v, sc: sharedCostsFor(v.id, fromISO, toExcl), pc: powerCutsFor(v.id, fromISO, toExcl), fb: fuelBalanceFor(v.id),
+    ox: allOpEx.filter(o => o.villaId === v.id && o.date >= fromISO && o.date < toExcl).reduce((x, o) => x + o.amount, 0) }));
+  const weekOf = date => Math.min(4, Math.floor((parseInt(date.slice(8,10), 10) - 1) / 7));
+  const trips = allLaundry.filter(l => l.date >= fromISO && l.date < toExcl);
+  const fuelLines = allFuel.filter(f => f.date >= fromISO && f.date < toExcl).sort((a,b) => a.date.localeCompare(b.date));
+  const laundryLines = trips.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const canDel = canDelete();
+  const delBtn = (kind, id) => canDel ? `<button class="manage-del no-print" data-vc-del="${esc(id)}" data-vc-kind="${kind}">Delete</button>` : '';
+
+  const totals = rows.reduce((t, r) => ({
+    ox: t.ox + r.ox, admin: t.admin + r.sc.adminShare, laundry: t.laundry + r.sc.laundry, laundryTrips: t.laundryTrips + r.sc.laundryTrips,
+    bought: t.bought + r.pc.boughtLitres, cost: t.cost + r.pc.boughtCost, cutDays: t.cutDays + r.pc.cutDays, hours: t.hours + r.pc.hours,
+  }), { ox:0, admin:0, laundry:0, laundryTrips:0, bought:0, cost:0, cutDays:0, hours:0 });
+
+  let html = `<div class="rpt-section" data-rpt-section="vcsummary">
+    <div class="rpt-section-title">Villa costs, power cuts & laundry
+      <span class="rpt-section-count">${esc(fmtDayY(fromISO))} to ${esc(fmtDayY(toISO(new Date(parseISO(toExcl) - 86400000))))}</span></div>
+    <div class="rpt-note">Company administrative expenses are shared between villas by the nights each had booked. Diesel left is for all time: fuel bought less fuel used on power cuts.</div>
+    <table class="rpt-table"><thead><tr>
+      <th>Villa</th><th class="r">Salaries &amp; bills</th><th class="r">Admin share</th><th class="r">Laundry</th><th class="r">Diesel bought</th>
+      <th class="r">Power-cut days</th><th class="r">Hours off</th><th class="r">Diesel left</th></tr></thead><tbody>
+      ${rows.map(r => `<tr>
+        <td>${esc(r.v.name)}</td>
+        <td class="r">${money(r.ox)}</td>
+        <td class="r">${money(r.sc.adminShare)}</td>
+        <td class="r">${r.sc.laundryTrips ? r.sc.laundryTrips + ' trip' + (r.sc.laundryTrips === 1 ? '' : 's') + ' · ' + money(r.sc.laundry) : '—'}</td>
+        <td class="r">${r.pc.boughtLitres ? vcLitres(r.pc.boughtLitres) + ' L · ' + money(r.pc.boughtCost) : '—'}</td>
+        <td class="r">${r.pc.cutDays || '—'}</td>
+        <td class="r">${r.pc.hours ? vcLitres(r.pc.hours) : '—'}</td>
+        <td class="r">${r.fb.bought ? vcLitres(r.fb.left) + ' L' : '—'}</td></tr>`).join('')}
+      <tr class="subtotal"><td><b>All villas</b></td><td class="r"><b>${money(totals.ox)}</b></td><td class="r"><b>${money(totals.admin)}</b></td>
+        <td class="r"><b>${totals.laundryTrips ? totals.laundryTrips + ' trips · ' + money(totals.laundry) : '—'}</b></td>
+        <td class="r"><b>${totals.bought ? vcLitres(totals.bought) + ' L · ' + money(totals.cost) : '—'}</b></td>
+        <td class="r"><b>${totals.cutDays || '—'}</b></td><td class="r"><b>${totals.hours ? vcLitres(totals.hours) : '—'}</b></td><td></td></tr>
+    </tbody></table>
+  </div>`;
+
+  // Laundry per week: how many times each villa sent laundry, week by week.
+  html += `<div class="rpt-section" data-rpt-section="vclaundryweeks" style="margin-top:14px;">
+    <div class="rpt-section-title">Laundry trips per week</div>
+    <table class="rpt-table"><thead><tr><th>Villa</th><th class="r">Week 1</th><th class="r">Week 2</th><th class="r">Week 3</th><th class="r">Week 4</th><th class="r">Week 5</th><th class="r">Total</th><th class="r">Per week</th></tr></thead><tbody>
+      ${villas.map(v => {
+        const wk = [0,0,0,0,0];
+        trips.filter(l => l.villaId === v.id).forEach(l => wk[weekOf(l.date)]++);
+        const n = wk.reduce((a,b) => a + b, 0);
+        const weeks = Math.max(1, Math.ceil(nightsBetween(fromISO, toExcl) / 7));
+        return `<tr><td>${esc(v.name)}</td>${wk.map(c => `<td class="r">${c || '—'}</td>`).join('')}<td class="r"><b>${n || '—'}</b></td><td class="r">${n ? (Math.round(n / weeks * 10) / 10) : '—'}</td></tr>`;
+      }).join('')}
+    </tbody></table>
+  </div>`;
+
+  html += `<div class="rpt-section" data-rpt-section="vcpowercuts" style="margin-top:14px;">
+    <div class="rpt-section-title">Power cuts & diesel — details <span class="rpt-section-count">${fuelLines.length} line${fuelLines.length === 1 ? '' : 's'}</span></div>
+    ${fuelLines.length ? `<table class="rpt-table"><thead><tr><th>Date</th><th>Villa</th><th>What</th><th class="r">Hours</th><th class="r">Litres</th><th class="r">LKR</th><th>Note</th><th class="no-print"></th></tr></thead><tbody>
+      ${fuelLines.map(f => `<tr>
+        <td>${esc(fmtDay(f.date))}</td><td>${esc(vcVillaName(f.villaId))}</td>
+        <td>${f.kind === 'use' ? 'Power cut — generator ran' : esc(VC_FUEL_LABEL[f.fuelType] || 'Fuel') + ' bought'}</td>
+        <td class="r">${f.hours ? vcLitres(f.hours) : '—'}</td>
+        <td class="r">${f.litres ? vcLitres(f.litres) : '—'}</td>
+        <td class="r">${f.amount ? rn(f.amount) : '—'}</td>
+        <td>${esc(f.note)}</td><td class="no-print">${delBtn('fuel', f.id)}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="rpt-empty">No power cuts or fuel purchases recorded this month.</div>'}
+  </div>`;
+
+  html += `<div class="rpt-section" data-rpt-section="vclaundry" style="margin-top:14px;">
+    <div class="rpt-section-title">Laundry — details <span class="rpt-section-count">${laundryLines.length} trip${laundryLines.length === 1 ? '' : 's'} · ${money(totals.laundry)}</span></div>
+    ${laundryLines.length ? `<table class="rpt-table"><thead><tr><th>Date</th><th>Villa</th><th class="r">Bedsheets</th><th class="r">Towels</th><th class="r">Duvet covers</th><th class="r">Other</th><th class="r">LKR</th><th>Note</th><th class="no-print"></th></tr></thead><tbody>
+      ${laundryLines.map(l => `<tr>
+        <td>${esc(fmtDay(l.date))}</td><td>${esc(vcVillaName(l.villaId))}</td>
+        <td class="r">${l.bedsheets || '—'}</td><td class="r">${l.towels || '—'}</td><td class="r">${l.duvetCovers || '—'}</td><td class="r">${l.otherItems || '—'}</td>
+        <td class="r">${l.amount ? rn(l.amount) : '—'}</td><td>${esc(l.note)}</td><td class="no-print">${delBtn('laundry', l.id)}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="rpt-empty">No laundry recorded this month.</div>'}
+  </div>`;
+  return html;
+}
+
 function initVillaReport(){
   villaReportInited = true;
+  ensureVillaCosts();
   if(!cashInited){ initPettyCash(); }
   if(!invInited){ initInventory(); }
   if(!bookingsInited){ initBookings(); }
@@ -10735,6 +11089,8 @@ async function villaPeriodStats(villaId, fromISO, toExcl, cur, rate){
     if(t.type === 'expense'){ st.petty += t.amount; st.pettyBy[pettyGroupOf(t)] += t.amount; }
   }
   st.opex = allOpEx.filter(o => o.villaId === villaId && o.date >= fromISO && o.date < toExcl).reduce((x, o) => x + o.amount, 0);
+  const shc = sharedCostsFor(villaId, fromISO, toExcl);
+  st.adminShare = shc.adminShare; st.laundry = shc.laundry;
   const sup = buildSuppliesSection(villaId, fromISO, toExcl);
   st.supplies = sup.total || 0; st.supplyCount = sup.count || 0;
   return st;
@@ -10752,7 +11108,7 @@ function finishStats(st, days, villaCount, rate){
   st.revenue = st.bookingRev + st.keptRev + st.extraRev;
   st.fee = st.revenue * 0.15;
   st.share = st.revenue - st.fee;
-  st.costs = st.petty + st.opex + st.supplies;
+  st.costs = st.petty + st.opex + st.supplies + (st.adminShare || 0) + (st.laundry || 0);
   st.net = st.share - st.costs;
   st.available = days * villaCount;
   st.occPct = st.available ? st.occupied / st.available * 100 : 0;
@@ -10903,6 +11259,8 @@ async function renderCompare(){
     costs: [`Costs (${cur})`, [
       ['petty',    'Petty cash & bank spending', M, false],
       ['opex',     'Salaries, bills & other operating costs', M, false],
+      ['adminShare', 'Company admin share (by nights booked)', M, false],
+      ['laundry',  'Laundry sent out', M, false],
       ['supplies', 'Store supplies received', M, false],
       ['costs',    'Total costs', M, false, null, 'key'],
     ]],
@@ -10979,7 +11337,7 @@ function cmpDownload(){
   const { PA, PB, A, B, villas, per, cur, focus } = cmpLast;
   const money = [['bookingRev','Booking revenue'],['keptRev','Kept from cancellations'],['extraRev','Direct payments extra income'],['revenue','Total revenue'],
     ['adr','Average per night'],['fee','Ceymora fee'],['share','Villa share'],['petty','Petty cash & bank spending'],
-    ...PETTY_GROUPS.map(g => ['petty_' + g.key, g.pl]),['opex','Operating costs'],['supplies','Store supplies'],['costs','Total costs'],['net','Net profit']];
+    ...PETTY_GROUPS.map(g => ['petty_' + g.key, g.pl]),['opex','Operating costs'],['adminShare','Company admin share'],['laundry','Laundry'],['supplies','Store supplies'],['costs','Total costs'],['net','Net profit']];
   const counts = [['stays','Stays'],['guests','Guests'],['nights','Nights booked'],['stayDays','Days booked'],['occupied','Nights occupied in period'],
     ['occPct','Occupancy %'],['avgStay','Average stay (nights)'],['supplyCount','Store transfers']];
   const r2 = v => Math.round(v * 100) / 100;
@@ -11566,7 +11924,9 @@ async function buildVillaProfitReportHTML(loc, monthDate){
   const supplies = buildSuppliesSection(loc, monthStartISO, monthEndISO);
 
   /* ---------------- 5. THE NUMBERS ---------------- */
-  const totalExpenses = pettyCashTotal + opExTotal + supplies.total;
+  const shared = sharedCostsFor(loc, monthStartISO, monthEndISO);
+  const sharedTotal = shared.adminShare + shared.laundry;
+  const totalExpenses = pettyCashTotal + opExTotal + supplies.total + sharedTotal;
   const netProfit = villaShare - totalExpenses;
   const adr = bookedNights > 0 ? grossLkr / bookedNights : 0;
   const margin = totalRevenueLkr > 0 ? Math.round(netProfit / totalRevenueLkr * 100) : null;
@@ -11670,6 +12030,16 @@ async function buildVillaProfitReportHTML(loc, monthDate){
         <span class="toolbar-actions no-print" id="opExButtons"></span>
       </div>
       ${opExHtml}
+    </div>
+
+    <div class="rpt-section" data-rpt-section="shared">
+      <div class="rpt-section-title"><span>3b. Shared Admin Costs & Laundry <span class="rpt-section-count">${lkr(sharedTotal)}</span></span></div>
+      <table class="rpt-table"><tbody>
+        <tr><td>Company administrative expenses this month (all villas)</td><td class="r">${rnx(shared.adminTotal)}</td></tr>
+        <tr><td>This villa's share — ${shared.nights} of ${shared.nightsTotal} nights booked${shared.nightsTotal ? ' (' + pct(shared.nights, shared.nightsTotal) + ')' : ''}</td><td class="r">${rnx(shared.adminShare)}</td></tr>
+        <tr><td>Laundry sent out — ${shared.laundryTrips} trip${shared.laundryTrips === 1 ? '' : 's'}</td><td class="r">${rnx(shared.laundry)}</td></tr>
+        <tr class="subtotal"><td><b>Total shared costs</b></td><td class="r"><b>${rnx(sharedTotal)}</b></td></tr>
+      </tbody></table>
     </div>
 
     <div class="rpt-section" data-rpt-section="inventory">
