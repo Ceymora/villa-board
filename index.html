@@ -4333,7 +4333,7 @@ const TRUSTED_PERMS = [
   { key:'delete_records', label:'Delete records' },
   { key:'backup',         label:'Download a full backup of everything' },
   { key:'restore_deleted', label:'See deleted records and restore them' },
-  { key:'delete_airbnb',  label:'Ask Makky to delete Airbnb bookings entered wrongly' },
+  { key:'delete_airbnb',  label:'Ask Makky to delete bookings entered wrongly (Makky approves)' },
   { key:'admin',          label:'Full admin — everything, always', master:true },
 ];
 // Kept in the old shape for the summaries elsewhere in the app.
@@ -4906,7 +4906,7 @@ document.querySelectorAll('.maintab-btn').forEach(btn=>{
 const DR_TABLES = {
   petty_cash_transactions: { label:'Petty cash', edit:'edit_cash',      bar:'cashSelBar' },
   inventory_transactions:  { label:'Inventory',  edit:'edit_inventory', bar:'invSelBar' },
-  villa_bookings:          { label:'Airbnb booking', edit:'delete_airbnb', bar:null },
+  villa_bookings:          { label:'Booking', edit:'delete_airbnb', bar:null },
 };
 let allDelReqs = [], drReady = null;
 const DELSEL = { petty_cash_transactions: new Set(), inventory_transactions: new Set(), villa_bookings: new Set() };
@@ -7292,7 +7292,7 @@ function openModal(booking, presetCheckInISO, presetCheckOutISO){
     document.getElementById('fRateUsd').value = booking.rateUsd || '';
     setTypeUI(booking.type);
     // An Airbnb booking, opened by someone without full delete rights: they can only ask Makky.
-    const askOnly = !!booking.fromAirbnb && !canDelete();
+    const askOnly = !canDelete() && (!!booking.fromAirbnb || hasPerm('delete_airbnb'));
     btnDelete.style.display = askOnly ? 'none' : '';
     btnAskDelete.style.display = askOnly && hasPerm('delete_airbnb') ? '' : 'none';
     drRefreshAskBtn(booking.id);
@@ -10639,9 +10639,10 @@ const vcVillas = () => CAL_VILLAS.map(v => ({ id:v.id, name:v.name }));
 const vcVillaName = id => (CAL_VILLAS.find(v => v.id === id) || {}).name || id;
 const vcLitres = n => Math.round((Number(n) || 0) * 10) / 10;
 
+// Whoever records petty cash (Zahny) can also record laundry, fuel and power cuts.
 function vcCan(kind){
-  if(kind === 'diesel') return canChange('expenses') && canChange('pettycash');
-  return canChange('expenses');
+  if(kind === 'diesel') return canChange('pettycash');
+  return canChange('expenses') || canChange('pettycash');
 }
 function vcApplyButtons(){
   document.querySelectorAll('[data-vc]').forEach(b => {
