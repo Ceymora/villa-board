@@ -2112,6 +2112,7 @@
             <button id="repThisMonth">This month</button>
           </div>
           <button class="add-booking-btn" id="repPrintBtn">🖨️ Print</button>
+          <button class="add-booking-btn" id="repInvPackBtn">🧾 Invoice pack (this month)</button>
         </div>
       </div>
       <div class="field-hint" style="margin-bottom:8px;">"Direct" purchases below are items bought straight for a villa/office (bypassing Store) — see the Petty Cash tab for the direct-purchases total.</div>
@@ -2768,6 +2769,10 @@
     <input type="text" id="rpInv" maxlength="60"></div>
     <label for="rpNote">Note (optional)</label>
     <input type="text" id="rpNote" maxlength="200">
+    <div id="rpFilesWrap" style="display:none"><label>Invoice / receipt (optional)</label>
+      <div id="rpExisting" style="font-size:12px; margin-bottom:4px;"></div>
+      <input type="file" id="rpFile" accept="image/*,.pdf">
+      <div id="rpFileList"></div></div>
     <div class="r-err" id="rpError"></div>
     <div class="modal-actions"><span></span><div style="display:flex; gap:8px;">
       <button class="btn btn-cancel" id="rpCancel">Cancel</button>
@@ -4243,6 +4248,7 @@ function createMultiFileHandler(inputId, listId){
 const incFileHandler = createMultiFileHandler('incFile', 'incFileList');
 const expFileHandler = createMultiFileHandler('expFile', 'expFileList');
 const opExFileHandler = createMultiFileHandler('opExFile', 'opExFileList');
+const rpFileHandler = createMultiFileHandler('rpFile', 'rpFileList');
 const advFileHandler = createMultiFileHandler('advFile', 'advFileList');
 
 // An advance can leave as cash out of a card, or as a bank transfer. Either way it is
@@ -4389,7 +4395,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-secure3';
+const APP_VERSION = 'v2026.10.21-invoices1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -10364,6 +10370,152 @@ function renderInventory(){
   }
 }
 
+/* ============================= INVOICE PACKS ============================= */
+/* A monthly pack: every invoice file for one month (villas and restaurants) in a ZIP,
+   with an index PDF that lists each bill. Built in the browser; nothing is removed here. */
+const PACK_CRC_TABLE = (() => { const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+function packCrc32(u8){ let c = 0xFFFFFFFF; for(let i = 0; i < u8.length; i++) c = PACK_CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makePackZip(entries){
+  const enc = new TextEncoder(), parts = [], central = [];
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  let offset = 0;
+  for(const e of entries){
+    const name = enc.encode(e.name), crc = packCrc32(e.data), size = e.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), name, e.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(10, 0, true); ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((n, p) => n + p.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type:'application/zip' });
+}
+/* A plain text PDF (Courier, one column). Text is kept to plain ASCII so the file is always valid. */
+function makeIndexPdf(title, lines){
+  const ascii = s => String(s == null ? '' : s).replace(/[^\x20-\x7E]/g, '?').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  const top = 800, lh = 12, perPage = Math.floor((top - 50) / lh);
+  const pages = [];
+  for(let i = 0; i < lines.length; i += perPage) pages.push(lines.slice(i, i + perPage));
+  if(!pages.length) pages.push([]);
+  const contents = pages.map((pl, pi) => {
+    let c = `BT /F2 10 Tf 40 ${top + 16} Td (${ascii(title + '   page ' + (pi + 1) + ' of ' + pages.length)}) Tj ET\n`;
+    let y = top;
+    pl.forEach(line => {
+      const bold = line.charAt(0) === '*';
+      c += `BT /F${bold ? 2 : 1} 8 Tf 40 ${y} Td (${ascii(bold ? line.slice(1) : line)}) Tj ET\n`;
+      y -= lh;
+    });
+    return c;
+  });
+  let out = '%PDF-1.4\n';
+  const offs = [];
+  const add = (id, body) => { offs[id] = out.length; out += `${id} 0 obj\n${body}\nendobj\n`; };
+  const n = pages.length, pageIds = pages.map((_, i) => 5 + 2 * i);
+  add(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  add(2, `<< /Type /Pages /Kids [${pageIds.map(i => i + ' 0 R').join(' ')}] /Count ${n} >>`);
+  add(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>');
+  add(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>');
+  pages.forEach((_, i) => {
+    add(5 + 2 * i, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6 + 2 * i} 0 R >>`);
+    add(6 + 2 * i, `<< /Length ${contents[i].length} >>\nstream\n${contents[i]}endstream`);
+  });
+  const total = 5 + 2 * n, xref = out.length;
+  let x = `xref\n0 ${total}\n0000000000 65535 f \n`;
+  for(let id = 1; id < total; id++) x += String(offs[id]).padStart(10, '0') + ' 00000 n \n';
+  out += x + `trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new Blob([out], { type:'application/pdf' });
+}
+/* Every invoice file dated in [from, to]: villa petty cash lines and restaurant bills. */
+async function invoiceRowsForPeriod(from, to){
+  const rows = [];
+  (allCashTxns || []).forEach(t => {
+    if(!t.date || t.date < from || t.date > to) return;
+    const paths = [...getInvoiceLinks(t), ...(Array.isArray(t.settledInvoiceUrls) ? t.settledInvoiceUrls : [])].map(receiptPathOf).filter(Boolean);
+    if(!paths.length) return;
+    rows.push({ date:t.date, place:'Villa ' + (FOR_LABELS[t.for] || t.for || ''), desc:t.purpose || t.note || '',
+      amount:Number(t.amount) || 0, invNo:t.invoiceNo || '', paths, kind:'Villa' });
+  });
+  const { data, error } = await sb.from('restaurant_bills').select('day,restaurant,description,amount,invoice_no,invoice_urls')
+    .gte('day', from).lte('day', to).order('day');
+  if(error) throw error;
+  (data || []).forEach(r => {
+    const paths = (Array.isArray(r.invoice_urls) ? r.invoice_urls : []).map(receiptPathOf).filter(Boolean);
+    if(!paths.length) return;
+    rows.push({ date:r.day, place:'Restaurant ' + (restInfo(r.restaurant).name || r.restaurant), desc:r.description || '',
+      amount:Number(r.amount) || 0, invNo:r.invoice_no || '', paths, kind:'Restaurant' });
+  });
+  rows.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return rows;
+}
+function packSafe(s, max){ return String(s || '').replace(/[^a-zA-Z0-9 _-]+/g, '').trim().replace(/\s+/g, '-').slice(0, max) || 'x'; }
+async function downloadInvoicePack(fromISO, toISO, label){
+  const btn = document.getElementById('repInvPackBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparing…'; }
+  try{
+    const rows = await invoiceRowsForPeriod(fromISO, toISO);
+    const entries = [], missing = [], saved = [];
+    let k = 0;
+    for(const r of rows){
+      for(const path of r.paths){
+        k++;
+        const { data: blob, error } = await sb.storage.from('receipts').download(path);
+        if(error || !blob){ missing.push(`${r.date}  ${r.place}  ${path}`); continue; }
+        const base = path.split('/').pop();
+        const name = `${r.date}_${packSafe(r.kind + '-' + r.place, 40)}_${Math.round(r.amount)}_${String(k).padStart(3, '0')}_${base}`;
+        entries.push({ name, data: new Uint8Array(await blob.arrayBuffer()) });
+        saved.push(path);
+      }
+    }
+    const title = `Invoice pack - ${label} - ${rows.length} bills, ${saved.length} files`;
+    const lines = [`*${title}`, '', `*${'Date'.padEnd(11)}${'Place'.padEnd(34)}${'Bill'.padEnd(30)}${'Amount'.padStart(12)}  ${'Invoice no'.padEnd(14)}`];
+    const totals = {};
+    rows.forEach(r => {
+      lines.push(`${r.date.padEnd(11)}${String(r.place).slice(0, 33).padEnd(34)}${String(r.desc).slice(0, 29).padEnd(30)}${Math.round(r.amount).toLocaleString('en-US').padStart(12)}  ${String(r.invNo).slice(0, 14).padEnd(14)}`);
+      totals[r.place] = (totals[r.place] || 0) + r.amount;
+    });
+    lines.push('', '*Totals');
+    Object.entries(totals).forEach(([p, v]) => lines.push(`${p.slice(0, 50).padEnd(52)}${Math.round(v).toLocaleString('en-US').padStart(12)}`));
+    if(missing.length){ lines.push('', '*Files that could not be downloaded:'); missing.forEach(m => lines.push(m)); }
+    entries.unshift({ name:'index.pdf', data: new Uint8Array(await makeIndexPdf(title, lines).arrayBuffer()) });
+    const zip = makePackZip(entries);
+    const url = URL.createObjectURL(zip);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Invoices-${label}.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const { error: logErr } = await sb.from('invoice_packs').insert({
+      kind:'monthly', period_from: fromISO, period_to: toISO, file_count: saved.length, file_paths: saved,
+      note: missing.length ? `${missing.length} file(s) could not be downloaded` : null,
+      created_by_email: currentUser && currentUser.email ? currentUser.email : null,
+    });
+    if(logErr) console.warn('pack log not saved', logErr);
+    alert(`Downloaded Invoices-${label}.zip — ${saved.length} files for ${rows.length} bills.` + (missing.length ? `\n\n${missing.length} file(s) could not be downloaded; they are listed in the index.` : '') + (logErr ? '\n\n(The pack log could not be saved — run file 44 in Supabase.)' : ''));
+  }catch(e){
+    console.error(e);
+    alert('Could not make the pack — ' + (e.message || 'check the connection.'));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '🧾 Invoice pack (this month)'; }
+  }
+}
+function repPackMonth(){
+  const y = repMonthDate.getFullYear(), m = repMonthDate.getMonth();
+  const from = toISO(new Date(y, m, 1)), to = toISO(new Date(y, m + 1, 0));
+  const label = `${y}-${String(m + 1).padStart(2, '0')}`;
+  return downloadInvoicePack(from, to, label);
+}
+
 /* ============================= REPORTS (printable) ============================= */
 let reportsInited = false;
 let repMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -10376,6 +10528,7 @@ function initReports(){
   document.getElementById('repNextMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()+1); renderReports(); });
   document.getElementById('repThisMonth').addEventListener('click', ()=>{ repMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderReports(); });
   document.getElementById('repPrintBtn').addEventListener('click', ()=> window.print());
+  document.getElementById('repInvPackBtn').addEventListener('click', ()=> repPackMonth());
   renderReports();
 }
 
@@ -19130,6 +19283,19 @@ function restOpenPetty(kind, row){
   document.getElementById('rpInv').value = row ? (row.invoice_no || '') : '';
   document.getElementById('rpNote').value = row ? (row.note || '') : '';
   document.getElementById('rpError').textContent = '';
+  // Invoice files: bills only. Show the ones already attached, each one a link to open it.
+  document.getElementById('rpFilesWrap').style.display = bill ? '' : 'none';
+  rpFileHandler.reset();
+  const ex = document.getElementById('rpExisting');
+  ex.innerHTML = '';
+  const paths = bill && row && Array.isArray(row.invoice_urls) ? row.invoice_urls : [];
+  paths.forEach((stored, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'r-btn'; b.style.cssText = 'margin:2px 4px 2px 0; font-size:12px;';
+    b.textContent = '📎 Invoice ' + (i + 1);
+    b.addEventListener('click', () => openStoredFile(stored));
+    ex.appendChild(b);
+  });
   document.getElementById('rpModalOverlay').classList.add('open');
   setTimeout(() => document.getElementById(kind === 'in' ? 'rpAmount' : 'rpDesc').focus(), 30);
 }
@@ -19148,10 +19314,22 @@ async function restSavePetty(){
     note: document.getElementById('rpNote').value.trim() || null };
   if(bill) rec.paid_from = document.getElementById('rpPaid').value; else rec.kind = REST.kind;
   const btn = document.getElementById('rpSave'); btn.disabled = true;
+  if(bill){
+    try{
+      const newUrls = [];
+      for(const f of rpFileHandler.getFiles()) newUrls.push(await uploadReceiptFile(f));
+      const kept = REST.editing && Array.isArray(REST.editing.invoice_urls) ? REST.editing.invoice_urls : [];
+      rec.invoice_urls = [...kept, ...newUrls];
+    }catch(e){
+      btn.disabled = false;
+      err.textContent = 'Could not upload the invoice — ' + (e.message || 'check the connection.');
+      return;
+    }
+  }
   const res = REST.editing ? await sb.from(table).update(rec).eq('id', REST.editing.id)
                            : await sb.from(table).insert(Object.assign({ restaurant:REST.id }, rec));
   btn.disabled = false;
-  if(res.error){ err.textContent = /restaurant_bills/.test(res.error.message || '') ? 'Run 31-supabase-restaurant-bills.sql in Supabase first.' : 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
+  if(res.error){ err.textContent = /invoice_urls/.test(res.error.message || '') ? 'Run 43-supabase-restaurant-bill-invoices.sql in Supabase first.' : /restaurant_bills/.test(res.error.message || '') ? 'Run 31-supabase-restaurant-bills.sql in Supabase first.' : 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
   document.getElementById('rpModalOverlay').classList.remove('open');
   REST.month = day.slice(0,7);
   await restLoad(); renderRest(); restToast('✓ Saved');
@@ -19918,7 +20096,7 @@ function restBillsView(body, info){
     </div>
     <div class="r-box"><h3>Bills & expenses <small>${esc(rMonthName(ym))}</small></h3>
       <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid from</th><th>Bill no.</th><th class="n">Amount</th><th>Entered / changed by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${esc(rDay(r.day))}</td><td>${esc(r.category)}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}</td>
+      ${rows.map(r => `<tr><td>${esc(rDay(r.day))}</td><td>${esc(r.category)}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}${(Array.isArray(r.invoice_urls) && r.invoice_urls.length) ? `<div style="margin-top:3px">${r.invoice_urls.map((u, i) => `<button type="button" class="r-btn" data-inv-b="${esc(r.id)}" data-inv-i="${i}" style="font-size:11px;padding:1px 7px;margin:1px 3px 1px 0">📎 Invoice ${i + 1}</button>`).join('')}</div>` : ''}</td>
         <td>${esc(PAID_FROM[r.paid_from] || r.paid_from)}</td><td>${esc(r.invoice_no || '')}</td><td class="n">${rs(r.amount)}</td>
         <td class="r-muted" style="font-size:11px;white-space:normal;min-width:110px">${esc(restWho(r))}</td>
         ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-edit-b="${esc(r.id)}" title="Edit">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-del-b="${esc(r.id)}" data-pt="restaurant_bills" data-pid="${esc(r.id)}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`).join('')
@@ -19932,6 +20110,12 @@ function restBillsView(body, info){
     body.querySelectorAll('[data-edit-b]').forEach(b => b.addEventListener('click', () => { const r = REST.bills.find(x => String(x.id) === b.dataset.editB); if(r) restOpenPetty('bill', r); }));
   }
   body.querySelectorAll('[data-del-b]').forEach(b => b.addEventListener('click', () => restDelete('restaurant_bills', b.dataset.delB, 'this bill')));
+  // Open an attached invoice straight from the list (works for bills from any past month).
+  body.querySelectorAll('[data-inv-b]').forEach(b => b.addEventListener('click', () => {
+    const r = REST.bills.find(x => String(x.id) === b.dataset.invB);
+    const u = r && Array.isArray(r.invoice_urls) ? r.invoice_urls[Number(b.dataset.invI)] : null;
+    if(u) openStoredFile(u);
+  }));
   restWireExport(body, 'Bills & expenses — ' + rMonthName(ym), ['Date','Category','Description','Paid from','Bill no.','Amount','Entered / changed by'],
     rows.map(r => [rLong(r.day), r.category, r.description + (r.note ? ' — ' + r.note : ''), PAID_FROM[r.paid_from] || r.paid_from, r.invoice_no || '', Number(r.amount), restWho(r)]),
     ['Total', '', '', '', '', total, '']);
