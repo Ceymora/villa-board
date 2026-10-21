@@ -2113,6 +2113,12 @@
           </div>
           <button class="add-booking-btn" id="repPrintBtn">🖨️ Print</button>
           <button class="add-booking-btn" id="repInvPackBtn">🧾 Invoice pack (this month)</button>
+          <div class="no-print" id="pastInvBox" style="margin:10px 0; padding:10px; border:1px dashed #cbd5e1; border-radius:8px;">
+            <b>Past invoices</b> <span class="field-hint">Upload invoices for an older month. They are listed here and go into that month's pack.</span><br>
+            <input type="month" id="pastInvPeriod"> <input type="file" id="pastInvFile" multiple accept="image/*,application/pdf">
+            <button type="button" class="add-booking-btn" id="pastInvSave">Upload invoices</button>
+            <div id="pastInvList" style="margin-top:8px;"></div>
+          </div>
         </div>
       </div>
       <div class="field-hint" style="margin-bottom:8px;">"Direct" purchases below are items bought straight for a villa/office (bypassing Store) — see the Petty Cash tab for the direct-purchases total.</div>
@@ -4395,7 +4401,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-invoices1';
+const APP_VERSION = 'v2026.10.21-invoices2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -10456,6 +10462,12 @@ async function invoiceRowsForPeriod(from, to){
     rows.push({ date:r.day, place:'Restaurant ' + (restInfo(r.restaurant).name || r.restaurant), desc:r.description || '',
       amount:Number(r.amount) || 0, invNo:r.invoice_no || '', paths, kind:'Restaurant' });
   });
+  // Past uploads for the months in this period (listed under their month).
+  const { data: past, error: pErr } = await sb.from('past_invoice_files').select('period,path,file_name')
+    .gte('period', from.slice(0, 7)).lte('period', to.slice(0, 7)).order('period');
+  if(pErr) throw pErr;
+  (past || []).forEach(p => rows.push({ date:p.period, place:'Past upload', desc:p.file_name || 'invoice',
+    amount:0, invNo:'', paths:[p.path], kind:'Past upload' }));
   rows.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   return rows;
 }
@@ -10516,6 +10528,68 @@ function repPackMonth(){
   return downloadInvoicePack(from, to, label);
 }
 
+/* ---- Past invoices: upload invoices for an older month, so they can be opened and go into that month's pack ---- */
+let pastInvFiles = [];
+function pastInvSync(){
+  const el = document.getElementById('pastInvPeriod');
+  if(el) el.value = `${repMonthDate.getFullYear()}-${String(repMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  pastInvRefresh();
+}
+async function pastInvRefresh(){
+  const box = document.getElementById('pastInvList'); if(!box || !sb) return;
+  const period = document.getElementById('pastInvPeriod').value;
+  if(!/^\d{4}-\d{2}$/.test(period)){ box.innerHTML = ''; return; }
+  try{
+    const { data, error } = await sb.from('past_invoice_files').select('*').eq('period', period).order('uploaded_at');
+    if(error) throw error;
+    pastInvFiles = data || [];
+    box.innerHTML = pastInvFiles.length
+      ? pastInvFiles.map((f, i) => `<div style="margin:3px 0;"><button type="button" class="add-booking-btn" data-pinv-open="${i}">📎 ${esc(f.file_name || 'invoice')}</button>${isAdmin() ? ` <button type="button" class="add-booking-btn" data-pinv-del="${i}">Remove</button>` : ''}</div>`).join('')
+      : `<span class="field-hint">No past invoices uploaded for ${esc(period)} yet.</span>`;
+    box.querySelectorAll('[data-pinv-open]').forEach(b => b.addEventListener('click', () => openStoredFile(pastInvFiles[Number(b.dataset.pinvOpen)].path)));
+    box.querySelectorAll('[data-pinv-del]').forEach(b => b.addEventListener('click', () => pastInvRemove(pastInvFiles[Number(b.dataset.pinvDel)])));
+  }catch(e){
+    console.error(e);
+    box.innerHTML = '<span class="field-hint">Could not load the past invoices for this month.</span>';
+  }
+}
+async function pastInvUpload(){
+  const period = document.getElementById('pastInvPeriod').value;
+  const input = document.getElementById('pastInvFile');
+  const files = [...input.files];
+  if(!/^\d{4}-\d{2}$/.test(period)) return alert('Pick the month these invoices belong to.');
+  if(!files.length) return alert('Choose the invoice files first.');
+  const btn = document.getElementById('pastInvSave'); btn.disabled = true; btn.textContent = 'Uploading…';
+  try{
+    for(const f of files){
+      const path = await uploadReceiptFile(f);
+      const { error } = await sb.from('past_invoice_files').insert({ period, path, file_name: f.name, uploaded_by_email: (currentUser && currentUser.email) || null });
+      if(error) throw error;
+    }
+    input.value = '';
+    await pastInvRefresh();
+    alert(`Saved ${files.length} invoice file(s) for ${period}. They are now in that month's pack.`);
+  }catch(e){
+    console.error(e);
+    alert('Could not save the invoices — ' + (e.message || 'check the connection.'));
+  }finally{
+    btn.disabled = false; btn.textContent = 'Upload invoices';
+  }
+}
+async function pastInvRemove(f){
+  if(!f || !confirm(`Remove "${f.file_name || 'this invoice'}" from ${f.period}? The file is deleted and cannot be undone.`)) return;
+  const { error } = await sb.from('past_invoice_files').delete().eq('id', f.id);
+  if(error) return alert('Could not remove it — ' + error.message);
+  await sb.storage.from('receipts').remove([f.path]);
+  await pastInvRefresh();
+}
+function initPastInv(){
+  document.getElementById('pastInvSave').addEventListener('click', pastInvUpload);
+  document.getElementById('pastInvPeriod').addEventListener('change', pastInvRefresh);
+  ['repPrevMonth', 'repNextMonth', 'repThisMonth'].forEach(id => document.getElementById(id).addEventListener('click', () => setTimeout(pastInvSync, 0)));
+  pastInvSync();
+}
+
 /* ============================= REPORTS (printable) ============================= */
 let reportsInited = false;
 let repMonthDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -10528,6 +10602,7 @@ function initReports(){
   document.getElementById('repNextMonth').addEventListener('click', ()=>{ repMonthDate.setMonth(repMonthDate.getMonth()+1); renderReports(); });
   document.getElementById('repThisMonth').addEventListener('click', ()=>{ repMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderReports(); });
   document.getElementById('repPrintBtn').addEventListener('click', ()=> window.print());
+  initPastInv();
   document.getElementById('repInvPackBtn').addEventListener('click', ()=> repPackMonth());
   renderReports();
 }
