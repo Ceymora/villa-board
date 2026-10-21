@@ -4389,7 +4389,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-settled1';
+const APP_VERSION = 'v2026.10.21-settled2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -9144,6 +9144,10 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     document.getElementById('expFileHint').textContent = '';
     const qtyLabel = itemQtyRaw ? ` (qty ${itemQty})` : '';
 
+    // Zahny / Buddhini: is this bill settled? Asked for new bills and for edits, before anything is saved.
+    const settledFlag = isSettleStaff() ? await askSettledBill(`${purpose} — LKR ${amount.toLocaleString()}`) : null;
+    if(isSettleStaff() && settledFlag === null) return;
+
     if(editingCashId){
       const original = allCashTxns.find(t=>t.id===editingCashId) || {};
       const wasStock = !!original.linkedInventory;
@@ -9206,6 +9210,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       }
 
       const payload = { type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory:isStock, linked_purchase_id:newLinkedPurchaseId, linked_distribute_id:newLinkedDistributeId, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId, ...docFields };
+      if(settledFlag !== null) payload.settled_bill = settledFlag;
       if(newUrls.length){
         const existingUrls = getInvoiceLinks(original);
         payload.invoice_urls = [...existingUrls, ...newUrls];
@@ -9219,8 +9224,6 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       return;
     }
 
-    const settledFlag = isSettleStaff() ? await askSettledBill(`${purpose} — LKR ${amount.toLocaleString()}`) : null;
-    if(isSettleStaff() && settledFlag === null) return;
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
       ...(settledFlag === null ? {} : { settled_bill: settledFlag }),
       type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId, ...docFields
@@ -9674,12 +9677,15 @@ async function advAddDraftInvoice(){
   }
   const billCols = await pcColsReady();
   if(forWhom === 'office' && !account) return fail('Pick the company account for this office bill.');
+  const billSettled = isSettleStaff() ? await askSettledBill(`${purpose} — LKR ${amount.toLocaleString()} (advance from ${adv.employeeName})`) : null;
+  if(isSettleStaff() && billSettled === null) return false;
   const btn = g('advBillAdd'); btn.disabled = true;
   let ok = false;
   try{
     const urls = [];
     for(const fl of advBillFileHandler.getFiles()) urls.push(await uploadReceiptFile(fl));
     const { error } = await sb.from('petty_cash_transactions').insert({
+      ...(billSettled === null ? {} : { settled_bill: billSettled }),
       type:'expense', date: billDate, card: adv.card, for: forWhom, purpose, amount,
       note:'', linked_inventory:false, invoice_urls: urls, employee_name: adv.employeeName,
       direct_expense: g('advBillDirect').checked, account_code: account, advance_id: String(adv.id),
@@ -12549,6 +12555,8 @@ function wireSimpleAdvance(name){
       if(take > 0){ parts.push({ adv, amount: Math.round(take * 100) / 100 }); rest = Math.round((rest - take) * 100) / 100; }
     });
     if(!parts.length) parts.push({ adv: open[open.length - 1], amount });
+    const billSettled = isSettleStaff() ? await askSettledBill(`${purpose} — LKR ${amount.toLocaleString()} (advance from ${name})`) : null;
+    if(isSettleStaff() && billSettled === null) return;
     const btn = g('saSave'); btn.disabled = true; btn.textContent = 'Saving…';
     try{
       const files = [...(g('saFile').files || [])];
@@ -12557,6 +12565,7 @@ function wireSimpleAdvance(name){
       const cols = await pcColsReady();
       for(const [i, pt] of parts.entries()){
         const { error } = await sb.from('petty_cash_transactions').insert({
+          ...(billSettled === null ? {} : { settled_bill: billSettled }),
           type:'expense', date, card: pt.adv.card, for: place,
           purpose: parts.length > 1 ? `${purpose} (part ${i + 1} of ${parts.length})` : purpose,
           amount: pt.amount, note:'', linked_inventory:false, invoice_urls: urls,
