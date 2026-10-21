@@ -4389,7 +4389,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-secure2';
+const APP_VERSION = 'v2026.10.21-secure3';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -19533,9 +19533,11 @@ function restLoyverseShow(lv, info){
       // was cash or card, so a cash/card split difference alone is shown as a note, not a warning.
       const match = Math.abs(diff) < 1;
       match ? ok++ : bad++; diffSum += diff;
+      // Who typed this day's sales in this app (kept on each sales line).
+      const enteredBy = [...new Set(salesBetween(d, d).map(r => r.created_by_email).filter(Boolean))].map(drWho).join(' & ') || '—';
       status = match
-        ? `✅ Matches${notes.length ? `<div style="font-size:11px;color:#6b7280">Cash/card split differs (Loyverse did not say which): ${esc(notes.join(' · '))}</div>` : ''}`
-        : `⚠️ Check${notes.length ? `<div style="font-size:11px;color:#c92a2a">${esc(notes.join(' · '))}</div>` : ''}`;
+        ? `✅ Matched<div style="font-size:11px;color:#1f7a55">Entered by ${esc(enteredBy)} · checked with Loyverse</div>${notes.length ? `<div style="font-size:11px;color:#6b7280">Cash/card split differs (Loyverse did not say which): ${esc(notes.join(' · '))}</div>` : ''}`
+        : `⚠️ Check<div style="font-size:11px;color:#6b7280">Entered by ${esc(enteredBy)}</div>${notes.length ? `<div style="font-size:11px;color:#c92a2a">${esc(notes.join(' · '))}</div>` : ''}`;
       diffCell = `<span style="font-weight:700;color:${Math.abs(diff) < 1 ? '#1f7a55' : '#c92a2a'}">${Math.abs(diff) < 1 ? '0' : (diff > 0 ? '+' : '') + rnum(diff)}</span>`;
     }
     return `<tr><td>${esc(rLong(d))}<div class="r-muted" style="font-size:11px">${esc(b.receipts)} receipts${b.refunds ? ' · ' + esc(b.refunds) + ' refunds' : ''}</div></td>
