@@ -2112,8 +2112,7 @@
             <button id="repThisMonth">This month</button>
           </div>
           <button class="add-booking-btn" id="repPrintBtn">🖨️ Print</button>
-          <button class="add-booking-btn" id="repInvPackBtn">🧾 Invoice pack — selected location (this month)</button>
-          <button class="add-booking-btn" id="repInvAllBtn">🧾 Invoice pack — all locations + restaurants (this month)</button>
+          <button class="add-booking-btn" id="repInvPackBtn">🧾 Invoice pack — this location (this month)</button>
           <div class="no-print" id="pastInvBox" style="margin:10px 0; padding:10px; border:1px dashed #cbd5e1; border-radius:8px;">
             <b>Past invoices</b> <span class="field-hint">Upload invoices for an older month. They are listed here and go into that month's pack.</span><br>
             <input type="month" id="pastInvPeriod"> <input type="file" id="pastInvFile" multiple accept="image/*,application/pdf">
@@ -4402,7 +4401,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-invoices4';
+const APP_VERSION = 'v2026.10.21-places1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -10446,30 +10445,34 @@ function makeIndexPdf(title, lines){
 }
 /* Every invoice file dated in [from, to]: villa petty cash lines and restaurant bills. */
 async function invoiceRowsForPeriod(from, to, scope){
+  // scope: a villa, 'office' or 'store' (the Reports dropdown), or 'rest:<restaurant id>'.
+  const isRest = String(scope).startsWith('rest:');
+  const placeId = isRest ? String(scope).slice(5) : String(scope);
   const rows = [];
-  const wantsAll = scope === 'all';
-  (allCashTxns || []).forEach(t => {
-    if(!t.date || t.date < from || t.date > to) return;
-    if(!wantsAll && t.for !== scope) return;   // only the location picked in the dropdown
-    const paths = [...getInvoiceLinks(t), ...(Array.isArray(t.settledInvoiceUrls) ? t.settledInvoiceUrls : [])].map(receiptPathOf).filter(Boolean);
-    if(!paths.length) return;
-    const isVilla = !['office', 'store'].includes(t.for);
-    rows.push({ date:t.date, place: isVilla ? 'Villa ' + (FOR_LABELS[t.for] || t.for || '') : (FOR_LABELS[t.for] || t.for || 'Office'), desc:t.purpose || t.note || '',
-      amount:Number(t.amount) || 0, invNo:t.invoiceNo || '', paths, kind:'Villa' });
-  });
-  // Restaurant bills belong to no location in the dropdown: they go in the all-locations pack only.
-  const { data, error } = wantsAll ? await sb.from('restaurant_bills').select('day,restaurant,description,amount,invoice_no,invoice_urls')
-    .gte('day', from).lte('day', to).order('day') : { data: [], error: null };
-  if(error) throw error;
-  (data || []).forEach(r => {
-    const paths = (Array.isArray(r.invoice_urls) ? r.invoice_urls : []).map(receiptPathOf).filter(Boolean);
-    if(!paths.length) return;
-    rows.push({ date:r.day, place:'Restaurant ' + (restInfo(r.restaurant).name || r.restaurant), desc:r.description || '',
-      amount:Number(r.amount) || 0, invNo:r.invoice_no || '', paths, kind:'Restaurant' });
-  });
-  // Past uploads for the months in this period (listed under their month).
-  const { data: past, error: pErr } = wantsAll ? await sb.from('past_invoice_files').select('period,path,file_name')
-    .gte('period', from.slice(0, 7)).lte('period', to.slice(0, 7)).order('period') : { data: [], error: null };
+  if(!isRest){
+    (allCashTxns || []).forEach(t => {
+      if(!t.date || t.date < from || t.date > to) return;
+      if(t.for !== placeId) return;
+      const paths = [...getInvoiceLinks(t), ...(Array.isArray(t.settledInvoiceUrls) ? t.settledInvoiceUrls : [])].map(receiptPathOf).filter(Boolean);
+      if(!paths.length) return;
+      const isVilla = !['office', 'store'].includes(t.for);
+      rows.push({ date:t.date, place: isVilla ? 'Villa ' + (FOR_LABELS[t.for] || t.for || '') : (FOR_LABELS[t.for] || t.for || 'Office'),
+        desc:t.purpose || t.note || '', amount:Number(t.amount) || 0, invNo:t.invoiceNo || '', paths, kind: isVilla ? 'Villa' : 'Office' });
+    });
+  } else {
+    const { data, error } = await sb.from('restaurant_bills').select('day,restaurant,description,amount,invoice_no,invoice_urls')
+      .eq('restaurant', placeId).gte('day', from).lte('day', to).order('day');
+    if(error) throw error;
+    (data || []).forEach(r => {
+      const paths = (Array.isArray(r.invoice_urls) ? r.invoice_urls : []).map(receiptPathOf).filter(Boolean);
+      if(!paths.length) return;
+      rows.push({ date:r.day, place:'Restaurant ' + (restInfo(r.restaurant).name || r.restaurant), desc:r.description || '',
+        amount:Number(r.amount) || 0, invNo:r.invoice_no || '', paths, kind:'Restaurant' });
+    });
+  }
+  // Past uploads for this same place and months.
+  const { data: past, error: pErr } = await sb.from('past_invoice_files').select('period,path,file_name')
+    .eq('place', placeId).gte('period', from.slice(0, 7)).lte('period', to.slice(0, 7)).order('period');
   if(pErr) throw pErr;
   (past || []).forEach(p => rows.push({ date:p.period, place:'Past upload', desc:p.file_name || 'invoice',
     amount:0, invNo:'', paths:[p.path], kind:'Past upload' }));
@@ -10477,8 +10480,8 @@ async function invoiceRowsForPeriod(from, to, scope){
   return rows;
 }
 function packSafe(s, max){ return String(s || '').replace(/[^a-zA-Z0-9 _-]+/g, '').trim().replace(/\s+/g, '-').slice(0, max) || 'x'; }
-async function downloadInvoicePack(fromISO, toISO, label, scope){
-  const btn = document.getElementById(scope === 'all' ? 'repInvAllBtn' : 'repInvPackBtn');
+async function downloadInvoicePack(fromISO, toISO, label, scope, btnId){
+  const btn = document.getElementById(btnId);
   const btnText = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = 'Preparing…'; }
   try{
@@ -10527,75 +10530,95 @@ async function downloadInvoicePack(fromISO, toISO, label, scope){
     if(btn){ btn.disabled = false; btn.textContent = btnText; }
   }
 }
-function repPackMonth(scope){
+/* Packs: a villa/office/store (Reports dropdown) or one restaurant (Restaurant Reports). */
+function repPackMonth(){
+  const sel = document.getElementById('repLocationSelect');
+  const loc = sel.value;
   const y = repMonthDate.getFullYear(), m = repMonthDate.getMonth();
   const from = toISO(new Date(y, m, 1)), to = toISO(new Date(y, m + 1, 0));
   const ym = `${y}-${String(m + 1).padStart(2, '0')}`;
-  const sel = document.getElementById('repLocationSelect');
-  const name = scope === 'all' ? 'all-locations' : packSafe((sel && sel.selectedOptions[0] && sel.selectedOptions[0].textContent) || scope, 30);
-  return downloadInvoicePack(from, to, `${ym}-${name}`, scope === 'all' ? 'all' : scope);
+  const name = packSafe((sel.selectedOptions[0] && sel.selectedOptions[0].textContent) || loc, 30);
+  return downloadInvoicePack(from, to, `${ym}-${name}`, loc, 'repInvPackBtn');
+}
+function restPackMonth(){
+  const ym = document.getElementById('rpkPeriod').value;
+  if(!/^\d{4}-\d{2}$/.test(ym)) return alert('Pick the month first.');
+  const [y, m] = ym.split('-').map(Number);
+  const from = toISO(new Date(y, m - 1, 1)), to = toISO(new Date(y, m, 0));
+  const name = packSafe(restInfo(REST.id).name || REST.id, 30);
+  return downloadInvoicePack(from, to, `${ym}-${name}`, 'rest:' + REST.id, 'rpkPack');
 }
 
-/* ---- Past invoices: upload invoices for an older month, so they can be opened and go into that month's pack ---- */
-let pastInvFiles = [];
-function pastInvSync(){
-  const el = document.getElementById('pastInvPeriod');
-  if(el) el.value = `${repMonthDate.getFullYear()}-${String(repMonthDate.getMonth() + 1).padStart(2, '0')}`;
-  pastInvRefresh();
-}
-async function pastInvRefresh(){
-  const box = document.getElementById('pastInvList'); if(!box || !sb) return;
-  const period = document.getElementById('pastInvPeriod').value;
-  if(!/^\d{4}-\d{2}$/.test(period)){ box.innerHTML = ''; return; }
+/* ---- Past invoices: upload invoices for an older month, for ONE place. They are listed there
+   and go into that place's pack for that month. Used by Villa Reports and by each Restaurant. ---- */
+const PB_VILLA = { period:'pastInvPeriod', file:'pastInvFile', save:'pastInvSave', list:'pastInvList', place:() => document.getElementById('repLocationSelect').value };
+const PB_REST  = { period:'rpkPeriod', file:'rpkFile', save:'rpkSave', list:'rpkList', place:() => REST.id };
+const pastBoxRows = {};
+function pastBoxMonth(ids){ const v = document.getElementById(ids.period).value; return /^\d{4}-\d{2}$/.test(v) ? v : null; }
+async function pastBoxRefresh(ids){
+  const box = document.getElementById(ids.list); if(!box || !sb) return;
+  const period = pastBoxMonth(ids), place = ids.place();
+  if(!period || !place){ box.innerHTML = ''; return; }
   try{
-    const { data, error } = await sb.from('past_invoice_files').select('*').eq('period', period).order('uploaded_at');
+    const { data, error } = await sb.from('past_invoice_files').select('*').eq('period', period).eq('place', place).order('uploaded_at');
     if(error) throw error;
-    pastInvFiles = data || [];
-    box.innerHTML = pastInvFiles.length
-      ? pastInvFiles.map((f, i) => `<div style="margin:3px 0;"><button type="button" class="add-booking-btn" data-pinv-open="${i}">📎 ${esc(f.file_name || 'invoice')}</button>${isAdmin() ? ` <button type="button" class="add-booking-btn" data-pinv-del="${i}">Remove</button>` : ''}</div>`).join('')
+    const rows = pastBoxRows[ids.list] = data || [];
+    box.innerHTML = rows.length
+      ? rows.map((f, i) => `<div style="margin:3px 0;"><button type="button" data-pb-open="${i}">📎 ${esc(f.file_name || 'invoice')}</button>${isAdmin() ? ` <button type="button" data-pb-del="${i}">Remove</button>` : ''}</div>`).join('')
       : `<span class="field-hint">No past invoices uploaded for ${esc(period)} yet.</span>`;
-    box.querySelectorAll('[data-pinv-open]').forEach(b => b.addEventListener('click', () => openStoredFile(pastInvFiles[Number(b.dataset.pinvOpen)].path)));
-    box.querySelectorAll('[data-pinv-del]').forEach(b => b.addEventListener('click', () => pastInvRemove(pastInvFiles[Number(b.dataset.pinvDel)])));
+    box.querySelectorAll('[data-pb-open]').forEach(b => b.addEventListener('click', () => openStoredFile(rows[Number(b.dataset.pbOpen)].path)));
+    box.querySelectorAll('[data-pb-del]').forEach(b => b.addEventListener('click', () => pastBoxRemove(ids, rows[Number(b.dataset.pbDel)])));
   }catch(e){
     console.error(e);
     box.innerHTML = '<span class="field-hint">Could not load the past invoices for this month.</span>';
   }
 }
-async function pastInvUpload(){
-  const period = document.getElementById('pastInvPeriod').value;
-  const input = document.getElementById('pastInvFile');
-  const files = [...input.files];
-  if(!/^\d{4}-\d{2}$/.test(period)) return alert('Pick the month these invoices belong to.');
+async function pastBoxUpload(ids){
+  const period = pastBoxMonth(ids), place = ids.place();
+  const input = document.getElementById(ids.file), files = [...input.files];
+  if(!period) return alert('Pick the month these invoices belong to.');
+  if(!place) return alert('Choose the place first.');
   if(!files.length) return alert('Choose the invoice files first.');
-  const btn = document.getElementById('pastInvSave'); btn.disabled = true; btn.textContent = 'Uploading…';
+  const btn = document.getElementById(ids.save), label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Uploading…';
   try{
     for(const f of files){
       const path = await uploadReceiptFile(f);
-      const { error } = await sb.from('past_invoice_files').insert({ period, path, file_name: f.name, uploaded_by_email: (currentUser && currentUser.email) || null });
+      const { error } = await sb.from('past_invoice_files').insert({ period, place, path, file_name: f.name, uploaded_by_email: (currentUser && currentUser.email) || null });
       if(error) throw error;
     }
     input.value = '';
-    await pastInvRefresh();
+    await pastBoxRefresh(ids);
     alert(`Saved ${files.length} invoice file(s) for ${period}. They are now in that month's pack.`);
   }catch(e){
     console.error(e);
     alert('Could not save the invoices — ' + (e.message || 'check the connection.'));
   }finally{
-    btn.disabled = false; btn.textContent = 'Upload invoices';
+    btn.disabled = false; btn.textContent = label;
   }
 }
-async function pastInvRemove(f){
+async function pastBoxRemove(ids, f){
   if(!f || !confirm(`Remove "${f.file_name || 'this invoice'}" from ${f.period}? The file is deleted and cannot be undone.`)) return;
   const { error } = await sb.from('past_invoice_files').delete().eq('id', f.id);
   if(error) return alert('Could not remove it — ' + error.message);
   await sb.storage.from('receipts').remove([f.path]);
-  await pastInvRefresh();
+  await pastBoxRefresh(ids);
+}
+function wirePastBox(ids){
+  document.getElementById(ids.save).addEventListener('click', () => pastBoxUpload(ids));
+  document.getElementById(ids.period).addEventListener('change', () => pastBoxRefresh(ids));
+  pastBoxRefresh(ids);
+}
+function pastInvSync(){
+  const el = document.getElementById('pastInvPeriod');
+  if(el) el.value = `${repMonthDate.getFullYear()}-${String(repMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  pastBoxRefresh(PB_VILLA);
 }
 function initPastInv(){
-  document.getElementById('pastInvSave').addEventListener('click', pastInvUpload);
-  document.getElementById('pastInvPeriod').addEventListener('change', pastInvRefresh);
-  ['repPrevMonth', 'repNextMonth', 'repThisMonth'].forEach(id => document.getElementById(id).addEventListener('click', () => setTimeout(pastInvSync, 0)));
   pastInvSync();
+  wirePastBox(PB_VILLA);
+  ['repPrevMonth', 'repNextMonth', 'repThisMonth'].forEach(id => document.getElementById(id).addEventListener('click', () => setTimeout(pastInvSync, 0)));
+  document.getElementById('repLocationSelect').addEventListener('change', () => setTimeout(() => pastBoxRefresh(PB_VILLA), 0));
 }
 
 /* ============================= REPORTS (printable) ============================= */
@@ -10611,8 +10634,7 @@ function initReports(){
   document.getElementById('repThisMonth').addEventListener('click', ()=>{ repMonthDate=new Date(new Date().getFullYear(), new Date().getMonth(),1); renderReports(); });
   document.getElementById('repPrintBtn').addEventListener('click', ()=> window.print());
   initPastInv();
-  document.getElementById('repInvPackBtn').addEventListener('click', ()=> repPackMonth(document.getElementById('repLocationSelect').value));
-  document.getElementById('repInvAllBtn').addEventListener('click', ()=> repPackMonth('all'));
+  document.getElementById('repInvPackBtn').addEventListener('click', ()=> repPackMonth());
   renderReports();
 }
 
@@ -19957,8 +19979,19 @@ function restReportsView(body, info){
       ${type === 'pl' && both ? `<select id="rrScope" class="r-btn"><option value="one">${esc(info.name)}</option><option value="both" ${REST.plScope === 'both' ? 'selected' : ''}>Both restaurants</option></select>` : ''}
       <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
     </div>
+    <div class="r-box" style="margin-bottom:12px"><h3><span>Invoices — ${esc(info.name)}</span><small>only this restaurant's bills and past uploads</small></h3>
+      <div class="r-toolbar" style="gap:8px;flex-wrap:wrap">
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px">Month <input type="month" id="rpkPeriod" value="${esc(REST.month)}"></label>
+        <button class="r-btn primary" id="rpkPack">🧾 Download this restaurant's pack</button>
+      </div>
+      <div class="r-note" style="margin:6px 0;">Upload invoices for a past month here, or attach an invoice to a bill in Bills & Expenses (any month).</div>
+      <div class="r-toolbar" style="gap:8px;flex-wrap:wrap"><input type="file" id="rpkFile" multiple accept="image/*,application/pdf"><button class="r-btn" id="rpkSave">Upload invoices</button></div>
+      <div id="rpkList" style="margin-top:6px;"></div>
+    </div>
     <div id="repOut"></div>`;
   const set = (f, t) => { REST.repFrom = f; REST.repTo = t; renderRest(); };
+  body.querySelector('#rpkPack').addEventListener('click', restPackMonth);
+  wirePastBox(PB_REST);
   body.querySelectorAll('[data-rtype]').forEach(b => b.addEventListener('click', () => { REST.repType = b.dataset.rtype; renderRest(); }));
   body.querySelector('#rrFrom').addEventListener('change', e => { if(e.target.value) set(e.target.value, to); });
   body.querySelector('#rrTo').addEventListener('change', e => { if(e.target.value) set(from, e.target.value); });
