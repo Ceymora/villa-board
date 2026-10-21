@@ -3738,7 +3738,7 @@ function rowToBooking(r){ return {
 }; }
 // Advances once recorded for "Unassigned" are the office's money: shown and kept as "Office".
 function advPersonName(n){ const v = String(n || '').trim(); if(!v) return null; return /^unassigned$/i.test(v) ? 'Office' : v; }
-function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:advPersonName(r.employee_name), settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, invoiceDate: r.invoice_date || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
+function rowToCash(r){ return { id:r.id, type:r.type, date:r.date, card:r.card, amount:Number(r.amount), note:r.note, for:r.for, purpose:r.purpose, linkedInventory:r.linked_inventory, settledBill: (r.settled_bill === true ? true : (r.settled_bill === false ? false : null)), invoiceUrl:r.invoice_url, invoiceUrls:r.invoice_urls || [], employeeName:advPersonName(r.employee_name), settled: !!r.settled, settledDate: r.settled_date || null, settledNote: r.settled_note || null, linkedPurchaseId: r.linked_purchase_id || null, linkedDistributeId: r.linked_distribute_id || null, purchasedBy: r.purchased_by || null, directExpense: !!r.direct_expense, settledInvoiceUrls: r.settled_invoice_urls || [], accountCode: r.account_code || null, advanceId: r.advance_id != null ? String(r.advance_id) : null, settledBy: r.settled_by || null, invoiceNo: r.invoice_no || null, invoiceDate: r.invoice_date || null, voucherNo: r.voucher_no || null, bankAccount: r.bank_account || null, undoRequestedBy: r.undo_requested_by || null, undoRequestedAt: r.undo_requested_at || null, undoReason: r.undo_reason || null, settleLog: Array.isArray(r.settle_log) ? r.settle_log : [] }; }
 function getInvoiceLinks(t){
   const links = [];
   if(t.invoiceUrl) links.push(t.invoiceUrl);
@@ -4389,7 +4389,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.20-villacosts1';
+const APP_VERSION = 'v2026.10.21-settled1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -8730,6 +8730,7 @@ function openBossDetail(){
 document.getElementById('bossSpendCard').addEventListener('click', openBossDetail);
 
 function renderCash(){
+  renderUnsettledBanner();
   try{ renderBossBox(); }catch(e){ console.error(e); }
   let ceymoraBal = 0, kalavaBal = 0, directKalava = 0, directCeymora = 0;
   for(const t of allCashTxns){
@@ -9218,7 +9219,10 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       return;
     }
 
+    const settledFlag = isSettleStaff() ? await askSettledBill(`${purpose} — LKR ${amount.toLocaleString()}`) : null;
+    if(isSettleStaff() && settledFlag === null) return;
     const { data: expenseRow, error } = await sb.from('petty_cash_transactions').insert({
+      ...(settledFlag === null ? {} : { settled_bill: settledFlag }),
       type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId, ...docFields
     }).select().single();
     if(error) throw error;
@@ -9275,6 +9279,97 @@ function advTopUpRow(adv){
 function advUnlinkedBills(adv){
   return allCashTxns.filter(t => t.type === 'expense' && t.employeeName === adv.employeeName && !t.advanceId);
 }
+/* ---------------- Bills not settled (Zahny and Buddhini) ----------------
+   Each bill they record is asked: Settled or Not settled. Not-settled bills are listed on
+   Petty Cash with a warning until someone marks them settled. They still count in the villa
+   spending either way; "settled" only decides what is on the warning list.                */
+const SETTLE_STAFF = /zahny|buddhini/i;
+function isSettleStaff(){
+  if(!currentUser) return false;
+  return SETTLE_STAFF.test([currentUser.full_name, currentUser.fullName, currentUser.username, currentUser.email].filter(Boolean).join(' '));
+}
+let settleResolve = null, settleShownOnce = false;
+function askSettledBill(summary){
+  return new Promise(resolve => {
+    let ov = document.getElementById('settleAskOverlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.className = 'modal-overlay'; ov.id = 'settleAskOverlay';
+      ov.innerHTML = `<div class="modal"><h3>Is this bill settled?</h3>
+        <div id="settleAskText" style="margin-bottom:10px;"></div>
+        <div class="field-hint">Settled means the bill is paid and accounted for. Not-settled bills stay on the warning list until they are marked settled.</div>
+        <div class="modal-actions"><div style="flex:1"></div>
+          <button class="btn btn-cancel" id="settleAskCancel">Cancel</button>
+          <button class="btn" id="settleAskNo" style="background:var(--amber); color:#fff;">Not settled</button>
+          <button class="btn btn-save" id="settleAskYes">Settled</button></div></div>`;
+      document.body.appendChild(ov);
+      const done = v => { ov.classList.remove('open'); const r = settleResolve; settleResolve = null; if(r) r(v); };
+      document.getElementById('settleAskYes').addEventListener('click', ()=> done(true));
+      document.getElementById('settleAskNo').addEventListener('click', ()=> done(false));
+      document.getElementById('settleAskCancel').addEventListener('click', ()=> done(null));
+    }
+    document.getElementById('settleAskText').textContent = summary;
+    settleResolve = resolve;
+    ov.classList.add('open');
+  });
+}
+function unsettledBills(){ return allCashTxns.filter(t => t.type === 'expense' && t.settledBill === false); }
+function openUnsettledModal(){
+  let ov = document.getElementById('unsettledOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay'; ov.id = 'unsettledOverlay';
+    ov.innerHTML = `<div class="modal" style="max-width:640px;"><h3>⚠ These bills are not settled</h3>
+      <div id="unsettledBody"></div>
+      <div class="modal-actions"><div style="flex:1"></div><button class="btn btn-save" id="unsettledClose">Close</button></div></div>`;
+    document.body.appendChild(ov);
+    document.getElementById('unsettledClose').addEventListener('click', ()=> ov.classList.remove('open'));
+    ov.addEventListener('click', e => {
+      if(e.target === ov) ov.classList.remove('open');
+      const b = e.target.closest && e.target.closest('[data-mark-settled]');
+      if(b) markBillSettled(b.dataset.markSettled);
+    });
+  }
+  const list = unsettledBills().sort((a,b) => (a.date || '').localeCompare(b.date || ''));
+  const total = list.reduce((x,t) => x + (t.amount || 0), 0);
+  document.getElementById('unsettledBody').innerHTML = list.length
+    ? `<div class="rpt-note" style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} · LKR ${Math.round(total).toLocaleString()} not yet marked settled.</div>
+       <table class="rpt-table"><thead><tr><th>Date</th><th>Bill</th><th>Villa</th><th class="r">LKR</th><th></th></tr></thead><tbody>
+       ${list.map(t => `<tr><td>${esc(fmtDay(t.date))}</td><td>${esc(t.purpose || t.note || 'Bill')}</td>
+         <td>${esc(FOR_LABELS[t.for] || t.for || '')}</td><td class="r">${rn(t.amount)}</td>
+         <td><button class="btn btn-save" style="padding:4px 10px;" data-mark-settled="${esc(t.id)}">Mark settled</button></td></tr>`).join('')}
+       </tbody></table>`
+    : '<div class="rpt-empty">All bills are settled.</div>';
+  ov.classList.add('open');
+}
+async function markBillSettled(id){
+  const { error } = await sb.from('petty_cash_transactions').update({ settled_bill: true }).eq('id', id);
+  if(error){ alert('Could not mark it settled — ' + (error.message || 'check the connection.')); return; }
+  logActivity('update', 'petty_cash_transactions', 'Marked a bill as settled');
+  try{ await fetchCash(); }catch(_e){ console.error(_e); }
+  openUnsettledModal();
+}
+function renderUnsettledBanner(){
+  const panel = document.getElementById('pettyCashPanel');
+  if(!panel) return;
+  let box = document.getElementById('unsettledBanner');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'unsettledBanner';
+    panel.insertBefore(box, panel.firstChild);
+    box.addEventListener('click', e => { if(e.target.closest('[data-open-unsettled]')) openUnsettledModal(); });
+  }
+  const list = unsettledBills();
+  if(!list.length){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const total = list.reduce((x,t) => x + (t.amount || 0), 0);
+  box.style.display = '';
+  box.innerHTML = `<div style="background:#fff4e6; border:1px solid #f08c00; border-radius:8px; padding:10px 12px; margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <b>⚠ These bills are not settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · LKR ${Math.round(total).toLocaleString()}</span>
+    <button class="btn btn-save" style="padding:4px 10px;" data-open-unsettled="1">Review</button></div>`;
+  // Zahny and Buddhini are told once each time the page opens.
+  if(!settleShownOnce && isSettleStaff()){ settleShownOnce = true; openUnsettledModal(); }
+}
+
 function oldestOpenAdvanceFor(name){
   return allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName === name)
     .sort((a,b)=> (a.date||'').localeCompare(b.date||''))[0] || null;
@@ -10637,8 +10732,22 @@ const VC_CARDS = [['ceymora','Ceymora Card'],['kalava_card','Kalava Villa Card']
                   ['bank:ceymora','Bank transfer from Ceymora'],['bank:kalava','Bank transfer from Kalava Villa']];
 // Card or bank transfer, saved the same way petty cash saves it (bank rows also name the account).
 async function vcPayFields(choice){
+  // Someone's advance: the bill is saved under their name, linked to their open advance,
+  // and takes the card or bank account the advance came from.
+  if(String(choice).startsWith('staff:')){
+    const name = String(choice).slice(6);
+    const adv = oldestOpenAdvanceFor(name);
+    if(!adv) throw new Error(`${name} has no open advance. Give the advance first (+ Give advance), then record this.`);
+    return { card: adv.card || 'ceymora', ...((await pcColsReady()) ? { bank_account: adv.card === 'bank' ? (adv.bankAccount || null) : null } : {}),
+             employee_name: name, advance_id: String(adv.id) };
+  }
   const { card, bankAccount } = splitPay(choice);
   return { card, ...((await pcColsReady()) ? { bank_account: card === 'bank' ? bankAccount : null } : {}) };
+}
+function vcPaidOptions(){
+  const names = [...new Set(allCashTxns.filter(t => isAdvanceParent(t) && !t.settled && t.employeeName).map(t => t.employeeName))].sort();
+  return VC_CARDS.map(([k,l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')
+    + names.map(n => `<option value="staff:${esc(n)}">Advance — ${esc(n)}</option>`).join('');
 }
 const VC_FUEL_LABEL = { diesel:'Diesel', petrol:'Petrol' };
 const vcVillas = () => CAL_VILLAS.map(v => ({ id:v.id, name:v.name }));
@@ -10789,7 +10898,7 @@ function vcOpenModal(kind, fromPetty){
         + `<label>Duvet covers</label><input type="number" id="vcDuvet" min="0" step="1" value="0">`
         + `<label>Other items (pillows, mats, curtains…)</label><input type="number" id="vcOther" min="0" step="1" value="0">`
         + `<label>Total paid (LKR)</label><input type="number" id="vcCost" min="0" step="1">`
-        + (fromPetty ? `<label>Paid from</label><select id="vcCard">${VC_CARDS.map(([k,l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select>` : '')
+        + (fromPetty ? `<label>Paid from</label><select id="vcCard">${vcPaidOptions()}</select>` : '')
         + noteRow },
     diesel: { title:'Diesel / petrol bought',
       hint:'This is also recorded as a petty cash expense for the villa, so the petty cash balance goes down.',
@@ -10797,7 +10906,7 @@ function vcOpenModal(kind, fromPetty){
         + `<label>Fuel</label><select id="vcFuel"><option value="diesel">Diesel</option><option value="petrol">Petrol</option></select>`
         + `<label>Litres bought</label><input type="number" id="vcLitres" min="0" step="0.1">`
         + `<label>Cost (LKR)</label><input type="number" id="vcCost" min="0" step="1">`
-        + `<label>Paid from</label><select id="vcCard">${VC_CARDS.map(([k,l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select>`
+        + `<label>Paid from</label><select id="vcCard">${vcPaidOptions()}</select>`
         + noteRow },
     power: { title:'Power cut — generator used',
       hint:'Enter each day the generator ran. Hours and litres are optional; litres given here reduce the diesel left in the tank.',
@@ -10832,9 +10941,13 @@ async function vcSave(){
       let pettyId = null;
       if(vcState.fromPetty){
         if(!(cost > 0)) return fail('Enter what was paid — it comes out of petty cash.');
+        if(!val('vcCard')) return fail('Choose how it was paid.');
         // Paid from petty cash: recorded as an expense for this villa, so the card balance goes down.
+        const pay = await vcPayFields(val('vcCard'));
+        const settled = isSettleStaff() ? await askSettledBill(`Laundry — LKR ${cost.toLocaleString()} for ${vcVillaName(villa)}`) : null;
+        if(isSettleStaff() && settled === null) return;
         const { data: pRow, error: pErr } = await sb.from('petty_cash_transactions').insert({
-          type:'expense', date, ...(await vcPayFields(val('vcCard'))), for: villa, amount: cost, linked_inventory: false, invoice_urls: [], note,
+          type:'expense', date, ...pay, ...(settled === null ? {} : { settled_bill: settled }), for: villa, amount: cost, linked_inventory: false, invoice_urls: [], note,
           purpose: `Laundry: ${bed} bedsheets, ${towel} towels, ${duvet} duvet covers, ${other} other`
         }).select().single();
         if(pErr) throw pErr;
@@ -10849,10 +10962,14 @@ async function vcSave(){
       const litres = num('vcLitres'), cost = num('vcCost'), fuel = val('vcFuel'), card = val('vcCard');
       if(!(litres > 0)) return fail('Enter how many litres were bought.');
       if(!(cost > 0)) return fail('Enter what was paid.');
+      if(!val('vcCard')) return fail('Choose how it was paid.');
       const label = `${VC_FUEL_LABEL[fuel] || 'Fuel'} ${vcLitres(litres)} L`;
       // The money comes out of petty cash, so it is recorded there too, for this villa.
+      const pay = await vcPayFields(card);
+      const settled = isSettleStaff() ? await askSettledBill(`${label} — LKR ${cost.toLocaleString()} for ${vcVillaName(villa)}`) : null;
+      if(isSettleStaff() && settled === null) return;
       const { data: pRow, error: pErr } = await sb.from('petty_cash_transactions').insert({
-        type:'expense', date, ...(await vcPayFields(card)), for: villa, purpose: label, amount: cost, note, linked_inventory: false, invoice_urls: []
+        type:'expense', date, ...pay, ...(settled === null ? {} : { settled_bill: settled }), for: villa, purpose: label, amount: cost, note, linked_inventory: false, invoice_urls: []
       }).select().single();
       if(pErr) throw pErr;
       const { error } = await sb.from('fuel_log').insert({ villa_id:villa, log_date:date, kind:'buy', fuel_type:fuel,
