@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Where this page may load code from and send data to. Even if something slipped
      past the escaping, it could only talk to Ceymora's own database — not to anyone else. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://wjbgbuvatrsnamsbvqrs.supabase.co wss://wjbgbuvatrsnamsbvqrs.supabase.co https://cdn.jsdelivr.net https://*.currency-api.pages.dev; img-src 'self' data: blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://wjbgbuvatrsnamsbvqrs.supabase.co wss://wjbgbuvatrsnamsbvqrs.supabase.co https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@ https://*.currency-api.pages.dev/v1/; img-src 'self' data: blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' blob: https://wjbgbuvatrsnamsbvqrs.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; manifest-src 'none'">
 <!-- Links opened from here (bills, WhatsApp) are not told which page they came from. -->
 <meta name="referrer" content="no-referrer">
 <script>
@@ -3643,7 +3643,7 @@
 </div> <!-- /#appRoot -->
 
 <script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.109.0/+esm";
 
 // This page must never run inside someone else's page (a trick used to make people
 // click things they cannot see).
@@ -4389,7 +4389,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-settled2';
+const APP_VERSION = 'v2026.10.21-secure1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
