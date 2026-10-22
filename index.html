@@ -4405,7 +4405,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.22-bookdel1';
+const APP_VERSION = 'v2026.10.22-advdel2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4959,7 +4959,7 @@ function drRowOf(table, id){
 function drSelectable(table, t){
   if(!t || !drReady || !drCanAsk(table)) return false;
   if(table === 'petty_cash_transactions'){
-    if(t.type === 'advance') return false;
+    if(t.type === 'advance' && t.advanceId) return false;   // extra cash paid out belongs to its advance and goes with it
     if(t.type === 'income' && t.advanceId) return false;
     if(billLockedBySettledAdvance(t)) return false;
   }
@@ -4968,6 +4968,7 @@ function drSelectable(table, t){
 function drSummary(table, t){
   if(!t) return '(gone)';
   if(table === 'villa_bookings') return `${t.checkIn} → ${t.checkOut} · ${t.guest || 'guest'} · ${(CAL_VILLAS.find(v => v.id === t.villa) || {}).name || t.villa}${t.rateUsd ? ' · ' + t.rateUsd : ''}`;
+  if(table === 'petty_cash_transactions' && t.type === 'advance') return `${t.date} · Advance to ${t.employeeName || ''}${t.note ? ' — ' + t.note : ''} · LKR ${Number(t.amount || 0).toLocaleString()}`;
   if(table === 'petty_cash_transactions') return `${t.date} · ${t.type === 'income' ? 'Money received' : (t.purpose || 'Expense')} · ${FOR_LABELS[t.for] || t.for || ''} · LKR ${Number(t.amount || 0).toLocaleString()}`;
   return `${t.date} · ${t.type === 'purchase' ? 'Purchase' : 'Sent to ' + (INV_LOCATION_LABELS[t.toVilla] || t.toVilla)}: ${t.item} × ${t.qty}${t.amount ? ' · LKR ' + Number(t.amount).toLocaleString() : ''}`;
 }
@@ -9476,7 +9477,10 @@ function openAdvanceModal(record){
     ['advDate','advEmployee','advGiveMode','advAmount','advNote','advReturned','advPaidOut','advSettled','advSettledNote','advFile','advSettledFile']
       .forEach(id => { g(id).disabled = locked; });
     g('advSave').style.display = locked ? 'none' : '';
-    g('advDeleteBtn').style.display = (record && !locked) ? '' : 'none';
+    // A settled advance is locked for changes, but anyone who records petty cash can still ASK Makky to delete it.
+    const canAskDel = !!(record && drReady && drCanAsk('petty_cash_transactions'));
+    g('advDeleteBtn').style.display = (record && (!locked || canAskDel)) ? '' : 'none';
+    g('advDeleteBtn').textContent = (canDelete() && !locked) ? 'Delete' : ((record && drReady && drPending('petty_cash_transactions', record.id)) ? 'Undo delete request' : 'Ask Makky to delete');
     g('advCancel').textContent = locked ? 'Close' : 'Cancel';
     g('advanceModalOverlay').querySelector('h3').textContent = !record ? 'Give advance'
       : record.settled ? `Settled advance — ${record.employeeName}` : `Settle / edit advance — ${record.employeeName}`;
@@ -9983,7 +9987,15 @@ document.getElementById('advSave').addEventListener('click', async ()=>{
 document.getElementById('advDeleteBtn').addEventListener('click', async ()=>{
   if(!editingCashId) return;
   const adv = allCashTxns.find(t => t.id === editingCashId);
-  if(advLocked(adv)){ alert('A settled advance can only be removed by Makky.'); return; }
+  // Without delete rights (Zahny), or for a settled (locked) advance: ask Makky. Nothing is changed or removed until he approves.
+  if(!canDelete() || advLocked(adv)){
+    if(!drReady){ alert('Delete requests are not ready yet — run the latest Supabase files first.'); return; }
+    const waiting = drPending('petty_cash_transactions', adv.id);
+    if(waiting){ await drCancel(waiting.id); document.getElementById('advDeleteBtn').textContent = 'Ask Makky to delete'; return; }
+    document.getElementById('advanceModalOverlay').classList.remove('open');
+    drAsk('petty_cash_transactions', [String(adv.id)]);
+    return;
+  }
   if(!checkDeletePassword()) return;
   if(!confirm('Delete this advance record? Its bills stay recorded as expenses.')) return;
   try{
