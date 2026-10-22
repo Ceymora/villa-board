@@ -2773,6 +2773,8 @@
     <div id="rpPaidWrap" style="display:none"><label for="rpPaid">Paid from</label><select id="rpPaid"><option value="bank">Bank</option><option value="card">Card</option><option value="owner">Owner (Sharon)</option><option value="other">Other</option></select></div>
     <div id="rpInvWrap"><label for="rpInv">Bill / invoice no. (optional)</label>
     <input type="text" id="rpInv" maxlength="60"></div>
+    <div id="rpSettledWrap" style="display:none"><label for="rpSettled">Is this bill settled?</label>
+      <select id="rpSettled"><option value="yes">Settled — paid and accounted for</option><option value="no">Not settled yet — remind us</option></select></div>
     <label for="rpNote">Note (optional)</label>
     <input type="text" id="rpNote" maxlength="200">
     <div id="rpFilesWrap" style="display:none"><label>Invoice / receipt (optional)</label>
@@ -4401,7 +4403,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.21-places2';
+const APP_VERSION = 'v2026.10.22-settle1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4500,6 +4502,16 @@ async function enterApp(profile){
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   startApp();
+  startupSettleReminder().catch(e => console.error(e));
+}
+/* Villa petty cash: right after sign-in, if any bill is not settled, pop up the reminder with the outstanding
+   amount. (The petty cash tab is only loaded when it is opened, so it cannot do this by itself.) */
+async function startupSettleReminder(){
+  if(settleShownOnce || !sb) return;
+  const { data, error } = await sb.from('petty_cash_transactions').select('*').eq('type', 'expense').eq('settled_bill', false).order('date');
+  if(error || !data || !data.length || settleShownOnce) return;
+  settleShownOnce = true;
+  openUnsettledModal(data.map(rowToCash));   // show what was just fetched; the full list loads with the tab
 }
 
 function showNoAccess(email, suspended){
@@ -9329,12 +9341,12 @@ function askSettledBill(summary){
   });
 }
 function unsettledBills(){ return allCashTxns.filter(t => t.type === 'expense' && t.settledBill === false); }
-function openUnsettledModal(){
+function openUnsettledModal(given){
   let ov = document.getElementById('unsettledOverlay');
   if(!ov){
     ov = document.createElement('div');
     ov.className = 'modal-overlay'; ov.id = 'unsettledOverlay';
-    ov.innerHTML = `<div class="modal" style="max-width:640px;"><h3>⚠ These bills are not settled</h3>
+    ov.innerHTML = `<div class="modal" style="max-width:640px;"><h3>⚠ These bills need to be settled</h3>
       <div id="unsettledBody"></div>
       <div class="modal-actions"><div style="flex:1"></div><button class="btn btn-save" id="unsettledClose">Close</button></div></div>`;
     document.body.appendChild(ov);
@@ -9345,10 +9357,10 @@ function openUnsettledModal(){
       if(b) markBillSettled(b.dataset.markSettled);
     });
   }
-  const list = unsettledBills().sort((a,b) => (a.date || '').localeCompare(b.date || ''));
+  const list = (Array.isArray(given) ? given : unsettledBills()).sort((a,b) => (a.date || '').localeCompare(b.date || ''));
   const total = list.reduce((x,t) => x + (t.amount || 0), 0);
   document.getElementById('unsettledBody').innerHTML = list.length
-    ? `<div class="rpt-note" style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} · LKR ${Math.round(total).toLocaleString()} not yet marked settled.</div>
+    ? `<div class="rpt-note" style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} still to be settled · <b>Outstanding amount: LKR ${Math.round(total).toLocaleString()}</b></div>
        <table class="rpt-table"><thead><tr><th>Date</th><th>Bill</th><th>Villa</th><th class="r">LKR</th><th></th></tr></thead><tbody>
        ${list.map(t => `<tr><td>${esc(fmtDay(t.date))}</td><td>${esc(t.purpose || t.note || 'Bill')}</td>
          <td>${esc(FOR_LABELS[t.for] || t.for || '')}</td><td class="r">${rn(t.amount)}</td>
@@ -9379,10 +9391,10 @@ function renderUnsettledBanner(){
   const total = list.reduce((x,t) => x + (t.amount || 0), 0);
   box.style.display = '';
   box.innerHTML = `<div style="background:#fff4e6; border:1px solid #f08c00; border-radius:8px; padding:10px 12px; margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-    <b>⚠ These bills are not settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · LKR ${Math.round(total).toLocaleString()}</span>
+    <b>⚠ These bills need to be settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · Outstanding LKR ${Math.round(total).toLocaleString()}</span>
     <button class="btn btn-save" style="padding:4px 10px;" data-open-unsettled="1">Review</button></div>`;
-  // Zahny and Buddhini are told once each time the page opens.
-  if(!settleShownOnce && isSettleStaff()){ settleShownOnce = true; openUnsettledModal(); }
+  // Everyone who can see petty cash gets the reminder popup once each time the page opens.
+  if(!settleShownOnce && currentUser){ settleShownOnce = true; openUnsettledModal(); }
 }
 
 function oldestOpenAdvanceFor(name){
@@ -19017,7 +19029,7 @@ function renderRest(){
   if(REST.loadedFor !== id){ body.innerHTML = `<div class="r-muted" style="padding:30px 4px;">${REST.loadError ? esc(REST.loadError) : 'Loading…'}</div>`; return; }
   const V = { dashboard:restDashboard, sales:restSalesView, petty:restPettyView, service:restServiceView,
               monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView, history:restHistoryView, bills:restBillsView, delreq:restDelReqView, search:restSearchView, ask:restAskView };
-  Promise.resolve((V[REST.view] || restDashboard)(body, info)).then(() => restMarkPending(body));
+  Promise.resolve((V[REST.view] || restDashboard)(body, info)).then(() => { restMarkPending(body); restUnsettledCheck(body); });
   const waitingN = REST.dreqs.filter(q => q.status === 'pending').length, nb = document.querySelector('#restNav [data-rv="delreq"]');
   if(nb) nb.innerHTML = `<span class="i">🗂</span>Delete Requests${waitingN ? ` <span style="background:#c92a2a;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;margin-left:4px">${waitingN}</span>` : ''}`;
 }
@@ -19341,7 +19353,7 @@ function restPettyView(body, info){
         <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Bill no.</th><th class="n">In</th><th class="n">Out</th><th class="n">Balance</th><th>By</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           <tr><td>${esc(rDay(from))}</td><td class="r-muted">Brought forward</td><td></td><td></td><td></td><td></td><td class="n">${rs(opening)}</td><td></td>${edit || del ? '<td></td>' : ''}</tr>
           ${rows.map(r => { run += r.kind === 'in' ? Number(r.amount) : -Number(r.amount);
-            return `<tr><td>${esc(rDay(r.day))}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}</td>
+            return `<tr><td>${esc(rDay(r.day))}</td><td class="wrap">${esc(r.description)}${r.settled === false ? ' <b style="color:#b45309;font-size:11px">⚠ not settled</b>' : ''}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}</td>
               <td>${r.kind === 'in' ? '<span class="r-in">Money in</span>' : esc(r.category || '')}</td><td>${esc(r.invoice_no || '')}${Array.isArray(r.invoice_urls) ? r.invoice_urls.map((_, i) => ` <button class="r-btn" style="font-size:11px;padding:1px 6px" data-pinv="${esc(r.id)}" data-pi="${i}" title="Open invoice ${i + 1}">📎 ${i + 1}</button>`).join('') : ''}</td>
               <td class="n r-in">${r.kind === 'in' ? rs(r.amount) : ''}</td><td class="n">${r.kind === 'expense' ? rs(r.amount) : ''}</td><td class="n">${rs(run)}</td>
               <td class="r-muted" style="font-size:11px;white-space:normal;min-width:110px">${esc(restWho(r))}</td>
@@ -19376,6 +19388,61 @@ function restPettyView(body, info){
     if(r && Array.isArray(r.invoice_urls)) openStoredFile(r.invoice_urls[Number(b.dataset.pi)]);
   }));
 }
+/* Reminder for restaurant petty cash bills that are not settled yet: a banner on this screen and a popup once
+   per restaurant each time the page opens, always showing the outstanding amount (all months, not just this one). */
+const REST_SETTLE_SHOWN = {};
+async function restUnsettledList(){
+  const { data, error } = await sb.from('restaurant_petty').select('id,day,description,amount')
+    .eq('restaurant', REST.id).eq('kind', 'expense').eq('settled', false).order('day');
+  return error ? null : (data || []);   // null until file 48 has been run
+}
+async function restUnsettledCheck(body){
+  if(!REST.id) return;
+  const list = await restUnsettledList();
+  if(list === null) return;
+  let box = body.querySelector('#rpUnsettled');
+  if(!box){ box = document.createElement('div'); box.id = 'rpUnsettled'; body.insertBefore(box, body.firstChild); }
+  if(!list.length){ box.innerHTML = ''; return; }
+  const total = list.reduce((x, t) => x + Number(t.amount || 0), 0);
+  box.innerHTML = `<div style="background:#fff4e6; border:1px solid #f08c00; border-radius:8px; padding:10px 12px; margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <b>⚠ These bills need to be settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · Outstanding ${esc(rs(total))}</span>
+    <button class="r-btn primary" id="rpUnsettledOpen">Review</button></div>`;
+  box.querySelector('#rpUnsettledOpen').addEventListener('click', restOpenUnsettled);
+  if(!REST_SETTLE_SHOWN[REST.id]){ REST_SETTLE_SHOWN[REST.id] = true; restOpenUnsettled(); }
+}
+async function restOpenUnsettled(){
+  let ov = document.getElementById('rpUnsettledOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay'; ov.id = 'rpUnsettledOverlay';
+    ov.innerHTML = `<div class="modal r-form" style="max-width:640px;"><h3>⚠ These bills need to be settled</h3>
+      <div id="rpUnsettledBody"></div>
+      <div class="modal-actions"><div style="flex:1"></div><button class="btn btn-save" id="rpUnsettledClose">Close</button></div></div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.classList.remove('open'); renderRest(); };
+    document.getElementById('rpUnsettledClose').addEventListener('click', close);
+    ov.addEventListener('click', async e => {
+      if(e.target === ov){ close(); return; }
+      const b = e.target.closest && e.target.closest('[data-rp-settle]');
+      if(!b) return;
+      b.disabled = true;
+      const { error } = await sb.from('restaurant_petty').update({ settled:true }).eq('id', b.dataset.rpSettle);
+      if(error){ alert('Could not mark it settled — ' + (error.message || 'check the connection.')); b.disabled = false; return; }
+      restOpenUnsettled();
+    });
+  }
+  const list = await restUnsettledList() || [];
+  const total = list.reduce((x, t) => x + Number(t.amount || 0), 0);
+  const edit = restEdits(REST.id);
+  document.getElementById('rpUnsettledBody').innerHTML = list.length
+    ? `<div class="r-muted" style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} still to be settled · <b>Outstanding amount: ${esc(rs(total))}</b></div>
+       <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Bill</th><th class="n">Amount</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
+       ${list.map(t => `<tr><td>${esc(rDay(t.day))}</td><td class="wrap">${esc(t.description)}</td><td class="n">${esc(rs(t.amount))}</td>
+         ${edit ? `<td><button class="r-btn primary" data-rp-settle="${esc(t.id)}">Mark settled</button></td>` : ''}</tr>`).join('')}
+       </tbody></table></div>`
+    : '<div class="r-muted">All bills are settled.</div>';
+  ov.classList.add('open');
+}
 function restOpenPetty(kind, row){
   REST.kind = kind; REST.editing = row || null;
   const info = restInfo(REST.id), bill = kind === 'bill';
@@ -19383,6 +19450,8 @@ function restOpenPetty(kind, row){
   document.getElementById('rpCatWrap').style.display = kind === 'in' ? 'none' : '';
   document.getElementById('rpInvWrap').style.display = kind === 'in' ? 'none' : '';
   document.getElementById('rpPaidWrap').style.display = bill ? '' : 'none';
+  document.getElementById('rpSettledWrap').style.display = kind === 'expense' ? '' : 'none';
+  document.getElementById('rpSettled').value = row && row.settled === false ? 'no' : 'yes';
   document.getElementById('rpPaid').value = row && row.paid_from ? row.paid_from : 'bank';
   const cats = EXPENSE_CATEGORIES;
   const cat = document.getElementById('rpCat');
@@ -19426,6 +19495,7 @@ async function restSavePetty(){
     invoice_no: REST.kind === 'in' ? null : (document.getElementById('rpInv').value.trim() || null),
     note: document.getElementById('rpNote').value.trim() || null };
   if(bill) rec.paid_from = document.getElementById('rpPaid').value; else rec.kind = REST.kind;
+  if(REST.kind === 'expense') rec.settled = document.getElementById('rpSettled').value === 'yes';
   const btn = document.getElementById('rpSave'); btn.disabled = true;
   if(REST.kind !== 'in'){
     try{
@@ -19442,7 +19512,7 @@ async function restSavePetty(){
   const res = REST.editing ? await sb.from(table).update(rec).eq('id', REST.editing.id)
                            : await sb.from(table).insert(Object.assign({ restaurant:REST.id }, rec));
   btn.disabled = false;
-  if(res.error){ err.textContent = /invoice_urls/.test(res.error.message || '') ? (bill ? 'Run 43-supabase-restaurant-bill-invoices.sql in Supabase first.' : 'Run 47-supabase-restaurant-petty-invoices.sql in Supabase first.') : /restaurant_bills/.test(res.error.message || '') ? 'Run 31-supabase-restaurant-bills.sql in Supabase first.' : 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
+  if(res.error){ err.textContent = /settled/.test(res.error.message || '') ? 'Run 48-supabase-restaurant-petty-settled.sql in Supabase first.' : /invoice_urls/.test(res.error.message || '') ? (bill ? 'Run 43-supabase-restaurant-bill-invoices.sql in Supabase first.' : 'Run 47-supabase-restaurant-petty-invoices.sql in Supabase first.') : /restaurant_bills/.test(res.error.message || '') ? 'Run 31-supabase-restaurant-bills.sql in Supabase first.' : 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
   document.getElementById('rpModalOverlay').classList.remove('open');
   REST.month = day.slice(0,7);
   await restLoad(); renderRest(); restToast('✓ Saved');
