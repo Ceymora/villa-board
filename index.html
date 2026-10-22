@@ -860,6 +860,7 @@
   .delsel-bar.picking{ justify-content:flex-start; padding:8px 12px; background:#fff8f0; border:1px solid #ffd8a8; border-radius:10px; }
   .delsel-bar button{ font-size:12.5px; }
   tr.dr-pending td{ background:#fff4e6 !important; }
+  .booking-pill.dr-wait{ outline:2px dashed #f08c00; outline-offset:-2px; }
   .dr-badge{ font-size:11.5px; color:#a65b00; margin-top:3px; }
   input.dr-cb{ width:16px; height:16px; cursor:pointer; }
   /* attendance register */
@@ -1697,6 +1698,7 @@
           <span id="monthLabel">Month of ...</span>
           <button id="nextMonth">Next ▶</button>
           <button id="thisMonth">This month</button>
+          <button id="delReqBtnBook" style="display:none;" title="Bookings someone asked to delete — the admin approves or keeps each one">🗂 Delete requests <span class="delreq-count-book"></span></button>
         </div>
         <div class="legend">
           <span><span class="swatch" style="background:var(--airbnb)"></span>Airbnb</span>
@@ -4403,7 +4405,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.22-settle1';
+const APP_VERSION = 'v2026.10.22-bookdel1';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -5128,6 +5130,14 @@ function drRefreshViews(){
   ['delReqBtnCash','delReqBtnInv'].forEach(id => { const b = document.getElementById(id); if(b) b.style.display = drReady && (isAdmin() || canRestore() || drCanAsk(id === 'delReqBtnCash' ? 'petty_cash_transactions' : 'inventory_transactions')) ? '' : 'none'; });
   const it = document.querySelector('.maintab-btn[data-tab="inventory"]');
   if(it){ if(!it.dataset.base) it.dataset.base = it.textContent; const n = isAdmin() ? pend('inventory_transactions') : 0; it.textContent = it.dataset.base + (n ? ` 🔔${n}` : ''); }
+  // Bookings: a button to the waiting requests, a 🔔 on the tab for the approver, and the waiting bookings marked on the calendar.
+  { const nb = pend('villa_bookings');
+    const bb = document.getElementById('delReqBtnBook');
+    if(bb){ bb.style.display = drReady && (isAdmin() || canRestore() || drCanAsk('villa_bookings')) ? '' : 'none';
+      const c = bb.querySelector('.delreq-count-book'); if(c) c.textContent = nb ? '· ' + nb + ' waiting' : ''; }
+    const bt = document.querySelector('.maintab-btn[data-tab="bookings"]');
+    if(bt){ if(!bt.dataset.base) bt.dataset.base = bt.textContent; const n = isAdmin() ? nb : 0; bt.textContent = bt.dataset.base + (n ? ` 🔔${n}` : ''); }
+    if(typeof bookingsInited !== 'undefined' && bookingsInited && typeof renderCalendar === 'function'){ try{ renderCalendar(); }catch(e){ console.error(e); } } }
   if(typeof cashInited !== 'undefined' && cashInited && typeof renderCash === 'function') renderCash();
   if(typeof invInited !== 'undefined' && invInited && typeof renderInventory === 'function') renderInventory();
 }
@@ -5229,6 +5239,7 @@ document.querySelectorAll('[data-dr-view]').forEach(b => b.addEventListener('cli
 ['drMonth','drPerson'].forEach(id => document.getElementById(id).addEventListener('change', renderDrModal));
 document.getElementById('delReqBtnCash').addEventListener('click', () => openDrModal());
 document.getElementById('delReqBtnInv').addEventListener('click', () => openDrModal());
+document.getElementById('delReqBtnBook').addEventListener('click', () => openDrModal());
 document.getElementById('drPrint').addEventListener('click', () => printPiece('Delete requests', document.getElementById('drBody').innerHTML));
 let drStarted = false;
 function startDelReqs(){
@@ -6772,6 +6783,14 @@ function renderCalendar(){
 
       pill.title = `${b.type==='airbnb'?'Airbnb':'Direct'} · ${b.checkIn} → ${b.checkOut} · ${totalNights} night${totalNights===1?'':'s'}${b.guest ? ' · '+b.guest : ''}`
         + (b.rateUsd ? ` · ${moneyFull(b.rateUsd, b.currency)}/night · total ${moneyFull(b.rateUsd*totalNights, b.currency)}` : ' · no rate set');
+      // A booking someone has asked to delete waits for the admin: marked here so nobody thinks it is gone.
+      const dreq = drReady ? drPending('villa_bookings', b.id) : null;
+      if(dreq){
+        pill.classList.add('dr-wait');
+        const w = document.createElement('span'); w.textContent = '🕓'; w.style.marginLeft = '3px';
+        pill.appendChild(w);
+        pill.title += ` · delete asked by ${drWho(dreq.requested_by_email)}: “${dreq.reason}”`;
+      }
       pill.addEventListener('click', (e)=>{ e.stopPropagation(); openModal(b, null); });
       overlay.appendChild(pill);
     }
