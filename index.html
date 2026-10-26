@@ -4106,9 +4106,24 @@ function storagePathFor(file){
   return `${folder}/${Date.now()}_${rand}_${safeName}`;
 }
 
+// What each file store accepts (file 50 enforces the same limits in the database). Checked first so the
+// person gets a plain message instead of a vague error.
+const UPLOAD_RULES = {
+  receipts: { max: 20 * 1024 * 1024, types: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'],
+              label: 'a PDF or a photo (JPEG, PNG, WebP, HEIC or GIF) up to 20 MB' },
+  brand:    { max: 5 * 1024 * 1024, types: ['image/png', 'image/jpeg', 'image/webp'], label: 'a PNG, JPEG or WebP picture up to 5 MB' },
+};
+function checkUploadFile(file, bucket){
+  const rule = UPLOAD_RULES[bucket];
+  if(!rule || !file) return;
+  if(file.size > rule.max) throw new Error(`“${file.name}” is too big — use ${rule.label}.`);
+  if(!rule.types.includes(String(file.type || '').toLowerCase())) throw new Error(`“${file.name}” cannot be attached — use ${rule.label}.`);
+}
+
 // A private document. Returns the path to store — never a URL.
 async function uploadReceiptFile(file){
   if(!file) return null;
+  checkUploadFile(file, 'receipts');
   const path = storagePathFor(file);
   const { error } = await sb.storage.from('receipts').upload(path, file);
   if(error) throw error;
@@ -4118,6 +4133,7 @@ async function uploadReceiptFile(file){
 // The logo and the villa photos, which have to render without a login.
 async function uploadBrandFile(file){
   if(!file) return null;
+  checkUploadFile(file, 'brand');
   const path = storagePathFor(file);
   const { error } = await sb.storage.from('brand').upload(path, file, { upsert:true });
   if(error) throw error;
@@ -4405,7 +4421,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.22-advdel2';
+const APP_VERSION = 'v2026.10.26-secure2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -10343,7 +10359,7 @@ function renderInventory(){
   // datalist for distribute modal autocomplete
   setTimeout(() => drRenderBar('inventory_transactions'), 0);
   const dl = document.getElementById('invItemList');
-  dl.innerHTML = itemNames.map(n=>`<option value="${n}">`).join('');
+  dl.innerHTML = itemNames.map(n=>`<option value="${esc(n)}">`).join('');
 
   // history list — filtered by Purchase/Distribution sub-tab, shown as a proper table
   const hist = document.getElementById('invHistoryList');
@@ -10539,7 +10555,7 @@ async function downloadInvoicePack(fromISO, toISO, label, scope, btnId){
         k++;
         const { data: blob, error } = await sb.storage.from('receipts').download(path);
         if(error || !blob){ missing.push(`${r.date}  ${r.place}  ${path}`); continue; }
-        const base = path.split('/').pop();
+        const base = path.split('/').pop().replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'file';
         const name = `${r.date}_${packSafe(r.kind + '-' + r.place, 40)}_${Math.round(r.amount)}_${String(k).padStart(3, '0')}_${base}`;
         entries.push({ name, data: new Uint8Array(await blob.arrayBuffer()) });
         saved.push(path);
@@ -14010,7 +14026,7 @@ function renderReminderList(){
   const rows = reminderCandidates();
 
   if(rows.length === 0){
-    const who = settingsVillaScope === 'all' ? '' : ` for ${scopedVillaName()}`;
+    const who = settingsVillaScope === 'all' ? '' : ` for ${esc(scopedVillaName())}`;
     wrap.innerHTML = `<div class="manage-empty">No balances to chase${who} — nothing checking in within ${reminderDays()} days is unpaid.</div>`;
     return;
   }
@@ -14677,7 +14693,7 @@ function renderInvoiceList(){
   if(rows.length === 0){
     const who = settingsVillaScope === 'all'
       ? 'No direct bookings invoiced yet.'
-      : `No invoices for ${(CAL_VILLAS.find(v=>v.id===settingsVillaScope)||{}).name || settingsVillaScope} yet.`;
+      : `No invoices for ${esc((CAL_VILLAS.find(v=>v.id===settingsVillaScope)||{}).name || settingsVillaScope)} yet.`;
     wrap.innerHTML = `<div class="manage-empty">${who} Add one from the Bookings Calendar: pick the villa, choose “Direct”, then save.</div>`;
     return;
   }
@@ -14740,7 +14756,7 @@ function renderCancelledList(){
   `;
 
   if(rows.length === 0){
-    const who = settingsVillaScope === 'all' ? '' : ` for ${scopedVillaName()}`;
+    const who = settingsVillaScope === 'all' ? '' : ` for ${esc(scopedVillaName())}`;
     wrap.innerHTML = `<div class="manage-empty">No cancellations${who}. 🎉</div>`;
     return;
   }
@@ -18624,7 +18640,7 @@ function abImportRender(){
     <div class="abi-sum"><span>➕ ${n('add')} new</span><span>✏️ ${n('update') + n('code')} to fill in</span><span>✖ ${n('cancel')} to mark cancelled</span><span>✓ ${n('none')} nothing to do</span></div>
     <div class="abi-wrap"><table class="abi-tbl"><thead><tr><th>Code</th><th>Villa</th><th>Dates</th><th>Guest</th><th style="text-align:right">Earnings</th><th>What happens</th></tr></thead><tbody>
       ${plan.map(p => `<tr><td>${esc(p.r.code)}</td><td>${esc(p.villa ? abVillaName(p.villa) : '—')}</td><td style="white-space:nowrap">${esc(srFmtDate(p.r.start))} → ${esc(srFmtDate(p.r.end))}</td>
-        <td>${esc(p.r.guest)}${p.r.guests ? ` <span class="srch-hint">· ${p.r.guests}</span>` : ''}</td><td class="n">${p.r.earnings != null ? esc(moneyFull(p.r.earnings, p.r.currency || 'USD')) : ''}</td>
+        <td>${esc(p.r.guest)}${p.r.guests ? ` <span class="srch-hint">· ${esc(p.r.guests)}</span>` : ''}</td><td class="n">${p.r.earnings != null ? esc(moneyFull(p.r.earnings, p.r.currency || 'USD')) : ''}</td>
         <td class="${cls[p.action]}">${esc(p.label)}</td></tr>`).join('')}
     </tbody></table></div>
     <button class="abi-go" id="abiGo"${plan.some(p => p.action !== 'none') ? '' : ' disabled'}>Import ${plan.filter(p => p.action !== 'none').length} change(s)</button>
