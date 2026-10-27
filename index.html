@@ -1953,6 +1953,7 @@
           <button data-rv="sales"><span class="i">🧾</span>Daily Sales</button>
           <button data-rv="petty"><span class="i">👛</span>Petty Cash</button>
           <button data-rv="bills"><span class="i">🧾</span>Bills & Expenses</button>
+          <button data-rv="vendors"><span class="i">🚚</span>Vendors</button>
           <button data-rv="service"><span class="i">👥</span>Service Charge</button>
           <button data-rv="monthly"><span class="i">📊</span>Monthly Summary</button>
           <button data-rv="reports"><span class="i">📄</span>Reports</button>
@@ -4421,7 +4422,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.26-secure2';
+const APP_VERSION = 'v2026.10.27-bills-vendors';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4526,10 +4527,10 @@ async function enterApp(profile){
    amount. (The petty cash tab is only loaded when it is opened, so it cannot do this by itself.) */
 async function startupSettleReminder(){
   if(settleShownOnce || !sb) return;
-  const { data, error } = await sb.from('petty_cash_transactions').select('*').eq('type', 'expense').eq('settled_bill', false).order('date');
-  if(error || !data || !data.length || settleShownOnce) return;
+  const rows = await billsFetch('villa');
+  if(rows === null || settleShownOnce || !bpOpenList('villa').length) return;
   settleShownOnce = true;
-  openUnsettledModal(data.map(rowToCash));   // show what was just fetched; the full list loads with the tab
+  billsOpen('villa', true);   // shows the balance of every bill that is still open
 }
 
 function showNoAccess(email, suspended){
@@ -9376,43 +9377,220 @@ function askSettledBill(summary){
     ov.classList.add('open');
   });
 }
-function unsettledBills(){ return allCashTxns.filter(t => t.type === 'expense' && t.settledBill === false); }
-function openUnsettledModal(given){
-  let ov = document.getElementById('unsettledOverlay');
-  if(!ov){
-    ov = document.createElement('div');
-    ov.className = 'modal-overlay'; ov.id = 'unsettledOverlay';
-    ov.innerHTML = `<div class="modal" style="max-width:640px;"><h3>⚠ These bills need to be settled</h3>
-      <div id="unsettledBody"></div>
-      <div class="modal-actions"><div style="flex:1"></div><button class="btn btn-save" id="unsettledClose">Close</button></div></div>`;
-    document.body.appendChild(ov);
-    document.getElementById('unsettledClose').addEventListener('click', ()=> ov.classList.remove('open'));
-    ov.addEventListener('click', e => {
-      if(e.target === ov) ov.classList.remove('open');
-      const b = e.target.closest && e.target.closest('[data-mark-settled]');
-      if(b) markBillSettled(b.dataset.markSettled);
-    });
+/* ---------------- Bills paid in parts (file 51) ----------------
+   A bill that is "not settled" can be paid in several goes. Every payment is written down (date, amount, method).
+   The reminder popup always shows the BALANCE (bill amount minus what was paid so far). When the payments add up
+   the database marks the bill settled and keeps the date; settled bills go to the Bills report.
+   Used by villa petty cash and restaurant petty cash alike.                                                   */
+const BILLPAY = { villa:[], restaurant:[], missing:false, at:{ villa:0, restaurant:0 }, ctx:{ villa:{ all:[] }, restaurant:{ all:[] } } };
+const BILLPAY_METHODS = { cash:'Cash', bank:'Bank', transfer:'Transfer', card:'Card' };
+function bpMoney(source, n){ return source === 'villa' ? 'LKR ' + rmoney(n) : rs(n); }
+function bpCanPay(source){
+  return source === 'villa' ? (hasPerm('edit_cash') || hasPerm('edit_villareport')) : restEdits(REST.id);
+}
+async function billPaysLoad(source, force){
+  if(!sb) return BILLPAY[source];
+  if(!force && Date.now() - BILLPAY.at[source] < 15000) return BILLPAY[source];
+  let q = sb.from('bill_payments').select('*').eq('source', source).order('paid_on').order('id').range(0, 4999);
+  if(source === 'restaurant') q = q.eq('restaurant', REST.id);
+  const { data, error } = await q;
+  if(error){ BILLPAY.missing = true; BILLPAY[source] = []; }
+  else { BILLPAY.missing = false; BILLPAY[source] = data || []; }
+  BILLPAY.at[source] = Date.now();
+  return BILLPAY[source];
+}
+/* Every bill that was asked "settled or not", with its payments. Newest data straight from the database. */
+async function billsFetch(source){
+  let rows = [];
+  if(source === 'villa'){
+    const { data, error } = await sb.from('petty_cash_transactions').select('*').eq('type', 'expense').not('settled_bill', 'is', null).order('date').range(0, 4999);
+    if(error) return null;
+    rows = (data || []).map(r => ({ id:String(r.id), date:r.date, title:r.purpose || r.note || 'Bill', place:FOR_LABELS[r.for] || r.for || '',
+      amount:Number(r.amount) || 0, settled:r.settled_bill === true, settledOn:r.settled_on || null }));
+  }else{
+    const { data, error } = await sb.from('restaurant_petty').select('*').eq('restaurant', REST.id).eq('kind', 'expense').not('settled', 'is', null).order('day').range(0, 4999);
+    if(error) return null;   // null until file 48 has been run
+    rows = (data || []).map(r => ({ id:String(r.id), date:r.day, title:r.description, place:r.category || '',
+      amount:Number(r.amount) || 0, settled:r.settled === true, settledOn:r.settled_on || null, invoiceNo:r.invoice_no || '' }));
   }
-  const list = (Array.isArray(given) ? given : unsettledBills()).sort((a,b) => (a.date || '').localeCompare(b.date || ''));
-  const total = list.reduce((x,t) => x + (t.amount || 0), 0);
-  document.getElementById('unsettledBody').innerHTML = list.length
-    ? `<div class="rpt-note" style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} still to be settled · <b>Outstanding amount: LKR ${Math.round(total).toLocaleString()}</b></div>
-       <table class="rpt-table"><thead><tr><th>Date</th><th>Bill</th><th>Villa</th><th class="r">LKR</th><th></th></tr></thead><tbody>
-       ${list.map(t => `<tr><td>${esc(fmtDay(t.date))}</td><td>${esc(t.purpose || t.note || 'Bill')}</td>
-         <td>${esc(FOR_LABELS[t.for] || t.for || '')}</td><td class="r">${rn(t.amount)}</td>
-         <td><button class="btn btn-save" style="padding:4px 10px;" data-mark-settled="${esc(t.id)}">Mark settled</button></td></tr>`).join('')}
-       </tbody></table>`
-    : '<div class="rpt-empty">All bills are settled.</div>';
+  await billPaysLoad(source, true);
+  BILLPAY.ctx[source].all = rows;
+  return rows;
+}
+function billFig(source, b){
+  const pays = BILLPAY[source].filter(p => String(p.bill_id) === String(b.id));
+  const paid = Math.round(pays.reduce((s, p) => s + Number(p.amount || 0), 0) * 100) / 100;
+  const last = pays.reduce((m, p) => (!m || p.paid_on > m.paid_on) ? p : m, null);
+  return { pays, paid, balance: Math.max(0, Math.round((b.amount - paid) * 100) / 100), last };
+}
+function bpPayText(source, p){ return `${fmtDayY(p.paid_on)} — ${bpMoney(source, p.amount)}${p.method ? ' (' + (BILLPAY_METHODS[p.method] || p.method) + ')' : ''}`; }
+function bpOpenList(source){ return BILLPAY.ctx[source].all.filter(b => !b.settled); }
+function bpOutstanding(source){ return bpOpenList(source).reduce((s, b) => s + billFig(source, b).balance, 0); }
+
+function bpOverlay(source){
+  const id = 'billsOv_' + source;
+  let ov = document.getElementById(id);
+  if(ov) return ov;
+  ov = document.createElement('div');
+  ov.className = 'modal-overlay'; ov.id = id;
+  ov.innerHTML = `<div class="modal r-form" style="max-width:780px;"><h3>⚠ These bills need to be settled</h3><div data-bp-body></div>
+    <div class="modal-actions"><button type="button" class="btn" data-bp-report>📋 Bills report</button><div style="flex:1"></div><button type="button" class="btn btn-save" data-bp-close>Close</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if(e.target === ov || e.target.closest('[data-bp-close]')){ ov.classList.remove('open'); if(source === 'restaurant' && REST.id) renderRest(); return; }
+    if(e.target.closest('[data-bp-report]')){ billsReportOpen(source); return; }
+    const b = e.target.closest('[data-bp-pay]');
+    if(b){ const bill = BILLPAY.ctx[source].all.find(x => x.id === b.dataset.bpPay); if(bill) billPayForm(source, bill); }
+  });
+  return ov;
+}
+async function billsOpen(source, preloaded){
+  const ov = bpOverlay(source);
+  if(!preloaded){ const r = await billsFetch(source); if(r === null){ alert('Run the bills files in Supabase first (40 / 48, then 51).'); return; } }
+  const list = bpOpenList(source).map(b => ({ b, f:billFig(source, b) })).sort((x, y) => (x.b.date || '').localeCompare(y.b.date || ''));
+  const total = list.reduce((s, r) => s + r.f.balance, 0), can = bpCanPay(source);
+  const num = 'text-align:right;white-space:nowrap';
+  ov.querySelector('[data-bp-body]').innerHTML = list.length
+    ? `<div style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} still to be settled · <b>Outstanding balance: ${esc(bpMoney(source, total))}</b></div>
+       ${BILLPAY.missing ? '<div style="color:#b45309;margin-bottom:6px;">Part-payments are not switched on yet — run 51-supabase-bill-part-payments.sql in Supabase.</div>' : ''}
+       <div style="overflow:auto"><table class="${source === 'villa' ? 'rpt-table' : 'r-table'}" style="width:100%"><thead><tr><th>Date</th><th>Bill</th><th style="${num}">Bill amount</th><th style="${num}">Paid so far</th><th style="${num}">Balance</th><th>Last payment</th>${can ? '<th></th>' : ''}</tr></thead><tbody>
+       ${list.map(({ b, f }) => `<tr><td>${esc(fmtDayY(b.date))}</td><td>${esc(b.title)}${b.place ? `<div style="font-size:11px;opacity:.7">${esc(b.place)}</div>` : ''}</td>
+         <td style="${num}">${esc(rmoney(b.amount))}</td><td style="${num}">${f.paid ? esc(rmoney(f.paid)) : '–'}</td><td style="${num};font-weight:700;color:#b45309">${esc(rmoney(f.balance))}</td>
+         <td style="font-size:12px">${f.last ? esc(bpPayText(source, f.last)) : '<span style="opacity:.6">no payment yet</span>'}</td>
+         ${can ? `<td><button type="button" class="btn btn-save" style="padding:4px 10px;" data-bp-pay="${esc(b.id)}">Record payment</button></td>` : ''}</tr>`).join('')}
+       </tbody></table></div>`
+    : '<div style="padding:8px 0;">✅ All bills are settled.</div>';
   ov.classList.add('open');
 }
-async function markBillSettled(id){
-  const { error } = await sb.from('petty_cash_transactions').update({ settled_bill: true }).eq('id', id);
-  if(error){ alert('Could not mark it settled — ' + (error.message || 'check the connection.')); return; }
-  logActivity('update', 'petty_cash_transactions', 'Marked a bill as settled');
-  try{ await fetchCash(); }catch(_e){ console.error(_e); }
-  openUnsettledModal();
+
+function billPayForm(source, b){
+  const f = billFig(source, b);
+  let ov = document.getElementById('billPayOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay'; ov.id = 'billPayOv'; ov.style.zIndex = '10050';
+    ov.innerHTML = `<div class="modal r-form" style="max-width:430px;"><h3>Record a payment</h3>
+      <div id="bpInfo" style="margin-bottom:6px;"></div>
+      <label>Date paid</label><input type="date" id="bpDate">
+      <label>Amount paid now</label><input type="number" id="bpAmt" min="0.01" step="0.01">
+      <label>Paid by</label><select id="bpMethod"><option value="">—</option>${Object.keys(BILLPAY_METHODS).map(k => `<option value="${k}">${BILLPAY_METHODS[k]}</option>`).join('')}</select>
+      <label>Note (optional)</label><input type="text" id="bpNote" maxlength="500">
+      <div id="bpErr" style="color:#c92a2a;font-size:13px;margin-top:8px;min-height:18px;"></div>
+      <div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" id="bpCancel">Cancel</button><button type="button" class="btn btn-save" id="bpSave">Save payment</button></div></div>`;
+    document.body.appendChild(ov);
+    document.getElementById('bpCancel').addEventListener('click', () => ov.classList.remove('open'));
+  }
+  ov._bill = { source, b };
+  document.getElementById('bpInfo').innerHTML = `<b>${esc(b.title)}</b> · bill ${esc(bpMoney(source, b.amount))}<br>Paid so far ${esc(bpMoney(source, f.paid))} · <b>balance ${esc(bpMoney(source, f.balance))}</b>`;
+  document.getElementById('bpDate').value = todayISO();
+  document.getElementById('bpAmt').value = f.balance;
+  document.getElementById('bpMethod').value = '';
+  document.getElementById('bpNote').value = '';
+  document.getElementById('bpErr').textContent = '';
+  const save = document.getElementById('bpSave');
+  save.disabled = false;
+  save.onclick = async () => {
+    const { source: s, b: bill } = ov._bill, fig = billFig(s, bill), err = document.getElementById('bpErr');
+    const paid_on = document.getElementById('bpDate').value, amount = Math.round(Number(document.getElementById('bpAmt').value) * 100) / 100;
+    if(!paid_on){ err.textContent = 'Pick the date it was paid.'; return; }
+    if(!(amount > 0)){ err.textContent = 'Enter the amount paid.'; return; }
+    if(amount > fig.balance + 0.005){ err.textContent = 'That is more than the balance (' + bpMoney(s, fig.balance) + ').'; return; }
+    save.disabled = true;
+    const row = { source:s, bill_id:String(bill.id), paid_on, amount, method:document.getElementById('bpMethod').value || null, note:document.getElementById('bpNote').value.trim() || null };
+    if(s === 'restaurant') row.restaurant = REST.id;
+    const { error } = await sb.from('bill_payments').insert(row);
+    save.disabled = false;
+    if(error){ err.textContent = /bill_payments/.test(error.message || '') && /exist|schema cache/.test(error.message || '') ? 'Run 51-supabase-bill-part-payments.sql in Supabase first.' : 'Could not save — ' + (error.message || 'check the connection.'); return; }
+    logActivity('insert', 'bill_payments', 'Recorded a part-payment on a bill');
+    ov.classList.remove('open');
+    BILLPAY.at[s] = 0;
+    if(s === 'villa'){ try{ await fetchCash(); }catch(_e){ console.error(_e); } }
+    else { try{ await restLoad(); }catch(_e){ console.error(_e); } }
+    await billsOpen(s);
+    if(s === 'restaurant') restToast('✓ Payment saved');
+    const rep = document.getElementById('billsRep_' + s); if(rep && rep.classList.contains('open')) billsReportOpen(s);
+  };
+  ov.classList.add('open');
+  setTimeout(() => document.getElementById('bpAmt').focus(), 30);
 }
-function renderUnsettledBanner(){
+
+/* The Bills report: what is still owed (with every payment so far) and what is fully settled (with the date). */
+function billsReportOpen(source, keepFilter){
+  const id = 'billsRep_' + source;
+  let ov = document.getElementById(id);
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'modal-overlay'; ov.id = id; ov.style.zIndex = '10040';
+    ov.innerHTML = `<div class="modal r-form" style="max-width:980px;"><h3>📋 Bills report</h3>
+      <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px;">
+        <div><label>Settled from</label><input type="date" data-bp-from></div><div><label>to</label><input type="date" data-bp-to></div>
+        <button type="button" class="btn" data-bp-csv>⬇ CSV</button><button type="button" class="btn" data-bp-print>🖨️ Print</button></div>
+      <div data-bp-rbody style="max-height:62vh;overflow:auto;"></div>
+      <div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-save" data-bp-rclose>Close</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if(e.target === ov || e.target.closest('[data-bp-rclose]')) ov.classList.remove('open'); });
+    ov.querySelector('[data-bp-from]').addEventListener('change', () => billsReportDraw(source));
+    ov.querySelector('[data-bp-to]').addEventListener('change', () => billsReportDraw(source));
+    ov.querySelector('[data-bp-csv]').addEventListener('click', () => billsReportCsv(source));
+    ov.querySelector('[data-bp-print]').addEventListener('click', () => {
+      const w = window.open('', '_blank'); if(!w) return;
+      w.document.write('<!doctype html><meta charset="utf-8"><title>Bills report</title><style>body{font:13px Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%;margin:8px 0 18px}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left}th{background:#eee}h3{margin:14px 0 4px}</style>' + ov.querySelector('[data-bp-rbody]').innerHTML);
+      w.document.close(); w.focus(); w.print();
+    });
+  }
+  const go = async () => { await billsFetch(source); billsReportDraw(source); ov.classList.add('open'); };
+  if(keepFilter){ billsReportDraw(source); return; }
+  go();
+}
+function billsReportData(source){
+  const ov = document.getElementById('billsRep_' + source);
+  const from = ov ? ov.querySelector('[data-bp-from]').value : '', to = ov ? ov.querySelector('[data-bp-to]').value : '';
+  const all = BILLPAY.ctx[source].all.map(b => ({ b, f:billFig(source, b) }));
+  const open = all.filter(x => !x.b.settled);
+  const part = open.filter(x => x.f.paid > 0), unpaid = open.filter(x => !x.f.paid);
+  const settledDate = x => x.b.settledOn || (x.f.last ? x.f.last.paid_on : x.b.date);
+  const done = all.filter(x => x.b.settled && (!from || settledDate(x) >= from) && (!to || settledDate(x) <= to))
+    .sort((p, q) => settledDate(q).localeCompare(settledDate(p)));
+  return { part, unpaid, done, settledDate, from, to };
+}
+function billsReportDraw(source){
+  const ov = document.getElementById('billsRep_' + source); if(!ov) return;
+  const { part, unpaid, done, settledDate } = billsReportData(source), m = n => esc(bpMoney(source, n));
+  const T = (x) => 'text-align:right;white-space:nowrap';
+  const tbl = source === 'villa' ? 'rpt-table' : 'r-table';
+  const pays = x => x.f.pays.length ? x.f.pays.map(p => `<div>${esc(bpPayText(source, p))}${p.note ? ` <span style="opacity:.6">· ${esc(p.note)}</span>` : ''}</div>`).join('') : '<span style="opacity:.6">–</span>';
+  const balTotal = part.concat(unpaid).reduce((s, x) => s + x.f.balance, 0), doneTotal = done.reduce((s, x) => s + x.b.amount, 0);
+  ov.querySelector('[data-bp-rbody]').innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 10px;">
+      <div style="background:#fff4e6;border:1px solid #f08c00;border-radius:8px;padding:8px 12px;"><div style="font-size:11px;opacity:.7">STILL OWED (balance)</div><b style="font-size:17px">${m(balTotal)}</b></div>
+      <div style="background:#e9f7ef;border:1px solid #2f9e5b;border-radius:8px;padding:8px 12px;"><div style="font-size:11px;opacity:.7">FULLY SETTLED (shown below)</div><b style="font-size:17px">${m(doneTotal)}</b></div></div>
+    <h3>Part-paid — balance still due (${part.length})</h3>
+    ${part.length ? `<table class="${tbl}" style="width:100%"><thead><tr><th>Bill date</th><th>Bill</th><th style="${T()}">Bill amount</th><th style="${T()}">Paid so far</th><th style="${T()}">Balance</th><th>Paid on (date — amount)</th></tr></thead><tbody>
+      ${part.map(x => `<tr><td>${esc(fmtDayY(x.b.date))}</td><td>${esc(x.b.title)}</td><td style="${T()}">${esc(rmoney(x.b.amount))}</td><td style="${T()}">${esc(rmoney(x.f.paid))}</td><td style="${T()};font-weight:700;color:#b45309">${esc(rmoney(x.f.balance))}</td><td style="font-size:12px">${pays(x)}</td></tr>`).join('')}
+      <tr><td colspan="4"><b>Total balance</b></td><td style="${T()};font-weight:700">${esc(rmoney(part.reduce((s, x) => s + x.f.balance, 0)))}</td><td></td></tr></tbody></table>` : '<div style="opacity:.7;margin-bottom:8px;">None.</div>'}
+    <h3>Not paid at all yet (${unpaid.length})</h3>
+    ${unpaid.length ? `<table class="${tbl}" style="width:100%"><thead><tr><th>Bill date</th><th>Bill</th><th style="${T()}">Amount owed</th></tr></thead><tbody>
+      ${unpaid.map(x => `<tr><td>${esc(fmtDayY(x.b.date))}</td><td>${esc(x.b.title)}</td><td style="${T()}">${esc(rmoney(x.b.amount))}</td></tr>`).join('')}</tbody></table>` : '<div style="opacity:.7;margin-bottom:8px;">None.</div>'}
+    <h3>Fully settled (${done.length})</h3>
+    ${done.length ? `<table class="${tbl}" style="width:100%"><thead><tr><th>Settled on</th><th>Bill date</th><th>Bill</th><th style="${T()}">Bill amount</th><th>Payments</th></tr></thead><tbody>
+      ${done.map(x => `<tr><td><b>${esc(fmtDayY(settledDate(x)))}</b></td><td>${esc(fmtDayY(x.b.date))}</td><td>${esc(x.b.title)}</td><td style="${T()}">${esc(rmoney(x.b.amount))}</td><td style="font-size:12px">${x.f.pays.length ? pays(x) : '<span style="opacity:.6">marked settled when entered</span>'}</td></tr>`).join('')}
+      <tr><td colspan="3"><b>Total settled</b></td><td style="${T()};font-weight:700">${esc(rmoney(doneTotal))}</td><td></td></tr></tbody></table>` : '<div style="opacity:.7;">None in this period.</div>'}`;
+}
+function billsReportCsv(source){
+  const { part, unpaid, done, settledDate } = billsReportData(source);
+  const cell = v => { v = String(v == null ? '' : v); if(/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
+  const lines = [['Status', 'Bill date', 'Bill', 'Bill amount', 'Paid so far', 'Balance', 'Settled on', 'Payments'].map(cell).join(',')];
+  const add = (st, x) => lines.push([st, x.b.date, x.b.title, x.b.amount, x.f.paid, x.f.balance, st === 'Settled' ? settledDate(x) : '', x.f.pays.map(p => bpPayText(source, p)).join(' | ')].map(cell).join(','));
+  part.forEach(x => add('Part-paid', x)); unpaid.forEach(x => add('Not paid', x)); done.forEach(x => add('Settled', x));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' }));
+  a.download = 'bills-report-' + source + '-' + todayISO() + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---- villa petty cash: popup, banner ---- */
+function openUnsettledModal(){ return billsOpen('villa'); }
+async function renderUnsettledBanner(){
   const panel = document.getElementById('pettyCashPanel');
   if(!panel) return;
   let box = document.getElementById('unsettledBanner');
@@ -9420,17 +9598,22 @@ function renderUnsettledBanner(){
     box = document.createElement('div');
     box.id = 'unsettledBanner';
     panel.insertBefore(box, panel.firstChild);
-    box.addEventListener('click', e => { if(e.target.closest('[data-open-unsettled]')) openUnsettledModal(); });
+    box.addEventListener('click', e => {
+      if(e.target.closest('[data-open-unsettled]')) billsOpen('villa');
+      if(e.target.closest('[data-open-billsrep]')) billsReportOpen('villa');
+    });
   }
-  const list = unsettledBills();
-  if(!list.length){ box.style.display = 'none'; box.innerHTML = ''; return; }
-  const total = list.reduce((x,t) => x + (t.amount || 0), 0);
+  const rows = await billsFetch('villa');
+  if(rows === null){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const list = bpOpenList('villa'), total = bpOutstanding('villa');
   box.style.display = '';
-  box.innerHTML = `<div style="background:#fff4e6; border:1px solid #f08c00; border-radius:8px; padding:10px 12px; margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-    <b>⚠ These bills need to be settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · Outstanding LKR ${Math.round(total).toLocaleString()}</span>
-    <button class="btn btn-save" style="padding:4px 10px;" data-open-unsettled="1">Review</button></div>`;
+  box.innerHTML = (list.length ? `<div style="background:#fff4e6; border:1px solid #f08c00; border-radius:8px; padding:10px 12px; margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <b>⚠ These bills need to be settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · Outstanding balance ${esc(bpMoney('villa', total))}</span>
+    <button type="button" class="btn btn-save" style="padding:4px 10px;" data-open-unsettled="1">Review / pay</button>
+    <button type="button" class="btn" style="padding:4px 10px;" data-open-billsrep="1">📋 Bills report</button></div>`
+    : `<div style="margin-bottom:10px;"><button type="button" class="btn" style="padding:4px 10px;" data-open-billsrep="1">📋 Bills report</button></div>`);
   // Everyone who can see petty cash gets the reminder popup once each time the page opens.
-  if(!settleShownOnce && currentUser){ settleShownOnce = true; openUnsettledModal(); }
+  if(list.length && !settleShownOnce && currentUser){ settleShownOnce = true; billsOpen('villa', true); }
 }
 
 function oldestOpenAdvanceFor(name){
@@ -13295,6 +13478,10 @@ const BIN_SECTIONS = {
   restaurant_petty:         { label:'Restaurants — petty cash',  area:'rest_sda' },
   restaurant_bills:         { label:'Restaurants — bills',       area:'rest_sda' },
   restaurant_balances:      { label:'Restaurants — bank balances', area:'rest_sda' },
+  restaurant_vendors:       { label:'Restaurants — vendors',       area:'rest_sda' },
+  restaurant_vendor_invoices: { label:'Restaurants — vendor invoices', area:'rest_sda' },
+  restaurant_vendor_payments: { label:'Restaurants — vendor payments', area:'rest_sda' },
+  bill_payments:            { label:'Bills — part-payments',     area:'rest_sda' },
 };
 const BIN_TAB_OF = { pettycash:['petty_cash_transactions'], expenses:['petty_cash_transactions'], inventory:['inventory_transactions'],
   bookings:['villa_bookings'], villareport:['villa_operating_expenses','owner_payments','petty_cash_transactions'] };
@@ -13335,7 +13522,14 @@ function binSummary(table, r){
     case 'restaurant_bills':
       return `${restDef(r.restaurant).name} bill: ${r.description || ''} — ${binMoney(r.amount)}${r.category ? ' · ' + r.category : ''}${r.day ? ' · ' + r.day : ''}`;
     case 'restaurant_petty':
-      return `${restDef(r.restaurant).name} petty cash ${r.kind === 'in' ? 'money in' : 'expense'}: ${r.description || ''} — ${binMoney(r.amount)}${r.day ? ' · ' + r.day : ''}`;
+      return `${restDef(r.restaurant).name} petty cash ${r.kind === 'in' ? 'money in' : 'expense'}: ${r.description || ''} — ${binMoney(r.amount)}${r.day ? ' · ' + r.day : ''}`;    case 'restaurant_vendors':
+      return `${restDef(r.restaurant).name} vendor: ${r.name || ''} — opening ${binMoney(r.opening_balance)}`;
+    case 'restaurant_vendor_invoices':
+      return `${restDef(r.restaurant).name} vendor invoice ${r.our_no || ''}: ${r.description || ''} — ${binMoney(r.amount)}${r.day ? ' · ' + r.day : ''}`;
+    case 'restaurant_vendor_payments':
+      return `${restDef(r.restaurant).name} vendor payment: ${binMoney(r.amount)}${r.method ? ' (' + r.method + ')' : ''}${r.day ? ' · ' + r.day : ''}`;
+    case 'bill_payments':
+      return `Bill part-payment: ${binMoney(r.amount)}${r.paid_on ? ' · ' + r.paid_on : ''}`;
   }
   return table;
 }
@@ -19054,6 +19248,7 @@ function renderRest(){
     service:['Service Charge', `${info.service_rate}% ${scWord(info)} — ${info.staff_share}% to employees, ${100 - info.staff_share}% to the company.`],
     loyverse:['Loyverse Check', 'Compare what was entered here with Loyverse, day by day, in LKR.'],
     bills:['Bills & Expenses', 'Costs paid from the bank, by card or by the owner — rent, salaries, suppliers, electricity …'],
+    vendors:['Vendor Payables', 'What we owe each supplier — invoices, payments and the balance, for the month and overall.'],
     delreq:['Delete Requests', 'Lines staff asked Makky to delete — approve, reject, or undo.'],
     history:['Change History', 'Who entered, changed or deleted each figure — and what it was before and after.'],
     ask:['Ask', 'Ask simple questions — sales, spending, petty cash and service charge for this restaurant.'],
@@ -19075,7 +19270,7 @@ function renderRest(){
   }
   if(REST.loadedFor !== id){ body.innerHTML = `<div class="r-muted" style="padding:30px 4px;">${REST.loadError ? esc(REST.loadError) : 'Loading…'}</div>`; return; }
   const V = { dashboard:restDashboard, sales:restSalesView, petty:restPettyView, service:restServiceView,
-              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView, history:restHistoryView, bills:restBillsView, delreq:restDelReqView, search:restSearchView, ask:restAskView };
+              monthly:restMonthlyView, reports:restReportsView, settings:restSettingsView, loyverse:restLoyverseView, history:restHistoryView, bills:restBillsView, vendors:restVendorsView, delreq:restDelReqView, search:restSearchView, ask:restAskView };
   Promise.resolve((V[REST.view] || restDashboard)(body, info)).then(() => { restMarkPending(body); restUnsettledCheck(body); });
   const waitingN = REST.dreqs.filter(q => q.status === 'pending').length, nb = document.querySelector('#restNav [data-rv="delreq"]');
   if(nb) nb.innerHTML = `<span class="i">🗂</span>Delete Requests${waitingN ? ` <span style="background:#c92a2a;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;margin-left:4px">${waitingN}</span>` : ''}`;
@@ -19436,59 +19631,22 @@ function restPettyView(body, info){
   }));
 }
 /* Reminder for restaurant petty cash bills that are not settled yet: a banner on this screen and a popup once
-   per restaurant each time the page opens, always showing the outstanding amount (all months, not just this one). */
+   per restaurant each time the page opens, always showing the outstanding BALANCE (all months, not just this one). */
 const REST_SETTLE_SHOWN = {};
-async function restUnsettledList(){
-  const { data, error } = await sb.from('restaurant_petty').select('id,day,description,amount')
-    .eq('restaurant', REST.id).eq('kind', 'expense').eq('settled', false).order('day');
-  return error ? null : (data || []);   // null until file 48 has been run
-}
 async function restUnsettledCheck(body){
   if(!REST.id) return;
-  const list = await restUnsettledList();
-  if(list === null) return;
+  const rows = await billsFetch('restaurant');
+  if(rows === null) return;   // null until file 48 has been run
   let box = body.querySelector('#rpUnsettled');
   if(!box){ box = document.createElement('div'); box.id = 'rpUnsettled'; body.insertBefore(box, body.firstChild); }
-  if(!list.length){ box.innerHTML = ''; return; }
-  const total = list.reduce((x, t) => x + Number(t.amount || 0), 0);
+  const list = bpOpenList('restaurant'), total = bpOutstanding('restaurant');
+  if(!list.length){ box.innerHTML = `<div style="margin-bottom:10px;"><button class="r-btn" id="rpBillsRep">📋 Bills report</button></div>`; box.querySelector('#rpBillsRep').addEventListener('click', () => billsReportOpen('restaurant')); return; }
   box.innerHTML = `<div style="background:#fff4e6; border:1px solid #f08c00; border-radius:8px; padding:10px 12px; margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-    <b>⚠ These bills need to be settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · Outstanding ${esc(rs(total))}</span>
-    <button class="r-btn primary" id="rpUnsettledOpen">Review</button></div>`;
-  box.querySelector('#rpUnsettledOpen').addEventListener('click', restOpenUnsettled);
-  if(!REST_SETTLE_SHOWN[REST.id]){ REST_SETTLE_SHOWN[REST.id] = true; restOpenUnsettled(); }
-}
-async function restOpenUnsettled(){
-  let ov = document.getElementById('rpUnsettledOverlay');
-  if(!ov){
-    ov = document.createElement('div');
-    ov.className = 'modal-overlay'; ov.id = 'rpUnsettledOverlay';
-    ov.innerHTML = `<div class="modal r-form" style="max-width:640px;"><h3>⚠ These bills need to be settled</h3>
-      <div id="rpUnsettledBody"></div>
-      <div class="modal-actions"><div style="flex:1"></div><button class="btn btn-save" id="rpUnsettledClose">Close</button></div></div>`;
-    document.body.appendChild(ov);
-    const close = () => { ov.classList.remove('open'); renderRest(); };
-    document.getElementById('rpUnsettledClose').addEventListener('click', close);
-    ov.addEventListener('click', async e => {
-      if(e.target === ov){ close(); return; }
-      const b = e.target.closest && e.target.closest('[data-rp-settle]');
-      if(!b) return;
-      b.disabled = true;
-      const { error } = await sb.from('restaurant_petty').update({ settled:true }).eq('id', b.dataset.rpSettle);
-      if(error){ alert('Could not mark it settled — ' + (error.message || 'check the connection.')); b.disabled = false; return; }
-      restOpenUnsettled();
-    });
-  }
-  const list = await restUnsettledList() || [];
-  const total = list.reduce((x, t) => x + Number(t.amount || 0), 0);
-  const edit = restEdits(REST.id);
-  document.getElementById('rpUnsettledBody').innerHTML = list.length
-    ? `<div class="r-muted" style="margin-bottom:8px;">${list.length} bill${list.length === 1 ? '' : 's'} still to be settled · <b>Outstanding amount: ${esc(rs(total))}</b></div>
-       <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Bill</th><th class="n">Amount</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
-       ${list.map(t => `<tr><td>${esc(rDay(t.day))}</td><td class="wrap">${esc(t.description)}</td><td class="n">${esc(rs(t.amount))}</td>
-         ${edit ? `<td><button class="r-btn primary" data-rp-settle="${esc(t.id)}">Mark settled</button></td>` : ''}</tr>`).join('')}
-       </tbody></table></div>`
-    : '<div class="r-muted">All bills are settled.</div>';
-  ov.classList.add('open');
+    <b>⚠ These bills need to be settled</b> <span>${list.length} bill${list.length === 1 ? '' : 's'} · Outstanding balance ${esc(rs(total))}</span>
+    <button class="r-btn primary" id="rpUnsettledOpen">Review / pay</button><button class="r-btn" id="rpBillsRep">📋 Bills report</button></div>`;
+  box.querySelector('#rpUnsettledOpen').addEventListener('click', () => billsOpen('restaurant', true));
+  box.querySelector('#rpBillsRep').addEventListener('click', () => billsReportOpen('restaurant'));
+  if(!REST_SETTLE_SHOWN[REST.id]){ REST_SETTLE_SHOWN[REST.id] = true; billsOpen('restaurant', true); }
 }
 function restOpenPetty(kind, row){
   REST.kind = kind; REST.editing = row || null;
@@ -20360,6 +20518,295 @@ function restBillsView(body, info){
   restWireExport(body, 'Bills & expenses — ' + rMonthName(ym), ['Date','Category','Description','Paid from','Bill no.','Amount','Entered / changed by'],
     rows.map(r => [rLong(r.day), r.category, r.description + (r.note ? ' — ' + r.note : ''), PAID_FROM[r.paid_from] || r.paid_from, r.invoice_no || '', Number(r.amount), restWho(r)]),
     ['Total', '', '', '', '', total, '']);
+}
+
+
+/* ---------------- Vendors: what we owe each supplier (file 52) ----------------
+   Invoices come in, payments go out; the balance of every vendor is worked out live:
+   opening balance + invoices - payments. A payment settles the OLDEST invoices first, so every invoice shows
+   Paid / Part paid / Unpaid and how it was paid (Bank / Cash / Transfer / Card).                              */
+const VEND = { id:null, vendors:[], inv:[], pay:[], missing:false, sel:null, loaded:false };
+const VEND_COLORS = ['#2563eb', '#e8890c', '#2f9e5b', '#7c3aed', '#c92a2a', '#0891b2', '#d6336c', '#5f3dc4', '#f59f00', '#37b24d', '#1c7ed6', '#868e96'];
+const VEND_METHODS = { bank:'Bank', cash:'Cash', transfer:'Transfer', card:'Card' };
+async function vendFetch(table, col){
+  const out = [];
+  for(let from = 0; from < 100000; from += 1000){
+    const { data, error } = await sb.from(table).select('*').eq('restaurant', REST.id).order(col, { ascending:true }).order('id', { ascending:true }).range(from, from + 999);
+    if(error) throw error;
+    out.push(...(data || []));
+    if(!data || data.length < 1000) break;
+  }
+  return out;
+}
+async function vendLoad(){
+  const id = REST.id;
+  try{
+    const [v, i, p] = await Promise.all([vendFetch('restaurant_vendors', 'name'), vendFetch('restaurant_vendor_invoices', 'day'), vendFetch('restaurant_vendor_payments', 'day')]);
+    if(REST.id !== id) return;
+    VEND.vendors = v; VEND.inv = i; VEND.pay = p; VEND.missing = false; VEND.id = id; VEND.loaded = true;
+  }catch(e){ console.error('vendors', e); VEND.missing = true; VEND.vendors = []; VEND.inv = []; VEND.pay = []; VEND.id = id; VEND.loaded = true; }
+}
+function vendColor(vid){ const i = VEND.vendors.findIndex(v => v.id === vid); return VEND_COLORS[(i < 0 ? 0 : i) % VEND_COLORS.length]; }
+function vendName(vid){ const v = VEND.vendors.find(x => x.id === vid); return v ? v.name : '?'; }
+/* Work out, for one vendor, how much of every invoice is paid, and how. */
+function vendFigures(v){
+  const invs = VEND.inv.filter(x => x.vendor_id === v.id).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  const pays = VEND.pay.filter(x => x.vendor_id === v.id).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  const items = [{ opening:true, left:Number(v.opening_balance) || 0, total:Number(v.opening_balance) || 0, via:{} }]
+    .concat(invs.map(i => ({ inv:i, left:Number(i.amount), total:Number(i.amount), via:{}, lastDay:null })));
+  pays.forEach(p => {
+    let rest = Number(p.amount);
+    for(const it of items){
+      if(rest <= 0.0001) break;
+      if(it.left <= 0.0001) continue;
+      const take = Math.min(it.left, rest);
+      it.left -= take; rest -= take; it.via[p.method] = (it.via[p.method] || 0) + take; it.lastDay = p.day;
+    }
+  });
+  const invoiced = invs.reduce((s, i) => s + Number(i.amount), 0), paid = pays.reduce((s, p) => s + Number(p.amount), 0);
+  const opening = Number(v.opening_balance) || 0;
+  return { invs, pays, items, opening, invoiced, paid, balance:rc(opening + invoiced - paid), byInv:new Map(items.filter(x => x.inv).map(x => [x.inv.id, x])) };
+}
+function vendStatus(it){
+  const paid = it.total - it.left;
+  if(it.left <= 0.005) return ['Paid', '#1f7a55', '#e8f6ee'];
+  if(paid > 0.005) return ['Part paid', '#b45309', '#fff4e0'];
+  return ['Unpaid', '#c92a2a', '#fdecec'];
+}
+function vendBadge(st){ return `<span style="background:${st[2]};color:${st[1]};padding:2px 8px;border-radius:10px;font-weight:700;font-size:11px;white-space:nowrap">${st[0]}</span>`; }
+function vendViaText(via){ return Object.keys(via).map(k => VEND_METHODS[k] || k).join(' + '); }
+function vendDonut(items, centerTop, centerSub){
+  const R = 62, C = 2 * Math.PI * R, sum = items.reduce((s, x) => s + x.value, 0);
+  let off = 0, arcs = '';
+  if(sum > 0){
+    items.filter(x => x.value > 0).forEach(x => {
+      const len = C * x.value / sum, gap = items.filter(y => y.value > 0).length > 1 ? 2 : 0;
+      arcs += `<circle cx="85" cy="85" r="${R}" fill="none" stroke="${x.color}" stroke-width="24" stroke-dasharray="${Math.max(0, len - gap)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 85 85)"/>`;
+      off += len;
+    });
+  } else arcs = `<circle cx="85" cy="85" r="${R}" fill="none" stroke="#e9ecf2" stroke-width="24"/>`;
+  return `<svg viewBox="0 0 170 170" role="img" aria-label="${esc(centerSub)}" style="max-width:190px;width:100%;display:block;margin:0 auto">${arcs}
+    <text x="85" y="82" text-anchor="middle" font-size="13" font-weight="700" fill="#13233a">${esc(centerTop)}</text>
+    <text x="85" y="98" text-anchor="middle" font-size="9.5" fill="#6b7385">${esc(centerSub)}</text></svg>`;
+}
+function vendLegend(items, fmt){
+  const sum = items.reduce((s, x) => s + x.value, 0);
+  return `<div style="margin-top:8px;font-size:12.5px">${items.filter(x => x.value > 0).map(x => `<div style="display:flex;gap:8px;align-items:center;padding:2px 0"><span style="width:11px;height:11px;border-radius:3px;background:${x.color};flex:none"></span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.label)}</span><b>${esc(fmt(x.value))}</b><span class="r-muted" style="width:38px;text-align:right">${sum ? Math.round(x.value / sum * 100) + '%' : ''}</span></div>`).join('') || '<div class="r-muted">Nothing yet.</div>'}</div>`;
+}
+function vendBars(items, fmt){
+  const max = Math.max(1, ...items.map(x => x.value));
+  return items.filter(x => x.value > 0).map(x => `<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${esc(x.label)}</span><b>${esc(fmt(x.value))}</b></div>
+    <div style="background:#eef1f6;border-radius:6px;height:11px;overflow:hidden"><div style="width:${Math.max(2, x.value / max * 100)}%;height:100%;background:${x.color};border-radius:6px"></div></div></div>`).join('') || '<div class="r-muted">Nothing owed.</div>';
+}
+async function restVendorsView(body, info){
+  if(!VEND.loaded || VEND.id !== REST.id) await vendLoad();
+  if(REST.view !== 'vendors') return;
+  if(VEND.missing){ body.innerHTML = '<div class="r-warn">Vendor payables are not set up in the database yet. Run <b>52-supabase-restaurant-vendors.sql</b> in Supabase once, then reload.</div>'; return; }
+  if(VEND.sel && !VEND.vendors.find(v => v.id === VEND.sel)) VEND.sel = null;
+  if(VEND.sel) vendDetail(body, info); else vendOverview(body, info);
+}
+function vendWire(body){
+  const edit = restEdits(REST.id);
+  body.querySelectorAll('[data-vsel]').forEach(b => b.addEventListener('click', () => { VEND.sel = Number(b.dataset.vsel) || null; renderRest(); }));
+  body.querySelectorAll('[data-vback]').forEach(b => b.addEventListener('click', () => { VEND.sel = null; renderRest(); }));
+  body.querySelectorAll('[data-mshift]').forEach(b => b.addEventListener('click', () => { REST.month = shiftMonth(REST.month, +b.dataset.mshift); renderRest(); }));
+  const m = body.querySelector('#vMonth'); if(m) m.addEventListener('change', e => { if(e.target.value){ REST.month = e.target.value; renderRest(); } });
+  if(!edit) return;
+  const add = (sel, kind) => { const el = body.querySelector(sel); if(el) el.addEventListener('click', () => vendForm(kind, null, VEND.sel)); };
+  add('#vAddVendor', 'vendor'); add('#vAddInv', 'invoice'); add('#vAddPay', 'payment');
+  body.querySelectorAll('[data-vedit]').forEach(b => b.addEventListener('click', () => {
+    const [kind, id] = b.dataset.vedit.split(':'), list = kind === 'vendor' ? VEND.vendors : kind === 'invoice' ? VEND.inv : VEND.pay;
+    const row = list.find(x => String(x.id) === id); if(row) vendForm(kind, row);
+  }));
+  body.querySelectorAll('[data-vdel]').forEach(b => b.addEventListener('click', async () => {
+    const [kind, id] = b.dataset.vdel.split(':');
+    if(!restCanDelete()){ alert('Only Makky can delete this. Please ask him — and tell him which line it is.'); return; }
+    const table = kind === 'invoice' ? 'restaurant_vendor_invoices' : kind === 'payment' ? 'restaurant_vendor_payments' : 'restaurant_vendors';
+    if(!confirm('Delete this ' + kind + '? A copy is kept in Deleted items.')) return;
+    const { error } = await sb.from(table).delete().eq('id', id).eq('restaurant', REST.id);
+    if(error){ alert('Could not delete — ' + (/foreign key/.test(error.message || '') ? 'this vendor still has invoices or payments.' : (error.message || 'check the connection.'))); return; }
+    await vendLoad(); renderRest(); restToast('Deleted');
+  }));
+}
+function vendOverview(body, info){
+  const ym = REST.month, from = monthStart(ym), to = monthEnd(ym), edit = restEdits(REST.id), del = restCanBin();
+  const figs = VEND.vendors.map(v => ({ v, f:vendFigures(v) }));
+  const inM = d => d >= from && d <= to;
+  figs.forEach(x => { x.mInv = x.f.invs.filter(i => inM(i.day)).reduce((s, i) => s + Number(i.amount), 0); x.mPaid = x.f.pays.filter(p => inM(p.day)).reduce((s, p) => s + Number(p.amount), 0); });
+  const T = k => figs.reduce((s, x) => s + (k === 'balance' ? x.f.balance : k === 'mInv' ? x.mInv : k === 'mPaid' ? x.mPaid : x.f[k]), 0);
+  const rowsM = VEND.inv.filter(i => inM(i.day)).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  const owing = figs.filter(x => x.f.balance > 0.005).length;
+  const pieInv = figs.map(x => ({ label:x.v.name, value:x.mInv, color:vendColor(x.v.id) }));
+  const bars = figs.map(x => ({ label:x.v.name, value:Math.max(0, x.f.balance), color:vendColor(x.v.id) })).sort((a, b) => b.value - a.value);
+  const monthPay = {}; VEND.pay.filter(p => inM(p.day)).forEach(p => { monthPay[p.method] = (monthPay[p.method] || 0) + Number(p.amount); });
+  const pieMeth = Object.keys(monthPay).map((k, i) => ({ label:VEND_METHODS[k] || k, value:monthPay[k], color:['#2563eb', '#2f9e5b', '#e8890c', '#7c3aed'][i % 4] }));
+  const logStatus = i => { const f = figs.find(x => x.v.id === i.vendor_id); const it = f && f.f.byInv.get(i.id); return it ? { it, st:vendStatus(it) } : null; };
+  body.innerHTML = `
+    <div class="r-toolbar">
+      <button class="r-btn" data-mshift="-1">◀</button><input type="month" id="vMonth" value="${esc(ym)}"><button class="r-btn" data-mshift="1">▶</button>
+      <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
+      ${edit ? '<button class="r-btn" id="vAddVendor">＋ Vendor</button><button class="r-btn primary" id="vAddInv">＋ Invoice</button><button class="r-btn" id="vAddPay" style="background:#2563eb;color:#fff;border-color:#2563eb">＋ Payment</button>' : '<span class="r-muted">View only</span>'}
+    </div>
+    <div class="r-cards">
+      ${restCard('#c92a2a', '💳', 'Total payable (all vendors)', rs(T('balance')), [['Vendors owed', String(owing)]])}
+      ${restCard('#2563eb', '🧾', 'Invoiced in ' + esc(rMonthName(ym)), rs(T('mInv')), [['Invoices', String(rowsM.length)]])}
+      ${restCard('#2f9e5b', '✅', 'Paid in ' + esc(rMonthName(ym)), rs(T('mPaid')), [['Payments', String(VEND.pay.filter(p => inM(p.day)).length)]])}
+      ${restCard('#e8890c', '⏳', 'Opening balances', rs(T('opening')), [['Total paid ever', rs(T('paid'))]])}
+    </div>
+    <div class="r-grid2">
+      <div>
+        <div class="r-box"><h3>Vendor payable list <small>click a vendor to open its sheet</small></h3>
+          <div class="r-scroll"><table class="r-table"><thead><tr><th>Vendor</th><th class="n">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th style="min-width:90px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+          ${figs.map(x => { const tot = x.f.opening + x.f.invoiced, pct = tot ? Math.min(100, x.f.paid / tot * 100) : 0; return `<tr>
+            <td><button type="button" class="r-btn" data-vsel="${x.v.id}" style="border-left:6px solid ${vendColor(x.v.id)};font-weight:700">${esc(x.v.name)}</button></td>
+            <td class="n">${rs(x.f.opening)}</td><td class="n">${rs(x.f.invoiced)}</td><td class="n">${rs(x.f.paid)}</td>
+            <td class="n" style="font-weight:700;color:${x.f.balance > 0.005 ? '#c92a2a' : '#1f7a55'}">${rs(x.f.balance)}</td><td class="n">${rs(x.mInv)}</td><td class="n">${rs(x.mPaid)}</td>
+            <td><div style="background:#eef1f6;border-radius:6px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${vendColor(x.v.id)}"></div></div><div class="r-muted" style="font-size:11px">${Math.round(pct)}%</div></td>
+            ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="Delete vendor">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
+            || `<tr><td colspan="9" class="r-muted">No vendors yet.${edit ? ' Press “＋ Vendor” to add the first one.' : ''}</td></tr>`}
+          <tr class="tot"><td>TOTAL PAYABLE</td><td class="n">${rs(T('opening'))}</td><td class="n">${rs(T('invoiced'))}</td><td class="n">${rs(T('paid'))}</td><td class="n">${rs(T('balance'))}</td><td class="n">${rs(T('mInv'))}</td><td class="n">${rs(T('mPaid'))}</td><td></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
+        <div class="r-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
+          <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+          ${rowsM.map(i => { const s = logStatus(i); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}</td>
+            <td><span style="border-left:5px solid ${vendColor(i.vendor_id)};padding-left:6px">${esc(vendName(i.vendor_id))}</span></td><td class="n">${rs(i.amount)}</td>
+            <td>${s ? vendBadge(s.st) : ''}</td><td>${s ? esc(vendViaText(s.it.via)) : ''}</td><td class="wrap r-muted" style="font-size:12px">${esc(i.remarks || '')}</td>
+            ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="invoice:${i.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="invoice:${i.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
+            || `<tr><td colspan="10" class="r-muted">No invoices in ${esc(rMonthName(ym))}.${edit ? ' Press “＋ Invoice”.' : ''}</td></tr>`}
+          <tr class="tot"><td colspan="5">Total invoiced</td><td class="n">${rs(T('mInv'))}</td><td colspan="${edit || del ? 4 : 3}"></td></tr></tbody></table></div>
+          <div class="r-note">Payments are entered under “＋ Payment” (or on the vendor's own sheet). A payment settles the oldest invoice first.</div></div>
+      </div>
+      <div>
+        <div class="r-box"><h3>Invoiced by vendor <small>${esc(rMonthName(ym))}</small></h3>${vendDonut(pieInv, rs(T('mInv')), 'invoiced')}${vendLegend(pieInv, rs)}</div>
+        <div class="r-box"><h3>Balance due by vendor <small>today</small></h3>${vendBars(bars, rs)}</div>
+        <div class="r-box"><h3>Paid by method <small>${esc(rMonthName(ym))}</small></h3>${vendDonut(pieMeth, rs(T('mPaid')), 'paid')}${vendLegend(pieMeth, rs)}</div>
+      </div>
+    </div>`;
+  vendWire(body);
+  restWireExport(body, 'Vendor payables — ' + rMonthName(ym), ['Vendor', 'Opening', 'Invoiced', 'Paid', 'Balance due', 'Invoiced this month', 'Paid this month'],
+    figs.map(x => [x.v.name, x.f.opening, x.f.invoiced, x.f.paid, x.f.balance, x.mInv, x.mPaid]), ['Total', T('opening'), T('invoiced'), T('paid'), T('balance'), T('mInv'), T('mPaid')]);
+}
+function vendDetail(body, info){
+  const v = VEND.vendors.find(x => x.id === VEND.sel), f = vendFigures(v), edit = restEdits(REST.id), del = restCanBin(), col = vendColor(v.id);
+  const pct = (f.opening + f.invoiced) ? Math.min(100, f.paid / (f.opening + f.invoiced) * 100) : 0;
+  const meth = {}; f.pays.forEach(p => { meth[p.method] = (meth[p.method] || 0) + Number(p.amount); });
+  const pieMeth = Object.keys(meth).map((k, i) => ({ label:VEND_METHODS[k] || k, value:meth[k], color:['#2563eb', '#2f9e5b', '#e8890c', '#7c3aed'][i % 4] }));
+  const pieBal = [{ label:'Paid', value:f.paid, color:'#2f9e5b' }, { label:'Balance due', value:Math.max(0, f.balance), color:'#c92a2a' }];
+  const run = (() => { let r = f.opening; const evs = f.invs.map(i => ({ d:i.day, k:'i', x:i })).concat(f.pays.map(p => ({ d:p.day, k:'p', x:p }))).sort((a, b) => a.d.localeCompare(b.d) || (a.k < b.k ? 1 : -1) || a.x.id - b.x.id); return evs.map(e => { r += e.k === 'i' ? Number(e.x.amount) : -Number(e.x.amount); return Object.assign({ bal:r }, e); }); })();
+  body.innerHTML = `
+    <div class="r-toolbar"><button class="r-btn" data-vback>◀ All vendors</button><b style="font-size:18px;border-left:7px solid ${col};padding-left:10px">${esc(v.name)}</b>
+      <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
+      ${edit ? `<button class="r-btn primary" id="vAddInv">＋ Invoice</button><button class="r-btn" id="vAddPay" style="background:#2563eb;color:#fff;border-color:#2563eb">＋ Payment</button>` : ''}</div>
+    <div class="r-cards">
+      ${restCard('#6b7385', '📂', 'Opening balance', rs(f.opening), [['', '']])}
+      ${restCard('#2563eb', '🧾', 'Total invoiced', rs(f.invoiced), [['Invoices', String(f.invs.length)]])}
+      ${restCard('#2f9e5b', '✅', 'Total paid', rs(f.paid), [['Payments', String(f.pays.length)], ['Paid', Math.round(pct) + '%']])}
+      ${restCard('#c92a2a', '⏳', 'BALANCE DUE', rs(f.balance), [['', '']])}
+    </div>
+    <div class="r-grid2"><div>
+      <div class="r-box"><h3>Invoices <small>filled from the invoice log</small></h3><div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our no.</th><th>Supplier bill</th><th>Description</th><th class="n">Amount</th><th class="n">Paid</th><th class="n">Balance</th><th>Status</th><th>Paid by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+        ${f.opening > 0 ? `<tr class="r-muted"><td colspan="4">Opening balance brought forward</td><td class="n">${rs(f.opening)}</td><td class="n">${rs(f.opening - f.items[0].left)}</td><td class="n">${rs(f.items[0].left)}</td><td>${vendBadge(vendStatus(f.items[0]))}</td><td>${esc(vendViaText(f.items[0].via))}</td>${edit || del ? '<td></td>' : ''}</tr>` : ''}
+        ${f.invs.map(i => { const it = f.byInv.get(i.id); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}${i.remarks ? `<div class="r-muted" style="font-size:11px">${esc(i.remarks)}</div>` : ''}</td>
+          <td class="n">${rs(i.amount)}</td><td class="n">${rs(i.amount - it.left)}</td><td class="n">${rs(it.left)}</td><td>${vendBadge(vendStatus(it))}</td><td>${esc(vendViaText(it.via))}</td>
+          ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="invoice:${i.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="invoice:${i.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
+          || `<tr><td colspan="10" class="r-muted">No invoices yet.</td></tr>`}
+        <tr class="tot"><td colspan="4">Total</td><td class="n">${rs(f.invoiced + f.opening)}</td><td class="n">${rs(f.paid)}</td><td class="n">${rs(f.balance)}</td><td colspan="${edit || del ? 3 : 2}"></td></tr></tbody></table></div></div>
+      <div class="r-box"><h3>Payments to ${esc(v.name)}</h3><div class="r-scroll"><table class="r-table"><thead><tr><th>Date paid</th><th>Method</th><th>Reference</th><th class="n">Amount paid</th><th class="n">Balance after</th><th>Remarks</th><th>Entered by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+        ${run.filter(e => e.k === 'p').map(e => { const p = e.x; return `<tr><td>${esc(rLong(p.day))}</td><td>${esc(VEND_METHODS[p.method] || p.method)}</td><td>${esc(p.reference || '')}</td><td class="n" style="font-weight:700;color:#1f7a55">${rs(p.amount)}</td><td class="n">${rs(e.bal)}</td>
+          <td class="wrap r-muted" style="font-size:12px">${esc(p.remarks || '')}</td><td class="r-muted" style="font-size:11px">${esc(restWho(p))}</td>
+          ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="payment:${p.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="payment:${p.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
+          || `<tr><td colspan="8" class="r-muted">No payments yet.${edit ? ' Press “＋ Payment” when you pay this vendor.' : ''}</td></tr>`}
+        <tr class="tot"><td colspan="3">Total paid</td><td class="n">${rs(f.paid)}</td><td class="n">${rs(f.balance)}</td><td colspan="${edit || del ? 3 : 2}"></td></tr></tbody></table></div></div>
+    </div><div>
+      <div class="r-box"><h3>Paid vs balance</h3>${vendDonut(pieBal, Math.round(pct) + '%', 'paid')}${vendLegend(pieBal, rs)}</div>
+      <div class="r-box"><h3>Payments by method</h3>${vendDonut(pieMeth, rs(f.paid), 'paid')}${vendLegend(pieMeth, rs)}</div>
+    </div></div>`;
+  vendWire(body);
+  const rows = run.map(e => e.k === 'i' ? [rLong(e.d), 'Invoice ' + (e.x.our_no || ''), (e.x.bill_no ? e.x.bill_no + ' — ' : '') + e.x.description, Number(e.x.amount), '', e.bal] : [rLong(e.d), 'Payment (' + (VEND_METHODS[e.x.method] || e.x.method) + ')', e.x.reference || e.x.remarks || '', '', Number(e.x.amount), e.bal]);
+  restWireExport(body, 'Vendor statement — ' + v.name, ['Date', 'Entry', 'Details', 'Invoiced', 'Paid', 'Balance'], (f.opening > 0 ? [['', 'Opening balance', '', '', '', f.opening]] : []).concat(rows), ['Total', '', '', f.invoiced, f.paid, f.balance]);
+}
+
+/* The one form for a vendor, an invoice and a payment. */
+function vendForm(kind, row, preVendor){
+  let ov = document.getElementById('vendFormOv');
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'vendFormOv';
+    ov.innerHTML = `<div class="modal r-form" style="max-width:460px;"><h3 id="vfTitle"></h3><div id="vfFields"></div>
+      <div id="vfErr" style="color:#c92a2a;font-size:13px;margin-top:8px;min-height:18px;"></div>
+      <div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" id="vfCancel">Cancel</button><button type="button" class="btn btn-save" id="vfSave">Save</button></div></div>`;
+    document.body.appendChild(ov);
+    document.getElementById('vfCancel').addEventListener('click', () => ov.classList.remove('open'));
+  }
+  const vendors = VEND.vendors.filter(v => v.active !== false || (row && row.vendor_id === v.id));
+  const vsel = (sel) => `<label>Vendor</label><select id="vfVendor" ${row ? 'disabled' : ''}>${vendors.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>`;
+  const today = REST.month === todayISO().slice(0, 7) ? todayISO() : monthEnd(REST.month);
+  const T = { vendor:'Vendor', invoice:'Invoice', payment:'Payment' }[kind];
+  document.getElementById('vfTitle').textContent = (row ? 'Correct ' : 'New ') + T.toLowerCase() + ' — ' + restInfo(REST.id).name;
+  const f = document.getElementById('vfFields');
+  if(kind === 'vendor'){
+    f.innerHTML = `<label>Vendor name</label><input id="vfName" maxlength="80" value="${esc(row ? row.name : '')}">
+      <label>Opening balance — what we already owed before using this sheet</label><input id="vfOpen" type="number" min="0" step="0.01" value="${row ? Number(row.opening_balance) : 0}">
+      ${row ? `<label>Active</label><select id="vfActive"><option value="1" ${row.active !== false ? 'selected' : ''}>Yes</option><option value="0" ${row.active === false ? 'selected' : ''}>No — hide from the lists</option></select>` : ''}`;
+  }else if(!vendors.length){
+    f.innerHTML = '<div class="r-warn">Add a vendor first (＋ Vendor).</div>';
+  }else if(kind === 'invoice'){
+    f.innerHTML = `<label>Invoice date</label><input id="vfDay" type="date" value="${esc(row ? row.day : today)}">${vsel(row ? row.vendor_id : (preVendor || vendors[0].id))}
+      <label>Supplier's bill number</label><input id="vfBill" maxlength="60" value="${esc(row ? row.bill_no || '' : '')}">
+      <label>Description / item</label><input id="vfDesc" maxlength="300" value="${esc(row ? row.description : '')}">
+      <label>Amount (Rs.)</label><input id="vfAmt" type="number" min="0.01" step="0.01" value="${row ? Number(row.amount) : ''}">
+      <label>Remarks</label><input id="vfRem" maxlength="500" value="${esc(row ? row.remarks || '' : '')}">
+      <div class="r-muted" style="font-size:12px;margin-top:6px">${row ? 'Our invoice number: <b>' + esc(row.our_no || '') + '</b>' : 'Our invoice number is given automatically when you save.'}</div>`;
+  }else{
+    const pv = row ? row.vendor_id : (preVendor || vendors[0].id);
+    f.innerHTML = `<label>Date paid</label><input id="vfDay" type="date" value="${esc(row ? row.day : todayISO())}">${vsel(pv)}
+      <div id="vfBalHint" class="r-muted" style="font-size:12px;margin-top:4px"></div>
+      <label>Paid by</label><select id="vfMethod">${Object.keys(VEND_METHODS).map(k => `<option value="${k}" ${row && row.method === k ? 'selected' : ''}>${VEND_METHODS[k]}</option>`).join('')}</select>
+      <label>Amount paid (Rs.)</label><input id="vfAmt" type="number" min="0.01" step="0.01" value="${row ? Number(row.amount) : ''}">
+      <label>Reference (cheque / transfer no.)</label><input id="vfRef" maxlength="80" value="${esc(row ? row.reference || '' : '')}">
+      <label>Remarks</label><input id="vfRem" maxlength="500" value="${esc(row ? row.remarks || '' : '')}">`;
+    const hint = () => { const vv = VEND.vendors.find(x => x.id === Number(document.getElementById('vfVendor').value)); if(!vv) return;
+      const bal = vendFigures(vv).balance; document.getElementById('vfBalHint').innerHTML = 'Balance owed now: <b>' + esc(rs(bal)) + '</b>';
+      const a = document.getElementById('vfAmt'); if(!row && !a.dataset.touched) a.value = bal > 0 ? bal : ''; };
+    document.getElementById('vfVendor').addEventListener('change', () => { document.getElementById('vfAmt').dataset.touched = ''; hint(); });
+    document.getElementById('vfAmt').addEventListener('input', e => { e.target.dataset.touched = '1'; });
+    hint();
+  }
+  document.getElementById('vfErr').textContent = '';
+  const save = document.getElementById('vfSave'); save.disabled = false; save.style.display = (kind !== 'vendor' && !vendors.length) ? 'none' : '';
+  save.onclick = async () => {
+    const err = document.getElementById('vfErr'), val = id => (document.getElementById(id) || {}).value || '';
+    let table, rec;
+    if(kind === 'vendor'){
+      const name = val('vfName').trim(), open = Number(val('vfOpen') || 0);
+      if(!name){ err.textContent = 'Write the vendor name.'; return; }
+      if(!(open >= 0)){ err.textContent = 'Opening balance cannot be below 0.'; return; }
+      table = 'restaurant_vendors'; rec = { name, opening_balance:open }; if(row) rec.active = val('vfActive') !== '0';
+    }else if(kind === 'invoice'){
+      const amount = Number(val('vfAmt')), desc = val('vfDesc').trim();
+      if(!val('vfDay')){ err.textContent = 'Pick the invoice date.'; return; }
+      if(!desc){ err.textContent = 'Write what was bought.'; return; }
+      if(!(amount > 0)){ err.textContent = 'Enter an amount above 0.'; return; }
+      table = 'restaurant_vendor_invoices'; rec = { day:val('vfDay'), bill_no:val('vfBill').trim() || null, description:desc, amount, remarks:val('vfRem').trim() || null };
+      if(!row) rec.vendor_id = Number(val('vfVendor'));
+    }else{
+      const amount = Number(val('vfAmt'));
+      if(!val('vfDay')){ err.textContent = 'Pick the date paid.'; return; }
+      if(!(amount > 0)){ err.textContent = 'Enter the amount paid.'; return; }
+      if(!row){ const vv = VEND.vendors.find(x => x.id === Number(val('vfVendor'))), bal = vv ? vendFigures(vv).balance : 0;
+        if(amount > bal + 0.005){ err.textContent = 'That is more than what is owed to this vendor (' + rs(bal) + ').'; return; } }
+      table = 'restaurant_vendor_payments'; rec = { day:val('vfDay'), method:val('vfMethod'), amount, reference:val('vfRef').trim() || null, remarks:val('vfRem').trim() || null };
+      if(!row) rec.vendor_id = Number(val('vfVendor'));
+    }
+    save.disabled = true;
+    const res = row ? await sb.from(table).update(rec).eq('id', row.id).eq('restaurant', REST.id) : await sb.from(table).insert(Object.assign({ restaurant:REST.id }, rec));
+    save.disabled = false;
+    if(res.error){ const m = res.error.message || '';
+      err.textContent = /duplicate key/.test(m) ? 'There is already a vendor with that name.' : /more than what is owed/.test(m) ? m : /row-level security/.test(m) ? 'You are not allowed to do that for this restaurant.' : 'Could not save — ' + (m || 'check the connection.'); return; }
+    ov.classList.remove('open');
+    if(kind === 'invoice') REST.month = rec.day.slice(0, 7);
+    await vendLoad(); renderRest(); restToast('✓ Saved');
+  };
+  ov.classList.add('open');
+  setTimeout(() => { const el = ov.querySelector('input,select'); if(el) el.focus(); }, 30);
 }
 
 /* ---- Delete Requests (restaurant) ---- */
