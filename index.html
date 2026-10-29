@@ -1494,6 +1494,15 @@
   .vf-scroll .r-btn{ white-space:nowrap; }
   @media (max-width: 1000px){ .v-opt{ display:none; } }
   .vl-list .r-table{ width:100% !important; min-width:0 !important; font-size:12.5px; }
+  .vend-roomy{ height:auto !important; min-height:0; }
+  .vend-roomy .vf-body{ min-height:430px; flex:none; }
+  .vend-roomy .vf-col{ min-height:430px; }
+  .vl-big{ overflow:visible !important; }
+  .vl-big .vl-list .r-table{ font-size:14.5px; }
+  .vl-big .vl-list .r-table th, .vl-big .vl-list .r-table td{ padding:10px 10px; }
+  .vl-big .vl-list .r-table th{ font-size:13px; }
+  .vl-big .vl-list .r-btn{ padding:6px 12px; font-size:14px; max-width:260px; }
+  .vl-big h3{ font-size:16px !important; margin-bottom:10px !important; }
   .vl-list .r-table th, .vl-list .r-table td{ padding:4px 5px; }
   .vl-list .r-table th{ white-space:normal !important; line-height:1.15; }
   .vl-list .r-table td{ white-space:normal; } .vl-list .r-table td.n{ white-space:nowrap; }
@@ -4459,7 +4468,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.29-vendor-delete-ask';
+const APP_VERSION = 'v2026.10.29-vendor-roomy';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20737,7 +20746,7 @@ function vendOverview(body, info){
   const pieMeth = Object.keys(monthPay).map((k, i) => ({ label:VEND_METHODS[k] || k, value:monthPay[k], color:['#2563eb', '#2f9e5b', '#e8890c', '#7c3aed'][i % 4] }));
   const logStatus = i => { const f = figs.find(x => x.v.id === i.vendor_id); const it = f && f.f.byInv.get(i.id); return it ? { it, st:vendStatus(it) } : null; };
   body.innerHTML = `
-    <div class="vend-fit">
+    <div class="vend-fit vend-roomy">
     <div class="r-toolbar">
       <button class="r-btn" data-mshift="-1">◀</button><input type="month" id="vMonth" value="${esc(ym)}"><button class="r-btn" data-mshift="1">▶</button>
       <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
@@ -20749,9 +20758,7 @@ function vendOverview(body, info){
       ${vendTile('#2f9e5b', '✅', 'Paid in ' + rMonthName(ym), rs(T('mPaid')), VEND.pay.filter(p => inM(p.day)).length + ' payments')}
       ${vendTile('#e8890c', '⏳', 'Opening balances', rs(T('opening')), 'Paid so far: ' + rs(T('paid')))}
     </div>
-    <div class="vf-body">
-      <div class="vf-col">
-        <div class="r-box vf-box" style="flex:0 0 auto"><h3>Vendor payable list <small>Rs. · click a vendor to open its sheet</small></h3>
+<div class="r-box vf-box vl-big" style="flex:0 0 auto;margin-bottom:12px"><h3>Vendor payable list <small>Rs. · click a vendor to open its sheet</small></h3>
           <div class="vf-scroll vl-list" style="overflow:visible"><table class="r-table"><thead><tr><th>Vendor</th><th class="n v-opt">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th class="v-opt" style="min-width:56px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${figs.map(x => { const tot = x.f.opening + x.f.invoiced, pct = tot ? Math.min(100, x.f.paid / tot * 100) : 0; return `<tr>
             <td><button type="button" class="r-btn" data-vsel="${x.v.id}" style="border-left:6px solid ${vendColor(x.v.id)};font-weight:700">${esc(x.v.name)}</button></td>
@@ -20761,6 +20768,9 @@ function vendOverview(body, info){
             ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="${restCanDelete() ? 'Delete vendor' : 'Ask Makky to delete this vendor'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
             || `<tr><td colspan="9" class="r-muted">No vendors yet.${edit ? ' Press “＋ Vendor” to add the first one.' : ''}</td></tr>`}
           <tr class="tot"><td>TOTAL PAYABLE</td><td class="n v-opt">${vn(T('opening'))}</td><td class="n">${vn(T('invoiced'))}</td><td class="n">${vn(T('paid'))}</td><td class="n">${vn(T('balance'))}</td><td class="n">${vn(T('mInv'))}</td><td class="n">${vn(T('mPaid'))}</td><td class="v-opt"></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
+    <div class="vf-body">
+      <div class="vf-col">
+
         <div class="r-box vf-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
           <div class="vf-scroll vl-list"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${rowsM.map(i => { const s = logStatus(i); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}</td>
