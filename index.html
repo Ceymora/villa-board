@@ -1396,7 +1396,7 @@
     background:#fff; color:var(--muted); padding:7px 13px; border-radius:20px; cursor:pointer; }
   .area-switch button.on{ background:#13233a; color:#fff; border-color:#13233a; }
   .area-switch button.on[data-area="sda"]{ background:#0b4f5c; border-color:#0b4f5c; }    /* SDA Mezze: deep teal */
-  .area-switch button.on[data-area="thai"]{ background:#6f1a2b; border-color:#6f1a2b; }   /* Thai Charm: deep crimson */
+  .area-switch button.on[data-area="thai"]{ background:#1b5e3a; border-color:#1b5e3a; }   /* Thai Charm: deep green */
   body.in-rest .frame{ max-width:1320px; }
   body.in-rest #board > h1, body.in-rest #board > .sub, body.in-rest #board > .maintabs{ display:none !important; }
   #restPanel{ --r-ink:#13233a; --r-muted:#6b7385; --r-line:#e6e9f0; --r-bg:#f4f6fa; --r-cash:#2f9e5b; --r-card:#2563eb;
@@ -1414,7 +1414,7 @@
   .rest-nav button.on{ background:var(--r-side-on, #1f7a55); color:#fff; font-weight:600; }
   /* each restaurant has its own colour for the dark side bar */
   #restPanel[data-rest="sda"]  { --r-side:#0b4f5c; --r-side-on:#13a07e; }   /* SDA Mezze: deep teal */
-  #restPanel[data-rest="thai"] { --r-side:#6f1a2b; --r-side-on:#b85c0a; }   /* Thai Charm: deep crimson */
+  #restPanel[data-rest="thai"] { --r-side:#1b5e3a; --r-side-on:#2e9e5b; }   /* Thai Charm: deep green */
   #restPanel[data-rest="sda"] .rest-brand small, #restPanel[data-rest="thai"] .rest-brand small{ color:rgba(255,255,255,.72); }
   #restPanel[data-rest="sda"] .rest-tag, #restPanel[data-rest="thai"] .rest-tag{ color:rgba(255,255,255,.78); }
   .rest-nav .i{ width:20px; text-align:center; }
@@ -1481,7 +1481,7 @@
   .v-tile .l{ font-size:11.5px; font-weight:600; color:var(--r-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .v-tile .v{ font-size:18px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.25; }
   .v-tile .s{ font-size:11px; color:var(--r-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .vf-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.9fr) minmax(0,1fr); gap:12px; }
+  .vf-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,2.3fr) minmax(0,1.2fr); gap:12px; }
   .vf-col{ display:flex; flex-direction:column; gap:12px; min-height:0; }
   .vf-box{ display:flex; flex-direction:column; min-height:0; padding:10px 12px; overflow:hidden; flex:1 1 0; }
   .vf-box h3{ margin:0 0 6px; font-size:14px; flex:none; }
@@ -1492,7 +1492,12 @@
   .vf-scroll .r-table th{ white-space:nowrap; vertical-align:middle; }
   .vf-scroll .r-table td.wrap{ white-space:normal; min-width:130px; max-width:240px; }
   .vf-scroll .r-btn{ white-space:nowrap; }
-  @media (max-width: 1560px){ .v-opt{ display:none; } }
+  @media (max-width: 1000px){ .v-opt{ display:none; } }
+  .vl-list .r-table{ width:100% !important; min-width:0 !important; font-size:12.5px; }
+  .vl-list .r-table th, .vl-list .r-table td{ padding:4px 5px; }
+  .vl-list .r-table th{ white-space:normal !important; line-height:1.15; }
+  .vl-list .r-table td{ white-space:normal; } .vl-list .r-table td.n{ white-space:nowrap; }
+  .vl-list .r-btn{ padding:4px 8px; font-size:12px; max-width:150px; overflow:hidden; text-overflow:ellipsis; }
   .vf-pie{ display:flex; gap:10px; align-items:center; }
   .vf-pie svg{ width:104px !important; max-width:104px !important; margin:0 !important; flex:none; }
   .vf-pie > div{ flex:1; min-width:0; }
@@ -4454,7 +4459,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.29-vendor-invoice-form';
+const APP_VERSION = 'v2026.10.29-bill-filters';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -9465,9 +9470,20 @@ function bpOverlay(source){
   if(ov) return ov;
   ov = document.createElement('div');
   ov.className = 'modal-overlay'; ov.id = id;
-  ov.innerHTML = `<div class="modal r-form" style="width:min(1200px,96vw);max-width:96vw;max-height:92vh;overflow:auto;"><h3>⚠ These bills need to be settled</h3><div data-bp-body></div>
+  ov.innerHTML = `<div class="modal r-form" style="width:min(1200px,96vw);max-width:96vw;max-height:92vh;overflow:auto;"><h3>⚠ These bills need to be settled</h3>
+    <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px;">
+      <div><label>Bill month</label><input type="month" data-bo-month></div>
+      <div><label>${source === 'villa' ? 'Villa / place' : 'Category'}</label><select data-bo-place><option value="">All</option></select></div>
+      <div><label>Vendor / bill (search)</label><input type="text" data-bo-q placeholder="type a name" style="width:170px"></div>
+      <div><label>Sort by</label><select data-bo-sort><option value="">Oldest bill first</option><option value="new">Newest bill first</option><option value="place">${source === 'villa' ? 'Villa / place' : 'Category'} (A–Z)</option><option value="name">Vendor / bill name (A–Z)</option><option value="amt">Biggest balance first</option></select></div>
+      <button type="button" class="btn" data-bo-clear>✕ Clear</button></div>
+    <div data-bp-body></div>
     <div class="modal-actions"><button type="button" class="btn" data-bp-report>📋 Bills report</button><div style="flex:1"></div><button type="button" class="btn btn-save" data-bp-close>Close</button></div></div>`;
   document.body.appendChild(ov);
+  const reDraw = () => billsOpen(source, true);
+  ov.querySelectorAll('[data-bo-month],[data-bo-place],[data-bo-sort]').forEach(el => el.addEventListener('change', reDraw));
+  ov.querySelector('[data-bo-q]').addEventListener('input', reDraw);
+  ov.querySelector('[data-bo-clear]').addEventListener('click', () => { ov.querySelectorAll('[data-bo-month],[data-bo-place],[data-bo-q],[data-bo-sort]').forEach(el => { el.value = ''; }); reDraw(); });
   ov.addEventListener('click', e => {
     if(e.target === ov || e.target.closest('[data-bp-close]')){ ov.classList.remove('open'); if(source === 'restaurant' && REST.id) renderRest(); return; }
     if(e.target.closest('[data-bp-report]')){ billsReportOpen(source); return; }
@@ -9479,7 +9495,15 @@ function bpOverlay(source){
 async function billsOpen(source, preloaded){
   const ov = bpOverlay(source);
   if(!preloaded){ const r = await billsFetch(source); if(r === null){ alert('Run the bills files in Supabase first (40 / 48, then 51).'); return; } }
-  const list = bpOpenList(source).map(b => ({ b, f:billFig(source, b) })).sort((x, y) => (x.b.date || '').localeCompare(y.b.date || ''));
+  const gv = sel => { const e = ov.querySelector(sel); return e ? e.value : ''; };
+  const fMonth = gv('[data-bo-month]'), fPlace = gv('[data-bo-place]'), fText = gv('[data-bo-q]').trim().toLowerCase(), fSort = gv('[data-bo-sort]');
+  { const pSel = ov.querySelector('[data-bo-place]'), keep = pSel.value, places = [...new Set(BILLPAY.ctx[source].all.map(b => b.place).filter(Boolean))].sort((x, y) => x.localeCompare(y));
+    if(pSel.options.length !== places.length + 1){ pSel.innerHTML = '<option value="">All</option>' + places.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join(''); pSel.value = places.includes(keep) ? keep : ''; } }
+  const ord = { '':(x, y) => (x.b.date || '').localeCompare(y.b.date || ''), new:(x, y) => (y.b.date || '').localeCompare(x.b.date || ''),
+    place:(x, y) => (x.b.place || '').localeCompare(y.b.place || '') || (x.b.date || '').localeCompare(y.b.date || ''),
+    name:(x, y) => (x.b.title || '').localeCompare(y.b.title || '') || (x.b.date || '').localeCompare(y.b.date || ''), amt:(x, y) => y.f.balance - x.f.balance };
+  const list = bpOpenList(source).filter(b => (!fMonth || (b.date || '').slice(0, 7) === fMonth) && (!fPlace || b.place === fPlace) && (!fText || (b.title + ' ' + (b.place || '') + ' ' + (b.invoiceNo || '')).toLowerCase().includes(fText)))
+    .map(b => ({ b, f:billFig(source, b) })).sort(ord[fSort] || ord['']);
   const total = list.reduce((s, r) => s + r.f.balance, 0), can = bpCanPay(source);
   const num = 'text-align:right;white-space:nowrap';
   ov.querySelector('[data-bp-body]').innerHTML = list.length
@@ -9491,7 +9515,7 @@ async function billsOpen(source, preloaded){
          <td style="font-size:12px">${f.last ? esc(bpPayText(source, f.last)) : '<span style="opacity:.6">no payment yet</span>'}</td>
          ${can ? `<td><button type="button" class="btn btn-save" style="padding:4px 10px;" data-bp-pay="${esc(b.id)}">Record payment</button></td>` : ''}</tr>`).join('')}
        </tbody></table></div>`
-    : '<div style="padding:8px 0;">✅ All bills are settled.</div>';
+    : `<div style="padding:8px 0;">${bpOpenList(source).length ? 'No bills match these filters.' : '✅ All bills are settled.'}</div>`;
   ov.classList.add('open');
 }
 
@@ -9556,6 +9580,11 @@ function billsReportOpen(source, keepFilter){
     ov.innerHTML = `<div class="modal r-form" style="width:min(1250px,96vw);max-width:96vw;max-height:92vh;overflow:auto;"><h3>📋 Bills report</h3>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px;">
         <div><label>Settled from</label><input type="date" data-bp-from></div><div><label>to</label><input type="date" data-bp-to></div>
+        <div><label>Bill month</label><input type="month" data-bp-month></div>
+        <div><label>${source === 'villa' ? 'Villa / place' : 'Category'}</label><select data-bp-place><option value="">All</option></select></div>
+        <div><label>Vendor / bill (search)</label><input type="text" data-bp-q placeholder="type a name" style="width:170px"></div>
+        <div><label>Sort by</label><select data-bp-sort><option value="">Default</option><option value="new">Newest bill first</option><option value="old">Oldest bill first</option><option value="place">${source === 'villa' ? 'Villa / place' : 'Category'} (A–Z)</option><option value="name">Vendor / bill name (A–Z)</option><option value="amt">Amount (highest first)</option></select></div>
+        <button type="button" class="btn" data-bp-clear>✕ Clear filters</button>
         <button type="button" class="btn" data-bp-csv>⬇ CSV</button><button type="button" class="btn" data-bp-print>🖨️ Print</button></div>
       <div data-bp-rbody style="max-height:62vh;overflow:auto;"></div>
       <div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-save" data-bp-rclose>Close</button></div></div>`;
@@ -9563,6 +9592,12 @@ function billsReportOpen(source, keepFilter){
     ov.addEventListener('click', e => { if(e.target === ov || e.target.closest('[data-bp-rclose]')) ov.classList.remove('open'); });
     ov.querySelector('[data-bp-from]').addEventListener('change', () => billsReportDraw(source));
     ov.querySelector('[data-bp-to]').addEventListener('change', () => billsReportDraw(source));
+    ['[data-bp-month]', '[data-bp-place]', '[data-bp-sort]'].forEach(q => ov.querySelector(q).addEventListener('change', () => billsReportDraw(source)));
+    ov.querySelector('[data-bp-q]').addEventListener('input', () => billsReportDraw(source));
+    ov.querySelector('[data-bp-clear]').addEventListener('click', () => {
+      ['[data-bp-from]', '[data-bp-to]', '[data-bp-month]', '[data-bp-place]', '[data-bp-q]', '[data-bp-sort]'].forEach(q => { ov.querySelector(q).value = ''; });
+      billsReportDraw(source);
+    });
     ov.querySelector('[data-bp-csv]').addEventListener('click', () => billsReportCsv(source));
     ov.querySelector('[data-bp-print]').addEventListener('click', () => {
       const w = window.open('', '_blank'); if(!w) return;
@@ -9575,14 +9610,25 @@ function billsReportOpen(source, keepFilter){
   go();
 }
 function billsReportData(source){
-  const ov = document.getElementById('billsRep_' + source);
-  const from = ov ? ov.querySelector('[data-bp-from]').value : '', to = ov ? ov.querySelector('[data-bp-to]').value : '';
-  const all = BILLPAY.ctx[source].all.map(b => ({ b, f:billFig(source, b) }));
+  const ov = document.getElementById('billsRep_' + source), q = sel => ov ? ov.querySelector(sel) : null, val = sel => (q(sel) ? q(sel).value : '');
+  const from = val('[data-bp-from]'), to = val('[data-bp-to]'), month = val('[data-bp-month]'), place = val('[data-bp-place]'), text = val('[data-bp-q]').trim().toLowerCase(), sort = val('[data-bp-sort]');
+  const everyone = BILLPAY.ctx[source].all;
+  // keep the place list in step with the bills (and keep the choice)
+  const pSel = q('[data-bp-place]');
+  if(pSel){ const places = [...new Set(everyone.map(b => b.place).filter(Boolean))].sort((x, y) => x.localeCompare(y)), keep = pSel.value;
+    pSel.innerHTML = '<option value="">All</option>' + places.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join(''); pSel.value = places.includes(keep) ? keep : ''; }
+  const keepIt = b => (!month || (b.date || '').slice(0, 7) === month) && (!place || b.place === place) && (!text || (b.title + ' ' + (b.place || '') + ' ' + (b.invoiceNo || '')).toLowerCase().includes(text));
+  const all = everyone.filter(keepIt).map(b => ({ b, f:billFig(source, b) }));
   const open = all.filter(x => !x.b.settled);
-  const part = open.filter(x => x.f.paid > 0), unpaid = open.filter(x => !x.f.paid);
   const settledDate = x => x.b.settledOn || (x.f.last ? x.f.last.paid_on : x.b.date);
-  const done = all.filter(x => x.b.settled && (!from || settledDate(x) >= from) && (!to || settledDate(x) <= to))
-    .sort((p, q) => settledDate(q).localeCompare(settledDate(p)));
+  const order = {
+    new:(p, r) => (r.b.date || '').localeCompare(p.b.date || ''), old:(p, r) => (p.b.date || '').localeCompare(r.b.date || ''),
+    place:(p, r) => (p.b.place || '').localeCompare(r.b.place || '') || (p.b.date || '').localeCompare(r.b.date || ''),
+    name:(p, r) => (p.b.title || '').localeCompare(r.b.title || '') || (p.b.date || '').localeCompare(r.b.date || ''),
+    amt:(p, r) => r.b.amount - p.b.amount };
+  const arrange = (list, dflt) => list.slice().sort(order[sort] || dflt);
+  const part = arrange(open.filter(x => x.f.paid > 0), order.old), unpaid = arrange(open.filter(x => !x.f.paid), order.old);
+  const done = arrange(all.filter(x => x.b.settled && (!from || settledDate(x) >= from) && (!to || settledDate(x) <= to)), (p, r) => settledDate(r).localeCompare(settledDate(p)));
   return { part, unpaid, done, settledDate, from, to };
 }
 function billsReportDraw(source){
@@ -20673,6 +20719,7 @@ function vendWire(body){
   }));
 }
 function vendOverview(body, info){
+  const vn = n => Math.round(Number(n) || 0).toLocaleString('en-US');
   const ym = REST.month, from = monthStart(ym), to = monthEnd(ym), edit = restEdits(REST.id), del = restCanBin();
   const figs = VEND.vendors.map(v => ({ v, f:vendFigures(v) }));
   const inM = d => d >= from && d <= to;
@@ -20700,18 +20747,18 @@ function vendOverview(body, info){
     </div>
     <div class="vf-body">
       <div class="vf-col">
-        <div class="r-box vf-box" style="flex:0 1 auto;max-height:46%"><h3>Vendor payable list <small>click a vendor to open its sheet</small></h3>
-          <div class="vf-scroll"><table class="r-table"><thead><tr><th>Vendor</th><th class="n v-opt">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th class="v-opt" style="min-width:90px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+        <div class="r-box vf-box" style="flex:0 0 auto"><h3>Vendor payable list <small>Rs. · click a vendor to open its sheet</small></h3>
+          <div class="vf-scroll vl-list" style="overflow:visible"><table class="r-table"><thead><tr><th>Vendor</th><th class="n v-opt">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th class="v-opt" style="min-width:56px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${figs.map(x => { const tot = x.f.opening + x.f.invoiced, pct = tot ? Math.min(100, x.f.paid / tot * 100) : 0; return `<tr>
             <td><button type="button" class="r-btn" data-vsel="${x.v.id}" style="border-left:6px solid ${vendColor(x.v.id)};font-weight:700">${esc(x.v.name)}</button></td>
-            <td class="n v-opt">${rs(x.f.opening)}</td><td class="n">${rs(x.f.invoiced)}</td><td class="n">${rs(x.f.paid)}</td>
-            <td class="n" style="font-weight:700;color:${x.f.balance > 0.005 ? '#c92a2a' : '#1f7a55'}">${rs(x.f.balance)}</td><td class="n">${rs(x.mInv)}</td><td class="n">${rs(x.mPaid)}</td>
+            <td class="n v-opt">${vn(x.f.opening)}</td><td class="n">${vn(x.f.invoiced)}</td><td class="n">${vn(x.f.paid)}</td>
+            <td class="n" style="font-weight:700;color:${x.f.balance > 0.005 ? '#c92a2a' : '#1f7a55'}">${vn(x.f.balance)}</td><td class="n">${vn(x.mInv)}</td><td class="n">${vn(x.mPaid)}</td>
             <td class="v-opt"><div style="background:#eef1f6;border-radius:6px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${vendColor(x.v.id)}"></div></div><div class="r-muted" style="font-size:11px">${Math.round(pct)}%</div></td>
             ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="Delete vendor">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
             || `<tr><td colspan="9" class="r-muted">No vendors yet.${edit ? ' Press “＋ Vendor” to add the first one.' : ''}</td></tr>`}
-          <tr class="tot"><td>TOTAL PAYABLE</td><td class="n v-opt">${rs(T('opening'))}</td><td class="n">${rs(T('invoiced'))}</td><td class="n">${rs(T('paid'))}</td><td class="n">${rs(T('balance'))}</td><td class="n">${rs(T('mInv'))}</td><td class="n">${rs(T('mPaid'))}</td><td class="v-opt"></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
+          <tr class="tot"><td>TOTAL PAYABLE</td><td class="n v-opt">${vn(T('opening'))}</td><td class="n">${vn(T('invoiced'))}</td><td class="n">${vn(T('paid'))}</td><td class="n">${vn(T('balance'))}</td><td class="n">${vn(T('mInv'))}</td><td class="n">${vn(T('mPaid'))}</td><td class="v-opt"></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
         <div class="r-box vf-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
-          <div class="vf-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+          <div class="vf-scroll vl-list"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${rowsM.map(i => { const s = logStatus(i); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}</td>
             <td><span style="border-left:5px solid ${vendColor(i.vendor_id)};padding-left:6px">${esc(vendName(i.vendor_id))}</span></td><td class="n">${rs(i.amount)}</td>
             <td>${s ? vendBadge(s.st) : ''}</td><td>${s ? esc(vendViaText(s.it.via)) : ''}</td><td class="wrap r-muted" style="font-size:12px">${esc(i.remarks || '')}</td>
