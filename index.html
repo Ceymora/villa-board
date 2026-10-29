@@ -4459,7 +4459,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.29-store-option';
+const APP_VERSION = 'v2026.10.29-vendor-delete-ask';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20710,8 +20710,12 @@ function vendWire(body){
   }));
   body.querySelectorAll('[data-vdel]').forEach(b => b.addEventListener('click', async () => {
     const [kind, id] = b.dataset.vdel.split(':');
-    if(!restCanDelete()){ alert('Only Makky can delete this. Please ask him — and tell him which line it is.'); return; }
     const table = kind === 'invoice' ? 'restaurant_vendor_invoices' : kind === 'payment' ? 'restaurant_vendor_payments' : 'restaurant_vendors';
+    if(!restCanDelete()){
+      // Buddhini and others who can change the restaurant: ask Makky. Nothing is deleted until he approves.
+      const what = kind === 'vendor' ? 'this vendor' : kind === 'invoice' ? 'this vendor invoice' : 'this vendor payment';
+      await restDeleteMany(table, [id], what); await vendLoad(); renderRest(); return;
+    }
     if(!confirm('Delete this ' + kind + '? A copy is kept in Deleted items.')) return;
     const { error } = await sb.from(table).delete().eq('id', id).eq('restaurant', REST.id);
     if(error){ alert('Could not delete — ' + (/foreign key/.test(error.message || '') ? 'this vendor still has invoices or payments.' : (error.message || 'check the connection.'))); return; }
@@ -20754,7 +20758,7 @@ function vendOverview(body, info){
             <td class="n v-opt">${vn(x.f.opening)}</td><td class="n">${vn(x.f.invoiced)}</td><td class="n">${vn(x.f.paid)}</td>
             <td class="n" style="font-weight:700;color:${x.f.balance > 0.005 ? '#c92a2a' : '#1f7a55'}">${vn(x.f.balance)}</td><td class="n">${vn(x.mInv)}</td><td class="n">${vn(x.mPaid)}</td>
             <td class="v-opt"><div style="background:#eef1f6;border-radius:6px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${vendColor(x.v.id)}"></div></div><div class="r-muted" style="font-size:11px">${Math.round(pct)}%</div></td>
-            ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="Delete vendor">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
+            ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="${restCanDelete() ? 'Delete vendor' : 'Ask Makky to delete this vendor'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
             || `<tr><td colspan="9" class="r-muted">No vendors yet.${edit ? ' Press “＋ Vendor” to add the first one.' : ''}</td></tr>`}
           <tr class="tot"><td>TOTAL PAYABLE</td><td class="n v-opt">${vn(T('opening'))}</td><td class="n">${vn(T('invoiced'))}</td><td class="n">${vn(T('paid'))}</td><td class="n">${vn(T('balance'))}</td><td class="n">${vn(T('mInv'))}</td><td class="n">${vn(T('mPaid'))}</td><td class="v-opt"></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
         <div class="r-box vf-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
