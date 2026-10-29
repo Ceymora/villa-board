@@ -1395,12 +1395,14 @@
   .area-switch button{ font-family:Inter,sans-serif; font-size:12.5px; font-weight:600; border:1px solid var(--board-line);
     background:#fff; color:var(--muted); padding:7px 13px; border-radius:20px; cursor:pointer; }
   .area-switch button.on{ background:#13233a; color:#fff; border-color:#13233a; }
+  .area-switch button.on[data-area="sda"]{ background:#0b4f5c; border-color:#0b4f5c; }    /* SDA Mezze: deep teal */
+  .area-switch button.on[data-area="thai"]{ background:#6f1a2b; border-color:#6f1a2b; }   /* Thai Charm: deep crimson */
   body.in-rest .frame{ max-width:1320px; }
   body.in-rest #board > h1, body.in-rest #board > .sub, body.in-rest #board > .maintabs{ display:none !important; }
   #restPanel{ --r-ink:#13233a; --r-muted:#6b7385; --r-line:#e6e9f0; --r-bg:#f4f6fa; --r-cash:#2f9e5b; --r-card:#2563eb;
     --r-co:#8b5cf6; --r-tr:#d97706; --r-amber:#e8890c; --r-green-bg:#e8f6ee;
     display:flex; background:var(--r-bg); border-radius:14px; overflow:hidden; border:1px solid var(--r-line); min-height:640px; color:var(--r-ink); }
-  .rest-side{ width:218px; flex:0 0 218px; background:#13233a; color:#dfe5ef; padding:18px 12px; display:flex; flex-direction:column; }
+  .rest-side{ width:218px; flex:0 0 218px; background:var(--r-side, #13233a); color:#dfe5ef; padding:18px 12px; display:flex; flex-direction:column; }
   .rest-brand{ display:flex; gap:10px; align-items:center; padding:2px 6px 18px; }
   .rest-brand .ico{ font-size:28px; line-height:1; }
   .rest-brand b{ display:block; font-size:15.5px; color:#fff; line-height:1.2; }
@@ -1409,7 +1411,12 @@
   .rest-nav button{ display:flex; gap:11px; align-items:center; text-align:left; background:none; border:0; color:#dfe5ef; font:500 13.5px Inter,sans-serif;
     padding:10px 12px; border-radius:8px; cursor:pointer; }
   .rest-nav button:hover{ background:rgba(255,255,255,0.06); }
-  .rest-nav button.on{ background:#1f7a55; color:#fff; font-weight:600; }
+  .rest-nav button.on{ background:var(--r-side-on, #1f7a55); color:#fff; font-weight:600; }
+  /* each restaurant has its own colour for the dark side bar */
+  #restPanel[data-rest="sda"]  { --r-side:#0b4f5c; --r-side-on:#13a07e; }   /* SDA Mezze: deep teal */
+  #restPanel[data-rest="thai"] { --r-side:#6f1a2b; --r-side-on:#b85c0a; }   /* Thai Charm: deep crimson */
+  #restPanel[data-rest="sda"] .rest-brand small, #restPanel[data-rest="thai"] .rest-brand small{ color:rgba(255,255,255,.72); }
+  #restPanel[data-rest="sda"] .rest-tag, #restPanel[data-rest="thai"] .rest-tag{ color:rgba(255,255,255,.78); }
   .rest-nav .i{ width:20px; text-align:center; }
   .rest-tag{ margin-top:auto; padding:18px 10px 4px; font:italic 13px/1.5 'Kalam',cursive; color:#b9c4d6; }
   .rest-main{ flex:1; min-width:0; padding:20px 22px 26px; }
@@ -1466,6 +1473,31 @@
   }
   .r-table tr.click{ cursor:pointer; } .r-table tr.click:hover td{ background:#f8fafc; }
   .r-scroll{ overflow-x:auto; }
+  /* Vendor payables: the whole page fits the screen; only the long lists scroll inside their own box. */
+  .vend-fit{ display:flex; flex-direction:column; height:calc(100vh - 240px); min-height:520px; }
+  .vend-fit .r-toolbar{ margin-bottom:8px; flex:none; }
+  .v-tiles{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:10px; flex:none; }
+  .v-tile{ background:#fff; border:1px solid var(--r-line); border-left:5px solid var(--c); border-radius:10px; padding:7px 12px; min-width:0; }
+  .v-tile .l{ font-size:11.5px; font-weight:600; color:var(--r-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .v-tile .v{ font-size:18px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.25; }
+  .v-tile .s{ font-size:11px; color:var(--r-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vf-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.9fr) minmax(0,1fr); gap:12px; }
+  .vf-col{ display:flex; flex-direction:column; gap:12px; min-height:0; }
+  .vf-box{ display:flex; flex-direction:column; min-height:0; padding:10px 12px; overflow:hidden; flex:1 1 0; }
+  .vf-box h3{ margin:0 0 6px; font-size:14px; flex:none; }
+  .vf-scroll{ overflow:auto; min-height:0; flex:1 1 auto; }
+  .vf-scroll .r-table th, .vf-scroll .r-table td{ padding:5px 7px; }
+  .vf-scroll thead th{ position:sticky; top:0; z-index:1; }
+  .vf-scroll .r-table{ width:max-content; min-width:100%; }
+  .vf-scroll .r-table th{ white-space:nowrap; vertical-align:middle; }
+  .vf-scroll .r-table td.wrap{ white-space:normal; min-width:130px; max-width:240px; }
+  .vf-scroll .r-btn{ white-space:nowrap; }
+  @media (max-width: 1560px){ .v-opt{ display:none; } }
+  .vf-pie{ display:flex; gap:10px; align-items:center; }
+  .vf-pie svg{ width:104px !important; max-width:104px !important; margin:0 !important; flex:none; }
+  .vf-pie > div{ flex:1; min-width:0; }
+  .vf-pie > div > div{ margin-top:0 !important; }
+  @media (max-width: 900px){ .vend-fit{ height:auto !important; } .vf-body{ display:block; } .vf-col{ margin-bottom:12px; } .vf-box{ max-height:none !important; } .v-tiles{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
   .r-sum div{ display:flex; align-items:center; gap:12px; padding:8px 0; font-size:13px; }
   .r-sum .b{ width:32px; height:32px; flex:0 0 32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:15px; }
   .r-sum span{ flex:1; } .r-sum b{ white-space:nowrap; }
@@ -1477,7 +1509,7 @@
   .r-muted{ color:var(--r-muted); }
   .r-chart{ position:relative; }
   .r-chart svg{ display:block; width:100%; height:auto; }
-  .r-tip{ position:absolute; pointer-events:none; background:#13233a; color:#fff; font-size:12px; padding:8px 10px; border-radius:8px; white-space:nowrap;
+  .r-tip{ position:absolute; pointer-events:none; background:var(--r-side,#13233a); color:#fff; font-size:12px; padding:8px 10px; border-radius:8px; white-space:nowrap;
     box-shadow:0 6px 18px rgba(0,0,0,0.18); display:none; z-index:3; line-height:1.55; }
   .r-donut{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
   .r-donut svg{ width:170px; height:170px; flex:0 0 170px; }
@@ -4422,7 +4454,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.27-bills-vendors';
+const APP_VERSION = 'v2026.10.29-vendor-invoice-form';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -9433,7 +9465,7 @@ function bpOverlay(source){
   if(ov) return ov;
   ov = document.createElement('div');
   ov.className = 'modal-overlay'; ov.id = id;
-  ov.innerHTML = `<div class="modal r-form" style="max-width:780px;"><h3>⚠ These bills need to be settled</h3><div data-bp-body></div>
+  ov.innerHTML = `<div class="modal r-form" style="width:min(1200px,96vw);max-width:96vw;max-height:92vh;overflow:auto;"><h3>⚠ These bills need to be settled</h3><div data-bp-body></div>
     <div class="modal-actions"><button type="button" class="btn" data-bp-report>📋 Bills report</button><div style="flex:1"></div><button type="button" class="btn btn-save" data-bp-close>Close</button></div></div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => {
@@ -9469,7 +9501,7 @@ function billPayForm(source, b){
   if(!ov){
     ov = document.createElement('div');
     ov.className = 'modal-overlay'; ov.id = 'billPayOv'; ov.style.zIndex = '10050';
-    ov.innerHTML = `<div class="modal r-form" style="max-width:430px;"><h3>Record a payment</h3>
+    ov.innerHTML = `<div class="modal r-form" style="width:min(480px,94vw);"><h3>Record a payment</h3>
       <div id="bpInfo" style="margin-bottom:6px;"></div>
       <label>Date paid</label><input type="date" id="bpDate">
       <label>Amount paid now</label><input type="number" id="bpAmt" min="0.01" step="0.01">
@@ -9521,7 +9553,7 @@ function billsReportOpen(source, keepFilter){
   if(!ov){
     ov = document.createElement('div');
     ov.className = 'modal-overlay'; ov.id = id; ov.style.zIndex = '10040';
-    ov.innerHTML = `<div class="modal r-form" style="max-width:980px;"><h3>📋 Bills report</h3>
+    ov.innerHTML = `<div class="modal r-form" style="width:min(1250px,96vw);max-width:96vw;max-height:92vh;overflow:auto;"><h3>📋 Bills report</h3>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px;">
         <div><label>Settled from</label><input type="date" data-bp-from></div><div><label>to</label><input type="date" data-bp-to></div>
         <button type="button" class="btn" data-bp-csv>⬇ CSV</button><button type="button" class="btn" data-bp-print>🖨️ Print</button></div>
@@ -19234,6 +19266,7 @@ function restSubscribe(){
 function renderRest(){
   const id = REST.id; if(!id) return;
   const info = restInfo(id);
+  document.getElementById('restPanel').dataset.rest = id;
   const ic = document.getElementById('restIcon');
   if(restLogoOk(info.logo)){ ic.innerHTML = ''; const im = document.createElement('img'); im.src = info.logo; im.alt = '';
     im.style.cssText = 'width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;padding:2px'; ic.appendChild(im); }
@@ -20589,6 +20622,17 @@ function vendDonut(items, centerTop, centerSub){
     <text x="85" y="82" text-anchor="middle" font-size="13" font-weight="700" fill="#13233a">${esc(centerTop)}</text>
     <text x="85" y="98" text-anchor="middle" font-size="9.5" fill="#6b7385">${esc(centerSub)}</text></svg>`;
 }
+function vendTile(color, icon, label, value, sub){
+  return `<div class="v-tile" style="--c:${color}"><div class="l">${icon} ${esc(label)}</div><div class="v" style="color:${color}">${esc(value)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ''}</div>`;
+}
+/* Make the vendor page exactly as tall as the screen, so nothing but the long lists scrolls. */
+function vendFit(body){
+  const fit = () => { const el = document.querySelector('#restPanel .vend-fit'); if(!el) return;
+    if(window.innerWidth <= 900){ el.style.height = ''; return; }
+    const top = Math.max(0, el.getBoundingClientRect().top); el.style.height = Math.max(480, window.innerHeight - top - 34) + 'px'; };
+  fit(); requestAnimationFrame(fit);
+  if(!window.__vendFitOn){ window.__vendFitOn = true; window.addEventListener('resize', fit); }
+}
 function vendLegend(items, fmt){
   const sum = items.reduce((s, x) => s + x.value, 0);
   return `<div style="margin-top:8px;font-size:12.5px">${items.filter(x => x.value > 0).map(x => `<div style="display:flex;gap:8px;align-items:center;padding:2px 0"><span style="width:11px;height:11px;border-radius:3px;background:${x.color};flex:none"></span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.label)}</span><b>${esc(fmt(x.value))}</b><span class="r-muted" style="width:38px;text-align:right">${sum ? Math.round(x.value / sum * 100) + '%' : ''}</span></div>`).join('') || '<div class="r-muted">Nothing yet.</div>'}</div>`;
@@ -20642,45 +20686,48 @@ function vendOverview(body, info){
   const pieMeth = Object.keys(monthPay).map((k, i) => ({ label:VEND_METHODS[k] || k, value:monthPay[k], color:['#2563eb', '#2f9e5b', '#e8890c', '#7c3aed'][i % 4] }));
   const logStatus = i => { const f = figs.find(x => x.v.id === i.vendor_id); const it = f && f.f.byInv.get(i.id); return it ? { it, st:vendStatus(it) } : null; };
   body.innerHTML = `
+    <div class="vend-fit">
     <div class="r-toolbar">
       <button class="r-btn" data-mshift="-1">◀</button><input type="month" id="vMonth" value="${esc(ym)}"><button class="r-btn" data-mshift="1">▶</button>
       <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
       ${edit ? '<button class="r-btn" id="vAddVendor">＋ Vendor</button><button class="r-btn primary" id="vAddInv">＋ Invoice</button><button class="r-btn" id="vAddPay" style="background:#2563eb;color:#fff;border-color:#2563eb">＋ Payment</button>' : '<span class="r-muted">View only</span>'}
     </div>
-    <div class="r-cards">
-      ${restCard('#c92a2a', '💳', 'Total payable (all vendors)', rs(T('balance')), [['Vendors owed', String(owing)]])}
-      ${restCard('#2563eb', '🧾', 'Invoiced in ' + esc(rMonthName(ym)), rs(T('mInv')), [['Invoices', String(rowsM.length)]])}
-      ${restCard('#2f9e5b', '✅', 'Paid in ' + esc(rMonthName(ym)), rs(T('mPaid')), [['Payments', String(VEND.pay.filter(p => inM(p.day)).length)]])}
-      ${restCard('#e8890c', '⏳', 'Opening balances', rs(T('opening')), [['Total paid ever', rs(T('paid'))]])}
+    <div class="v-tiles">
+      ${vendTile('#c92a2a', '💳', 'Total payable (all vendors)', rs(T('balance')), owing + (owing === 1 ? ' vendor owed' : ' vendors owed'))}
+      ${vendTile('#2563eb', '🧾', 'Invoiced in ' + rMonthName(ym), rs(T('mInv')), rowsM.length + (rowsM.length === 1 ? ' invoice' : ' invoices'))}
+      ${vendTile('#2f9e5b', '✅', 'Paid in ' + rMonthName(ym), rs(T('mPaid')), VEND.pay.filter(p => inM(p.day)).length + ' payments')}
+      ${vendTile('#e8890c', '⏳', 'Opening balances', rs(T('opening')), 'Paid so far: ' + rs(T('paid')))}
     </div>
-    <div class="r-grid2">
-      <div>
-        <div class="r-box"><h3>Vendor payable list <small>click a vendor to open its sheet</small></h3>
-          <div class="r-scroll"><table class="r-table"><thead><tr><th>Vendor</th><th class="n">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th style="min-width:90px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+    <div class="vf-body">
+      <div class="vf-col">
+        <div class="r-box vf-box" style="flex:0 1 auto;max-height:46%"><h3>Vendor payable list <small>click a vendor to open its sheet</small></h3>
+          <div class="vf-scroll"><table class="r-table"><thead><tr><th>Vendor</th><th class="n v-opt">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th class="v-opt" style="min-width:90px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${figs.map(x => { const tot = x.f.opening + x.f.invoiced, pct = tot ? Math.min(100, x.f.paid / tot * 100) : 0; return `<tr>
             <td><button type="button" class="r-btn" data-vsel="${x.v.id}" style="border-left:6px solid ${vendColor(x.v.id)};font-weight:700">${esc(x.v.name)}</button></td>
-            <td class="n">${rs(x.f.opening)}</td><td class="n">${rs(x.f.invoiced)}</td><td class="n">${rs(x.f.paid)}</td>
+            <td class="n v-opt">${rs(x.f.opening)}</td><td class="n">${rs(x.f.invoiced)}</td><td class="n">${rs(x.f.paid)}</td>
             <td class="n" style="font-weight:700;color:${x.f.balance > 0.005 ? '#c92a2a' : '#1f7a55'}">${rs(x.f.balance)}</td><td class="n">${rs(x.mInv)}</td><td class="n">${rs(x.mPaid)}</td>
-            <td><div style="background:#eef1f6;border-radius:6px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${vendColor(x.v.id)}"></div></div><div class="r-muted" style="font-size:11px">${Math.round(pct)}%</div></td>
+            <td class="v-opt"><div style="background:#eef1f6;border-radius:6px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${vendColor(x.v.id)}"></div></div><div class="r-muted" style="font-size:11px">${Math.round(pct)}%</div></td>
             ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="Delete vendor">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
             || `<tr><td colspan="9" class="r-muted">No vendors yet.${edit ? ' Press “＋ Vendor” to add the first one.' : ''}</td></tr>`}
-          <tr class="tot"><td>TOTAL PAYABLE</td><td class="n">${rs(T('opening'))}</td><td class="n">${rs(T('invoiced'))}</td><td class="n">${rs(T('paid'))}</td><td class="n">${rs(T('balance'))}</td><td class="n">${rs(T('mInv'))}</td><td class="n">${rs(T('mPaid'))}</td><td></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
-        <div class="r-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
-          <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+          <tr class="tot"><td>TOTAL PAYABLE</td><td class="n v-opt">${rs(T('opening'))}</td><td class="n">${rs(T('invoiced'))}</td><td class="n">${rs(T('paid'))}</td><td class="n">${rs(T('balance'))}</td><td class="n">${rs(T('mInv'))}</td><td class="n">${rs(T('mPaid'))}</td><td class="v-opt"></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
+        <div class="r-box vf-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
+          <div class="vf-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${rowsM.map(i => { const s = logStatus(i); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}</td>
             <td><span style="border-left:5px solid ${vendColor(i.vendor_id)};padding-left:6px">${esc(vendName(i.vendor_id))}</span></td><td class="n">${rs(i.amount)}</td>
             <td>${s ? vendBadge(s.st) : ''}</td><td>${s ? esc(vendViaText(s.it.via)) : ''}</td><td class="wrap r-muted" style="font-size:12px">${esc(i.remarks || '')}</td>
             ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="invoice:${i.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="invoice:${i.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
             || `<tr><td colspan="10" class="r-muted">No invoices in ${esc(rMonthName(ym))}.${edit ? ' Press “＋ Invoice”.' : ''}</td></tr>`}
           <tr class="tot"><td colspan="5">Total invoiced</td><td class="n">${rs(T('mInv'))}</td><td colspan="${edit || del ? 4 : 3}"></td></tr></tbody></table></div>
-          <div class="r-note">Payments are entered under “＋ Payment” (or on the vendor's own sheet). A payment settles the oldest invoice first.</div></div>
+          <div class="r-note" style="flex:none;margin-top:6px;font-size:11.5px">Payments: “＋ Payment” (or on the vendor's own sheet). A payment settles the oldest invoice first.</div></div>
       </div>
-      <div>
-        <div class="r-box"><h3>Invoiced by vendor <small>${esc(rMonthName(ym))}</small></h3>${vendDonut(pieInv, rs(T('mInv')), 'invoiced')}${vendLegend(pieInv, rs)}</div>
-        <div class="r-box"><h3>Balance due by vendor <small>today</small></h3>${vendBars(bars, rs)}</div>
-        <div class="r-box"><h3>Paid by method <small>${esc(rMonthName(ym))}</small></h3>${vendDonut(pieMeth, rs(T('mPaid')), 'paid')}${vendLegend(pieMeth, rs)}</div>
+      <div class="vf-col">
+        <div class="r-box vf-box"><h3>Invoiced by vendor <small>${esc(rMonthName(ym))}</small></h3><div class="vf-scroll"><div class="vf-pie">${vendDonut(pieInv, rs(T('mInv')), 'invoiced')}<div>${vendLegend(pieInv, rs)}</div></div></div></div>
+        <div class="r-box vf-box"><h3>Balance due by vendor <small>today</small></h3><div class="vf-scroll">${vendBars(bars, rs)}</div></div>
+        <div class="r-box vf-box"><h3>Paid by method <small>${esc(rMonthName(ym))}</small></h3><div class="vf-scroll"><div class="vf-pie">${vendDonut(pieMeth, rs(T('mPaid')), 'paid')}<div>${vendLegend(pieMeth, rs)}</div></div></div></div>
       </div>
+    </div>
     </div>`;
+  vendFit(body);
   vendWire(body);
   restWireExport(body, 'Vendor payables — ' + rMonthName(ym), ['Vendor', 'Opening', 'Invoiced', 'Paid', 'Balance due', 'Invoiced this month', 'Paid this month'],
     figs.map(x => [x.v.name, x.f.opening, x.f.invoiced, x.f.paid, x.f.balance, x.mInv, x.mPaid]), ['Total', T('opening'), T('invoiced'), T('paid'), T('balance'), T('mInv'), T('mPaid')]);
@@ -20693,33 +20740,36 @@ function vendDetail(body, info){
   const pieBal = [{ label:'Paid', value:f.paid, color:'#2f9e5b' }, { label:'Balance due', value:Math.max(0, f.balance), color:'#c92a2a' }];
   const run = (() => { let r = f.opening; const evs = f.invs.map(i => ({ d:i.day, k:'i', x:i })).concat(f.pays.map(p => ({ d:p.day, k:'p', x:p }))).sort((a, b) => a.d.localeCompare(b.d) || (a.k < b.k ? 1 : -1) || a.x.id - b.x.id); return evs.map(e => { r += e.k === 'i' ? Number(e.x.amount) : -Number(e.x.amount); return Object.assign({ bal:r }, e); }); })();
   body.innerHTML = `
+    <div class="vend-fit">
     <div class="r-toolbar"><button class="r-btn" data-vback>◀ All vendors</button><b style="font-size:18px;border-left:7px solid ${col};padding-left:10px">${esc(v.name)}</b>
       <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
       ${edit ? `<button class="r-btn primary" id="vAddInv">＋ Invoice</button><button class="r-btn" id="vAddPay" style="background:#2563eb;color:#fff;border-color:#2563eb">＋ Payment</button>` : ''}</div>
-    <div class="r-cards">
-      ${restCard('#6b7385', '📂', 'Opening balance', rs(f.opening), [['', '']])}
-      ${restCard('#2563eb', '🧾', 'Total invoiced', rs(f.invoiced), [['Invoices', String(f.invs.length)]])}
-      ${restCard('#2f9e5b', '✅', 'Total paid', rs(f.paid), [['Payments', String(f.pays.length)], ['Paid', Math.round(pct) + '%']])}
-      ${restCard('#c92a2a', '⏳', 'BALANCE DUE', rs(f.balance), [['', '']])}
+    <div class="v-tiles">
+      ${vendTile('#6b7385', '📂', 'Opening balance', rs(f.opening), 'brought forward')}
+      ${vendTile('#2563eb', '🧾', 'Total invoiced', rs(f.invoiced), f.invs.length + (f.invs.length === 1 ? ' invoice' : ' invoices'))}
+      ${vendTile('#2f9e5b', '✅', 'Total paid', rs(f.paid), f.pays.length + ' payments · ' + Math.round(pct) + '% paid')}
+      ${vendTile('#c92a2a', '⏳', 'BALANCE DUE', rs(f.balance), f.balance > 0.005 ? 'still to pay' : f.balance < -0.005 ? 'credit — paid in advance' : 'nothing owed')}
     </div>
-    <div class="r-grid2"><div>
-      <div class="r-box"><h3>Invoices <small>filled from the invoice log</small></h3><div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our no.</th><th>Supplier bill</th><th>Description</th><th class="n">Amount</th><th class="n">Paid</th><th class="n">Balance</th><th>Status</th><th>Paid by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+    <div class="vf-body"><div class="vf-col">
+      <div class="r-box vf-box"><h3>Invoices <small>filled from the invoice log</small></h3><div class="vf-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Our no.</th><th>Supplier bill</th><th>Description</th><th class="n">Amount</th><th class="n">Paid</th><th class="n">Balance</th><th>Status</th><th>Paid by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
         ${f.opening > 0 ? `<tr class="r-muted"><td colspan="4">Opening balance brought forward</td><td class="n">${rs(f.opening)}</td><td class="n">${rs(f.opening - f.items[0].left)}</td><td class="n">${rs(f.items[0].left)}</td><td>${vendBadge(vendStatus(f.items[0]))}</td><td>${esc(vendViaText(f.items[0].via))}</td>${edit || del ? '<td></td>' : ''}</tr>` : ''}
         ${f.invs.map(i => { const it = f.byInv.get(i.id); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}${i.remarks ? `<div class="r-muted" style="font-size:11px">${esc(i.remarks)}</div>` : ''}</td>
           <td class="n">${rs(i.amount)}</td><td class="n">${rs(i.amount - it.left)}</td><td class="n">${rs(it.left)}</td><td>${vendBadge(vendStatus(it))}</td><td>${esc(vendViaText(it.via))}</td>
           ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="invoice:${i.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="invoice:${i.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
           || `<tr><td colspan="10" class="r-muted">No invoices yet.</td></tr>`}
         <tr class="tot"><td colspan="4">Total</td><td class="n">${rs(f.invoiced + f.opening)}</td><td class="n">${rs(f.paid)}</td><td class="n">${rs(f.balance)}</td><td colspan="${edit || del ? 3 : 2}"></td></tr></tbody></table></div></div>
-      <div class="r-box"><h3>Payments to ${esc(v.name)}</h3><div class="r-scroll"><table class="r-table"><thead><tr><th>Date paid</th><th>Method</th><th>Reference</th><th class="n">Amount paid</th><th class="n">Balance after</th><th>Remarks</th><th>Entered by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+      <div class="r-box vf-box"><h3>Payments to ${esc(v.name)}</h3><div class="vf-scroll"><table class="r-table"><thead><tr><th>Date paid</th><th>Method</th><th>Reference</th><th class="n">Amount paid</th><th class="n">Balance after</th><th>Remarks</th><th>Entered by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
         ${run.filter(e => e.k === 'p').map(e => { const p = e.x; return `<tr><td>${esc(rLong(p.day))}</td><td>${esc(VEND_METHODS[p.method] || p.method)}</td><td>${esc(p.reference || '')}</td><td class="n" style="font-weight:700;color:#1f7a55">${rs(p.amount)}</td><td class="n">${rs(e.bal)}</td>
           <td class="wrap r-muted" style="font-size:12px">${esc(p.remarks || '')}</td><td class="r-muted" style="font-size:11px">${esc(restWho(p))}</td>
           ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="payment:${p.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="payment:${p.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
           || `<tr><td colspan="8" class="r-muted">No payments yet.${edit ? ' Press “＋ Payment” when you pay this vendor.' : ''}</td></tr>`}
         <tr class="tot"><td colspan="3">Total paid</td><td class="n">${rs(f.paid)}</td><td class="n">${rs(f.balance)}</td><td colspan="${edit || del ? 3 : 2}"></td></tr></tbody></table></div></div>
-    </div><div>
-      <div class="r-box"><h3>Paid vs balance</h3>${vendDonut(pieBal, Math.round(pct) + '%', 'paid')}${vendLegend(pieBal, rs)}</div>
-      <div class="r-box"><h3>Payments by method</h3>${vendDonut(pieMeth, rs(f.paid), 'paid')}${vendLegend(pieMeth, rs)}</div>
-    </div></div>`;
+    </div><div class="vf-col">
+      <div class="r-box vf-box"><h3>Paid vs balance</h3><div class="vf-scroll"><div class="vf-pie">${vendDonut(pieBal, Math.round(pct) + '%', 'paid')}<div>${vendLegend(pieBal, rs)}</div></div></div></div>
+      <div class="r-box vf-box"><h3>Payments by method</h3><div class="vf-scroll"><div class="vf-pie">${vendDonut(pieMeth, rs(f.paid), 'paid')}<div>${vendLegend(pieMeth, rs)}</div></div></div></div>
+    </div></div>
+    </div>`;
+  vendFit(body);
   vendWire(body);
   const rows = run.map(e => e.k === 'i' ? [rLong(e.d), 'Invoice ' + (e.x.our_no || ''), (e.x.bill_no ? e.x.bill_no + ' — ' : '') + e.x.description, Number(e.x.amount), '', e.bal] : [rLong(e.d), 'Payment (' + (VEND_METHODS[e.x.method] || e.x.method) + ')', e.x.reference || e.x.remarks || '', '', Number(e.x.amount), e.bal]);
   restWireExport(body, 'Vendor statement — ' + v.name, ['Date', 'Entry', 'Details', 'Invoiced', 'Paid', 'Balance'], (f.opening > 0 ? [['', 'Opening balance', '', '', '', f.opening]] : []).concat(rows), ['Total', '', '', f.invoiced, f.paid, f.balance]);
@@ -20730,7 +20780,7 @@ function vendForm(kind, row, preVendor){
   let ov = document.getElementById('vendFormOv');
   if(!ov){
     ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'vendFormOv';
-    ov.innerHTML = `<div class="modal r-form" style="max-width:460px;"><h3 id="vfTitle"></h3><div id="vfFields"></div>
+    ov.innerHTML = `<div class="modal r-form" style="width:min(520px,94vw);max-height:94vh;overflow:auto;"><h3 id="vfTitle"></h3><div id="vfFields"></div>
       <div id="vfErr" style="color:#c92a2a;font-size:13px;margin-top:8px;min-height:18px;"></div>
       <div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" id="vfCancel">Cancel</button><button type="button" class="btn btn-save" id="vfSave">Save</button></div></div>`;
     document.body.appendChild(ov);
@@ -20749,12 +20799,39 @@ function vendForm(kind, row, preVendor){
   }else if(!vendors.length){
     f.innerHTML = '<div class="r-warn">Add a vendor first (＋ Vendor).</div>';
   }else if(kind === 'invoice'){
-    f.innerHTML = `<label>Invoice date</label><input id="vfDay" type="date" value="${esc(row ? row.day : today)}">${vsel(row ? row.vendor_id : (preVendor || vendors[0].id))}
-      <label>Supplier's bill number</label><input id="vfBill" maxlength="60" value="${esc(row ? row.bill_no || '' : '')}">
-      <label>Description / item</label><input id="vfDesc" maxlength="300" value="${esc(row ? row.description : '')}">
-      <label>Amount (Rs.)</label><input id="vfAmt" type="number" min="0.01" step="0.01" value="${row ? Number(row.amount) : ''}">
-      <label>Remarks</label><input id="vfRem" maxlength="500" value="${esc(row ? row.remarks || '' : '')}">
-      <div class="r-muted" style="font-size:12px;margin-top:6px">${row ? 'Our invoice number: <b>' + esc(row.our_no || '') + '</b>' : 'Our invoice number is given automatically when you save.'}</div>`;
+    f.innerHTML = `<label>1. Invoice date</label><input id="vfDay" type="date" value="${esc(row ? row.day : today)}">
+      <label>2. Vendor</label>${vsel(row ? row.vendor_id : (preVendor || vendors[0].id)).replace(/^<label>Vendor<\/label>/, '')}
+      <label>3. Supplier bill number</label><input id="vfBill" maxlength="60" value="${esc(row ? row.bill_no || '' : '')}">
+      <label>4. Description / item</label><input id="vfDesc" maxlength="300" value="${esc(row ? row.description : '')}">
+      <label>5. Amount (Rs.)</label><input id="vfAmt" type="number" min="0.01" step="0.01" value="${row ? Number(row.amount) : ''}">
+      ${row ? '' : `<label>6. Paying method</label>
+        <select id="vfPMethod"><option value="">Not paid yet</option><option value="cash">Cash</option><option value="card">Card</option><option value="transfer">Bank transfer</option><option value="bank">Bank (cheque / deposit)</option></select>
+        <div id="vfPaidBox" style="display:none"><label>7. Amount paid (Rs.)</label><input id="vfPAmt" type="number" min="0.01" step="0.01"></div>
+        <div id="vfSum" style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#f4f9f6;border:1px solid var(--r-line);font-size:13.5px;line-height:1.7"></div>`}
+      <label>Remarks (optional)</label><input id="vfRem" maxlength="500" value="${esc(row ? row.remarks || '' : '')}">
+      <div class="r-muted" style="font-size:12px;margin-top:6px">${row ? 'Our invoice number: <b>' + esc(row.our_no || '') + '</b>' : 'Our invoice number is given automatically when you save.'}</div>
+      ${row ? '<div class="r-muted" style="font-size:12px;margin-top:6px">To record a payment for this invoice use “＋ Payment”.</div>' : ''}`;
+    if(!row){
+      const g = id => document.getElementById(id), pm = g('vfPMethod'), pAmt = g('vfPAmt');
+      const sync = () => {
+        const amount = Number(g('vfAmt').value) || 0, paying = pm.value ? (Number(pAmt.value) || 0) : 0;
+        const vv = VEND.vendors.find(x => x.id === Number(g('vfVendor').value)), before = vv ? vendFigures(vv).balance : 0;
+        g('vfPaidBox').style.display = pm.value ? '' : 'none';
+        if(pm.value && !pAmt.dataset.touched) pAmt.value = amount > 0 ? amount : '';
+        const pay = pm.value ? (Number(pAmt.value) || 0) : 0, left = Math.round((amount - pay) * 100) / 100, after = Math.round((before + amount - pay) * 100) / 100;
+        g('vfSum').innerHTML = amount > 0
+          ? `Invoice <b>${esc(rs(amount))}</b> · Paying <b>${esc(rs(pay))}</b><br>` +
+            (left > 0.005 ? `<span style="color:#b45309">Balance to settle on this invoice: <b>${esc(rs(left))}</b></span>`
+             : left < -0.005 ? `<span style="color:#b45309">Paying <b>${esc(rs(-left))}</b> more than this invoice — kept as credit with the vendor.</span>`
+             : `<span style="color:#1f7a55"><b>Fully paid</b></span>`) +
+            `<br>${esc(vv ? vv.name : 'Vendor')} — total balance after saving: <b style="color:${after > 0.005 ? '#c92a2a' : '#1f7a55'}">${esc(rs(after))}</b>${after < -0.005 ? ' (credit)' : ''}`
+          : '<span class="r-muted">Enter the amount to see what is left to settle.</span>';
+      };
+      pm.addEventListener('change', () => { pAmt.dataset.touched = ''; sync(); });
+      pAmt.addEventListener('input', () => { pAmt.dataset.touched = '1'; sync(); });
+      g('vfAmt').addEventListener('input', sync); g('vfVendor').addEventListener('change', sync);
+      sync();
+    }
   }else{
     const pv = row ? row.vendor_id : (preVendor || vendors[0].id);
     f.innerHTML = `<label>Date paid</label><input id="vfDay" type="date" value="${esc(row ? row.day : todayISO())}">${vsel(pv)}
@@ -20765,16 +20842,18 @@ function vendForm(kind, row, preVendor){
       <label>Remarks</label><input id="vfRem" maxlength="500" value="${esc(row ? row.remarks || '' : '')}">`;
     const hint = () => { const vv = VEND.vendors.find(x => x.id === Number(document.getElementById('vfVendor').value)); if(!vv) return;
       const bal = vendFigures(vv).balance; document.getElementById('vfBalHint').innerHTML = 'Balance owed now: <b>' + esc(rs(bal)) + '</b>';
-      const a = document.getElementById('vfAmt'); if(!row && !a.dataset.touched) a.value = bal > 0 ? bal : ''; };
+      const a = document.getElementById('vfAmt'); if(!row && !a.dataset.touched) a.value = bal > 0 ? bal : '';
+      const over = Number(a.value) - (bal + (row ? Number(row.amount) : 0));
+      if(over > 0.005) document.getElementById('vfBalHint').innerHTML += ' · <span style="color:#b45309">This is <b>' + esc(rs(over)) + '</b> more than the balance — it is saved as <b>credit (paid in advance)</b> and will be used on this vendor\'s next invoices.</span>'; };
     document.getElementById('vfVendor').addEventListener('change', () => { document.getElementById('vfAmt').dataset.touched = ''; hint(); });
-    document.getElementById('vfAmt').addEventListener('input', e => { e.target.dataset.touched = '1'; });
+    document.getElementById('vfAmt').addEventListener('input', e => { e.target.dataset.touched = '1'; hint(); });
     hint();
   }
   document.getElementById('vfErr').textContent = '';
   const save = document.getElementById('vfSave'); save.disabled = false; save.style.display = (kind !== 'vendor' && !vendors.length) ? 'none' : '';
   save.onclick = async () => {
     const err = document.getElementById('vfErr'), val = id => (document.getElementById(id) || {}).value || '';
-    let table, rec;
+    let table, rec, payNow = null, addOpen = 0, openVendor = null;
     if(kind === 'vendor'){
       const name = val('vfName').trim(), open = Number(val('vfOpen') || 0);
       if(!name){ err.textContent = 'Write the vendor name.'; return; }
@@ -20787,23 +20866,35 @@ function vendForm(kind, row, preVendor){
       if(!(amount > 0)){ err.textContent = 'Enter an amount above 0.'; return; }
       table = 'restaurant_vendor_invoices'; rec = { day:val('vfDay'), bill_no:val('vfBill').trim() || null, description:desc, amount, remarks:val('vfRem').trim() || null };
       if(!row) rec.vendor_id = Number(val('vfVendor'));
+      if(!row && val('vfPMethod')){
+        const pa = Number(val('vfPAmt'));
+        if(!(pa > 0)){ err.textContent = 'Write how much was paid, or choose "Not paid yet".'; return; }
+        payNow = { day:val('vfDay'), method:val('vfPMethod'), amount:pa, reference:null, remarks:'Paid when the invoice was entered' + (rec.bill_no ? ' (bill ' + rec.bill_no + ')' : '') };
+      }
     }else{
       const amount = Number(val('vfAmt'));
       if(!val('vfDay')){ err.textContent = 'Pick the date paid.'; return; }
       if(!(amount > 0)){ err.textContent = 'Enter the amount paid.'; return; }
-      if(!row){ const vv = VEND.vendors.find(x => x.id === Number(val('vfVendor'))), bal = vv ? vendFigures(vv).balance : 0;
-        if(amount > bal + 0.005){ err.textContent = 'That is more than what is owed to this vendor (' + rs(bal) + ').'; return; } }
       table = 'restaurant_vendor_payments'; rec = { day:val('vfDay'), method:val('vfMethod'), amount, reference:val('vfRef').trim() || null, remarks:val('vfRem').trim() || null };
       if(!row) rec.vendor_id = Number(val('vfVendor'));
     }
     save.disabled = true;
+    if(addOpen > 0 && openVendor){
+      const r0 = await sb.from('restaurant_vendors').update({ opening_balance:Math.round((Number(openVendor.opening_balance) + addOpen) * 100) / 100 }).eq('id', openVendor.id).eq('restaurant', REST.id);
+      if(r0.error){ save.disabled = false; err.textContent = 'Could not add to the opening balance — ' + (r0.error.message || 'check the connection.'); return; }
+    }
     const res = row ? await sb.from(table).update(rec).eq('id', row.id).eq('restaurant', REST.id) : await sb.from(table).insert(Object.assign({ restaurant:REST.id }, rec));
     save.disabled = false;
     if(res.error){ const m = res.error.message || '';
       err.textContent = /duplicate key/.test(m) ? 'There is already a vendor with that name.' : /more than what is owed/.test(m) ? m : /row-level security/.test(m) ? 'You are not allowed to do that for this restaurant.' : 'Could not save — ' + (m || 'check the connection.'); return; }
+    if(payNow){
+      const pr = await sb.from('restaurant_vendor_payments').insert(Object.assign({ restaurant:REST.id, vendor_id:rec.vendor_id }, payNow));
+      if(pr.error){ ov.classList.remove('open'); REST.month = rec.day.slice(0, 7); await vendLoad(); renderRest();
+        alert('The invoice was saved, but the payment was NOT saved — ' + (pr.error.message || 'check the connection.') + '\n\nPlease add it with “＋ Payment”.'); return; }
+    }
     ov.classList.remove('open');
     if(kind === 'invoice') REST.month = rec.day.slice(0, 7);
-    await vendLoad(); renderRest(); restToast('✓ Saved');
+    await vendLoad(); renderRest(); restToast(payNow ? '✓ Saved — invoice and payment' : addOpen > 0 ? '✓ Saved — opening balance increased by ' + rs(addOpen) : '✓ Saved');
   };
   ov.classList.add('open');
   setTimeout(() => { const el = ov.querySelector('input,select'); if(el) el.focus(); }, 30);
@@ -20906,7 +20997,7 @@ function restDashReport(out, info, from, to){
       <span style="flex:1">${esc(x.label)}</span><b>${esc(fmtPct(pctOf(x.v, p.revenue)))}</b></div>`).join('');
   const kpi = (label, v) => `<tr><td>${esc(label)}</td><td class="n" style="font-weight:700;${colour(v)}">${esc(fmtPct(v))}</td></tr>`;
   out.innerHTML = `
-    <div class="r-box" style="margin-bottom:14px;background:#13233a;color:#fff;border-color:#13233a">
+    <div class="r-box" style="margin-bottom:14px;background:var(--r-side,#13233a);color:#fff;border-color:var(--r-side,#13233a)">
       <h3 style="color:#fff"><span>Dashboard — ${esc(info.name)}</span><small style="color:#b9c4d6">${esc(rMonthName(m))} compared with ${esc(rMonthName(pm))}</small></h3></div>
     <div class="r-grid3 r-compact" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">
       <div class="r-box"><h3>Page 1 · Performance</h3>
@@ -21022,7 +21113,7 @@ function restSalesAnalysis(out, info, from, to){
     <div class="r-box" style="margin-bottom:14px"><h3><span>${esc(info.name.toUpperCase())} — Sales summary April ${fy} to March ${fy + 1}</span>
       <select id="saFy" class="r-btn">${years.map(yv => `<option value="${yv}" ${yv === fy ? 'selected' : ''}>${yv}/${String(yv + 1).slice(2)}</option>`).join('')}</select></h3>
       <div class="r-cards" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:12px">
-        ${restCard('#13233a', 'Σ', 'Total sales', rs(T.total), [['Months with sales', String(withSales.length)]])}
+        ${restCard('var(--r-side,#13233a)', 'Σ', 'Total sales', rs(T.total), [['Months with sales', String(withSales.length)]])}
         ${restCard('#eb6834', '💳', 'Card & bank transfer', rs(T.card), [['Share', T.total ? Math.round(T.card / T.total * 1000) / 10 + '%' : '—']])}
         ${restCard('#2a78d6', '💵', 'Cash sale', rs(T.cash), [['Share', T.total ? Math.round(T.cash / T.total * 1000) / 10 + '%' : '—']])}
         ${restCard('#1f7a55', '🏆', 'Best month', best ? esc(mName(best.m)) : '—', [['Sales', best ? rs(best.total) : '—'], ['Average a month', rs(avg)]])}
