@@ -1643,6 +1643,7 @@
         </div>
       </div>
 
+      <div class="no-print" id="pkgOpenWrap" style="margin-bottom:10px"><button type="button" class="add-booking-btn" id="pkgOpenBtn">🎁 Package cost (calculator)</button></div>
       <div class="rpt-picker no-print">
         <span class="rpt-picker-label">Show:</span>
         <div id="exKindTabs" class="villatabs" style="margin:0; display:inline-flex;"></div>
@@ -4468,7 +4469,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.30-makky-delete-popup';
+const APP_VERSION = 'v2026.10.30-package-cost';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4620,6 +4621,146 @@ async function mdpShow(){
       + '<td style="white-space:nowrap"><button type="button" class="btn btn-delete" style="padding:4px 10px" data-mdp-yes="' + esc(q.id) + '">Approve</button> <button type="button" class="btn" style="padding:4px 10px" data-mdp-no="' + esc(q.id) + '">Reject</button></td></tr>').join('')
     + '</tbody></table></div>';
   ov.classList.add('open');
+}
+
+
+/* ---------------- Villa package cost calculator (file 58) ----------------
+   What the welcome package given to each booking cost the villa. Zahny types the prices; the database adds them up.
+   A private calculator — it is not part of the reports or the accounts.                                   */
+const PKG_BRISA = ['Coconut Milk', 'Munchee Biscuit Family Pack', 'Chocolate', 'Bread', 'Chips', 'Peanut', 'Jam', 'Samahan'];
+const PKG_KALAVA = ['Vegetables', 'Eggs', 'Curd', 'Yoghurt', 'Fresh Milk', 'Coconut Milk', 'Cheese', 'Butter', 'Tea Bag', 'Sunflower Oil', 'Pasta', 'Oats', 'Wine', 'Olive Oil'];
+function pkgItemsFor(villaId){
+  const id = String(villaId || '').toLowerCase(), list = ['Fruits'];
+  if(id.startsWith('kalava')) list.push(...PKG_KALAVA);
+  else{ list.push('Welcome Drink'); if(id.startsWith('brisa')) list.push(...PKG_BRISA); }
+  list.push('Soft Drinks Bottles');
+  return list;
+}
+const PKG = { villa:null, month:null, rows:[], loaded:false, missing:false };
+const pkgMoney = n => 'LKR ' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const pkgFmtDay = d => { try{ return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }catch(_e){ return d; } };
+function pkgCan(){ return (typeof vcCan === 'function') && vcCan('laundry'); }
+function pkgVillaName(id){ const v = (VR_VILLAS || []).find(x => x.id === id); return v ? v.name : id; }
+async function pkgLoad(){
+  const from = PKG.month + '-01', d = new Date(from + 'T00:00:00'); d.setMonth(d.getMonth() + 1);
+  const to = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+  const { data, error } = await sb.from('villa_packages').select('*').eq('villa_id', PKG.villa).gte('day', from).lt('day', to).order('day', { ascending:true }).limit(2000);
+  PKG.missing = !!error; PKG.rows = error ? [] : (data || []); PKG.loaded = true;
+}
+async function pkgOpen(){
+  let ov = document.getElementById('pkgOv');
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'pkgOv'; ov.style.zIndex = '10030';
+    ov.innerHTML = '<div class="modal r-form" style="width:min(1100px,96vw);max-height:94vh;overflow:auto;"><h3>🎁 Package cost — what we spend on each booking\'s package</h3><div data-pkg-body></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
+  }
+  const villas = VR_VILLAS || [];
+  if(!PKG.villa || !villas.some(v => v.id === PKG.villa)) PKG.villa = (villas[0] || {}).id;
+  if(!PKG.month) PKG.month = new Date().toISOString().slice(0, 7);
+  ov.classList.add('open');
+  await pkgDraw();
+}
+async function pkgDraw(){
+  const ov = document.getElementById('pkgOv'); if(!ov) return;
+  await pkgLoad();
+  const villas = VR_VILLAS || [], can = pkgCan(), total = PKG.rows.reduce((s, r) => s + Number(r.total), 0);
+  const byItem = {}; PKG.rows.forEach(r => (r.items || []).forEach(i => { byItem[i.name] = (byItem[i.name] || 0) + Number(i.price); }));
+  const th = 'text-align:left;padding:8px;border-bottom:2px solid #ddd;font-size:13px', td = 'padding:8px;border-bottom:1px solid #eee;vertical-align:top;font-size:13.5px';
+  ov.querySelector('[data-pkg-body]').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px">
+      <div><label>Villa</label><select data-pkg-villa>${villas.map(v => `<option value="${esc(v.id)}" ${v.id === PKG.villa ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></div>
+      <div><label>Month</label><input type="month" data-pkg-month value="${esc(PKG.month)}"></div>
+      ${can ? '<button type="button" class="btn btn-save" data-pkg-add>＋ New package</button>' : ''}
+      <button type="button" class="btn" data-pkg-print-all>🖨️ Print month</button>
+      <div style="flex:1"></div><button type="button" class="btn btn-cancel" data-pkg-close>Close</button></div>
+    ${PKG.missing ? '<div style="color:#b45309;margin-bottom:8px">Not set up yet — run 58-supabase-villa-packages.sql in Supabase once.</div>' : ''}
+    <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Date</th><th style="${th}">Guest name</th><th style="${th}">What was supplied</th><th style="${th};text-align:right">Package value</th><th style="${th}"></th></tr></thead><tbody>
+      ${PKG.rows.length ? PKG.rows.map(r => `<tr><td style="${td};white-space:nowrap">${esc(pkgFmtDay(r.day))}</td><td style="${td}"><b>${esc(r.guest)}</b>${r.note ? `<div style="font-size:12px;opacity:.7">${esc(r.note)}</div>` : ''}</td>
+        <td style="${td};font-size:12.5px">${(r.items || []).map(i => esc(i.name) + ' ' + Number(i.price).toLocaleString('en-US')).join(' · ') || '–'}</td>
+        <td style="${td};text-align:right;font-weight:700;white-space:nowrap">${esc(pkgMoney(r.total))}</td>
+        <td style="${td};white-space:nowrap"><button type="button" class="btn" style="padding:3px 8px" data-pkg-print="${esc(r.id)}">🖨️</button>${can ? ` <button type="button" class="btn" style="padding:3px 8px" data-pkg-edit="${esc(r.id)}">✏️ Edit</button> <button type="button" class="btn btn-delete" style="padding:3px 8px" data-pkg-del="${esc(r.id)}">🗑 Delete</button>` : ''}</td></tr>`).join('')
+        : `<tr><td colspan="5" style="${td};opacity:.7">No packages recorded for ${esc(pkgVillaName(PKG.villa))} in this month.</td></tr>`}
+      <tr><td colspan="3" style="padding:10px;font-weight:700;background:#e8f6ee">TOTAL — ${esc(pkgVillaName(PKG.villa))} · ${PKG.rows.length} package${PKG.rows.length === 1 ? '' : 's'}</td><td style="padding:10px;text-align:right;font-weight:800;background:#e8f6ee;white-space:nowrap">${esc(pkgMoney(total))}</td><td style="background:#e8f6ee"></td></tr>
+    </tbody></table></div>
+    ${Object.keys(byItem).length ? `<div style="margin-top:10px;font-size:12.5px"><b>By item:</b> ${Object.keys(byItem).sort((a, b) => byItem[b] - byItem[a]).map(k => esc(k) + ' ' + Number(byItem[k]).toLocaleString('en-US')).join(' · ')}</div>` : ''}`;
+  const q = sel => ov.querySelector(sel);
+  q('[data-pkg-villa]').addEventListener('change', e => { PKG.villa = e.target.value; pkgDraw(); });
+  q('[data-pkg-month]').addEventListener('change', e => { if(e.target.value){ PKG.month = e.target.value; pkgDraw(); } });
+  q('[data-pkg-close]').addEventListener('click', () => ov.classList.remove('open'));
+  q('[data-pkg-print-all]').addEventListener('click', () => pkgPrint(PKG.rows));
+  const add = q('[data-pkg-add]'); if(add) add.addEventListener('click', () => pkgForm(null));
+  ov.querySelectorAll('[data-pkg-print]').forEach(b => b.addEventListener('click', () => pkgPrint(PKG.rows.filter(r => r.id === b.dataset.pkgPrint))));
+  ov.querySelectorAll('[data-pkg-edit]').forEach(b => b.addEventListener('click', () => pkgForm(PKG.rows.find(r => r.id === b.dataset.pkgEdit))));
+  ov.querySelectorAll('[data-pkg-del]').forEach(b => b.addEventListener('click', async () => {
+    const r = PKG.rows.find(x => x.id === b.dataset.pkgDel); if(!r || !confirm('Delete the package for ' + r.guest + ' (' + pkgMoney(r.total) + ')?')) return;
+    const { error } = await sb.from('villa_packages').delete().eq('id', r.id);
+    if(error){ alert('Could not delete — ' + (error.message || 'check the connection.')); return; }
+    try{ logActivity('delete', 'villa_packages', 'Deleted a package: ' + r.guest + ' — ' + pkgMoney(r.total)); }catch(_e){}
+    pkgDraw();
+  }));
+}
+function pkgForm(row){
+  let ov = document.getElementById('pkgFormOv');
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'pkgFormOv'; ov.style.zIndex = '10040';
+    ov.innerHTML = '<div class="modal r-form" style="width:min(620px,96vw);max-height:94vh;overflow:auto;"><h3 data-pf-title></h3><div data-pf-body></div><div data-pf-err style="color:#c92a2a;font-size:13px;min-height:18px;margin-top:6px"></div><div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" data-pf-cancel>Cancel</button><button type="button" class="btn btn-save" data-pf-save>Save</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('[data-pf-cancel]').addEventListener('click', () => ov.classList.remove('open'));
+  }
+  const names = pkgItemsFor(PKG.villa), have = {}; ((row && row.items) || []).forEach(i => { have[i.name] = i.price; });
+  const custom = ((row && row.items) || []).filter(i => !names.includes(i.name));
+  ov.querySelector('[data-pf-title]').textContent = (row ? 'Edit package — ' : 'New package — ') + pkgVillaName(PKG.villa);
+  const customRow = (n, pr) => `<div class="pf-custom" style="display:flex;gap:6px;margin-bottom:4px"><input type="text" maxlength="60" placeholder="Other item" data-pf-cname value="${esc(n || '')}" style="flex:1"><input type="number" min="0" step="0.01" placeholder="Price" data-pf-cprice value="${pr == null ? '' : esc(pr)}" style="width:130px"></div>`;
+  ov.querySelector('[data-pf-body]').innerHTML = `
+    <div style="display:flex;gap:8px"><div style="flex:1"><label>Date</label><input type="date" data-pf-day value="${esc(row ? row.day : new Date().toISOString().slice(0, 10))}"></div>
+      <div style="flex:2"><label>Guest name</label><input type="text" maxlength="120" data-pf-guest value="${esc(row ? row.guest : '')}"></div></div>
+    <label style="margin-top:12px">Prices (leave blank what was not supplied)</label>
+    <div style="display:grid;grid-template-columns:1fr 130px;gap:4px 8px;align-items:center">${names.map((n, i) => `<div>${esc(n)}</div><input type="number" min="0" step="0.01" data-pf-price="${i}" value="${have[n] == null ? '' : esc(have[n])}">`).join('')}</div>
+    <label style="margin-top:12px">Other items</label><div data-pf-customs>${custom.map(c => customRow(c.name, c.price)).join('') || customRow('', null)}</div>
+    <button type="button" class="btn" data-pf-more style="margin-top:4px">＋ Add another item</button>
+    <label style="margin-top:12px">Note (optional)</label><input type="text" maxlength="500" data-pf-note value="${esc(row ? row.note || '' : '')}">
+    <div style="margin-top:12px;padding:10px;background:#f4f9f6;border-radius:8px;font-weight:700" data-pf-total></div>`;
+  const q = sel => ov.querySelector(sel), qa = sel => [...ov.querySelectorAll(sel)];
+  const collect = () => {
+    const items = [];
+    qa('[data-pf-price]').forEach(el => { const v = el.value.trim(); if(v !== '') items.push({ name:names[Number(el.dataset.pfPrice)], price:Number(v) }); });
+    qa('.pf-custom').forEach(div => { const n = div.querySelector('[data-pf-cname]').value.trim(), v = div.querySelector('[data-pf-cprice]').value.trim(); if(n || v !== '') items.push({ name:n, price:v === '' ? NaN : Number(v) }); });
+    return items;
+  };
+  const sum = () => { const t = collect().reduce((s, i) => s + (Number(i.price) || 0), 0); q('[data-pf-total]').textContent = 'Package value: ' + pkgMoney(t); };
+  ov.oninput = sum;
+  q('[data-pf-more]').onclick = () => { q('[data-pf-customs]').insertAdjacentHTML('beforeend', customRow('', null)); };
+  sum(); q('[data-pf-err]').textContent = '';
+  const save = q('[data-pf-save]'); save.disabled = false;
+  save.onclick = async () => {
+    const err = q('[data-pf-err]'), day = q('[data-pf-day]').value, guest = q('[data-pf-guest]').value.trim(), items = collect();
+    if(!day){ err.textContent = 'Pick the date.'; return; }
+    if(!guest){ err.textContent = 'Write the guest name.'; return; }
+    if(items.some(i => !i.name)){ err.textContent = 'An extra price has no item name.'; return; }
+    if(items.some(i => !(i.price >= 0))){ err.textContent = 'Every item needs a price (0 or more).'; return; }
+    if(!items.length){ err.textContent = 'Enter at least one price.'; return; }
+    save.disabled = true;
+    const rec = { day, guest, items, note:q('[data-pf-note]').value.trim() || null };
+    const res = row ? await sb.from('villa_packages').update(rec).eq('id', row.id) : await sb.from('villa_packages').insert(Object.assign({ villa_id:PKG.villa }, rec));
+    save.disabled = false;
+    if(res.error){ err.textContent = /villa_packages/.test(res.error.message || '') && /exist|schema cache/.test(res.error.message || '') ? 'Run 58-supabase-villa-packages.sql in Supabase first.' : 'Could not save — ' + (res.error.message || 'check the connection.'); return; }
+    try{ logActivity(row ? 'update' : 'create', 'villa_packages', (row ? 'Changed' : 'Added') + ' a package: ' + guest + ' — ' + pkgVillaName(PKG.villa)); }catch(_e){}
+    ov.classList.remove('open'); PKG.month = day.slice(0, 7); pkgDraw();
+  };
+  ov.classList.add('open');
+}
+function pkgPrint(rows){
+  if(!rows.length){ alert('Nothing to print.'); return; }
+  const total = rows.reduce((s, r) => s + Number(r.total), 0), single = rows.length === 1;
+  const detail = r => (r.items || []).map(i => `<tr><td>${esc(i.name)}</td><td style="text-align:right">${esc(pkgMoney(i.price))}</td></tr>`).join('');
+  const html = `<!doctype html><meta charset="utf-8"><title>Package cost</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:14px}th,td{border:1px solid #ccd;padding:6px 8px;text-align:left}th{background:#f2f4f8}.t td{font-weight:bold;background:#e8f6ee}h2{margin:0 0 4px}.s{color:#667;margin-bottom:14px}</style>
+    <h2>Package cost — ${esc(pkgVillaName(PKG.villa))}</h2><div class="s">${single ? esc(pkgFmtDay(rows[0].day)) + ' · ' + esc(rows[0].guest) : esc(PKG.month)}</div>
+    ${single ? `<table><thead><tr><th>Item</th><th style="text-align:right">Price</th></tr></thead><tbody>${detail(rows[0])}<tr class="t"><td>Package value</td><td style="text-align:right">${esc(pkgMoney(total))}</td></tr></tbody></table>${rows[0].note ? '<div>' + esc(rows[0].note) + '</div>' : ''}`
+      : `<table><thead><tr><th>Date</th><th>Guest name</th><th>What was supplied</th><th style="text-align:right">Package value</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(pkgFmtDay(r.day))}</td><td>${esc(r.guest)}</td><td style="font-size:12px">${(r.items || []).map(i => esc(i.name) + ' ' + Number(i.price).toLocaleString('en-US')).join(' · ')}</td><td style="text-align:right">${esc(pkgMoney(r.total))}</td></tr>`).join('')}<tr class="t"><td colspan="3">TOTAL — ${rows.length} package${rows.length === 1 ? '' : 's'}</td><td style="text-align:right">${esc(pkgMoney(total))}</td></tr></tbody></table>`}`;
+  const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f); f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+  setTimeout(() => { try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(_e){} setTimeout(() => f.remove(), 2000); }, 300);
 }
 
 function showNoAccess(email, suspended){
@@ -6283,6 +6424,7 @@ function exportVillaExpensesCSV(){
 
 function initVillaExpenses(){
   ensureVillaCosts();
+  { const pb = document.getElementById('pkgOpenBtn'); if(pb && !pb.dataset.on){ pb.dataset.on = '1'; pb.addEventListener('click', pkgOpen); } }
   if(typeof invInited !== 'undefined' && !invInited && typeof initInventory === 'function') initInventory();
   if(!exInited){
     exInited = true;
