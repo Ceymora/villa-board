@@ -4468,7 +4468,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.29-vendor-roomy';
+const APP_VERSION = 'v2026.10.30-makky-delete-popup';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4568,6 +4568,7 @@ async function enterApp(profile){
   document.getElementById('appRoot').style.display = 'block';
   startApp();
   startupSettleReminder().catch(e => console.error(e));
+  startMakkyDeletePopup().catch(e => console.error(e));
 }
 /* Villa petty cash: right after sign-in, if any bill is not settled, pop up the reminder with the outstanding
    amount. (The petty cash tab is only loaded when it is opened, so it cannot do this by itself.) */
@@ -4577,6 +4578,48 @@ async function startupSettleReminder(){
   if(rows === null || settleShownOnce || !bpOpenList('villa').length) return;
   settleShownOnce = true;
   billsOpen('villa', true);   // shows the balance of every bill that is still open
+}
+
+
+/* ---------------- Makky only: pop-up when someone has asked to delete something ----------------
+   Shown at sign-in and again the moment a new request arrives. Only the admin (Makky) ever sees it;
+   the database also refuses anyone else's approve / reject.                                          */
+let mdpStarted = false, mdpBusy = false;
+async function startMakkyDeletePopup(){
+  if(!sb || !isAdmin()) return;
+  await mdpShow(true);
+  if(mdpStarted) return; mdpStarted = true;
+  sb.channel('makky_delete_popup').on('postgres_changes', { event:'INSERT', schema:'public', table:'delete_requests' }, () => mdpShow(false)).subscribe();
+}
+async function mdpShow(){
+  if(!isAdmin() || mdpBusy) return;
+  const { data, error } = await sb.from('delete_requests').select('*').eq('status', 'pending').order('requested_at', { ascending:true }).limit(200);
+  let ov = document.getElementById('mdpOv');
+  if(error || !data || !data.length){ if(ov) ov.classList.remove('open'); return; }
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'mdpOv'; ov.style.zIndex = '10060';
+    ov.innerHTML = '<div class="modal r-form" style="width:min(900px,96vw);max-height:90vh;overflow:auto;"><h3>🗑 Delete requests waiting for you</h3><div data-mdp-body></div><div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" data-mdp-later>Decide later</button></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', async e => {
+      if(e.target === ov || e.target.closest('[data-mdp-later]')){ ov.classList.remove('open'); return; }
+      const b = e.target.closest('[data-mdp-yes],[data-mdp-no]'); if(!b) return;
+      const ok = b.hasAttribute('data-mdp-yes'), id = Number(b.dataset.mdpYes || b.dataset.mdpNo);
+      if(!confirm(ok ? 'Approve and delete this?' : 'Reject this request?')) return;
+      mdpBusy = true; b.disabled = true;
+      const { error } = await sb.rpc('decide_delete_request', { p_id:id, p_approve:ok, p_note:null });
+      mdpBusy = false;
+      if(error){ alert(error.message || 'Could not save.'); b.disabled = false; return; }
+      try{ if(typeof fetchDelReqs === 'function') fetchDelReqs(); if(typeof fetchCash === 'function') fetchCash(); if(typeof REST !== 'undefined' && REST.id && typeof restLoad === 'function'){ await restLoad(); if(typeof vendLoad === 'function') await vendLoad(); renderRest(); } }catch(_e){}
+      mdpShow();
+    });
+  }
+  const when = t => { try{ return new Date(t).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); }catch(_e){ return ''; } };
+  ov.querySelector('[data-mdp-body]').innerHTML = '<div style="margin-bottom:8px">' + data.length + ' request' + (data.length === 1 ? '' : 's') + ' — nothing is deleted until you approve.</div>'
+    + '<div style="overflow:auto"><table class="r-table" style="width:100%"><thead><tr><th>Asked</th><th>By</th><th>What</th><th>Reason</th><th></th></tr></thead><tbody>'
+    + data.map(q => '<tr><td style="white-space:nowrap">' + esc(when(q.requested_at)) + '</td><td>' + esc(q.requested_by_email || '') + '</td><td>' + esc(q.summary || '') + '</td><td>' + esc(q.reason || '') + '</td>'
+      + '<td style="white-space:nowrap"><button type="button" class="btn btn-delete" style="padding:4px 10px" data-mdp-yes="' + esc(q.id) + '">Approve</button> <button type="button" class="btn" style="padding:4px 10px" data-mdp-no="' + esc(q.id) + '">Reject</button></td></tr>').join('')
+    + '</tbody></table></div>';
+  ov.classList.add('open');
 }
 
 function showNoAccess(email, suspended){
