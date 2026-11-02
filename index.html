@@ -4469,7 +4469,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.10.30-package-cost';
+const APP_VERSION = 'v2026.11.02-vendor-delete-all';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20910,7 +20910,14 @@ function vendWire(body){
       const what = kind === 'vendor' ? 'this vendor' : kind === 'invoice' ? 'this vendor invoice' : 'this vendor payment';
       await restDeleteMany(table, [id], what); await vendLoad(); renderRest(); return;
     }
-    if(!confirm('Delete this ' + kind + '? A copy is kept in Deleted items.')) return;
+    let nInv = 0, nPay = 0;
+    if(kind === 'vendor'){ nInv = VEND.inv.filter(x => String(x.vendor_id) === id).length; nPay = VEND.pay.filter(x => String(x.vendor_id) === id).length; }
+    if(!confirm('Delete this ' + kind + (nInv + nPay ? ' together with its ' + nInv + ' invoice(s) and ' + nPay + ' payment(s)' : '') + '? A copy is kept in Deleted items.')) return;
+    if(kind === 'vendor' && nInv + nPay){
+      const a = await sb.from('restaurant_vendor_payments').delete().eq('vendor_id', id).eq('restaurant', REST.id);
+      const b2 = a.error ? a : await sb.from('restaurant_vendor_invoices').delete().eq('vendor_id', id).eq('restaurant', REST.id);
+      if(b2.error){ alert('Could not delete — ' + (b2.error.message || 'check the connection.')); await vendLoad(); renderRest(); return; }
+    }
     const { error } = await sb.from(table).delete().eq('id', id).eq('restaurant', REST.id);
     if(error){ alert('Could not delete — ' + (/foreign key/.test(error.message || '') ? 'this vendor still has invoices or payments.' : (error.message || 'check the connection.'))); return; }
     await vendLoad(); renderRest(); restToast('Deleted');
