@@ -1495,6 +1495,24 @@
   @media (max-width: 1000px){ .v-opt{ display:none; } }
   .vl-list .r-table{ width:100% !important; min-width:0 !important; font-size:12.5px; }
   .vend-roomy{ height:auto !important; min-height:0; }
+  .vp-hero{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:12px; }
+  .vp-card{ background:#fff; border:1px solid var(--r-line); border-top:6px solid var(--c); border-radius:14px; padding:16px 18px; box-shadow:0 2px 8px rgba(19,35,58,.06); min-width:0; }
+  .vp-k{ font-size:13px; font-weight:700; color:var(--c); letter-spacing:.3px; } .vp-k small{ font-weight:500; opacity:.75; }
+  .vp-v{ font-size:30px; font-weight:800; color:var(--c); margin:6px 0 4px; line-height:1.15; overflow-wrap:anywhere; }
+  .vp-s{ font-size:12.5px; color:var(--r-muted); }
+  .vp-sub{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:14px; }
+  .vp-sub > div{ background:#fff; border:1px solid var(--r-line); border-radius:12px; padding:10px 16px; display:flex; flex-direction:column; }
+  .vp-sub span{ font-size:12.5px; color:var(--r-muted); font-weight:600; } .vp-sub b{ font-size:20px; } .vp-sub small{ color:var(--r-muted); font-size:12px; }
+  .vp-log{ margin-bottom:14px; } .vp-log h3, .vl-big h3{ font-size:17px !important; }
+  .vp-logscroll{ max-height:460px; overflow:auto; }
+  .vp-logscroll thead th{ position:sticky; top:0; z-index:1; }
+  .vp-charts{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:14px; }
+  .vp-chart{ min-width:0; padding:16px 18px; } .vp-chart h3{ font-size:16px; margin:0 0 12px; display:flex; justify-content:space-between; gap:8px; }
+  .vp-pie{ display:flex; flex-direction:column; gap:12px; align-items:center; }
+  .vp-pie svg{ width:min(250px,100%) !important; max-width:250px !important; }
+  .vp-pie > div{ width:100%; } .vp-chart .vf-scroll{ overflow:visible; }
+  .vp-chart div[style*="12.5px"]{ font-size:14.5px !important; } .vp-chart div[style*="height:11px"]{ height:16px !important; }
+  @media (max-width: 1100px){ .vp-hero{ grid-template-columns:repeat(2,minmax(0,1fr)); } .vp-charts{ grid-template-columns:1fr; } .vp-sub{ grid-template-columns:1fr; } }
   .vend-roomy .vf-body{ min-height:430px; flex:none; }
   .vend-roomy .vf-col{ min-height:430px; }
   .vl-big{ overflow:visible !important; }
@@ -4469,7 +4487,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.02-vendor-delete-all';
+const APP_VERSION = 'v2026.11.03-vendor-dashboard';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20937,19 +20955,34 @@ function vendOverview(body, info){
   const monthPay = {}; VEND.pay.filter(p => inM(p.day)).forEach(p => { monthPay[p.method] = (monthPay[p.method] || 0) + Number(p.amount); });
   const pieMeth = Object.keys(monthPay).map((k, i) => ({ label:VEND_METHODS[k] || k, value:monthPay[k], color:['#2563eb', '#2f9e5b', '#e8890c', '#7c3aed'][i % 4] }));
   const logStatus = i => { const f = figs.find(x => x.v.id === i.vendor_id); const it = f && f.f.byInv.get(i.id); return it ? { it, st:vendStatus(it) } : null; };
+  const M = k => VEND.pay.filter(p => p.method === k).reduce((s, p) => s + Number(p.amount), 0), MM = k => VEND.pay.filter(p => p.method === k && inM(p.day)).reduce((s, p) => s + Number(p.amount), 0);
   body.innerHTML = `
-    <div class="vend-fit vend-roomy">
+    <div class="vend-fit vend-roomy vend-free">
     <div class="r-toolbar">
       <button class="r-btn" data-mshift="-1">◀</button><input type="month" id="vMonth" value="${esc(ym)}"><button class="r-btn" data-mshift="1">▶</button>
       <span class="sp"></span><button class="r-btn" data-print>🖨️ Print</button><button class="r-btn" data-csv>⬇ CSV</button>
       ${edit ? '<button class="r-btn" id="vAddVendor">＋ Vendor</button><button class="r-btn primary" id="vAddInv">＋ Invoice</button><button class="r-btn" id="vAddPay" style="background:#2563eb;color:#fff;border-color:#2563eb">＋ Payment</button>' : '<span class="r-muted">View only</span>'}
     </div>
-    <div class="v-tiles">
-      ${vendTile('#c92a2a', '💳', 'Total payable (all vendors)', rs(T('balance')), owing + (owing === 1 ? ' vendor owed' : ' vendors owed'))}
-      ${vendTile('#2563eb', '🧾', 'Invoiced in ' + rMonthName(ym), rs(T('mInv')), rowsM.length + (rowsM.length === 1 ? ' invoice' : ' invoices'))}
-      ${vendTile('#2f9e5b', '✅', 'Paid in ' + rMonthName(ym), rs(T('mPaid')), VEND.pay.filter(p => inM(p.day)).length + ' payments')}
-      ${vendTile('#e8890c', '⏳', 'Opening balances', rs(T('opening')), 'Paid so far: ' + rs(T('paid')))}
+    <div class="vp-hero">
+      <div class="vp-card" style="--c:#c92a2a"><div class="vp-k">⏳ PENDING — still to pay</div><div class="vp-v">${rs(T('balance'))}</div><div class="vp-s">${owing} ${owing === 1 ? 'vendor' : 'vendors'} owed · opening balances ${rs(T('opening'))}</div></div>
+      <div class="vp-card" style="--c:#2f9e5b"><div class="vp-k">💵 CASH paid</div><div class="vp-v">${rs(M('cash'))}</div><div class="vp-s">this month ${rs(MM('cash'))}</div></div>
+      <div class="vp-card" style="--c:#2563eb"><div class="vp-k">🏦 BANK paid <small>(bank + transfer)</small></div><div class="vp-v">${rs(M('bank') + M('transfer'))}</div><div class="vp-s">this month ${rs(MM('bank') + MM('transfer'))}</div></div>
+      <div class="vp-card" style="--c:#7c3aed"><div class="vp-k">💳 CARD paid</div><div class="vp-v">${rs(M('card'))}</div><div class="vp-s">this month ${rs(MM('card'))}</div></div>
     </div>
+    <div class="vp-sub">
+      <div><span>🧾 Invoiced in ${esc(rMonthName(ym))}</span><b>${rs(T('mInv'))}</b><small>${rowsM.length} ${rowsM.length === 1 ? 'invoice' : 'invoices'}</small></div>
+      <div><span>✅ Paid in ${esc(rMonthName(ym))}</span><b>${rs(T('mPaid'))}</b><small>${VEND.pay.filter(p => inM(p.day)).length} payments</small></div>
+      <div><span>📊 Paid so far (all time)</span><b>${rs(T('paid'))}</b><small>of ${rs(T('invoiced') + T('opening'))} owed in total</small></div>
+    </div>
+<div class="r-box vp-log"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
+          <div class="vp-logscroll vl-list"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
+          ${rowsM.map(i => { const s = logStatus(i); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}</td>
+            <td><span style="border-left:5px solid ${vendColor(i.vendor_id)};padding-left:6px">${esc(vendName(i.vendor_id))}</span></td><td class="n">${rs(i.amount)}</td>
+            <td>${s ? vendBadge(s.st) : ''}</td><td>${s ? esc(vendViaText(s.it.via)) : ''}</td><td class="wrap r-muted" style="font-size:12px">${esc(i.remarks || '')}</td>
+            ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="invoice:${i.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="invoice:${i.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
+            || `<tr><td colspan="10" class="r-muted">No invoices in ${esc(rMonthName(ym))}.${edit ? ' Press “＋ Invoice”.' : ''}</td></tr>`}
+          <tr class="tot"><td colspan="5">Total invoiced</td><td class="n">${rs(T('mInv'))}</td><td colspan="${edit || del ? 4 : 3}"></td></tr></tbody></table></div>
+          <div class="r-note" style="flex:none;margin-top:6px;font-size:11.5px">Payments: “＋ Payment” (or on the vendor's own sheet). A payment settles the oldest invoice first.</div></div>
 <div class="r-box vf-box vl-big" style="flex:0 0 auto;margin-bottom:12px"><h3>Vendor payable list <small>Rs. · click a vendor to open its sheet</small></h3>
           <div class="vf-scroll vl-list" style="overflow:visible"><table class="r-table"><thead><tr><th>Vendor</th><th class="n v-opt">Opening</th><th class="n">Invoiced</th><th class="n">Paid</th><th class="n">Balance due</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} invoiced</th><th class="n">${esc(rMonthName(ym).split(' ')[0])} paid</th><th class="v-opt" style="min-width:56px">Paid %</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
           ${figs.map(x => { const tot = x.f.opening + x.f.invoiced, pct = tot ? Math.min(100, x.f.paid / tot * 100) : 0; return `<tr>
@@ -20960,24 +20993,10 @@ function vendOverview(body, info){
             ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="vendor:${x.v.id}" title="Edit vendor">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="vendor:${x.v.id}" title="${restCanDelete() ? 'Delete vendor' : 'Ask Makky to delete this vendor'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
             || `<tr><td colspan="9" class="r-muted">No vendors yet.${edit ? ' Press “＋ Vendor” to add the first one.' : ''}</td></tr>`}
           <tr class="tot"><td>TOTAL PAYABLE</td><td class="n v-opt">${vn(T('opening'))}</td><td class="n">${vn(T('invoiced'))}</td><td class="n">${vn(T('paid'))}</td><td class="n">${vn(T('balance'))}</td><td class="n">${vn(T('mInv'))}</td><td class="n">${vn(T('mPaid'))}</td><td class="v-opt"></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div></div>
-    <div class="vf-body">
-      <div class="vf-col">
-
-        <div class="r-box vf-box"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
-          <div class="vf-scroll vl-list"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
-          ${rowsM.map(i => { const s = logStatus(i); return `<tr><td>${esc(rDay(i.day))}</td><td><b>${esc(i.our_no || '')}</b></td><td>${esc(i.bill_no || '')}</td><td class="wrap">${esc(i.description)}</td>
-            <td><span style="border-left:5px solid ${vendColor(i.vendor_id)};padding-left:6px">${esc(vendName(i.vendor_id))}</span></td><td class="n">${rs(i.amount)}</td>
-            <td>${s ? vendBadge(s.st) : ''}</td><td>${s ? esc(vendViaText(s.it.via)) : ''}</td><td class="wrap r-muted" style="font-size:12px">${esc(i.remarks || '')}</td>
-            ${edit || del ? `<td style="white-space:nowrap">${edit ? `<button class="r-btn r-ico" data-vedit="invoice:${i.id}" title="Correct">✏️</button>` : ''}${del ? `<button class="r-btn r-ico danger" data-vdel="invoice:${i.id}" title="${restCanDelete() ? 'Delete' : 'Ask Makky to delete'}">🗑</button>` : ''}</td>` : ''}</tr>`; }).join('')
-            || `<tr><td colspan="10" class="r-muted">No invoices in ${esc(rMonthName(ym))}.${edit ? ' Press “＋ Invoice”.' : ''}</td></tr>`}
-          <tr class="tot"><td colspan="5">Total invoiced</td><td class="n">${rs(T('mInv'))}</td><td colspan="${edit || del ? 4 : 3}"></td></tr></tbody></table></div>
-          <div class="r-note" style="flex:none;margin-top:6px;font-size:11.5px">Payments: “＋ Payment” (or on the vendor's own sheet). A payment settles the oldest invoice first.</div></div>
-      </div>
-      <div class="vf-col">
-        <div class="r-box vf-box"><h3>Invoiced by vendor <small>${esc(rMonthName(ym))}</small></h3><div class="vf-scroll"><div class="vf-pie">${vendDonut(pieInv, rs(T('mInv')), 'invoiced')}<div>${vendLegend(pieInv, rs)}</div></div></div></div>
-        <div class="r-box vf-box"><h3>Balance due by vendor <small>today</small></h3><div class="vf-scroll">${vendBars(bars, rs)}</div></div>
-        <div class="r-box vf-box"><h3>Paid by method <small>${esc(rMonthName(ym))}</small></h3><div class="vf-scroll"><div class="vf-pie">${vendDonut(pieMeth, rs(T('mPaid')), 'paid')}<div>${vendLegend(pieMeth, rs)}</div></div></div></div>
-      </div>
+    <div class="vp-charts">
+      <div class="r-box vp-chart"><h3>Invoiced by vendor <small>${esc(rMonthName(ym))}</small></h3><div class="vp-pie">${vendDonut(pieInv, rs(T('mInv')), 'invoiced')}<div>${vendLegend(pieInv, rs)}</div></div></div>
+      <div class="r-box vp-chart"><h3>Balance due by vendor <small>today</small></h3>${vendBars(bars, rs)}</div>
+      <div class="r-box vp-chart"><h3>Paid by method <small>${esc(rMonthName(ym))}</small></h3><div class="vp-pie">${vendDonut(pieMeth, rs(T('mPaid')), 'paid')}<div>${vendLegend(pieMeth, rs)}</div></div></div>
     </div>
     </div>`;
   vendFit(body);
