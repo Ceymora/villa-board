@@ -4487,7 +4487,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.03-vendor-dashboard';
+const APP_VERSION = 'v2026.11.04-vendor-edit-paid';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20845,8 +20845,16 @@ function vendFigures(v){
   const pays = VEND.pay.filter(x => x.vendor_id === v.id).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
   const items = [{ opening:true, left:Number(v.opening_balance) || 0, total:Number(v.opening_balance) || 0, via:{} }]
     .concat(invs.map(i => ({ inv:i, left:Number(i.amount), total:Number(i.amount), via:{}, lastDay:null })));
+  // A payment tied to an invoice (invoice_id) settles THAT invoice first; whatever is left over, and every
+  // payment not tied to an invoice, settles the oldest unpaid line first.
+  const spill = [];
   pays.forEach(p => {
+    const own = p.invoice_id ? items.find(it => it.inv && it.inv.id === p.invoice_id) : null;
     let rest = Number(p.amount);
+    if(own && own.left > 0.0001){ const take = Math.min(own.left, rest); own.left -= take; rest -= take; own.via[p.method] = (own.via[p.method] || 0) + take; own.lastDay = p.day; }
+    if(rest > 0.0001) spill.push({ p, rest });
+  });
+  spill.forEach(({ p, rest }) => {
     for(const it of items){
       if(rest <= 0.0001) break;
       if(it.left <= 0.0001) continue;
@@ -21047,6 +21055,22 @@ function vendDetail(body, info){
   restWireExport(body, 'Vendor statement — ' + v.name, ['Date', 'Entry', 'Details', 'Invoiced', 'Paid', 'Balance'], (f.opening > 0 ? [['', 'Opening balance', '', '', '', f.opening]] : []).concat(rows), ['Total', '', '', f.invoiced, f.paid, f.balance]);
 }
 
+/* Activity log line for a correction: who (the log adds the name), what, and old -> new. */
+function vendLogEdit(kind, row, rec){
+  const vn2 = id => vendName(id), m = n => rs(Number(n) || 0), ch = [];
+  const add = (label, a, b) => { if(String(a == null ? '' : a) !== String(b == null ? '' : b)) ch.push(label + ': ' + (a == null || a === '' ? '(empty)' : a) + ' → ' + (b == null || b === '' ? '(empty)' : b)); };
+  if(kind === 'vendor'){ add('name', row.name, rec.name); add('opening balance', m(row.opening_balance), m(rec.opening_balance)); if('active' in rec) add('active', row.active !== false ? 'yes' : 'no', rec.active ? 'yes' : 'no'); }
+  else{
+    add('date', row.day, rec.day); add('vendor', vn2(row.vendor_id), vn2(rec.vendor_id));
+    if(kind === 'invoice'){ add('supplier bill', row.bill_no, rec.bill_no); add('description', row.description, rec.description); }
+    else{ add('method', VEND_METHODS[row.method] || row.method, VEND_METHODS[rec.method] || rec.method); add('reference', row.reference, rec.reference); }
+    add('amount', m(row.amount), m(rec.amount)); add('remarks', row.remarks, rec.remarks);
+  }
+  const what = kind === 'vendor' ? 'vendor ' + row.name : kind === 'invoice' ? 'invoice ' + (row.our_no || '') + ' (' + vn2(row.vendor_id) + ')' : 'payment of ' + m(row.amount) + ' to ' + vn2(row.vendor_id);
+  logActivity('update', kind === 'vendor' ? 'restaurant_vendors' : kind === 'invoice' ? 'restaurant_vendor_invoices' : 'restaurant_vendor_payments',
+    'Corrected ' + what + ' — ' + restInfo(REST.id).name + (ch.length ? ': ' + ch.join('; ') : ': saved with no change'));
+}
+
 /* The one form for a vendor, an invoice and a payment. */
 function vendForm(kind, row, preVendor){
   let ov = document.getElementById('vendFormOv');
@@ -21059,7 +21083,7 @@ function vendForm(kind, row, preVendor){
     document.getElementById('vfCancel').addEventListener('click', () => ov.classList.remove('open'));
   }
   const vendors = VEND.vendors.filter(v => v.active !== false || (row && row.vendor_id === v.id));
-  const vsel = (sel) => `<label>Vendor</label><select id="vfVendor" ${row ? 'disabled' : ''}>${vendors.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>`;
+  const vsel = (sel) => `<label>Vendor</label><select id="vfVendor">${vendors.map(v => `<option value="${v.id}" ${v.id === sel ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>`;
   const today = REST.month === todayISO().slice(0, 7) ? todayISO() : monthEnd(REST.month);
   const T = { vendor:'Vendor', invoice:'Invoice', payment:'Payment' }[kind];
   document.getElementById('vfTitle').textContent = (row ? 'Correct ' : 'New ') + T.toLowerCase() + ' — ' + restInfo(REST.id).name;
@@ -21082,7 +21106,7 @@ function vendForm(kind, row, preVendor){
         <div id="vfSum" style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#f4f9f6;border:1px solid var(--r-line);font-size:13.5px;line-height:1.7"></div>`}
       <label>Remarks (optional)</label><input id="vfRem" maxlength="500" value="${esc(row ? row.remarks || '' : '')}">
       <div class="r-muted" style="font-size:12px;margin-top:6px">${row ? 'Our invoice number: <b>' + esc(row.our_no || '') + '</b>' : 'Our invoice number is given automatically when you save.'}</div>
-      ${row ? '<div class="r-muted" style="font-size:12px;margin-top:6px">To record a payment for this invoice use “＋ Payment”.</div>' : ''}`;
+      ${row ? '<div class="r-muted" style="font-size:12px;margin-top:6px">To record a payment for this invoice use “＋ Payment”. Who corrected it is written to the activity log.</div>' : ''}`;
     if(!row){
       const g = id => document.getElementById(id), pm = g('vfPMethod'), pAmt = g('vfPAmt');
       const sync = () => {
@@ -21108,6 +21132,7 @@ function vendForm(kind, row, preVendor){
     const pv = row ? row.vendor_id : (preVendor || vendors[0].id);
     f.innerHTML = `<label>Date paid</label><input id="vfDay" type="date" value="${esc(row ? row.day : todayISO())}">${vsel(pv)}
       <div id="vfBalHint" class="r-muted" style="font-size:12px;margin-top:4px"></div>
+      <label>Pays which invoice?</label><select id="vfFor"></select>
       <label>Paid by</label><select id="vfMethod">${Object.keys(VEND_METHODS).map(k => `<option value="${k}" ${row && row.method === k ? 'selected' : ''}>${VEND_METHODS[k]}</option>`).join('')}</select>
       <label>Amount paid (Rs.)</label><input id="vfAmt" type="number" min="0.01" step="0.01" value="${row ? Number(row.amount) : ''}">
       <label>Reference (cheque / transfer no.)</label><input id="vfRef" maxlength="80" value="${esc(row ? row.reference || '' : '')}">
@@ -21117,7 +21142,14 @@ function vendForm(kind, row, preVendor){
       const a = document.getElementById('vfAmt'); if(!row && !a.dataset.touched) a.value = bal > 0 ? bal : '';
       const over = Number(a.value) - (bal + (row ? Number(row.amount) : 0));
       if(over > 0.005) document.getElementById('vfBalHint').innerHTML += ' · <span style="color:#b45309">This is <b>' + esc(rs(over)) + '</b> more than the balance — it is saved as <b>credit (paid in advance)</b> and will be used on this vendor\'s next invoices.</span>'; };
-    document.getElementById('vfVendor').addEventListener('change', () => { document.getElementById('vfAmt').dataset.touched = ''; hint(); });
+    const fillFor = () => { const vv = VEND.vendors.find(x => x.id === Number(document.getElementById('vfVendor').value)), sel = document.getElementById('vfFor'); if(!vv){ sel.innerHTML = ''; return; }
+      const fg = vendFigures(vv), keep = row && row.vendor_id === vv.id ? row.invoice_id : null;
+      sel.innerHTML = '<option value="">Oldest unpaid first (automatic)</option>' + fg.invs.filter(i => { const it = fg.byInv.get(i.id); return (it && it.left > 0.005) || i.id === keep; })
+        .map(i => { const it = fg.byInv.get(i.id); return `<option value="${i.id}" ${i.id === keep ? 'selected' : ''}>${esc((i.our_no || '') + ' · ' + (i.description || '').slice(0, 30) + ' · ' + rs(i.amount))}${it && it.left > 0.005 ? esc(' (left ' + rs(it.left) + ')') : ''}</option>`; }).join('');
+      if(!row){ sel.onchange = () => { const i = fg.invs.find(x => x.id === Number(sel.value)), it = i && fg.byInv.get(i.id), a = document.getElementById('vfAmt'); if(it){ a.value = it.left; a.dataset.touched = '1'; hint(); } }; if(preInv){ sel.value = String(preInv); sel.onchange(); preInv = null; } } };
+    let preInv = null;
+    document.getElementById('vfVendor').addEventListener('change', () => { document.getElementById('vfAmt').dataset.touched = ''; fillFor(); hint(); });
+    fillFor();
     document.getElementById('vfAmt').addEventListener('input', e => { e.target.dataset.touched = '1'; hint(); });
     hint();
   }
@@ -21137,7 +21169,7 @@ function vendForm(kind, row, preVendor){
       if(!desc){ err.textContent = 'Write what was bought.'; return; }
       if(!(amount > 0)){ err.textContent = 'Enter an amount above 0.'; return; }
       table = 'restaurant_vendor_invoices'; rec = { day:val('vfDay'), bill_no:val('vfBill').trim() || null, description:desc, amount, remarks:val('vfRem').trim() || null };
-      if(!row) rec.vendor_id = Number(val('vfVendor'));
+      rec.vendor_id = Number(val('vfVendor'));
       if(!row && val('vfPMethod')){
         const pa = Number(val('vfPAmt'));
         if(!(pa > 0)){ err.textContent = 'Write how much was paid, or choose "Not paid yet".'; return; }
@@ -21148,19 +21180,27 @@ function vendForm(kind, row, preVendor){
       if(!val('vfDay')){ err.textContent = 'Pick the date paid.'; return; }
       if(!(amount > 0)){ err.textContent = 'Enter the amount paid.'; return; }
       table = 'restaurant_vendor_payments'; rec = { day:val('vfDay'), method:val('vfMethod'), amount, reference:val('vfRef').trim() || null, remarks:val('vfRem').trim() || null };
-      if(!row) rec.vendor_id = Number(val('vfVendor'));
+      rec.vendor_id = Number(val('vfVendor')); rec.invoice_id = Number(val('vfFor')) || null;
     }
     save.disabled = true;
     if(addOpen > 0 && openVendor){
       const r0 = await sb.from('restaurant_vendors').update({ opening_balance:Math.round((Number(openVendor.opening_balance) + addOpen) * 100) / 100 }).eq('id', openVendor.id).eq('restaurant', REST.id);
       if(r0.error){ save.disabled = false; err.textContent = 'Could not add to the opening balance — ' + (r0.error.message || 'check the connection.'); return; }
     }
-    const res = row ? await sb.from(table).update(rec).eq('id', row.id).eq('restaurant', REST.id) : await sb.from(table).insert(Object.assign({ restaurant:REST.id }, rec));
+    const run1 = async r => row ? await sb.from(table).update(r).eq('id', row.id).eq('restaurant', REST.id)
+      : kind === 'invoice' ? await sb.from(table).insert(Object.assign({ restaurant:REST.id }, r)).select('id') : await sb.from(table).insert(Object.assign({ restaurant:REST.id }, r));
+    let res = await run1(rec);
+    // File 60 not run yet: save anyway, without the invoice link.
+    if(res.error && kind === 'payment' && /invoice_id/.test(res.error.message || '')){ const r2 = Object.assign({}, rec); delete r2.invoice_id; res = await run1(r2); }
     save.disabled = false;
     if(res.error){ const m = res.error.message || '';
       err.textContent = /duplicate key/.test(m) ? 'There is already a vendor with that name.' : /more than what is owed/.test(m) ? m : /row-level security/.test(m) ? 'You are not allowed to do that for this restaurant.' : 'Could not save — ' + (m || 'check the connection.'); return; }
+    // Who corrected what — written to the activity log with the person's name.
+    try{ if(row) vendLogEdit(kind, row, rec); else if(kind === 'vendor') logActivity('create', 'restaurant_vendors', 'Added vendor ' + rec.name + ' (' + restInfo(REST.id).name + ')'); }catch(_e){}
     if(payNow){
-      const pr = await sb.from('restaurant_vendor_payments').insert(Object.assign({ restaurant:REST.id, vendor_id:rec.vendor_id }, payNow));
+      const newId = res.data && res.data[0] ? res.data[0].id : null;
+      let pr = await sb.from('restaurant_vendor_payments').insert(Object.assign({ restaurant:REST.id, vendor_id:rec.vendor_id }, newId ? { invoice_id:newId } : {}, payNow));
+      if(pr.error && /invoice_id/.test(pr.error.message || '')) pr = await sb.from('restaurant_vendor_payments').insert(Object.assign({ restaurant:REST.id, vendor_id:rec.vendor_id }, payNow));
       if(pr.error){ ov.classList.remove('open'); REST.month = rec.day.slice(0, 7); await vendLoad(); renderRest();
         alert('The invoice was saved, but the payment was NOT saved — ' + (pr.error.message || 'check the connection.') + '\n\nPlease add it with “＋ Payment”.'); return; }
     }
