@@ -1500,6 +1500,7 @@
   .vp-k{ font-size:13px; font-weight:700; color:var(--c); letter-spacing:.3px; } .vp-k small{ font-weight:500; opacity:.75; }
   .vp-v{ font-size:30px; font-weight:800; color:var(--c); margin:6px 0 4px; line-height:1.15; overflow-wrap:anywhere; }
   .vp-s{ font-size:12.5px; color:var(--r-muted); }
+  [data-vtile]{ cursor:pointer; transition:transform .12s, box-shadow .12s; } [data-vtile]:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(19,35,58,.14); }
   .vp-sub{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:14px; }
   .vp-sub > div{ background:#fff; border:1px solid var(--r-line); border-radius:12px; padding:10px 16px; display:flex; flex-direction:column; }
   .vp-sub span{ font-size:12.5px; color:var(--r-muted); font-weight:600; } .vp-sub b{ font-size:20px; } .vp-sub small{ color:var(--r-muted); font-size:12px; }
@@ -4487,7 +4488,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.04-vendor-edit-paid';
+const APP_VERSION = 'v2026.11.04-vendor-tiles';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20917,6 +20918,7 @@ async function restVendorsView(body, info){
 }
 function vendWire(body){
   const edit = restEdits(REST.id);
+  body.querySelectorAll('[data-vtile]').forEach(b => b.addEventListener('click', () => vendTileOpen(b.dataset.vtile)));
   body.querySelectorAll('[data-vsel]').forEach(b => b.addEventListener('click', () => { VEND.sel = Number(b.dataset.vsel) || null; renderRest(); }));
   body.querySelectorAll('[data-vback]').forEach(b => b.addEventListener('click', () => { VEND.sel = null; renderRest(); }));
   body.querySelectorAll('[data-mshift]').forEach(b => b.addEventListener('click', () => { REST.month = shiftMonth(REST.month, +b.dataset.mshift); renderRest(); }));
@@ -20972,15 +20974,15 @@ function vendOverview(body, info){
       ${edit ? '<button class="r-btn" id="vAddVendor">＋ Vendor</button><button class="r-btn primary" id="vAddInv">＋ Invoice</button><button class="r-btn" id="vAddPay" style="background:#2563eb;color:#fff;border-color:#2563eb">＋ Payment</button>' : '<span class="r-muted">View only</span>'}
     </div>
     <div class="vp-hero">
-      <div class="vp-card" style="--c:#c92a2a"><div class="vp-k">⏳ PENDING — still to pay</div><div class="vp-v">${rs(T('balance'))}</div><div class="vp-s">${owing} ${owing === 1 ? 'vendor' : 'vendors'} owed · opening balances ${rs(T('opening'))}</div></div>
-      <div class="vp-card" style="--c:#2f9e5b"><div class="vp-k">💵 CASH paid</div><div class="vp-v">${rs(M('cash'))}</div><div class="vp-s">this month ${rs(MM('cash'))}</div></div>
-      <div class="vp-card" style="--c:#2563eb"><div class="vp-k">🏦 BANK paid <small>(bank + transfer)</small></div><div class="vp-v">${rs(M('bank') + M('transfer'))}</div><div class="vp-s">this month ${rs(MM('bank') + MM('transfer'))}</div></div>
-      <div class="vp-card" style="--c:#7c3aed"><div class="vp-k">💳 CARD paid</div><div class="vp-v">${rs(M('card'))}</div><div class="vp-s">this month ${rs(MM('card'))}</div></div>
+      <div class="vp-card" data-vtile="pending" style="--c:#c92a2a"><div class="vp-k">⏳ PENDING — still to pay</div><div class="vp-v">${rs(T('balance'))}</div><div class="vp-s">${owing} ${owing === 1 ? 'vendor' : 'vendors'} owed · opening balances ${rs(T('opening'))}</div></div>
+      <div class="vp-card" data-vtile="cash" style="--c:#2f9e5b"><div class="vp-k">💵 CASH paid</div><div class="vp-v">${rs(M('cash'))}</div><div class="vp-s">this month ${rs(MM('cash'))}</div></div>
+      <div class="vp-card" data-vtile="bank" style="--c:#2563eb"><div class="vp-k">🏦 BANK paid <small>(bank + transfer)</small></div><div class="vp-v">${rs(M('bank') + M('transfer'))}</div><div class="vp-s">this month ${rs(MM('bank') + MM('transfer'))}</div></div>
+      <div class="vp-card" data-vtile="card" style="--c:#7c3aed"><div class="vp-k">💳 CARD paid</div><div class="vp-v">${rs(M('card'))}</div><div class="vp-s">this month ${rs(MM('card'))}</div></div>
     </div>
     <div class="vp-sub">
-      <div><span>🧾 Invoiced in ${esc(rMonthName(ym))}</span><b>${rs(T('mInv'))}</b><small>${rowsM.length} ${rowsM.length === 1 ? 'invoice' : 'invoices'}</small></div>
-      <div><span>✅ Paid in ${esc(rMonthName(ym))}</span><b>${rs(T('mPaid'))}</b><small>${VEND.pay.filter(p => inM(p.day)).length} payments</small></div>
-      <div><span>📊 Paid so far (all time)</span><b>${rs(T('paid'))}</b><small>of ${rs(T('invoiced') + T('opening'))} owed in total</small></div>
+      <div data-vtile="minv"><span>🧾 Invoiced in ${esc(rMonthName(ym))}</span><b>${rs(T('mInv'))}</b><small>${rowsM.length} ${rowsM.length === 1 ? 'invoice' : 'invoices'} · click to see all</small></div>
+      <div data-vtile="mpaid"><span>✅ Paid in ${esc(rMonthName(ym))}</span><b>${rs(T('mPaid'))}</b><small>${VEND.pay.filter(p => inM(p.day)).length} payments</small></div>
+      <div data-vtile="paid"><span>📊 Paid so far (all time)</span><b>${rs(T('paid'))}</b><small>of ${rs(T('invoiced') + T('opening'))} owed in total</small></div>
     </div>
 <div class="r-box vp-log"><h3>Invoice log <small>${esc(rMonthName(ym))}</small></h3>
           <div class="vp-logscroll vl-list"><table class="r-table"><thead><tr><th>Date</th><th>Our invoice no.</th><th>Supplier bill</th><th>Description / item</th><th>Vendor</th><th class="n">Amount</th><th>Paid?</th><th>Paid by</th><th>Remarks</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
@@ -21011,6 +21013,70 @@ function vendOverview(body, info){
   vendWire(body);
   restWireExport(body, 'Vendor payables — ' + rMonthName(ym), ['Vendor', 'Opening', 'Invoiced', 'Paid', 'Balance due', 'Invoiced this month', 'Paid this month'],
     figs.map(x => [x.v.name, x.f.opening, x.f.invoiced, x.f.paid, x.f.balance, x.mInv, x.mPaid]), ['Total', T('opening'), T('invoiced'), T('paid'), T('balance'), T('mInv'), T('mPaid')]);
+}
+
+/* Click a big figure on the Vendor Payables page: a large window with everything behind that number. */
+const VT = { kind:'cash', month:'', vendor:'', q:'' };
+const VT_TITLES = { pending:'⏳ Pending — what we still owe vendors', cash:'💵 Cash payments', bank:'🏦 Bank payments (bank + transfer)', card:'💳 Card payments', minv:'🧾 Invoices', mpaid:'✅ Payments', paid:'📊 All payments so far' };
+function vendTileOpen(kind){
+  VT.kind = kind; VT.vendor = ''; VT.q = ''; VT.month = (kind === 'minv' || kind === 'mpaid') ? REST.month : '';
+  let ov = document.getElementById('vendTileOv');
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'vendTileOv';
+    ov.innerHTML = `<div class="modal r-form" style="width:min(1250px,97vw);max-width:97vw;max-height:94vh;overflow:auto;"><h3 id="vtTitle"></h3>
+      <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">
+        <div><label>Month</label><input type="month" id="vtMonth"></div>
+        <div><label>Vendor</label><select id="vtVendor"></select></div>
+        <div><label>Search</label><input type="text" id="vtQ" placeholder="bill, item, reference" style="width:190px"></div>
+        <button type="button" class="btn" id="vtClear">✕ Clear</button></div>
+      <div id="vtBody"></div>
+      <div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-save" id="vtClose">Close</button></div></div>`;
+    document.body.appendChild(ov);
+    const redraw = () => { VT.month = document.getElementById('vtMonth').value; VT.vendor = document.getElementById('vtVendor').value; VT.q = document.getElementById('vtQ').value; vendTileDraw(); };
+    ['vtMonth', 'vtVendor'].forEach(i => document.getElementById(i).addEventListener('change', redraw));
+    document.getElementById('vtQ').addEventListener('input', redraw);
+    document.getElementById('vtClear').addEventListener('click', () => { document.getElementById('vtMonth').value = ''; document.getElementById('vtVendor').value = ''; document.getElementById('vtQ').value = ''; redraw(); });
+    const close = () => ov.classList.remove('open');
+    document.getElementById('vtClose').addEventListener('click', close);
+    ov.addEventListener('click', e => { if(e.target === ov) close(); });
+  }
+  document.getElementById('vtTitle').textContent = VT_TITLES[kind] + ' — ' + restInfo(REST.id).name;
+  document.getElementById('vtMonth').value = VT.month; document.getElementById('vtQ').value = '';
+  document.getElementById('vtVendor').innerHTML = '<option value="">All vendors</option>' + VEND.vendors.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('');
+  vendTileDraw(); ov.classList.add('open');
+}
+function vendTileDraw(){
+  const kind = VT.kind, box = document.getElementById('vtBody'), q = VT.q.trim().toLowerCase();
+  const inMonth = d => !VT.month || d.slice(0, 7) === VT.month, okV = id => !VT.vendor || String(id) === VT.vendor;
+  const hit = (...a) => !q || a.join(' ').toLowerCase().includes(q);
+  const payKinds = { cash:['cash'], bank:['bank', 'transfer'], card:['card'] };
+  let html = '';
+  if(payKinds[kind] || kind === 'mpaid' || kind === 'paid'){
+    const rows = VEND.pay.filter(p => (payKinds[kind] ? payKinds[kind].includes(p.method) : true) && inMonth(p.day) && okV(p.vendor_id) && hit(vendName(p.vendor_id), p.reference || '', p.remarks || '', VEND_METHODS[p.method] || ''))
+      .sort((a, b) => b.day.localeCompare(a.day) || b.id - a.id);
+    const inv = id => { const i = VEND.inv.find(x => x.id === id); return i ? i.our_no : ''; };
+    const tot = rows.reduce((s, p) => s + Number(p.amount), 0);
+    html = `<div style="font-size:15px;margin-bottom:8px"><b>${rows.length}</b> payments · total <b style="font-size:20px">${esc(rs(tot))}</b></div>
+      <table class="r-table"><thead><tr><th>Date paid</th><th>Vendor</th><th>For invoice</th><th>Method</th><th>Reference</th><th>Remarks</th><th>Entered by</th><th class="n">Amount</th></tr></thead><tbody>
+      ${rows.map(p => `<tr><td>${esc(rLong(p.day))}</td><td><span style="border-left:5px solid ${vendColor(p.vendor_id)};padding-left:6px">${esc(vendName(p.vendor_id))}</span></td><td>${esc(p.invoice_id ? inv(p.invoice_id) : '')}</td><td>${esc(VEND_METHODS[p.method] || p.method)}</td><td>${esc(p.reference || '')}</td><td class="wrap r-muted">${esc(p.remarks || '')}</td><td class="r-muted" style="font-size:11px">${esc(restWho(p))}</td><td class="n" style="font-weight:700">${rs(p.amount)}</td></tr>`).join('') || '<tr><td colspan="8" class="r-muted">Nothing found.</td></tr>'}
+      <tr class="tot"><td colspan="7">Total</td><td class="n">${rs(tot)}</td></tr></tbody></table>`;
+  }else{
+    const lines = [];
+    VEND.vendors.filter(v => okV(v.id)).forEach(v => { const f = vendFigures(v);
+      if(kind === 'pending' && f.opening > 0 && f.items[0].left > 0.005 && !VT.month && hit(v.name, 'opening balance')) lines.push({ v, open:true, it:f.items[0], day:'', amount:f.opening });
+      f.invs.forEach(i => { const it = f.byInv.get(i.id);
+        if(!inMonth(i.day) || !hit(v.name, i.our_no || '', i.bill_no || '', i.description || '', i.remarks || '')) return;
+        if(kind === 'pending' && !(it.left > 0.005)) return;
+        lines.push({ v, i, it, day:i.day, amount:Number(i.amount) }); }); });
+    lines.sort((a, b) => (a.day || '').localeCompare(b.day || ''));
+    const tAmt = lines.reduce((s, l) => s + l.amount, 0), tLeft = lines.reduce((s, l) => s + l.it.left, 0);
+    html = `<div style="font-size:15px;margin-bottom:8px"><b>${lines.length}</b> ${kind === 'pending' ? 'unpaid or part-paid lines' : 'invoices'} · invoiced <b>${esc(rs(tAmt))}</b> · still to pay <b style="font-size:20px;color:#c92a2a">${esc(rs(tLeft))}</b></div>
+      <table class="r-table"><thead><tr><th>Date</th><th>Our no.</th><th>Supplier bill</th><th>Description</th><th>Vendor</th><th class="n">Amount</th><th class="n">Paid</th><th class="n">Balance</th><th>Status</th><th>Paid by</th></tr></thead><tbody>
+      ${lines.map(l => `<tr><td>${l.open ? '' : esc(rDay(l.day))}</td><td><b>${l.open ? '' : esc(l.i.our_no || '')}</b></td><td>${l.open ? '' : esc(l.i.bill_no || '')}</td><td class="wrap">${l.open ? 'Opening balance brought forward' : esc(l.i.description)}</td>
+        <td><span style="border-left:5px solid ${vendColor(l.v.id)};padding-left:6px">${esc(l.v.name)}</span></td><td class="n">${rs(l.amount)}</td><td class="n">${rs(l.amount - l.it.left)}</td><td class="n" style="font-weight:700;color:${l.it.left > 0.005 ? '#c92a2a' : '#1f7a55'}">${rs(l.it.left)}</td><td>${vendBadge(vendStatus(l.it))}</td><td>${esc(vendViaText(l.it.via))}</td></tr>`).join('') || '<tr><td colspan="10" class="r-muted">Nothing found.</td></tr>'}
+      <tr class="tot"><td colspan="5">Total</td><td class="n">${rs(tAmt)}</td><td class="n">${rs(tAmt - tLeft)}</td><td class="n">${rs(tLeft)}</td><td colspan="2"></td></tr></tbody></table>`;
+  }
+  box.innerHTML = html;
 }
 function vendDetail(body, info){
   const v = VEND.vendors.find(x => x.id === VEND.sel), f = vendFigures(v), edit = restEdits(REST.id), del = restCanBin(), col = vendColor(v.id);
