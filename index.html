@@ -4488,7 +4488,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.04-vendor-tiles';
+const APP_VERSION = 'v2026.11.04-bills-filter';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20769,10 +20769,14 @@ function restBillsView(body, info){
   const ym = REST.month, from = monthStart(ym), to = monthEnd(ym);
   const edit = restEdits(REST.id), del = restCanBin();
   if(REST.billsMissing){ body.innerHTML = '<div class="r-warn">Bills & Expenses is not set up in the database yet. Run <b>31-supabase-restaurant-bills.sql</b> in Supabase once, then reload.</div>'; return; }
-  const rows = billsBetween(from, to).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  const allRows = billsBetween(from, to).sort((a, b) => a.day.localeCompare(b.day) || a.id - b.id);
+  // "Show me" ticks: any mix of Bank / Card / Owner / Cash-Other. Empty or all ticked = show everything.
+  const PF = [['bank', '🏦 Bank'], ['other', '💵 Cash / Other'], ['card', '💳 Card'], ['owner', '👤 Owner']];
+  const pick = Array.isArray(REST.billPF) ? REST.billPF : [];
+  const rows = pick.length ? allRows.filter(r => pick.includes(r.paid_from)) : allRows;
   const total = rc(rows.reduce((a, r) => a + Number(r.amount), 0));
-  const by = k => rc(rows.filter(r => r.paid_from === k).reduce((a, r) => a + Number(r.amount), 0));
-  const cats = {}; rows.forEach(r => { cats[r.category] = rc((cats[r.category] || 0) + Number(r.amount)); });
+  const by = k => rc(allRows.filter(r => r.paid_from === k).reduce((a, r) => a + Number(r.amount), 0));
+  const cats = {}; allRows.forEach(r => { cats[r.category] = rc((cats[r.category] || 0) + Number(r.amount)); });
   body.innerHTML = `
     <div class="r-toolbar">
       <button class="r-btn" data-mshift="-1">◀</button><input type="month" id="bMonth" value="${esc(ym)}"><button class="r-btn" data-mshift="1">▶</button>
@@ -20780,12 +20784,17 @@ function restBillsView(body, info){
       ${edit ? '<button class="r-btn primary" id="bAdd">＋ Add bill / expense</button>' : '<span class="r-muted">View only</span>'}
     </div>
     <div class="r-cards">
-      ${restCard('#c92a2a', '🧾', 'Total this month', rs(total), [['Lines', String(rows.length)]])}
+      ${restCard('#c92a2a', '🧾', 'Total this month', rs(rc(allRows.reduce((a, r) => a + Number(r.amount), 0))), [['Lines', String(allRows.length)]])}
       ${restCard('#2563eb', '🏦', 'Paid from bank', rs(by('bank')), [['By card', rs(by('card'))]])}
       ${restCard('#7c3aed', '👤', 'Paid by owner', rs(by('owner')), [['Other', rs(by('other'))]])}
       ${restCard('#2f9e5b', '📊', 'Biggest cost', esc(Object.keys(cats).sort((a, b) => cats[b] - cats[a])[0] || '—'), [['Amount', rs(Math.max(0, ...Object.values(cats)))]])}
     </div>
-    <div class="r-box"><h3>Bills & expenses <small>${esc(rMonthName(ym))}</small></h3>
+    <div class="r-box"><h3>Bills & expenses <small>${esc(rMonthName(ym))}${pick.length ? ' · showing ' + esc(PF.filter(x => pick.includes(x[0])).map(x => x[1].replace(/^\S+\s/, '')).join(' + ')) : ''}</small></h3>
+      <div id="bPF" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:2px 0 10px">
+        <b style="font-size:13px">Show:</b>
+        <button type="button" class="r-btn${pick.length ? '' : ' primary'}" data-pf="all">All <span class="r-muted" style="${pick.length ? '' : 'color:#fff;'}font-size:12px">${rs(rc(allRows.reduce((a, r) => a + Number(r.amount), 0)))}</span></button>
+        ${PF.map(([k, l]) => `<button type="button" class="r-btn${pick.includes(k) ? ' primary' : ''}" data-pf="${k}">${l} <span style="font-size:12px;opacity:.8">${rs(by(k))}</span></button>`).join('')}
+        <span class="r-muted" style="font-size:12px">tick one or more — e.g. Cash + Bank together, or only Bank</span></div>
       <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid from</th><th>Bill no.</th><th class="n">Amount</th><th>Entered / changed by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
       ${rows.map(r => `<tr><td>${esc(rDay(r.day))}</td><td>${esc(r.category)}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}${(Array.isArray(r.invoice_urls) && r.invoice_urls.length) ? `<div style="margin-top:3px">${r.invoice_urls.map((u, i) => `<button type="button" class="r-btn" data-inv-b="${esc(r.id)}" data-inv-i="${i}" style="font-size:11px;padding:1px 7px;margin:1px 3px 1px 0">📎 Invoice ${i + 1}</button>`).join('')}</div>` : ''}</td>
         <td>${esc(PAID_FROM[r.paid_from] || r.paid_from)}</td><td>${esc(r.invoice_no || '')}</td><td class="n">${rs(r.amount)}</td>
@@ -20794,6 +20803,11 @@ function restBillsView(body, info){
         || `<tr><td colspan="8" class="r-muted">No bills this month.${edit ? ' Press “Add bill / expense”.' : ''}</td></tr>`}
       <tr class="tot"><td colspan="5">Total</td><td class="n">${rs(total)}</td><td></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div>
       <div class="r-note">Use this for costs <b>not</b> paid from the petty cash box — rent, salaries, EPF/ETF, electricity, suppliers paid by bank, Loyverse, etc. Small cash spending stays in Petty Cash.</div></div>`;
+  body.querySelectorAll('[data-pf]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.pf; let a = Array.isArray(REST.billPF) ? REST.billPF.slice() : [];
+    if(k === 'all') a = []; else a = a.includes(k) ? a.filter(x => x !== k) : a.concat(k);
+    REST.billPF = a.length >= PF.length ? [] : a; renderRest();
+  }));
   body.querySelectorAll('[data-mshift]').forEach(b => b.addEventListener('click', () => { REST.month = shiftMonth(ym, +b.dataset.mshift); renderRest(); }));
   body.querySelector('#bMonth').addEventListener('change', e => { if(e.target.value){ REST.month = e.target.value; renderRest(); } });
   if(edit){
