@@ -4488,7 +4488,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.04-bills-filter';
+const APP_VERSION = 'v2026.11.04-bills-filter2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20794,7 +20794,7 @@ function restBillsView(body, info){
         <b style="font-size:13px">Show:</b>
         <button type="button" class="r-btn${pick.length ? '' : ' primary'}" data-pf="all">All <span class="r-muted" style="${pick.length ? '' : 'color:#fff;'}font-size:12px">${rs(rc(allRows.reduce((a, r) => a + Number(r.amount), 0)))}</span></button>
         ${PF.map(([k, l]) => `<button type="button" class="r-btn${pick.includes(k) ? ' primary' : ''}" data-pf="${k}">${l} <span style="font-size:12px;opacity:.8">${rs(by(k))}</span></button>`).join('')}
-        <span class="r-muted" style="font-size:12px">tick one or more — e.g. Cash + Bank together, or only Bank</span></div>
+        <span class="r-muted" style="font-size:12px">pick one to see only that; click All to see everything</span></div>
       <div class="r-scroll"><table class="r-table"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid from</th><th>Bill no.</th><th class="n">Amount</th><th>Entered / changed by</th>${edit || del ? '<th></th>' : ''}</tr></thead><tbody>
       ${rows.map(r => `<tr><td>${esc(rDay(r.day))}</td><td>${esc(r.category)}</td><td class="wrap">${esc(r.description)}${r.note ? `<div class="r-muted" style="font-size:11px">${esc(r.note)}</div>` : ''}${(Array.isArray(r.invoice_urls) && r.invoice_urls.length) ? `<div style="margin-top:3px">${r.invoice_urls.map((u, i) => `<button type="button" class="r-btn" data-inv-b="${esc(r.id)}" data-inv-i="${i}" style="font-size:11px;padding:1px 7px;margin:1px 3px 1px 0">📎 Invoice ${i + 1}</button>`).join('')}</div>` : ''}</td>
         <td>${esc(PAID_FROM[r.paid_from] || r.paid_from)}</td><td>${esc(r.invoice_no || '')}</td><td class="n">${rs(r.amount)}</td>
@@ -20804,9 +20804,9 @@ function restBillsView(body, info){
       <tr class="tot"><td colspan="5">Total</td><td class="n">${rs(total)}</td><td></td>${edit || del ? '<td></td>' : ''}</tr></tbody></table></div>
       <div class="r-note">Use this for costs <b>not</b> paid from the petty cash box — rent, salaries, EPF/ETF, electricity, suppliers paid by bank, Loyverse, etc. Small cash spending stays in Petty Cash.</div></div>`;
   body.querySelectorAll('[data-pf]').forEach(b => b.addEventListener('click', () => {
-    const k = b.dataset.pf; let a = Array.isArray(REST.billPF) ? REST.billPF.slice() : [];
-    if(k === 'all') a = []; else a = a.includes(k) ? a.filter(x => x !== k) : a.concat(k);
-    REST.billPF = a.length >= PF.length ? [] : a; renderRest();
+    // One choice at a time: picking Bank un-picks Cash, and the other way round. Clicking the chosen one again = All.
+    const k = b.dataset.pf, cur = Array.isArray(REST.billPF) ? REST.billPF : [];
+    REST.billPF = (k === 'all' || (cur.length === 1 && cur[0] === k)) ? [] : [k]; renderRest();
   }));
   body.querySelectorAll('[data-mshift]').forEach(b => b.addEventListener('click', () => { REST.month = shiftMonth(ym, +b.dataset.mshift); renderRest(); }));
   body.querySelector('#bMonth').addEventListener('change', e => { if(e.target.value){ REST.month = e.target.value; renderRest(); } });
