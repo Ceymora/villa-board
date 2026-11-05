@@ -4488,7 +4488,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.05-invoice-log';
+const APP_VERSION = 'v2026.11.05-invoice-log2';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4618,7 +4618,7 @@ async function mdpShow(){
   if(error || !data || !data.length){ if(ov) ov.classList.remove('open'); return; }
   if(!ov){
     ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'mdpOv'; ov.style.zIndex = '10060';
-    ov.innerHTML = '<div class="modal r-form" style="width:min(900px,96vw);max-height:90vh;overflow:auto;"><h3>🗑 Delete requests waiting for you</h3><div data-mdp-body></div><div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" data-mdp-later>Decide later</button></div></div>';
+    ov.innerHTML = '<div class="modal r-form" style="width:min(1400px,97vw);max-width:97vw;max-height:94vh;overflow:auto;"><h3>🗑 Delete requests waiting for you</h3><div data-mdp-body></div><div class="modal-actions"><div style="flex:1"></div><button type="button" class="btn btn-cancel" data-mdp-later>Decide later</button></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click', async e => {
       if(e.target === ov || e.target.closest('[data-mdp-later]')){ ov.classList.remove('open'); return; }
@@ -4636,8 +4636,8 @@ async function mdpShow(){
   }
   const when = t => { try{ return new Date(t).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); }catch(_e){ return ''; } };
   ov.querySelector('[data-mdp-body]').innerHTML = '<div style="margin-bottom:8px">' + data.length + ' request' + (data.length === 1 ? '' : 's') + ' — nothing is deleted until you approve.</div>'
-    + '<div style="overflow:auto"><table class="r-table" style="width:100%"><thead><tr><th>Asked</th><th>By</th><th>What</th><th>Reason</th><th></th></tr></thead><tbody>'
-    + data.map(q => '<tr><td style="white-space:nowrap">' + esc(when(q.requested_at)) + '</td><td>' + esc(q.requested_by_email || '') + '</td><td>' + esc(q.summary || '') + '</td><td>' + esc(q.reason || '') + '</td>'
+    + '<div><table class="r-table" style="width:100%;font-size:14.5px"><thead><tr><th>Asked</th><th>By</th><th>What</th><th>Reason</th><th></th></tr></thead><tbody>'
+    + data.map(q => '<tr><td style="white-space:nowrap">' + esc(when(q.requested_at)) + '</td><td class="wrap" style="white-space:normal;word-break:break-word">' + esc(q.requested_by_email || '') + '</td><td class="wrap" style="white-space:normal;min-width:260px">' + esc(q.summary || '') + '</td><td class="wrap" style="white-space:normal;min-width:220px">' + esc(q.reason || '') + '</td>'
       + '<td style="white-space:nowrap"><button type="button" class="btn btn-delete" style="padding:4px 10px" data-mdp-yes="' + esc(q.id) + '">Approve</button> <button type="button" class="btn" style="padding:4px 10px" data-mdp-no="' + esc(q.id) + '">Reject</button></td></tr>').join('')
     + '</tbody></table></div>';
   ov.classList.add('open');
