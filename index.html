@@ -2064,6 +2064,12 @@
       </div>
       <div class="field-hint" style="margin-bottom:10px;">Changes here take effect the moment that person reloads the page — no file redeploy needed.</div>
 
+      <div id="devicesSection" style="display:none; margin-bottom:18px;">
+        <div class="manage-title">💻 Approved computers &amp; phones</div>
+        <div class="field-hint" style="margin:2px 0 8px;">Each person can use <b>one computer and one phone</b>, approved by you. Anyone else's device is refused even with the right password. You can sign in from anywhere.</div>
+        <div id="devBody"></div>
+      </div>
+
       <div id="pendingSection" style="display:none; margin-bottom:18px;">
         <div class="manage-title" style="color:var(--amber);">⏳ Waiting for your approval</div>
         <div class="field-hint" style="margin:2px 0 8px;">These people registered themselves on the login page. They can see nothing at all until you approve them and tick what they may do.</div>
@@ -3760,9 +3766,38 @@ document.getElementById('setupBanner').style.display = CONFIGURED ? 'none' : 'bl
 const ARRIVED_FOR_RESET = /type=recovery/.test(location.hash + location.search);
 let resetMode = ARRIVED_FOR_RESET;
 
+/* ---- This browser's secret device number (file 62). Made once, kept in the browser; the database only lets a person
+   in from a computer / phone that Makky approved for their email. */
+const DEVICE = (() => {
+  let id = '';
+  try{ id = localStorage.getItem('ceymora_device') || ''; }catch(_e){}
+  if(!/^[a-f0-9]{48}$/.test(id)){ try{ const m = document.cookie.match(/(?:^|; )ceymora_device=([a-f0-9]{48})/); id = m ? m[1] : ''; }catch(_e){} }
+  if(!/^[a-f0-9]{48}$/.test(id)){ const a = new Uint8Array(24); crypto.getRandomValues(a); id = Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); }
+  try{ localStorage.setItem('ceymora_device', id); }catch(_e){}
+  try{ document.cookie = 'ceymora_device=' + id + '; max-age=63072000; path=/; SameSite=Strict' + (location.protocol === 'https:' ? '; Secure' : ''); }catch(_e){}
+  const u = navigator.userAgent || '';
+  const os = /Windows/.test(u) ? 'Windows' : /Android/.test(u) ? 'Android' : /iPhone|iPad|iPod/.test(u) ? 'iPhone/iPad' : /Mac OS X|Macintosh/.test(u) ? 'Mac' : /Linux/.test(u) ? 'Linux' : 'Device';
+  const br = /Edg\//.test(u) ? 'Edge' : /OPR\//.test(u) ? 'Opera' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'Browser';
+  return { id, kind:/Android|iPhone|iPad|iPod|Mobile/i.test(u) ? 'phone' : 'computer', label:os + ' · ' + br };
+})();
 let sb = null;
 if (CONFIGURED) {
-  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // The device number travels only with data and file requests (not with the edge-function calls, which have their own CORS rules).
+  // If the browser/gateway ever refuses the extra header (a network-level failure), stop sending it so the app keeps working;
+  // read requests are retried once without it.
+  const devFetch = (input, init) => {
+    let h = null;
+    try{ if(!DEVICE.noHeader && typeof input === 'string' && (input.includes('/rest/v1/') || input.includes('/storage/v1/'))){ h = new Headers((init && init.headers) || {}); h.set('x-device-id', DEVICE.id); } }catch(_e){ h = null; }
+    if(!h) return fetch(input, init);
+    return fetch(input, Object.assign({}, init, { headers:h })).catch(err => {
+      if(!(err instanceof TypeError)) throw err;
+      DEVICE.noHeader = true; console.warn('The device header was refused by the network; sending without it.');
+      const m = String((init && init.method) || 'GET').toUpperCase();
+      if(m === 'GET' || m === 'HEAD') return fetch(input, init);
+      throw err;
+    });
+  };
+  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global:{ fetch:devFetch } });
   sb.auth.onAuthStateChange((event)=>{ if(event === 'PASSWORD_RECOVERY'){ resetMode = true; showResetCard(); } });
 }
 
@@ -4498,7 +4533,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.05-invoice-log3';
+const APP_VERSION = 'v2026.11.05-device-lock';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -4590,6 +4625,115 @@ async function loadMyProfile(){
   };
 }
 
+/* ---- Only approved computers / phones (file 62) ---- */
+let devWatch = null;
+async function deviceRegister(){
+  const { data, error } = await sb.rpc('device_register', { p_device:DEVICE.id, p_kind:DEVICE.kind, p_label:DEVICE.label, p_ua:String(navigator.userAgent || '').slice(0, 290) });
+  if(error){ if(/device_register|PGRST202|Could not find/i.test(error.message || '')) return null; throw error; }   // file 62 not run yet: no lock
+  if(data) DEVICE.headerOk = data.header_ok !== false && !DEVICE.noHeader;
+  return data;
+}
+/* true = carry on into the app. Makky and test mode always pass. */
+async function deviceGuard(){
+  if(!sb) return true;
+  let r = null;
+  try{ r = await deviceRegister(); }catch(e){ console.error('device check', e); return true; }
+  if(!r || r.status === 'admin' || r.status === 'no_access' || !r.enforced) return true;
+  if(r.status === 'approved'){ startDeviceWatch(); return true; }
+  deviceBlockScreen(r.status);
+  return false;
+}
+function deviceBlockScreen(status){
+  let ov = document.getElementById('devBlockOv');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'devBlockOv';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(19,35,58,.92);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Inter,sans-serif';
+    ov.innerHTML = `<div style="background:#fff;border-radius:18px;max-width:520px;width:100%;padding:28px 26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+      <div style="font-size:44px">🔒</div><h2 style="margin:6px 0 8px;font-size:22px">This device is not approved</h2>
+      <div id="devBlockMsg" style="font-size:15px;line-height:1.55;color:#33415c"></div>
+      <div style="margin:14px 0;padding:10px;border-radius:10px;background:#f1f4f9;font-size:13px"><b id="devBlockLabel"></b><br><span style="color:#6b7385">Signed in as <span id="devBlockEmail"></span></span></div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button type="button" id="devBlockCheck" style="height:42px;padding:0 20px;border-radius:999px;border:0;background:#13233a;color:#fff;font-weight:700;cursor:pointer">Check again</button>
+      <button type="button" id="devBlockOut" style="height:42px;padding:0 20px;border-radius:999px;border:1.5px solid #cfd6e3;background:#fff;font-weight:700;cursor:pointer">Sign out</button></div></div>`;
+    document.body.appendChild(ov);
+    const check = async () => { try{ const r = await deviceRegister(); if(r && (r.status === 'approved' || r.status === 'admin' || !r.enforced)) location.reload(); else if(r) deviceBlockText(r.status); }catch(_e){} };
+    ov.querySelector('#devBlockCheck').addEventListener('click', check);
+    ov.querySelector('#devBlockOut').addEventListener('click', async () => { try{ await sb.auth.signOut(); }catch(_e){} location.reload(); });
+    setInterval(check, 15000);
+  }
+  deviceBlockText(status);
+  sb.auth.getUser().then(({ data }) => { const e = ov.querySelector('#devBlockEmail'); if(e) e.textContent = (data && data.user && data.user.email) || ''; }).catch(() => {});
+  ov.querySelector('#devBlockLabel').textContent = (DEVICE.kind === 'phone' ? '📱 ' : '💻 ') + DEVICE.label;
+  ov.style.display = 'flex';
+}
+function deviceBlockText(status){
+  const m = document.getElementById('devBlockMsg'); if(!m) return;
+  m.textContent = status === 'pending' ? 'Makky has been asked to approve this ' + (DEVICE.kind === 'phone' ? 'phone' : 'computer') + '. You can use the app as soon as he approves it — this page checks by itself every few seconds. Please tell him you are waiting.'
+    : 'Makky has not approved this ' + (DEVICE.kind === 'phone' ? 'phone' : 'computer') + ' for your login. Please ask him. Each person can use one approved computer and one approved phone.';
+}
+/* While signed in on an approved device: if Makky removes it, sign out. */
+function startDeviceWatch(){
+  if(devWatch) return;
+  devWatch = setInterval(async () => {
+    try{ const r = await deviceRegister(); if(r && r.enforced && r.status !== 'approved' && r.status !== 'admin' && r.status !== 'no_access'){ try{ sessionStorage.setItem('deviceRemoved', '1'); }catch(_e){} await sb.auth.signOut(); location.reload(); } }catch(_e){}
+  }, 90000);
+}
+/* Makky: a number on the Users tab when devices wait for him. */
+let devBadgeOn = false;
+async function startDeviceBadge(){
+  if(devBadgeOn || !sb || !isAdmin()) return; devBadgeOn = true;
+  const tick = async () => { try{ const { data, error } = await sb.rpc('device_summary'); if(error) return; const b = document.getElementById('usersTabBtn'); if(b) b.textContent = '👤 Users' + (data.pending ? ' · ' + data.pending + ' device' + (data.pending === 1 ? '' : 's') + ' waiting' : ''); }catch(_e){} };
+  tick(); setInterval(tick, 60000);
+}
+let devData = { list:[], sum:null };
+async function loadDevices(){
+  const sec = document.getElementById('devicesSection'); if(!sec) return;
+  if(!isAdmin()){ sec.style.display = 'none'; return; }
+  const [l, m] = await Promise.all([sb.rpc('device_list'), sb.rpc('device_summary')]);
+  if(l.error || m.error){ sec.style.display = ''; document.getElementById('devBody').innerHTML = '<div class="field-hint">The approved-devices lock is not installed yet. Run <b>62-supabase-approved-devices.sql</b> in Supabase once, then reload.</div>'; return; }
+  devData = { list:l.data || [], sum:m.data }; sec.style.display = ''; renderDevices();
+  const b = document.getElementById('usersTabBtn'); if(b) b.textContent = '👤 Users' + (devData.sum.pending ? ' · ' + devData.sum.pending + ' device' + (devData.sum.pending === 1 ? '' : 's') + ' waiting' : '');
+}
+function renderDevices(){
+  const box = document.getElementById('devBody'), sum = devData.sum || {}, on = !!sum.enforce, blocked = sum.would_be_blocked || [];
+  const when = t => { try{ return new Date(t).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); }catch(_e){ return ''; } };
+  const by = {}; devData.list.forEach(d => { (by[d.email] = by[d.email] || { name:d.full_name || d.email, rows:[] }).rows.push(d); });
+  const badge = st => ({ approved:['#e8f6ee', '#1f7a55', 'Approved'], pending:['#fff4e0', '#b45309', 'Waiting for you'], rejected:['#fdecec', '#c92a2a', 'Refused'], removed:['#f1f3f5', '#6b7385', 'Removed'] }[st] || ['#f1f3f5', '#6b7385', st]);
+  box.innerHTML = (DEVICE.headerOk === false ? `<div class="r-warn" style="margin-bottom:10px;padding:10px 14px;border-radius:12px;background:#fdecec;border:1px solid #f5c2c2;color:#8a1f1f"><b>⚠ Do not switch it on.</b> The device number from this browser is not reaching the database, so staff would be locked out. Press Ctrl+F5 and open this tab again; if this stays, tell me.</div>` : '')
+    + `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:${on ? '#e8f6ee' : '#fff4e0'};border:1px solid ${on ? '#bfe3cf' : '#f1d9a8'};margin-bottom:12px">
+      <div style="flex:1;min-width:240px"><b>${on ? '🔒 Only approved devices can sign in' : '🧪 Test mode — nobody is blocked yet'}</b>
+        <div class="ce-sub">${on ? 'Makky can sign in from anywhere. Everyone else only from the computer and phone you approved.' : (blocked.length ? 'Switching it on now would block: <b>' + esc(blocked.join(', ')) + '</b> (no approved device yet).' : 'Everyone already has an approved device — safe to switch on.')}</div></div>
+      <button type="button" class="manage-edit" id="devToggle" style="font-weight:700">${on ? 'Switch OFF' : 'Switch ON'}</button></div>
+    ${Object.keys(by).length ? Object.keys(by).map(em => `<div style="border:1px solid var(--board-line);border-radius:12px;padding:10px 14px;margin-bottom:10px;background:#fff"><b>${esc(by[em].name)}</b> <span class="ce-sub">${esc(em)}</span>
+      ${by[em].rows.map(d => { const bd = badge(d.status); return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #eef1f6;margin-top:6px">
+        <span style="font-size:20px">${d.kind === 'phone' ? '📱' : '💻'}</span><div style="flex:1;min-width:200px"><b>${esc(d.label || '')}</b><div class="ce-sub">first seen ${esc(when(d.first_seen))} · last used ${esc(when(d.last_seen))}</div></div>
+        <span style="background:${bd[0]};color:${bd[1]};padding:3px 10px;border-radius:10px;font-weight:700;font-size:12px">${bd[2]}</span>
+        ${d.status !== 'approved' ? `<button type="button" class="manage-edit" data-dev="approve:${d.id}">✓ Approve</button>` : ''}
+        ${d.status === 'pending' ? `<button type="button" class="manage-del" data-dev="reject:${d.id}">✕ Refuse</button>` : ''}
+        ${d.status === 'approved' ? `<button type="button" class="manage-del" data-dev="remove:${d.id}">Remove</button>` : ''}</div>`; }).join('')}</div>`).join('')
+      : '<div class="field-hint">No device has asked yet. Each person\'s computer / phone appears here the first time they sign in.</div>'}`;
+  const call = async (act, id, replace) => sb.rpc('device_decide', { p_id:id, p_action:act, p_replace:!!replace });
+  const logIt = (act, d, extra) => { try{ logActivity('update', 'user_devices', (act === 'approve' ? 'Approved' : act === 'reject' ? 'Refused' : 'Removed') + ' ' + (d.kind === 'phone' ? 'phone' : 'computer') + ' “' + d.label + '” for ' + (d.full_name || d.email) + (extra || '')); }catch(_e){} };
+  box.querySelectorAll('[data-dev]').forEach(b => b.addEventListener('click', async () => {
+    const [act, idS] = b.dataset.dev.split(':'), id = Number(idS), d = devData.list.find(x => x.id === id); if(!d) return;
+    if(act === 'remove' && !confirm('Remove ' + (d.full_name || d.email) + '\'s ' + (d.kind === 'phone' ? 'phone' : 'computer') + ' “' + d.label + '”? They will be signed out of it within a couple of minutes.')) return;
+    let r = await call(act, id, false), rep = false;
+    if(r.error && /ALREADY_HAS_ONE/.test(r.error.message || '')){
+      if(!confirm((d.full_name || d.email) + ' already has an approved ' + (d.kind === 'phone' ? 'phone' : 'computer') + '. Replace it with “' + d.label + '”? The old one will stop working.')) return;
+      r = await call(act, id, true); rep = true;
+    }
+    if(r.error){ alert(r.error.message || 'Could not save.'); return; }
+    logIt(act, d, rep ? ' (replacing the old one)' : ''); loadDevices();
+  }));
+  box.querySelector('#devToggle').addEventListener('click', async () => {
+    if(!on && DEVICE.headerOk === false){ alert('Not now — the device number is not reaching the database from this browser, so staff would be locked out. Press Ctrl+F5 and try again.'); return; }
+    if(!on && !confirm((blocked.length ? 'These people have NO approved device and will be blocked straight away:\n\n' + blocked.join('\n') + '\n\n' : '') + 'Switch ON “only approved devices”? You (Makky) are never blocked. You can switch it off again here at any time.')) return;
+    if(on && !confirm('Switch OFF the device lock? Anyone with a password can then sign in from any computer.')) return;
+    const r = await sb.rpc('device_set_enforce', { p_on:!on });
+    if(r.error){ alert(r.error.message || 'Could not change it.'); return; }
+    try{ logActivity('update', 'device_settings', 'Only-approved-devices lock switched ' + (!on ? 'ON' : 'OFF')); }catch(_e){}
+    loadDevices();
+  });
+}
 async function enterApp(profile){
   currentUser = profile;
   // Read the setup as the signed-in person before anything can show or save it.
@@ -4599,6 +4743,7 @@ async function enterApp(profile){
   startApp();
   startupSettleReminder().catch(e => console.error(e));
   startMakkyDeletePopup().catch(e => console.error(e));
+  startDeviceBadge().catch(e => console.error(e));
 }
 /* Villa petty cash: right after sign-in, if any bill is not settled, pop up the reminder with the outstanding
    amount. (The petty cash tab is only loaded when it is opened, so it cannot do this by itself.) */
@@ -4819,6 +4964,7 @@ async function doLogin(){
         : error.message);
       return;
     }
+    if(!(await deviceGuard())) return;
     const profile = await loadMyProfile();
     if(profile && profile.pending) return showPending(email);
     if(!profile || profile.blocked) return showNoAccess(email, profile && profile.suspended);
@@ -4958,6 +5104,7 @@ async function restoreSession(){
   try{
     const { data: { session } } = await sb.auth.getSession();
     if(resetMode) return showResetCard();
+    try{ if(sessionStorage.getItem('deviceRemoved') === '1'){ sessionStorage.removeItem('deviceRemoved'); loginMsg('error', 'Makky removed this device, so you were signed out. Ask him to approve it again.'); } }catch(e){}
     try{ if(sessionStorage.getItem('idleSignedOut') === '1'){ sessionStorage.removeItem('idleSignedOut');
       loginMsg('ok', `Signed out after ${IDLE_MINUTES / 60} hours without use. Sign in again to carry on.`); } }catch(e){}
     if(!session) return;
@@ -4965,6 +5112,7 @@ async function restoreSession(){
     let saved = 0; try{ saved = Number(localStorage.getItem(IDLE_KEY)) || 0; }catch(e){}
     if(saved && Date.now() - saved > IDLE_MINUTES * 60000){ lastActive = 0; return idleSignOut(); }
     markActive();
+    if(!(await deviceGuard())) return;
     const profile = await loadMyProfile();
     if(!profile) return;
     if(profile.pending) return showPending(profile.email);
@@ -14213,6 +14361,7 @@ function scopeSummary(u){
 
 function renderUsers(){
   renderPendingUsers();
+  loadDevices().catch(e => console.error(e));
   const body = document.getElementById('usersBody');
   body.innerHTML = '';
   const live = allAppUsers.filter(u => u.status !== 'pending');
