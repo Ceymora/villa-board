@@ -1500,6 +1500,16 @@
   .vp-k{ font-size:13px; font-weight:700; color:var(--c); letter-spacing:.3px; } .vp-k small{ font-weight:500; opacity:.75; }
   .vp-v{ font-size:30px; font-weight:800; color:var(--c); margin:6px 0 4px; line-height:1.15; overflow-wrap:anywhere; }
   .vp-s{ font-size:12.5px; color:var(--r-muted); }
+  .vl-bar{ background:linear-gradient(180deg,#f8fafd,#f1f4f9); border:1px solid var(--r-line); border-radius:14px; padding:14px 16px; gap:12px 14px !important; align-items:flex-end; }
+  .vl-bar > div, .vl-bar #vlDates > div{ display:flex; flex-direction:column; gap:5px; }
+  .vl-bar label{ display:block; margin:0; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--r-muted); }
+  .vl-bar select, .vl-bar input{ height:40px; min-width:130px; border:1.5px solid #cfd6e3; border-radius:10px; padding:0 12px; background:#fff; font-size:14px; color:#13233a; transition:border-color .12s, box-shadow .12s; }
+  .vl-bar select:hover, .vl-bar input:hover{ border-color:#9fb0c8; }
+  .vl-bar select:focus, .vl-bar input:focus{ outline:none; border-color:var(--r-side,#2563eb); box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+  .vl-btn{ height:40px; padding:0 18px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; font-weight:700; font-size:14px; cursor:pointer; color:#13233a; transition:transform .1s, box-shadow .12s; }
+  .vl-btn:hover{ transform:translateY(-1px); box-shadow:0 4px 10px rgba(19,35,58,.15); }
+  .vl-btn.main{ background:var(--r-side,#13233a); color:#fff; border-color:var(--r-side,#13233a); }
+  .vl-btn.soft{ background:#fdecec; color:#c92a2a; border-color:#f5c2c2; }
   [data-vtile]{ cursor:pointer; transition:transform .12s, box-shadow .12s; } [data-vtile]:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(19,35,58,.14); }
   .vp-sub{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:14px; }
   .vp-sub > div{ background:#fff; border:1px solid var(--r-line); border-radius:12px; padding:10px 16px; display:flex; flex-direction:column; }
@@ -4488,7 +4498,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.05-invoice-log2';
+const APP_VERSION = 'v2026.11.05-invoice-log3';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -21010,17 +21020,17 @@ function vendOverview(body, info){
       <div data-vtile="paid"><span>📊 Paid so far (all time)</span><b>${rs(T('paid'))}</b><small>of ${rs(T('invoiced') + T('opening'))} owed in total</small></div>
     </div>
 <div class="r-box vp-log"><h3>Invoice log <small id="vlCount"></small></h3>
-          <div class="vl-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="vl-bar" style="display:flex;flex-wrap:wrap;margin-bottom:12px">
             <div><label>Period</label><select id="vlPeriod"><option value="month">${esc(rMonthName(ym))}</option><option value="all">All months</option><option value="custom">Choose dates…</option></select></div>
             <div id="vlDates" style="display:none;gap:6px;align-items:end"><div><label>From</label><input type="date" id="vlFrom"></div><div><label>To</label><input type="date" id="vlTo"></div></div>
             <div><label>Vendor</label><select id="vlVendor"><option value="">All vendors</option>${VEND.vendors.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select></div>
             <div><label>Paid?</label><select id="vlStatus"><option value="">All</option><option>Paid</option><option>Part paid</option><option>Unpaid</option></select></div>
             <div><label>Paid by</label><select id="vlBy"><option value="">Any</option>${Object.keys(VEND_METHODS).map(k => `<option value="${k}">${VEND_METHODS[k]}</option>`).join('')}</select></div>
-            <div><label>Search (gas, bill no, remarks)</label><input type="text" id="vlQ" placeholder="type here" style="width:170px"></div>
+            <div><label>🔍 Search</label><input type="text" id="vlQ" placeholder="gas, bill no, remarks…" style="width:210px"></div>
             <div><label>Sort by</label><select id="vlSort"><option value="old">Invoice date — oldest first</option><option value="new">Invoice date — newest first</option><option value="paid">Date paid — latest first</option><option value="vendor">Vendor A–Z</option><option value="desc">Description A–Z</option><option value="amt">Amount — biggest first</option><option value="bal">Balance — biggest first</option></select></div>
-            <button type="button" class="r-btn" id="vlClear">✕ Clear</button>
+            <button type="button" class="vl-btn soft" id="vlClear">✕ Clear filters</button>
             <span class="sp" style="flex:1"></span>
-            <button type="button" class="r-btn" id="vlPrint">🖨️ Print / PDF</button><button type="button" class="r-btn" id="vlCsv">⬇ CSV</button></div>
+            <button type="button" class="vl-btn main" id="vlPrint">🖨️ Print / PDF</button><button type="button" class="vl-btn" id="vlCsv">⬇ Excel / CSV</button></div>
           <div class="vp-logscroll vl-list" id="vlBox"></div>
           <div class="r-note" style="flex:none;margin-top:6px;font-size:11.5px">Payments: “＋ Payment” (or on the vendor's own sheet). A payment settles its own invoice first, then the oldest. <b>Print / PDF</b> prints exactly what the filters show — choose “Save as PDF” in the print window.</div></div>
 <div class="r-box vf-box vl-big" style="flex:0 0 auto;margin-bottom:12px"><h3>Vendor payable list <small>Rs. · click a vendor to open its sheet</small></h3>
