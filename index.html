@@ -225,6 +225,48 @@
   .reset-link{ background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer; font-size:11px; padding:0; }
 
   /* Bookings calendar */
+
+  /* Direct Bookings — Excel-style sheet */
+  .bk-views{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .bk-views button{ font-family:inherit; font-size:14px; font-weight:700; padding:9px 18px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; color:#13233a; cursor:pointer; }
+  .bk-views button small{ font-weight:500; opacity:.7; }
+  .bk-views button.active{ background:#13233a; color:#fff; border-color:#13233a; }
+  #bookingsPanel.bk-direct > :not(.bk-views):not(#directBkView){ display:none !important; }
+  #bookingsPanel:not(.bk-direct) > #directBkView{ display:none; }
+  .dbhead{ display:flex; gap:12px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; margin-bottom:10px; }
+  .dbtools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .dbtools input{ height:38px; border:1.5px solid #cfd6e3; border-radius:10px; padding:0 12px; font-size:14px; min-width:220px; }
+  .dbbtn{ height:36px; padding:0 14px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; }
+  .dbbtn:hover{ box-shadow:0 3px 8px rgba(19,35,58,.15); } .dbbtn.main{ background:#13233a; color:#fff; border-color:#13233a; }
+  .dbchips{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  .dbsep{ width:1px; height:24px; background:#cfd6e3; margin:0 4px; }
+  .dbchip{ height:34px; padding:0 14px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; font-weight:600; font-size:13px; cursor:pointer; font-family:inherit; }
+  .dbchip.on{ background:#1e3a5f; color:#fff; border-color:#1e3a5f; }
+  .dbkpi{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:10px; }
+  .dbkpi > div{ background:#fff; border:1px solid #e3e8f0; border-radius:12px; padding:10px 14px; } .dbkpi span{ display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#6b7385; }
+  .dbkpi b{ font-size:21px; color:#13233a; } .dbkpi .warn b{ color:#c2410c; }
+  .dbmsg{ padding:9px 14px; border-radius:10px; margin-bottom:8px; font-weight:600; font-size:13.5px; }
+  .dbwrap{ overflow:auto; max-height:68vh; border:1px solid #c9d2e0; border-radius:10px; background:#fff; }
+  table.dbx{ border-collapse:separate; border-spacing:0; font-size:13px; min-width:2350px; }
+  .dbx th{ position:sticky; top:0; z-index:3; background:#1e3a5f; color:#fff; font-size:11.5px; padding:8px; border-right:1px solid rgba(255,255,255,.18); white-space:nowrap; text-align:center; }
+  .dbx td{ padding:6px 8px; border-right:1px solid #e3e8f0; border-bottom:1px solid #e3e8f0; white-space:nowrap; background:#fff; }
+  .dbx td.n{ text-align:right; font-variant-numeric:tabular-nums; } .dbx td.blue{ color:#1d4ed8; } .dbx td.lkr{ color:#1f7a55; font-weight:600; } .dbx td.bal{ color:#c2410c; font-weight:700; }
+  .dbx td.id{ font-weight:700; } .dbx td.guest{ font-weight:600; } .dbx td.notes{ white-space:normal; min-width:200px; max-width:280px; color:#44506a; font-size:12px; } .dbx td.act{ white-space:nowrap; }
+  .dbx tr[data-st=paid] td{ background:#f3fbf6; } .dbx tr[data-st=pending] td{ background:#fffbea; } .dbx tr[data-st=cancelled] td{ background:#fff5f5; color:#8a8f9c; text-decoration:line-through; }
+  .dbx tr[data-st=cancelled] td.act, .dbx tr[data-st=cancelled] td:nth-last-child(2){ text-decoration:none; }
+  .dbx th:nth-child(1), .dbx td:nth-child(1){ position:sticky; left:0; z-index:2; min-width:92px; max-width:92px; }
+  .dbx th:nth-child(2), .dbx td:nth-child(2){ position:sticky; left:92px; z-index:2; min-width:104px; max-width:104px; }
+  .dbx th:nth-child(3), .dbx td:nth-child(3){ position:sticky; left:196px; z-index:2; min-width:190px; max-width:190px; box-shadow:2px 0 0 #c9d2e0; white-space:normal; }
+  .dbx th:nth-child(-n+3){ z-index:5; }
+  .dbx tr.dbnew td, .dbx tr.dbedit td{ background:#eef4ff; text-decoration:none; } .dbx td.calc{ background:#f1f4f9 !important; text-align:right; color:#33415c; text-decoration:none; }
+  .dbx td.in input, .dbx td.in select{ width:100%; min-width:84px; border:1.5px solid #9db4e8; background:#fff; color:#1d4ed8; padding:5px 6px; border-radius:6px; font-size:13px; font-family:inherit; }
+  .dbx td.in input[type=date]{ min-width:128px; } .dbx td.in input[type=number]{ min-width:96px; }
+  .dbx tr.dbtot td{ position:sticky; bottom:0; z-index:2; background:#e8eef7 !important; font-weight:800; border-top:2px solid #1e3a5f; }
+  .dbvilla{ display:inline-block; padding:2px 10px 2px 8px; border-left:5px solid var(--c); font-weight:600; }
+  .dbst{ display:inline-block; padding:3px 10px; border-radius:10px; font-weight:700; font-size:12px; }
+  .dbhold{ background:#fff4e0; color:#b45309; border-radius:6px; padding:1px 6px; font-size:10px; font-weight:800; }
+  .dbsum{ margin-top:12px; } .dbsum summary{ cursor:pointer; font-weight:700; padding:6px 0; }
+  body.ro-bookings .dbnew{ display:none; }
   .villatabs{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
   .villatab-btn{
     font-family:'Kalam',cursive; font-size:14px; font-weight:700;
@@ -3862,6 +3904,12 @@ function rowToBooking(r){ return {
   // its currency). Once saved it never moves — see bookingRate().
   agreedRate: r.fx_rate !== null && r.fx_rate !== undefined && Number(r.fx_rate) > 0 ? Number(r.fx_rate) : null,
   agreedRateDate: r.fx_rate_date || null,
+  // --- Direct Bookings sheet (file 63) ---
+  bookingRef: r.booking_ref || '',
+  arrivalRate: r.arrival_rate !== null && r.arrival_rate !== undefined && Number(r.arrival_rate) > 0 ? Number(r.arrival_rate) : null,
+  balancePaid: r.balance_paid === true,
+  balancePaidOn: r.balance_paid_on || null,
+  sheetNotes: r.sheet_notes || '',
 }; }
 // Advances once recorded for "Unassigned" are the office's money: shown and kept as "Office".
 function advPersonName(n){ const v = String(n || '').trim(); if(!v) return null; return /^unassigned$/i.test(v) ? 'Office' : v; }
@@ -4533,7 +4581,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.05-device-lock';
+const APP_VERSION = 'v2026.11.06-direct-sheet';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7009,6 +7057,7 @@ function renderCalVillaTabs(){
 
 function initBookings(){
   bookingsInited = true;
+  initDirectBk();
   renderCalVillaTabs();
 
   if(!sb){ bookingStatusMsg.textContent = 'Not connected to Supabase yet'; renderCalendar(); return; }
@@ -7024,6 +7073,227 @@ function initBookings(){
   document.getElementById('addBookingBtn').addEventListener('click', ()=>{ resetSelection(); renderCalendar(); openModal(null, todayISO()); });
 
   renderCalendar();
+}
+
+/* =====================================================================
+   DIRECT BOOKINGS — Excel-style sheet (file 63)
+   The same records as the calendar's direct bookings, laid out like the Villa Booking
+   Management spreadsheet. Advance paid = the booking's "amount paid" (in its currency) and
+   "paid on" date, so the calendar and this sheet can never disagree.
+   ===================================================================== */
+const DBK = { open:false, villa:'', status:'', q:'', editId:null, hasCols:null };
+const dbN = (n, d) => (n === null || n === undefined || n === '' || !isFinite(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits:d === undefined ? 2 : d, maximumFractionDigits:d === undefined ? 2 : d });
+const dbD = iso => { if(!iso) return ''; const p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '-' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+p[1] - 1] + '-' + p[0] : ''; };
+function dbNights(ci, co){ if(!ci || !co) return null; const n = Math.round((new Date(co + 'T00:00:00Z') - new Date(ci + 'T00:00:00Z')) / 864e5); return n > 0 ? n : null; }
+/* Every figure of a row, worked out the way the spreadsheet's formulas do. */
+function dbCalc(b){
+  const cur = bookingCur(b), n = dbNights(b.checkIn, b.checkOut), rate = b.rateRaw;
+  const fx = cur === 'LKR' ? 1 : (b.agreedRate || null);
+  const tot = n && rate !== null && rate !== undefined ? n * rate : null;
+  const totL = tot !== null && fx ? tot * fx : null;
+  const advC = b.amountPaid > 0 ? b.amountPaid : null;
+  const adv = advC !== null && fx ? advC * fx : null;
+  const bal = totL !== null ? totL - (adv || 0) : null;
+  const arrBal = bal !== null && fx && b.arrivalRate ? bal / fx * b.arrivalRate : null;
+  const state = b.status === 'cancelled' ? 'cancelled' : (b.balancePaid || (bal !== null && bal <= 1 && adv !== null) ? 'paid' : 'pending');
+  return { cur, n, rate, fx, tot, totL, advC, adv, bal, arrBal, state };
+}
+const DB_STATE = { paid:['✅ Paid', '#e8f6ee', '#1f7a55'], pending:['⏳ Pending', '#fff6dd', '#a35a00'], cancelled:['❌ Cancelled', '#fdecec', '#c92a2a'] };
+
+function initDirectBk(){
+  const panel = document.getElementById('bookingsPanel'); if(!panel || document.getElementById('bkViews')) return;
+  const bar = document.createElement('div'); bar.id = 'bkViews'; bar.className = 'bk-views';
+  bar.innerHTML = '<button type="button" class="active" data-bkv="cal">📅 Calendar</button><button type="button" data-bkv="direct">📒 Direct Bookings <small>Excel view</small></button>';
+  panel.prepend(bar);
+  const view = document.createElement('div'); view.id = 'directBkView'; panel.appendChild(view);
+  bar.querySelectorAll('[data-bkv]').forEach(b => b.addEventListener('click', () => {
+    DBK.open = b.dataset.bkv === 'direct';
+    bar.querySelectorAll('[data-bkv]').forEach(x => x.classList.toggle('active', x === b));
+    panel.classList.toggle('bk-direct', DBK.open);
+    if(DBK.open) renderDirectBk();
+  }));
+}
+async function dbColsReady(){
+  if(DBK.hasCols !== null || !sb) return !!DBK.hasCols;
+  try{ const { error } = await sb.from('villa_bookings').select('booking_ref,arrival_rate,balance_paid,sheet_notes').limit(1); DBK.hasCols = !error; }catch(_e){ DBK.hasCols = false; }
+  return DBK.hasCols;
+}
+function dbRows(){
+  const q = DBK.q.trim().toLowerCase();
+  return (allBookingsRaw || []).filter(b => b.type === 'direct')
+    .filter(b => !DBK.villa || b.villa === DBK.villa)
+    .filter(b => { if(!DBK.status) return true; return dbCalc(b).state === DBK.status; })
+    .filter(b => !q || [b.guest, b.fullName, b.bookingRef, b.sheetNotes, b.invoiceNoCo, b.invoiceNoVilla].join(' ').toLowerCase().includes(q))
+    .sort((a, b) => a.checkIn.localeCompare(b.checkIn) || String(a.id).localeCompare(String(b.id)));
+}
+function dbVillaName(id){ const v = CAL_VILLAS.find(x => x.id === id); return v ? v.name : id; }
+function dbVillaColor(id){ const v = CAL_VILLAS.find(x => x.id === id); return v ? v.color : '#888'; }
+
+/* One row of input cells — a new booking (prefix 'dbn') or a booking being corrected ('dbe'). */
+function dbInputCells(p, b){
+  const v = b || {}, c = b ? dbCalc(b) : {}, villaId = v.villa || DBK.villa || (CAL_VILLAS[0] || {}).id, cur = v.currency || (CAL_VILLAS.find(x => x.id === villaId) || {}).currency || 'USD';
+  const val = x => x === null || x === undefined ? '' : String(x).replace(/"/g, '&quot;');
+  return `<td class="in"><input id="${p}Ref" value="${val(v.bookingRef)}" placeholder="ID"></td>
+    <td class="in"><select id="${p}Villa">${CAL_VILLAS.map(x => `<option value="${esc(x.id)}" ${x.id === villaId ? 'selected' : ''}>${esc(x.name.replace(/ Villa$/i, ''))}</option>`).join('')}</select></td>
+    <td class="in"><input id="${p}Guest" value="${val(v.fullName || v.guest)}" placeholder="Guest name"></td>
+    <td class="in"><input type="date" id="${p}CI" value="${val(v.checkIn)}"></td><td class="in"><input type="date" id="${p}CO" value="${val(v.checkOut)}"></td>
+    <td class="calc" id="${p}Nights">${val(c.n)}</td>
+    <td class="in"><select id="${p}Cur">${['USD', 'EUR', 'GBP', 'LKR'].map(x => `<option ${x === cur ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
+    <td class="in"><input type="number" step="0.01" id="${p}Rate" value="${val(v.rateRaw)}" placeholder="0.00"></td>
+    <td class="calc" id="${p}Tot"></td>
+    <td class="in"><input type="number" step="0.0001" id="${p}Fx" value="${val(v.agreedRate)}" placeholder="auto"></td>
+    <td class="calc lkr" id="${p}TotL"></td>
+    <td class="in"><input type="number" step="0.01" id="${p}Adv" value="${val(c.adv !== null && c.adv !== undefined ? Math.round(c.adv * 100) / 100 : '')}" placeholder="LKR"></td>
+    <td class="in"><input type="date" id="${p}AdvD" value="${val(v.paidOn)}"></td>
+    <td class="calc" id="${p}AdvC"></td><td class="calc bal" id="${p}Bal"></td><td class="calc" id="${p}Due">${val(dbD(v.checkIn))}</td>
+    <td class="in"><input type="number" step="0.0001" id="${p}Arr" value="${val(v.arrivalRate)}" placeholder="arrival day"></td>
+    <td class="calc" id="${p}ArrBal"></td>
+    <td class="in"><select id="${p}St">${['pending', 'paid', 'cancelled'].map(s => `<option value="${s}" ${(b ? c.state : 'pending') === s ? 'selected' : ''}>${DB_STATE[s][0]}</option>`).join('')}</select></td>
+    <td class="in"><input id="${p}Notes" value="${val(v.sheetNotes)}" placeholder="Notes"></td>`;
+}
+function dbWireInputs(p, existing){
+  const g = id => document.getElementById(p + id);
+  const calc = () => {
+    const n = dbNights(g('CI').value, g('CO').value), rate = parseFloat(g('Rate').value), fx = g('Cur').value === 'LKR' ? 1 : parseFloat(g('Fx').value);
+    const adv = parseFloat(g('Adv').value), tot = n && rate >= 0 ? n * rate : null, totL = tot !== null && fx > 0 ? tot * fx : null;
+    const bal = totL !== null ? totL - (adv > 0 ? adv : 0) : null, arr = parseFloat(g('Arr').value);
+    g('Nights').textContent = n === null ? '' : n; g('Tot').textContent = tot === null ? '' : dbN(tot);
+    g('TotL').textContent = totL === null ? '' : dbN(totL); g('AdvC').textContent = adv > 0 && fx > 0 ? dbN(adv / fx) : '';
+    g('Bal').textContent = bal === null ? '' : dbN(bal); g('Due').textContent = dbD(g('CI').value);
+    g('ArrBal').textContent = bal !== null && fx > 0 && arr > 0 ? dbN(bal / fx * arr) : '';
+    g('Fx').disabled = g('Cur').value === 'LKR';
+  };
+  ['CI', 'CO', 'Rate', 'Fx', 'Adv', 'Arr', 'Cur'].forEach(i => g(i).addEventListener('input', calc));
+  g('Cur').addEventListener('change', calc);
+  g('Villa').addEventListener('change', () => { const v = CAL_VILLAS.find(x => x.id === g('Villa').value); if(v && !existing){ g('Cur').value = ['USD', 'EUR', 'GBP', 'LKR'].includes(v.currency) ? v.currency : 'USD'; calc(); } });
+  g('CI').addEventListener('change', () => { if(!g('CO').value || g('CO').value <= g('CI').value){ const d = new Date(g('CI').value + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); g('CO').value = d.toISOString().slice(0, 10); calc(); } });
+  calc();
+}
+function dbMsg(t, ok){ const m = document.getElementById('dbMsg'); if(!m) return; m.textContent = t || ''; m.style.display = t ? '' : 'none'; m.style.background = ok ? '#e8f6ee' : '#fdecec'; m.style.color = ok ? '#1f7a55' : '#a11'; }
+
+/* Save a new row (existing = null) or a corrected row. */
+async function dbSave(p, existing){
+  const g = id => document.getElementById(p + id), s = id => g(id).value.trim();
+  const ci = s('CI'), co = s('CO'), guest = s('Guest'), villa = g('Villa').value, cur = g('Cur').value, status = g('St').value;
+  if(!guest){ dbMsg('Write the guest name.'); return; }
+  if(!ci || !co || co <= ci){ dbMsg('Check-out must be after check-in.'); return; }
+  const rate = parseFloat(g('Rate').value); if(!(rate >= 0)){ dbMsg('Write the rate per night.'); return; }
+  const advL = g('Adv').value === '' ? 0 : parseFloat(g('Adv').value); if(!(advL >= 0)){ dbMsg('The advance cannot be below 0.'); return; }
+  const advD = s('AdvD') || null, arr = g('Arr').value === '' ? null : parseFloat(g('Arr').value);
+  if(arr !== null && !(arr > 0)){ dbMsg('Write a valid arrival rate.'); return; }
+  const selfId = existing ? existing.id : null, clash = b => b.villa === villa && b.id !== selfId && b.checkIn < co && ci < b.checkOut;
+  if(status !== 'cancelled'){
+    const c = allBookings.find(clash);
+    if(c){ dbMsg('These dates clash with ' + (c.guest || 'another booking') + ' (' + c.checkIn + ' → ' + c.checkOut + '). Cancel that booking first or change the dates.'); return; }
+    const h = provisionalBookings.find(clash);
+    if(h && !confirm('Those dates are held for ' + (h.guest || 'an unpaid booking') + ' (' + h.checkIn + ' → ' + h.checkOut + '), who has not paid yet. Continue anyway?')) return;
+  }
+  if(!(await fxColsReady())){ dbMsg('Run file 10 in Supabase first (saved exchange rate).'); return; }
+  const bookingDate = (existing && existing.bookingDate) || advD || todayISO();
+  let fx = cur === 'LKR' ? 1 : parseFloat(g('Fx').value);
+  if(!(fx > 0)) fx = await getFxRate(bookingDate, cur);
+  if(!(fx > 0)){ dbMsg('Could not get the exchange rate. Type the booking rate in the “Booking rate” cell.'); return; }
+  if(!(existing && existing.agreedRate && fx === existing.agreedRate)) fx = Math.round(fx * 10000) / 10000;   // keep a saved rate exactly as it was
+  const nights = dbNights(ci, co), totL = nights * rate * fx, state = status;
+  // An untouched advance keeps its exact stored value (the sheet shows it rounded to 2 decimals).
+  const oldAdv = existing ? dbCalc(existing).adv : null;
+  const advSame = existing && ((oldAdv === null && advL === 0) || (oldAdv !== null && Math.round(oldAdv * 100) === Math.round(advL * 100)));
+  const payload = {
+    villa, check_in:ci, check_out:co, type:'direct', guest, guest_full_name:guest, currency:cur, rate_usd:rate,
+    fx_rate: cur === 'LKR' ? null : fx, fx_rate_date: cur === 'LKR' ? null : bookingDate,
+    amount_paid: advSame ? (existing.amountPaid || 0) : (advL > 0 ? advL / fx : 0), paid_on: advL > 0 ? (advD || todayISO()) : null,
+    booking_date: bookingDate, payment_terms: advL >= totL - 1 ? 'full' : 'deposit',
+    booking_ref: s('Ref') || null, arrival_rate: arr, sheet_notes: s('Notes') || null,
+    balance_paid: state === 'paid', balance_paid_on: state === 'paid' ? ((existing && existing.balancePaidOn) || todayISO()) : null,
+    // Nothing is truly booked until money has arrived: no advance and not paid = a hold on the calendar.
+    status: state === 'cancelled' ? 'cancelled' : (advL > 0 || state === 'paid' ? 'confirmed' : 'provisional'),
+  };
+  if(state === 'cancelled' && !(existing && existing.status === 'cancelled')) payload.cancelled_on = todayISO();
+  if(state !== 'cancelled' && existing && existing.status === 'cancelled'){ payload.cancelled_on = null; }
+  const btn = document.getElementById(p + 'Save'); if(btn) btn.disabled = true;
+  try{
+    let error;
+    if(existing){
+      ({ error } = await sb.from('villa_bookings').update(payload).eq('id', existing.id));
+      if(error) throw error;
+      const o = dbCalc(existing), ch = [];
+      const add = (l, a, b) => { if(String(a == null ? '' : a) !== String(b == null ? '' : b)) ch.push(l + ': ' + (a == null || a === '' ? '(empty)' : a) + ' → ' + (b == null || b === '' ? '(empty)' : b)); };
+      add('guest', existing.fullName || existing.guest, guest); add('villa', dbVillaName(existing.villa), dbVillaName(villa)); add('check-in', existing.checkIn, ci); add('check-out', existing.checkOut, co);
+      add('rate/night', existing.rateRaw, rate); add('booking rate', o.fx, fx); add('advance LKR', o.adv === null ? null : Math.round(o.adv * 100) / 100, Math.round(advL * 100) / 100);
+      add('arrival rate', existing.arrivalRate, arr); add('status', DB_STATE[o.state][0], DB_STATE[state][0]); add('ID', existing.bookingRef, payload.booking_ref); add('notes', existing.sheetNotes, payload.sheet_notes);
+      logActivity('update', 'villa_bookings', 'Direct bookings sheet — corrected ' + guest + ' (' + ci + ' → ' + co + ') at ' + dbVillaName(villa) + (ch.length ? ': ' + ch.join('; ') : ': saved with no change'));
+    }else{
+      try{ Object.assign(payload, await issueInvoiceNumbers(villa, bookingDate)); }catch(e){ console.error('Could not issue invoice numbers', e); }
+      ({ error } = await sb.from('villa_bookings').insert(payload));
+      if(error) throw error;
+      logActivity('create', 'villa_bookings', 'Direct bookings sheet — added ' + guest + ' (' + ci + ' → ' + co + ') at ' + dbVillaName(villa) + ' · ' + nights + ' nights × ' + cur + ' ' + rate + ' · advance Rs. ' + dbN(advL));
+    }
+  }catch(e){ console.error(e); dbMsg('Could not save — ' + (e.message || 'check the connection.')); if(btn) btn.disabled = false; return; }
+  DBK.editId = null; DBK.force = true; await fetchBookings(); dbMsg('Saved ✓', true); setTimeout(() => dbMsg(''), 2500);
+}
+
+async function renderDirectBk(){
+  const box = document.getElementById('directBkView'); if(!box) return;
+  if(!(await dbColsReady())){
+    box.innerHTML = '<div class="r-box" style="padding:18px"><h3>📒 Direct Bookings</h3><p>One small step first: run <b>63-supabase-direct-bookings-sheet.sql</b> in Supabase (SQL Editor), then reload this page. It adds the few columns this sheet needs. Nothing else changes.</p></div>';
+    return;
+  }
+  const rows = dbRows(), edit = canChange('bookings'), all = (allBookingsRaw || []).filter(b => b.type === 'direct');
+  const live = rows.filter(b => b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) }));
+  const sum = k => live.reduce((s, r) => s + (r.c[k] || 0), 0);
+  const toCollect = live.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
+  const villas = CAL_VILLAS.filter(v => all.some(b => b.villa === v.id) || !lockedVilla());
+  const chip = (k, label, cur, attr) => `<button type="button" class="dbchip${cur ? ' on' : ''}" data-${attr}="${esc(k)}">${label}</button>`;
+  const stCount = s => all.filter(b => (!DBK.villa || b.villa === DBK.villa) && dbCalc(b).state === s).length;
+  const th = ['Booking<br>ID', 'Villa', 'Guest name', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate<br>(LKR per 1)', 'Total<br>(LKR)', 'Advance<br>(LKR)', 'Advance<br>date', 'Advance<br>(in cur)', 'Balance<br>(LKR)', 'Balance<br>due date', 'Arrival rate', 'Balance @<br>arrival rate', 'Status', 'Notes'];
+  const rowHtml = ({ b, c }) => {
+    const st = DB_STATE[c.state];
+    if(DBK.editId !== null && String(DBK.editId) === String(b.id)) return `<tr class="dbedit" data-st="${c.state}">${dbInputCells('dbe', b)}<td class="act"><button type="button" class="dbbtn main" id="dbeSave">Save</button><button type="button" class="dbbtn" id="dbeCancel">Cancel</button></td></tr>`;
+    return `<tr data-st="${c.state}">
+      <td class="id">${esc(b.bookingRef || b.invoiceNoVilla || '')}</td>
+      <td><span class="dbvilla" style="--c:${dbVillaColor(b.villa)}">${esc(dbVillaName(b.villa).replace(/ Villa$/i, ''))}</span></td>
+      <td class="guest">${esc(b.fullName || b.guest || '')}${b.status === 'provisional' ? ' <span class="dbhold" title="No money received yet — the dates are only held">HOLD</span>' : ''}</td>
+      <td>${esc(dbD(b.checkIn))}</td><td>${esc(dbD(b.checkOut))}</td><td class="n">${c.n === null ? '' : c.n}</td><td>${esc(c.cur)}</td>
+      <td class="n blue">${c.rate === null || c.rate === undefined ? '' : Number(c.rate).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:4 })}</td><td class="n">${dbN(c.tot)}</td><td class="n blue">${c.cur === 'LKR' ? '' : dbN(c.fx, 4)}</td>
+      <td class="n lkr">${dbN(c.totL)}</td><td class="n lkr">${dbN(c.adv)}</td><td>${esc(dbD(b.paidOn))}</td><td class="n">${dbN(c.advC)}</td>
+      <td class="n bal">${dbN(c.bal)}</td><td>${esc(dbD(b.checkIn))}</td><td class="n blue">${dbN(b.arrivalRate, 4)}</td><td class="n bal">${dbN(c.arrBal)}</td>
+      <td><span class="dbst" style="background:${st[1]};color:${st[2]}">${st[0]}</span></td><td class="notes">${esc(b.sheetNotes || '')}</td>
+      ${edit ? `<td class="act"><button type="button" class="dbbtn" data-dbedit="${b.id}" title="Correct this booking (your name is kept in the activity log)">✏️</button></td>` : ''}</tr>`;
+  };
+  const sumRows = CAL_VILLAS.map(v => { const l = all.filter(b => b.villa === v.id && b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) })); if(!l.length) return '';
+    const t = k => l.reduce((s, r) => s + (r.c[k] || 0), 0), due = l.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
+    return `<tr><td><span class="dbvilla" style="--c:${v.color}">${esc(v.name)}</span></td><td class="n">${l.length}</td><td class="n">${t('n')}</td><td class="n lkr">${dbN(t('totL'))}</td><td class="n lkr">${dbN(t('adv'))}</td><td class="n bal">${dbN(due)}</td><td class="n">${l.filter(r => r.c.state === 'paid').length}</td></tr>`; }).join('');
+  box.innerHTML = `
+    <div class="dbhead"><div><h3 style="margin:0">📒 Direct Bookings <small>— Excel view · the same bookings as the calendar</small></h3>
+      <div class="r-muted" style="font-size:12px">Blue = typed in · green = LKR amount · orange = balance · rows turn green when paid, yellow when pending, red when cancelled.</div></div>
+      <div class="dbtools"><input type="search" id="dbQ" placeholder="🔍 Search guest, ID, notes" value="${esc(DBK.q)}"><button type="button" class="dbbtn" id="dbPrint">🖨️ Print / PDF</button><button type="button" class="dbbtn" id="dbCsv">⬇ Excel / CSV</button></div></div>
+    <div class="dbchips">${chip('', 'All villas', !DBK.villa, 'dbvilla')}${villas.map(v => chip(v.id, esc(v.name), DBK.villa === v.id, 'dbvilla')).join('')}
+      <span class="dbsep"></span>${chip('', 'All status', !DBK.status, 'dbstat')}${chip('pending', '⏳ Pending (' + stCount('pending') + ')', DBK.status === 'pending', 'dbstat')}${chip('paid', '✅ Paid (' + stCount('paid') + ')', DBK.status === 'paid', 'dbstat')}${chip('cancelled', '❌ Cancelled (' + stCount('cancelled') + ')', DBK.status === 'cancelled', 'dbstat')}</div>
+    <div class="dbkpi"><div><span>Bookings</span><b>${live.length}</b></div><div><span>Nights</span><b>${sum('n')}</b></div><div><span>Total (LKR)</span><b>${dbN(sum('totL'))}</b></div><div><span>Advance received (LKR)</span><b>${dbN(sum('adv'))}</b></div><div class="warn"><span>Still to collect (LKR)</span><b>${dbN(toCollect)}</b></div></div>
+    <div id="dbMsg" class="dbmsg" style="display:none"></div>
+    <div class="dbwrap"><table class="dbx"><thead><tr>${th.map((t, i) => `<th class="c${i}">${t}</th>`).join('')}${edit ? '<th></th>' : ''}</tr></thead><tbody>
+      ${edit && !DBK.editId ? `<tr class="dbnew">${dbInputCells('dbn', null)}<td class="act"><button type="button" class="dbbtn main" id="dbnSave">＋ Add</button></td></tr>` : ''}
+      ${live.length + rows.filter(b => b.status === 'cancelled').length ? rows.map(b => rowHtml({ b, c:dbCalc(b) })).join('') : `<tr><td colspan="${th.length + 1}" class="r-muted" style="padding:18px;text-align:center">No direct bookings match.${edit ? ' Type the first one in the blue row above.' : ''}</td></tr>`}
+      <tr class="dbtot"><td colspan="5">Total (${live.length} bookings, cancelled not counted)</td><td class="n">${sum('n')}</td><td colspan="4"></td><td class="n lkr">${dbN(sum('totL'))}</td><td class="n lkr">${dbN(sum('adv'))}</td><td colspan="2"></td><td class="n bal">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td colspan="2"></td><td class="n bal">${dbN(toCollect)}</td><td colspan="${edit ? 3 : 2}"></td></tr></tbody></table></div>
+    <details class="dbsum"><summary>📊 Summary by villa</summary><table class="r-table"><thead><tr><th>Villa</th><th class="n">Bookings</th><th class="n">Nights</th><th class="n">Total (LKR)</th><th class="n">Advance (LKR)</th><th class="n">Still to collect (LKR)</th><th class="n">Paid</th></tr></thead><tbody>${sumRows || '<tr><td colspan="7" class="r-muted">Nothing yet.</td></tr>'}</tbody></table></details>`;
+  // wiring
+  box.querySelectorAll('[data-dbvilla]').forEach(b => b.addEventListener('click', () => { DBK.villa = b.dataset.dbvilla; renderDirectBk(); }));
+  box.querySelectorAll('[data-dbstat]').forEach(b => b.addEventListener('click', () => { DBK.status = b.dataset.dbstat; renderDirectBk(); }));
+  const q = box.querySelector('#dbQ'); q.addEventListener('input', () => { DBK.q = q.value; clearTimeout(DBK.t); DBK.t = setTimeout(() => { renderDirectBk().then(() => { const n = document.getElementById('dbQ'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); }, 350); });
+  if(edit){
+    if(box.querySelector('#dbnSave')){ dbWireInputs('dbn', null); box.querySelector('#dbnSave').addEventListener('click', () => dbSave('dbn', null)); }
+    box.querySelectorAll('[data-dbedit]').forEach(b => b.addEventListener('click', () => { DBK.editId = b.dataset.dbedit; renderDirectBk(); }));
+    const ex = DBK.editId && all.find(x => String(x.id) === String(DBK.editId));
+    if(ex){ DBK.editId = ex.id; dbWireInputs('dbe', ex); box.querySelector('#dbeSave').addEventListener('click', () => dbSave('dbe', ex)); box.querySelector('#dbeCancel').addEventListener('click', () => { DBK.editId = null; renderDirectBk(); }); }
+  }
+  const label = () => [DBK.villa ? dbVillaName(DBK.villa) : 'All villas', DBK.status ? DB_STATE[DBK.status][0] : 'All status', DBK.q.trim() ? '“' + DBK.q.trim() + '”' : ''].filter(Boolean).join(' · ');
+  box.querySelector('#dbPrint').addEventListener('click', () => restPrintPage('Direct bookings', `<div style="margin-bottom:8px;font-size:12px">${esc(label())}</div><table><thead><tr>${['ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate', 'Total', 'Booking rate', 'Total LKR', 'Advance LKR', 'Adv. date', 'Balance LKR', 'Arrival rate', 'Bal @ arrival', 'Status', 'Notes'].map(h => '<th>' + h + '</th>').join('')}</tr></thead><tbody>${rows.map(b => { const c = dbCalc(b); return '<tr>' + [b.bookingRef || '', dbVillaName(b.villa), b.fullName || b.guest, dbD(b.checkIn), dbD(b.checkOut), c.n, c.cur, dbN(c.rate), dbN(c.tot), c.cur === 'LKR' ? '' : dbN(c.fx, 4), dbN(c.totL), dbN(c.adv), dbD(b.paidOn), dbN(c.bal), dbN(b.arrivalRate, 4), dbN(c.arrBal), DB_STATE[c.state][0], b.sheetNotes || ''].map((v, i) => `<td${[5, 7, 8, 9, 10, 11, 13, 14, 15].includes(i) ? ' style="text-align:right"' : ''}>${esc(v === null || v === undefined ? '' : v)}</td>`).join('') + '</tr>'; }).join('')}<tr class="tot"><td colspan="5">Total (${live.length} bookings)</td><td style="text-align:right">${sum('n')}</td><td colspan="4"></td><td style="text-align:right">${dbN(sum('totL'))}</td><td style="text-align:right">${dbN(sum('adv'))}</td><td></td><td style="text-align:right">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td></td><td style="text-align:right">${dbN(toCollect)}</td><td colspan="2"></td></tr></tbody></table>`));
+  box.querySelector('#dbCsv').addEventListener('click', () => {
+    const q2 = v => { const t = typeof v === 'number' ? String(Math.round(v * 10000) / 10000) : csvSafe(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const head = ['Booking ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Currency', 'Rate/night', 'Total', 'Booking rate', 'Total LKR', 'Advance LKR', 'Advance date', 'Advance (cur)', 'Balance LKR', 'Balance due date', 'Arrival rate', 'Balance @ arrival rate', 'Status', 'Notes'];
+    const csv = [head].concat(rows.map(b => { const c = dbCalc(b); return [b.bookingRef || '', dbVillaName(b.villa), b.fullName || b.guest, dbD(b.checkIn), dbD(b.checkOut), c.n, c.cur, c.rate, c.tot, c.cur === 'LKR' ? '' : c.fx, c.totL, c.adv, dbD(b.paidOn), c.advC, c.bal, dbD(b.checkIn), b.arrivalRate, c.arrBal, DB_STATE[c.state][0], b.sheetNotes || '']; })).map(r => r.map(q2).join(',')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' })); a.download = 'Direct bookings.csv'; document.body.appendChild(a); a.click(); a.remove();
+  });
 }
 
 async function fetchBookings(){
@@ -7055,6 +7325,11 @@ async function fetchBookings(){
 
   bookingStatusMsg.textContent = 'Calendar synced (live)';
   renderCalendar();
+  // The Direct Bookings sheet: refresh it, unless someone is in the middle of typing a row.
+  if(DBK.open){
+    const typing = !!DBK.editId || ['dbnGuest', 'dbnRate', 'dbnCI'].some(i => { const e = document.getElementById(i); return e && e.value; });
+    if(DBK.force || !typing){ DBK.force = false; renderDirectBk(); }
+  }
   renderHoldBanner();
   if(typeof settingsInited !== 'undefined' && settingsInited){ renderInvoiceList(); renderCancelledList(); renderReminderList(); }
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
