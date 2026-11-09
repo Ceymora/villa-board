@@ -4516,6 +4516,8 @@ const AREAS = [
     changeLabel:'tick off rooms, add staff',                     panel:'housekeepingPanel' },
   { key:'bookings',     label:'Bookings Calendar', see:'tab_bookings',     change:'edit_bookings',
     changeLabel:'add, edit and cancel bookings, invoices',       panel:'bookingsPanel' },
+  { key:'directbk',     label:'Direct Bookings',   see:'tab_directbk',     change:'edit_directbk',
+    changeLabel:'add, edit and delete direct bookings in the sheet (also needs Bookings Calendar ticked)', panel:'directPanel' },
   { key:'pettycash',    label:'Petty Cash',        see:'tab_pettycash',    change:'edit_cash',
     changeLabel:'record expenses, money in, advances, transfers', panel:'pettyCashPanel' },
   { key:'inventory',    label:'Inventory',         see:'tab_inventory',    change:'edit_inventory',
@@ -4605,7 +4607,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.09-direct-commission';
+const APP_VERSION = 'v2026.11.09-direct-permission';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7106,6 +7108,10 @@ function initBookings(){
    "paid on" date, so the calendar and this sheet can never disagree.
    ===================================================================== */
 const DBK = { open:false, villa:'', status:'', q:'', editId:null, hasCols:null, hasComm:null, sort:'ci-asc', sel:null };
+// The sheet shows the same records as the Bookings Calendar, and the database only lets people with the Bookings
+// Calendar tick read or write them — so the Direct Bookings tick works ON TOP of it: both are needed.
+function dbCanSee(){ return canSee('bookings') && canSee('directbk'); }
+function dbCanEdit(){ return canChange('bookings') && canChange('directbk'); }
 const DB_COMM = 2.5;   // the commission % charged to the client
 const DB_SORTS = { 'ci-asc':'Check-in date — earliest first', 'ci-desc':'Check-in date — latest first', 'villa':'Villa (A–Z), then check-in date', 'bd-desc':'Booking date — newest first', 'bd-asc':'Booking date — oldest first', 'pend':'Pending payments first', 'paid':'Paid first', 'canc':'Cancelled first', 'guest':'Guest name (A–Z)' };
 function dbCmp(a, b){
@@ -7343,7 +7349,7 @@ async function renderDirectBk(){
     box.innerHTML = '<div class="r-box" style="padding:18px"><h3>📒 Direct Bookings</h3><p>One small step first: run <b>63-supabase-direct-bookings-sheet.sql</b> in Supabase (SQL Editor), then reload this page. It adds the few columns this sheet needs. Nothing else changes.</p></div>';
     return;
   }
-  const rows = dbRows(), edit = canChange('bookings'), canDel = edit && (canDelete() || (drReady && drCanAsk('villa_bookings'))), all = (allBookingsRaw || []).filter(b => b.type === 'direct');
+  const rows = dbRows(), edit = dbCanEdit(), canDel = edit && (canDelete() || (drReady && drCanAsk('villa_bookings'))), all = (allBookingsRaw || []).filter(b => b.type === 'direct');
   const live = rows.filter(b => b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) }));
   const sum = k => live.reduce((s, r) => s + (r.c[k] || 0), 0);
   const toCollect = live.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
@@ -19984,7 +19990,7 @@ function initAreaSwitch(){
   const btns = [];
   if(villas) btns.push(`<button data-area="villas">🏡 Villas</button>`);
   rests.forEach(r => btns.push(`<button data-area="${esc(r.id)}">${r.icon} ${esc(restInfo(r.id).name)}</button>`));
-  if(villas && canSee('bookings')) btns.push(`<button data-area="direct">📒 Direct Bookings</button>`);
+  if(villas && dbCanSee()) btns.push(`<button data-area="direct">📒 Direct Bookings</button>`);
   bar.innerHTML = btns.join('');
   bar.style.display = btns.length > 1 ? '' : 'none';
   bar.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => {
@@ -20005,7 +20011,7 @@ function markAreaSwitch(){
 }
 /* ---- the Direct Bookings area: its own page beside Villas / SDA / Thai Charm ---- */
 function enterDirect(){
-  if(DBK.open) return;
+  if(DBK.open || !dbCanSee()) return;
   if(REST.id) leaveRest();
   DBK.shown = villaPanelIds().filter(p => { const el = document.getElementById(p); return el && el.style.display !== 'none'; });
   villaPanelIds().forEach(p => { const el = document.getElementById(p); if(el) el.style.display = 'none'; });
