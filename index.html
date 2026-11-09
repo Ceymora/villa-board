@@ -231,13 +231,24 @@
   .bk-views button{ font-family:inherit; font-size:14px; font-weight:700; padding:9px 18px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; color:#13233a; cursor:pointer; }
   .bk-views button small{ font-weight:500; opacity:.7; }
   .bk-views button.active{ background:#13233a; color:#fff; border-color:#13233a; }
-  #bookingsPanel.bk-direct > :not(.bk-views):not(#directBkView){ display:none !important; }
-  #bookingsPanel:not(.bk-direct) > #directBkView{ display:none; }
   .dbhead{ display:flex; gap:12px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; margin-bottom:10px; }
   .dbtools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .dbtools input{ height:38px; border:1.5px solid #cfd6e3; border-radius:10px; padding:0 12px; font-size:14px; min-width:220px; }
   .dbbtn{ height:36px; padding:0 14px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; }
   .dbbtn:hover{ box-shadow:0 3px 8px rgba(19,35,58,.15); } .dbbtn.main{ background:#13233a; color:#fff; border-color:#13233a; }
+  .dbp{ display:inline-flex; align-items:center; gap:5px; height:32px; padding:0 13px; border-radius:999px; border:0; font:700 12.5px Inter,sans-serif; cursor:pointer; color:#fff; box-shadow:0 2px 5px rgba(19,35,58,.18); transition:transform .08s, box-shadow .15s; white-space:nowrap; }
+  .dbp:hover{ transform:translateY(-1px); box-shadow:0 5px 12px rgba(19,35,58,.25); } .dbp:disabled{ opacity:.5; cursor:default; transform:none; }
+  .dbp.add{ background:linear-gradient(135deg,#1f9d6b,#157a52); } .dbp.edit{ background:linear-gradient(135deg,#3b7cf0,#2253c4); }
+  .dbp.clr{ background:linear-gradient(135deg,#8b94a8,#667088); } .dbp.del{ background:linear-gradient(135deg,#e5484d,#bd2a30); }
+  .dbp.print{ background:linear-gradient(135deg,#6d4fd8,#4a32a8); } .dbp.csv{ background:linear-gradient(135deg,#d98a0b,#b36a00); }
+  .dbp.big{ height:40px; padding:0 20px; font-size:14px; }
+  .dbx td.act, .dbx th.act{ position:sticky; right:0; background:#fff; box-shadow:-8px 0 8px -8px rgba(19,35,58,.25); z-index:2; white-space:nowrap; }
+  .dbx tr.dbnew td.act, .dbx tr.dbedit td.act{ background:#eef4ff; } .dbx td.act .dbp + .dbp{ margin-left:6px; }
+  .dbx th.act{ background:#13233a; color:#fff; }
+  #directPanel{ display:none; }
+  body.in-direct .frame{ max-width:1500px; }
+  body.in-direct #board > h1, body.in-direct #board > .sub, body.in-direct #board > .maintabs{ display:none !important; }
+  .area-switch button.on[data-area="direct"]{ background:#8a4b12; border-color:#8a4b12; }
   .dbchips{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
   .dbsep{ width:1px; height:24px; background:#cfd6e3; margin:0 4px; }
   .dbchip{ height:34px; padding:0 14px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; font-weight:600; font-size:13px; cursor:pointer; font-family:inherit; }
@@ -2063,6 +2074,8 @@
     </div>
 
     <!-- ===================== USERS PANEL (admin only) ===================== -->
+    <div id="directPanel" style="display:none"><div id="directBkView"></div></div>
+
     <div id="restPanel" style="display:none">
       <aside class="rest-side">
         <div class="rest-brand"><span class="ico" id="restIcon">🍽</span><div><b id="restName">Restaurant</b><small>Cash • Card • Transfer • Service Charge • Petty Cash</small></div></div>
@@ -4581,7 +4594,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.06-direct-sheet';
+const APP_VERSION = 'v2026.11.06-direct-tab';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7100,19 +7113,7 @@ function dbCalc(b){
 }
 const DB_STATE = { paid:['✅ Paid', '#e8f6ee', '#1f7a55'], pending:['⏳ Pending', '#fff6dd', '#a35a00'], cancelled:['❌ Cancelled', '#fdecec', '#c92a2a'] };
 
-function initDirectBk(){
-  const panel = document.getElementById('bookingsPanel'); if(!panel || document.getElementById('bkViews')) return;
-  const bar = document.createElement('div'); bar.id = 'bkViews'; bar.className = 'bk-views';
-  bar.innerHTML = '<button type="button" class="active" data-bkv="cal">📅 Calendar</button><button type="button" data-bkv="direct">📒 Direct Bookings <small>Excel view</small></button>';
-  panel.prepend(bar);
-  const view = document.createElement('div'); view.id = 'directBkView'; panel.appendChild(view);
-  bar.querySelectorAll('[data-bkv]').forEach(b => b.addEventListener('click', () => {
-    DBK.open = b.dataset.bkv === 'direct';
-    bar.querySelectorAll('[data-bkv]').forEach(x => x.classList.toggle('active', x === b));
-    panel.classList.toggle('bk-direct', DBK.open);
-    if(DBK.open) renderDirectBk();
-  }));
-}
+function initDirectBk(){ /* the Direct Bookings page is its own area now (see enterDirect) */ }
 async function dbColsReady(){
   if(DBK.hasCols !== null || !sb) return !!DBK.hasCols;
   try{ const { error } = await sb.from('villa_bookings').select('booking_ref,arrival_rate,balance_paid,sheet_notes').limit(1); DBK.hasCols = !error; }catch(_e){ DBK.hasCols = false; }
@@ -7232,13 +7233,61 @@ async function dbSave(p, existing){
   DBK.editId = null; DBK.force = true; await fetchBookings(); dbMsg('Saved ✓', true); setTimeout(() => dbMsg(''), 2500);
 }
 
+async function dbDelete(b){
+  const nm = b.fullName || b.guest || 'this booking';
+  if(canDelete()){
+    if(!confirm('Delete ' + nm + ' (' + dbD(b.checkIn) + ' → ' + dbD(b.checkOut) + ') at ' + dbVillaName(b.villa) + '?\n\nIt is removed from the calendar and the reports too. This cannot be undone.')) return;
+    try{
+      await delRows('villa_bookings', 'id', b.id);
+      logActivity('delete', 'villa_bookings', 'Direct bookings sheet — deleted ' + nm + ' (' + b.checkIn + ' → ' + b.checkOut + ') at ' + dbVillaName(b.villa));
+      DBK.force = true; await afterDelete('villa_bookings'); await fetchBookings();
+      dbMsg('Deleted ✓', true); setTimeout(() => dbMsg(''), 2500);
+    }catch(e){ delFailed(e); }
+  }else if(drReady && drCanAsk('villa_bookings')){
+    const p = drPending('villa_bookings', b.id);
+    if(p) drCancel(p.id); else drAsk('villa_bookings', [b.id]);
+  }else alert('You do not have permission to delete bookings.');
+}
+/* The printable report: letterhead, filters used, key figures, the table, a summary per villa, signature lines. */
+function dbPrintReport(rows, label){
+  const w = window.open('', '_blank'); if(!w){ alert('Please allow pop-ups to print the report.'); return; }
+  const co = (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.company) || {}, logo = (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.logoUrl) || '';
+  const list = rows.map(b => ({ b, c:dbCalc(b) })), live = list.filter(r => r.b.status !== 'cancelled');
+  const sum = (l, k) => l.reduce((t, r) => t + (r.c[k] || 0), 0);
+  const due = l => l.filter(r => r.c.state === 'pending').reduce((t, r) => t + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
+  const ST = { paid:'#e8f6ee', pending:'#fff6dd', cancelled:'#fdecec' };
+  const td = (v, c) => '<td' + (c ? ' class="' + c + '"' : '') + '>' + esc(v == null ? '' : String(v)) + '</td>';
+  const head = ['ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate', 'Total (LKR)', 'Advance (LKR)', 'Advance date', 'Balance (LKR)', 'Arrival rate', 'Bal. @ arrival', 'Status', 'Notes'];
+  const body = list.map(({ b, c }) => '<tr style="background:' + ST[c.state] + '">' + td(b.bookingRef || '') + td(dbVillaName(b.villa)) + td(b.fullName || b.guest || '') + td(dbD(b.checkIn)) + td(dbD(b.checkOut)) + td(c.n, 'n') + td(c.cur)
+    + td(c.rate === null || c.rate === undefined ? '' : Number(c.rate).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:4 }), 'n') + td(dbN(c.tot), 'n') + td(c.cur === 'LKR' ? '' : dbN(c.fx, 4), 'n') + td(dbN(c.totL), 'n') + td(dbN(c.adv), 'n') + td(dbD(b.paidOn))
+    + td(dbN(c.bal), 'n') + td(dbN(b.arrivalRate, 4), 'n') + td(dbN(c.arrBal), 'n') + td(DB_STATE[c.state][0].replace(/^[^A-Za-z]+/, '')) + td(b.sheetNotes || '') + '</tr>').join('');
+  const byVilla = CAL_VILLAS.map(v => { const l = live.filter(r => r.b.villa === v.id); if(!l.length) return '';
+    return '<tr>' + td(v.name) + td(l.length, 'n') + td(sum(l, 'n'), 'n') + td(dbN(sum(l, 'totL')), 'n') + td(dbN(sum(l, 'adv')), 'n') + td(dbN(due(l)), 'n') + td(l.filter(r => r.c.state === 'paid').length, 'n') + '</tr>'; }).join('');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Direct bookings report</title><style>'
+    + '@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#13233a;margin:0;padding:18px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + '.hd{display:flex;align-items:center;gap:16px;border-bottom:2px solid #13233a;padding-bottom:10px;margin-bottom:12px}.hd img{max-height:60px;max-width:160px;object-fit:contain}'
+    + 'h1{font-size:19px;margin:0}.sub{font-size:11px;color:#6b7385;margin-top:3px}.kpi{display:flex;gap:10px;margin:10px 0 12px}.kpi div{flex:1;border:1px solid #d5dae3;border-radius:6px;padding:7px 10px}'
+    + '.kpi span{display:block;font-size:10px;color:#6b7385;text-transform:uppercase}.kpi b{font-size:15px}table{border-collapse:collapse;width:100%;font-size:9px}th,td{border:1px solid #cfd5e1;padding:3px 5px;vertical-align:top}'
+    + 'th{background:#13233a;color:#fff;text-align:left}td.n{text-align:right;white-space:nowrap}tr.tot td{font-weight:bold;background:#e9edf5}h2{font-size:13px;margin:16px 0 6px}'
+    + 'thead{display:table-header-group}tr{page-break-inside:avoid}.sig{display:flex;gap:40px;margin-top:40px;font-size:11px}.sig div{flex:1;border-top:1px solid #13233a;padding-top:5px}'
+    + '</style></head><body><div class="hd">' + (logo && /^(https:|data:image\/)/.test(logo) ? '<img src="' + esc(logo) + '" alt="">' : '')
+    + '<div><h1>' + esc(co.name || co.companyName || 'Ceymora Management') + ' — Direct Bookings Report</h1><div class="sub">' + esc(label) + ' · Printed ' + esc(dbD(todayISO())) + ' · Cancelled bookings are listed but not counted in the totals</div></div></div>'
+    + '<div class="kpi"><div><span>Bookings</span><b>' + live.length + '</b></div><div><span>Nights</span><b>' + sum(live, 'n') + '</b></div><div><span>Total (LKR)</span><b>' + dbN(sum(live, 'totL')) + '</b></div><div><span>Advance received (LKR)</span><b>' + dbN(sum(live, 'adv')) + '</b></div><div><span>Still to collect (LKR)</span><b>' + dbN(due(live)) + '</b></div></div>'
+    + '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="18">No bookings match.</td></tr>')
+    + '<tr class="tot"><td colspan="5">Total (' + live.length + ' bookings)</td><td class="n">' + sum(live, 'n') + '</td><td colspan="4"></td><td class="n">' + dbN(sum(live, 'totL')) + '</td><td class="n">' + dbN(sum(live, 'adv')) + '</td><td></td><td class="n">' + dbN(live.reduce((t, r) => t + (r.c.bal || 0), 0)) + '</td><td></td><td class="n">' + dbN(due(live)) + '</td><td colspan="2"></td></tr></tbody></table>'
+    + '<h2>Summary by villa</h2><table style="max-width:700px"><thead><tr><th>Villa</th><th>Bookings</th><th>Nights</th><th>Total (LKR)</th><th>Advance (LKR)</th><th>Still to collect (LKR)</th><th>Paid</th></tr></thead><tbody>' + (byVilla || '<tr><td colspan="7">Nothing yet.</td></tr>') + '</tbody></table>'
+    + '<div class="sig"><div>Prepared by</div><div>Checked by</div></div></body></html>');
+  w.document.close(); setTimeout(() => w.print(), 400);
+  logActivity('print', 'villa_bookings', 'Printed the Direct Bookings report (' + label + ')');
+}
+
 async function renderDirectBk(){
   const box = document.getElementById('directBkView'); if(!box) return;
   if(!(await dbColsReady())){
     box.innerHTML = '<div class="r-box" style="padding:18px"><h3>📒 Direct Bookings</h3><p>One small step first: run <b>63-supabase-direct-bookings-sheet.sql</b> in Supabase (SQL Editor), then reload this page. It adds the few columns this sheet needs. Nothing else changes.</p></div>';
     return;
   }
-  const rows = dbRows(), edit = canChange('bookings'), all = (allBookingsRaw || []).filter(b => b.type === 'direct');
+  const rows = dbRows(), edit = canChange('bookings'), canDel = edit && (canDelete() || (drReady && drCanAsk('villa_bookings'))), all = (allBookingsRaw || []).filter(b => b.type === 'direct');
   const live = rows.filter(b => b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) }));
   const sum = k => live.reduce((s, r) => s + (r.c[k] || 0), 0);
   const toCollect = live.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
@@ -7248,7 +7297,7 @@ async function renderDirectBk(){
   const th = ['Booking<br>ID', 'Villa', 'Guest name', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate<br>(LKR per 1)', 'Total<br>(LKR)', 'Advance<br>(LKR)', 'Advance<br>date', 'Advance<br>(in cur)', 'Balance<br>(LKR)', 'Balance<br>due date', 'Arrival rate', 'Balance @<br>arrival rate', 'Status', 'Notes'];
   const rowHtml = ({ b, c }) => {
     const st = DB_STATE[c.state];
-    if(DBK.editId !== null && String(DBK.editId) === String(b.id)) return `<tr class="dbedit" data-st="${c.state}">${dbInputCells('dbe', b)}<td class="act"><button type="button" class="dbbtn main" id="dbeSave">Save</button><button type="button" class="dbbtn" id="dbeCancel">Cancel</button></td></tr>`;
+    if(DBK.editId !== null && String(DBK.editId) === String(b.id)) return `<tr class="dbedit" data-st="${c.state}">${dbInputCells('dbe', b)}<td class="act"><button type="button" class="dbp add" id="dbeSave">💾 Save</button><button type="button" class="dbp clr" id="dbeCancel">✖ Cancel</button></td></tr>`;
     return `<tr data-st="${c.state}">
       <td class="id">${esc(b.bookingRef || b.invoiceNoVilla || '')}</td>
       <td><span class="dbvilla" style="--c:${dbVillaColor(b.villa)}">${esc(dbVillaName(b.villa).replace(/ Villa$/i, ''))}</span></td>
@@ -7258,7 +7307,7 @@ async function renderDirectBk(){
       <td class="n lkr">${dbN(c.totL)}</td><td class="n lkr">${dbN(c.adv)}</td><td>${esc(dbD(b.paidOn))}</td><td class="n">${dbN(c.advC)}</td>
       <td class="n bal">${dbN(c.bal)}</td><td>${esc(dbD(b.checkIn))}</td><td class="n blue">${dbN(b.arrivalRate, 4)}</td><td class="n bal">${dbN(c.arrBal)}</td>
       <td><span class="dbst" style="background:${st[1]};color:${st[2]}">${st[0]}</span></td><td class="notes">${esc(b.sheetNotes || '')}</td>
-      ${edit ? `<td class="act"><button type="button" class="dbbtn" data-dbedit="${b.id}" title="Correct this booking (your name is kept in the activity log)">✏️</button></td>` : ''}</tr>`;
+      ${edit ? `<td class="act"><button type="button" class="dbp edit" data-dbedit="${b.id}" title="Correct this booking (your name is kept in the activity log)">✏️ Edit</button>${canDel ? (() => { const pr = (!canDelete() && drReady) ? drPending('villa_bookings', b.id) : null; return `<button type="button" class="dbp del" data-dbdel="${b.id}" title="${canDelete() ? 'Delete this booking everywhere' : (pr ? 'Withdraw the delete request' : 'Ask Makky to delete this booking')}">${pr ? '↩ Undo request' : '🗑️ Delete'}</button>`; })() : ''}</td>` : ''}</tr>`;
   };
   const sumRows = CAL_VILLAS.map(v => { const l = all.filter(b => b.villa === v.id && b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) })); if(!l.length) return '';
     const t = k => l.reduce((s, r) => s + (r.c[k] || 0), 0), due = l.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
@@ -7266,28 +7315,31 @@ async function renderDirectBk(){
   box.innerHTML = `
     <div class="dbhead"><div><h3 style="margin:0">📒 Direct Bookings <small>— Excel view · the same bookings as the calendar</small></h3>
       <div class="r-muted" style="font-size:12px">Blue = typed in · green = LKR amount · orange = balance · rows turn green when paid, yellow when pending, red when cancelled.</div></div>
-      <div class="dbtools"><input type="search" id="dbQ" placeholder="🔍 Search guest, ID, notes" value="${esc(DBK.q)}"><button type="button" class="dbbtn" id="dbPrint">🖨️ Print / PDF</button><button type="button" class="dbbtn" id="dbCsv">⬇ Excel / CSV</button></div></div>
+      <div class="dbtools"><input type="search" id="dbQ" placeholder="🔍 Search guest, ID, notes" value="${esc(DBK.q)}">${(DBK.villa || DBK.status || DBK.q) ? '<button type="button" class="dbp clr" id="dbClearF">✖ Clear filters</button>' : ''}<button type="button" class="dbp print" id="dbPrint">🖨️ Print report / PDF</button><button type="button" class="dbp csv" id="dbCsv">⬇ Excel / CSV</button></div></div>
     <div class="dbchips">${chip('', 'All villas', !DBK.villa, 'dbvilla')}${villas.map(v => chip(v.id, esc(v.name), DBK.villa === v.id, 'dbvilla')).join('')}
       <span class="dbsep"></span>${chip('', 'All status', !DBK.status, 'dbstat')}${chip('pending', '⏳ Pending (' + stCount('pending') + ')', DBK.status === 'pending', 'dbstat')}${chip('paid', '✅ Paid (' + stCount('paid') + ')', DBK.status === 'paid', 'dbstat')}${chip('cancelled', '❌ Cancelled (' + stCount('cancelled') + ')', DBK.status === 'cancelled', 'dbstat')}</div>
     <div class="dbkpi"><div><span>Bookings</span><b>${live.length}</b></div><div><span>Nights</span><b>${sum('n')}</b></div><div><span>Total (LKR)</span><b>${dbN(sum('totL'))}</b></div><div><span>Advance received (LKR)</span><b>${dbN(sum('adv'))}</b></div><div class="warn"><span>Still to collect (LKR)</span><b>${dbN(toCollect)}</b></div></div>
     <div id="dbMsg" class="dbmsg" style="display:none"></div>
-    <div class="dbwrap"><table class="dbx"><thead><tr>${th.map((t, i) => `<th class="c${i}">${t}</th>`).join('')}${edit ? '<th></th>' : ''}</tr></thead><tbody>
-      ${edit && !DBK.editId ? `<tr class="dbnew">${dbInputCells('dbn', null)}<td class="act"><button type="button" class="dbbtn main" id="dbnSave">＋ Add</button></td></tr>` : ''}
+    <div class="dbwrap"><table class="dbx"><thead><tr>${th.map((t, i) => `<th class="c${i}">${t}</th>`).join('')}${edit ? '<th class="act">Actions</th>' : ''}</tr></thead><tbody>
+      ${edit && !DBK.editId ? `<tr class="dbnew">${dbInputCells('dbn', null)}<td class="act"><button type="button" class="dbp add" id="dbnSave">＋ Add</button><button type="button" class="dbp clr" id="dbnClear" title="Empty the new-booking row">↺ Clear</button></td></tr>` : ''}
       ${live.length + rows.filter(b => b.status === 'cancelled').length ? rows.map(b => rowHtml({ b, c:dbCalc(b) })).join('') : `<tr><td colspan="${th.length + 1}" class="r-muted" style="padding:18px;text-align:center">No direct bookings match.${edit ? ' Type the first one in the blue row above.' : ''}</td></tr>`}
       <tr class="dbtot"><td colspan="5">Total (${live.length} bookings, cancelled not counted)</td><td class="n">${sum('n')}</td><td colspan="4"></td><td class="n lkr">${dbN(sum('totL'))}</td><td class="n lkr">${dbN(sum('adv'))}</td><td colspan="2"></td><td class="n bal">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td colspan="2"></td><td class="n bal">${dbN(toCollect)}</td><td colspan="${edit ? 3 : 2}"></td></tr></tbody></table></div>
     <details class="dbsum"><summary>📊 Summary by villa</summary><table class="r-table"><thead><tr><th>Villa</th><th class="n">Bookings</th><th class="n">Nights</th><th class="n">Total (LKR)</th><th class="n">Advance (LKR)</th><th class="n">Still to collect (LKR)</th><th class="n">Paid</th></tr></thead><tbody>${sumRows || '<tr><td colspan="7" class="r-muted">Nothing yet.</td></tr>'}</tbody></table></details>`;
   // wiring
   box.querySelectorAll('[data-dbvilla]').forEach(b => b.addEventListener('click', () => { DBK.villa = b.dataset.dbvilla; renderDirectBk(); }));
   box.querySelectorAll('[data-dbstat]').forEach(b => b.addEventListener('click', () => { DBK.status = b.dataset.dbstat; renderDirectBk(); }));
+  const cf = box.querySelector('#dbClearF'); if(cf) cf.addEventListener('click', () => { DBK.villa = ''; DBK.status = ''; DBK.q = ''; renderDirectBk(); });
   const q = box.querySelector('#dbQ'); q.addEventListener('input', () => { DBK.q = q.value; clearTimeout(DBK.t); DBK.t = setTimeout(() => { renderDirectBk().then(() => { const n = document.getElementById('dbQ'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); }, 350); });
   if(edit){
     if(box.querySelector('#dbnSave')){ dbWireInputs('dbn', null); box.querySelector('#dbnSave').addEventListener('click', () => dbSave('dbn', null)); }
+    const clr = box.querySelector('#dbnClear'); if(clr) clr.addEventListener('click', () => { DBK.force = true; renderDirectBk(); dbMsg('Row cleared.', true); setTimeout(() => dbMsg(''), 1500); });
+    box.querySelectorAll('[data-dbdel]').forEach(b => b.addEventListener('click', () => { const x = all.find(r => String(r.id) === String(b.dataset.dbdel)); if(x) dbDelete(x); }));
     box.querySelectorAll('[data-dbedit]').forEach(b => b.addEventListener('click', () => { DBK.editId = b.dataset.dbedit; renderDirectBk(); }));
     const ex = DBK.editId && all.find(x => String(x.id) === String(DBK.editId));
     if(ex){ DBK.editId = ex.id; dbWireInputs('dbe', ex); box.querySelector('#dbeSave').addEventListener('click', () => dbSave('dbe', ex)); box.querySelector('#dbeCancel').addEventListener('click', () => { DBK.editId = null; renderDirectBk(); }); }
   }
   const label = () => [DBK.villa ? dbVillaName(DBK.villa) : 'All villas', DBK.status ? DB_STATE[DBK.status][0] : 'All status', DBK.q.trim() ? '“' + DBK.q.trim() + '”' : ''].filter(Boolean).join(' · ');
-  box.querySelector('#dbPrint').addEventListener('click', () => restPrintPage('Direct bookings', `<div style="margin-bottom:8px;font-size:12px">${esc(label())}</div><table><thead><tr>${['ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate', 'Total', 'Booking rate', 'Total LKR', 'Advance LKR', 'Adv. date', 'Balance LKR', 'Arrival rate', 'Bal @ arrival', 'Status', 'Notes'].map(h => '<th>' + h + '</th>').join('')}</tr></thead><tbody>${rows.map(b => { const c = dbCalc(b); return '<tr>' + [b.bookingRef || '', dbVillaName(b.villa), b.fullName || b.guest, dbD(b.checkIn), dbD(b.checkOut), c.n, c.cur, dbN(c.rate), dbN(c.tot), c.cur === 'LKR' ? '' : dbN(c.fx, 4), dbN(c.totL), dbN(c.adv), dbD(b.paidOn), dbN(c.bal), dbN(b.arrivalRate, 4), dbN(c.arrBal), DB_STATE[c.state][0], b.sheetNotes || ''].map((v, i) => `<td${[5, 7, 8, 9, 10, 11, 13, 14, 15].includes(i) ? ' style="text-align:right"' : ''}>${esc(v === null || v === undefined ? '' : v)}</td>`).join('') + '</tr>'; }).join('')}<tr class="tot"><td colspan="5">Total (${live.length} bookings)</td><td style="text-align:right">${sum('n')}</td><td colspan="4"></td><td style="text-align:right">${dbN(sum('totL'))}</td><td style="text-align:right">${dbN(sum('adv'))}</td><td></td><td style="text-align:right">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td></td><td style="text-align:right">${dbN(toCollect)}</td><td colspan="2"></td></tr></tbody></table>`));
+  box.querySelector('#dbPrint').addEventListener('click', () => dbPrintReport(rows, label()));
   box.querySelector('#dbCsv').addEventListener('click', () => {
     const q2 = v => { const t = typeof v === 'number' ? String(Math.round(v * 10000) / 10000) : csvSafe(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
     const head = ['Booking ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Currency', 'Rate/night', 'Total', 'Booking rate', 'Total LKR', 'Advance LKR', 'Advance date', 'Advance (cur)', 'Balance LKR', 'Balance due date', 'Arrival rate', 'Balance @ arrival rate', 'Status', 'Notes'];
@@ -19865,20 +19917,45 @@ function initAreaSwitch(){
   const btns = [];
   if(villas) btns.push(`<button data-area="villas">🏡 Villas</button>`);
   rests.forEach(r => btns.push(`<button data-area="${esc(r.id)}">${r.icon} ${esc(restInfo(r.id).name)}</button>`));
+  if(villas && canSee('bookings')) btns.push(`<button data-area="direct">📒 Direct Bookings</button>`);
   bar.innerHTML = btns.join('');
   bar.style.display = btns.length > 1 ? '' : 'none';
   bar.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => {
-    if(b.dataset.area === 'villas') leaveRest(); else enterRest(b.dataset.area);
+    const a = b.dataset.area;
+    if(a === 'direct'){ enterDirect(); return; }
+    leaveDirect();
+    if(a === 'villas') leaveRest(); else enterRest(a);
   }));
   markAreaSwitch();
   fetchRestInfo().then(() => { // names may have been renamed in Settings
-    bar.querySelectorAll('[data-area]').forEach(b => { if(b.dataset.area !== 'villas') b.textContent = restDef(b.dataset.area).icon + ' ' + restInfo(b.dataset.area).name; });
+    bar.querySelectorAll('[data-area]').forEach(b => { if(b.dataset.area !== 'villas' && b.dataset.area !== 'direct') b.textContent = restDef(b.dataset.area).icon + ' ' + restInfo(b.dataset.area).name; });
   });
   if(!villas) enterRest(rests[0].id);
 }
 function markAreaSwitch(){
   const bar = document.getElementById('areaSwitch'); if(!bar) return;
-  bar.querySelectorAll('[data-area]').forEach(b => b.classList.toggle('on', (REST.id || 'villas') === b.dataset.area));
+  bar.querySelectorAll('[data-area]').forEach(b => b.classList.toggle('on', (DBK.open ? 'direct' : (REST.id || 'villas')) === b.dataset.area));
+}
+/* ---- the Direct Bookings area: its own page beside Villas / SDA / Thai Charm ---- */
+function enterDirect(){
+  if(DBK.open) return;
+  if(REST.id) leaveRest();
+  DBK.shown = villaPanelIds().filter(p => { const el = document.getElementById(p); return el && el.style.display !== 'none'; });
+  villaPanelIds().forEach(p => { const el = document.getElementById(p); if(el) el.style.display = 'none'; });
+  DBK.open = true;
+  document.body.classList.add('in-direct');
+  document.getElementById('directPanel').style.display = 'block';
+  markAreaSwitch();
+  if(!bookingsInited) initBookings(); else fetchBookings();
+  renderDirectBk();
+}
+function leaveDirect(){
+  if(!DBK.open) return;
+  DBK.open = false; DBK.editId = null;
+  document.body.classList.remove('in-direct');
+  document.getElementById('directPanel').style.display = 'none';
+  (DBK.shown && DBK.shown.length ? DBK.shown : ['housekeepingPanel']).forEach(p => { const el = document.getElementById(p); if(el) el.style.display = ''; });
+  markAreaSwitch();
 }
 function villaPanelIds(){ return [...new Set(AREAS.filter(a => !a.key.startsWith('rest_')).map(a => a.panel))]; }
 
