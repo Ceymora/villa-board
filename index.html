@@ -242,11 +242,8 @@
   .dbp.clr{ background:linear-gradient(135deg,#8b94a8,#667088); } .dbp.del{ background:linear-gradient(135deg,#e5484d,#bd2a30); }
   .dbp.print{ background:linear-gradient(135deg,#6d4fd8,#4a32a8); } .dbp.csv{ background:linear-gradient(135deg,#d98a0b,#b36a00); }
   .dbp.big{ height:40px; padding:0 20px; font-size:14px; }
-  .dbx td.act, .dbx th.act{ position:sticky; right:0; background:#fff; box-shadow:-8px 0 8px -8px rgba(19,35,58,.25); z-index:2; white-space:nowrap; }
-  .dbx tr.dbnew td.act, .dbx tr.dbedit td.act{ background:#eef4ff; } .dbx td.act .dbp + .dbp{ margin-left:6px; }
-  .dbx th.act{ background:#13233a; color:#fff; }
   #directPanel{ display:none; }
-  body.in-direct .frame{ max-width:1500px; }
+  body.in-direct .frame{ max-width:1760px; }
   body.in-direct #board > h1, body.in-direct #board > .sub, body.in-direct #board > .maintabs{ display:none !important; }
   .area-switch button.on[data-area="direct"]{ background:#8a4b12; border-color:#8a4b12; }
   .dbchips{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
@@ -257,27 +254,37 @@
   .dbkpi > div{ background:#fff; border:1px solid #e3e8f0; border-radius:12px; padding:10px 14px; } .dbkpi span{ display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#6b7385; }
   .dbkpi b{ font-size:21px; color:#13233a; } .dbkpi .warn b{ color:#c2410c; }
   .dbmsg{ padding:9px 14px; border-radius:10px; margin-bottom:8px; font-weight:600; font-size:13.5px; }
-  .dbwrap{ overflow:auto; max-height:68vh; border:1px solid #c9d2e0; border-radius:10px; background:#fff; }
-  table.dbx{ border-collapse:separate; border-spacing:0; font-size:13px; min-width:2350px; }
-  .dbx th{ position:sticky; top:0; z-index:3; background:#1e3a5f; color:#fff; font-size:11.5px; padding:8px; border-right:1px solid rgba(255,255,255,.18); white-space:nowrap; text-align:center; }
-  .dbx td{ padding:6px 8px; border-right:1px solid #e3e8f0; border-bottom:1px solid #e3e8f0; white-space:nowrap; background:#fff; }
+  .dbwrap{ overflow-x:auto; overflow-y:auto; max-height:72vh; border:1px solid #c9d2e0; border-radius:10px; background:#fff; }
+  table.dbx{ border-collapse:separate; border-spacing:0; font-size:11.5px; width:100%; }
+  .dbx th{ position:sticky; top:0; z-index:3; background:#1e3a5f; color:#fff; font-size:10.5px; line-height:1.25; padding:7px 4px; border-right:1px solid rgba(255,255,255,.18); text-align:center; }
+  .dbx td{ padding:6px 4px; border-right:1px solid #e3e8f0; border-bottom:1px solid #e3e8f0; white-space:nowrap; background:#fff; cursor:pointer; }
   .dbx td.n{ text-align:right; font-variant-numeric:tabular-nums; } .dbx td.blue{ color:#1d4ed8; } .dbx td.lkr{ color:#1f7a55; font-weight:600; } .dbx td.bal{ color:#c2410c; font-weight:700; }
-  .dbx td.id{ font-weight:700; } .dbx td.guest{ font-weight:600; } .dbx td.notes{ white-space:normal; min-width:200px; max-width:280px; color:#44506a; font-size:12px; } .dbx td.act{ white-space:nowrap; }
+  .dbx td.id{ font-weight:700; } .dbx td.guest{ font-weight:600; white-space:normal; } .dbx td.notes{ white-space:normal; color:#44506a; font-size:11px; }
   .dbx tr[data-st=paid] td{ background:#f3fbf6; } .dbx tr[data-st=pending] td{ background:#fffbea; } .dbx tr[data-st=cancelled] td{ background:#fff5f5; color:#8a8f9c; text-decoration:line-through; }
-  .dbx tr[data-st=cancelled] td.act, .dbx tr[data-st=cancelled] td:nth-last-child(2){ text-decoration:none; }
-  .dbx th:nth-child(1), .dbx td:nth-child(1){ position:sticky; left:0; z-index:2; min-width:92px; max-width:92px; }
-  .dbx th:nth-child(2), .dbx td:nth-child(2){ position:sticky; left:92px; z-index:2; min-width:104px; max-width:104px; }
-  .dbx th:nth-child(3), .dbx td:nth-child(3){ position:sticky; left:196px; z-index:2; min-width:190px; max-width:190px; box-shadow:2px 0 0 #c9d2e0; white-space:normal; }
-  .dbx th:nth-child(-n+3){ z-index:5; }
-  .dbx tr.dbnew td, .dbx tr.dbedit td{ background:#eef4ff; text-decoration:none; } .dbx td.calc{ background:#f1f4f9 !important; text-align:right; color:#33415c; text-decoration:none; }
-  .dbx td.in input, .dbx td.in select{ width:100%; min-width:84px; border:1.5px solid #9db4e8; background:#fff; color:#1d4ed8; padding:5px 6px; border-radius:6px; font-size:13px; font-family:inherit; }
-  .dbx td.in input[type=date]{ min-width:128px; } .dbx td.in input[type=number]{ min-width:96px; }
+  .dbx tr[data-st=cancelled] td:nth-last-child(2){ text-decoration:none; }
+  .dbx tbody tr:hover td{ filter:brightness(.97); } .dbx tr.sel td{ background:#d6e6ff !important; box-shadow:inset 0 2px 0 #2563eb, inset 0 -2px 0 #2563eb; text-decoration:none; }
   .dbx tr.dbtot td{ position:sticky; bottom:0; z-index:2; background:#e8eef7 !important; font-weight:800; border-top:2px solid #1e3a5f; }
   .dbvilla{ display:inline-block; padding:2px 10px 2px 8px; border-left:5px solid var(--c); font-weight:600; }
   .dbst{ display:inline-block; padding:3px 10px; border-radius:10px; font-weight:700; font-size:12px; }
   .dbhold{ background:#fff4e0; color:#b45309; border-radius:6px; padding:1px 6px; font-size:10px; font-weight:800; }
   .dbsum{ margin-top:12px; } .dbsum summary{ cursor:pointer; font-weight:700; padding:6px 0; }
-  body.ro-bookings .dbnew{ display:none; }
+  .dbbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#fff; border:1px solid #e3e8f0; border-radius:14px; padding:10px 14px; margin-bottom:10px; box-shadow:0 2px 8px rgba(19,35,58,.06); }
+  .dbselinfo{ font-size:13px; color:#6b7385; margin-left:6px; } .dbselinfo b{ color:#13233a; }
+  .dbsortl{ display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:13px; color:#13233a; margin-left:auto; }
+  .dbsortl select{ height:36px; border-radius:999px; border:1.5px solid #cfd6e3; background:#fff; padding:0 14px; font:600 13px Inter,sans-serif; color:#13233a; cursor:pointer; }
+  #dbModal{ position:fixed; inset:0; background:rgba(19,35,58,.55); z-index:9000; display:flex; align-items:flex-start; justify-content:center; padding:5vh 12px; overflow:auto; }
+  .dbcard{ background:#fff; border-radius:18px; width:min(900px,100%); box-shadow:0 20px 60px rgba(0,0,0,.35); padding:22px 24px; }
+  .dbcard h3{ margin:0 0 14px; font-size:19px; color:#13233a; }
+  .dbgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .dbgrid label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:#6b7385; text-transform:uppercase; letter-spacing:.04em; }
+  .dbgrid input, .dbgrid select{ height:40px; border:1.5px solid #cfd6e3; border-radius:10px; padding:0 11px; font:500 14px Inter,sans-serif; color:#13233a; background:#fff; text-transform:none; letter-spacing:0; }
+  .dbgrid input:focus, .dbgrid select:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+  .dbgrid .wide{ grid-column:span 2; } .dbgrid .full{ grid-column:1/-1; }
+  .dbpv{ display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; margin-top:14px; background:#f1f4f9; border-radius:12px; padding:10px 12px; }
+  .dbpv div{ font-size:11px; font-weight:700; color:#6b7385; text-transform:uppercase; } .dbpv b{ display:block; font-size:15px; color:#13233a; text-transform:none; min-height:20px; }
+  .dbpv b.lkr{ color:#1f7a55; } .dbpv b.bal{ color:#c2410c; }
+  .dbfoot{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap; }
+  @media (max-width:700px){ .dbgrid{ grid-template-columns:1fr; } .dbgrid .wide{ grid-column:auto; } }
   .villatabs{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
   .villatab-btn{
     font-family:'Kalam',cursive; font-size:14px; font-weight:700;
@@ -4594,7 +4601,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.06-direct-tab';
+const APP_VERSION = 'v2026.11.09-direct-fit';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7094,7 +7101,25 @@ function initBookings(){
    Management spreadsheet. Advance paid = the booking's "amount paid" (in its currency) and
    "paid on" date, so the calendar and this sheet can never disagree.
    ===================================================================== */
-const DBK = { open:false, villa:'', status:'', q:'', editId:null, hasCols:null };
+const DBK = { open:false, villa:'', status:'', q:'', editId:null, hasCols:null, sort:'ci-asc', sel:null };
+const DB_SORTS = { 'ci-asc':'Check-in date — earliest first', 'ci-desc':'Check-in date — latest first', 'villa':'Villa (A–Z), then check-in date', 'bd-desc':'Booking date — newest first', 'bd-asc':'Booking date — oldest first', 'pend':'Pending payments first', 'paid':'Paid first', 'canc':'Cancelled first', 'guest':'Guest name (A–Z)' };
+function dbCmp(a, b){
+  const ci = (x, y) => x.checkIn.localeCompare(y.checkIn), bd = x => String(x.bookingDate || x.paidOn || ''), st = x => dbCalc(x).state;
+  const rank = (first) => x => st(x) === first ? 0 : 1;
+  let r = 0;
+  switch(DBK.sort){
+    case 'ci-desc': r = ci(b, a); break;
+    case 'villa': r = dbVillaName(a.villa).localeCompare(dbVillaName(b.villa)) || ci(a, b); break;
+    case 'bd-desc': r = bd(b).localeCompare(bd(a)) || ci(a, b); break;
+    case 'bd-asc': r = bd(a).localeCompare(bd(b)) || ci(a, b); break;
+    case 'pend': r = rank('pending')(a) - rank('pending')(b) || ci(a, b); break;
+    case 'paid': r = rank('paid')(a) - rank('paid')(b) || ci(a, b); break;
+    case 'canc': r = rank('cancelled')(a) - rank('cancelled')(b) || ci(a, b); break;
+    case 'guest': r = String(a.fullName || a.guest || '').localeCompare(String(b.fullName || b.guest || '')) || ci(a, b); break;
+    default: r = ci(a, b);
+  }
+  return r || String(a.id).localeCompare(String(b.id));
+}
 const dbN = (n, d) => (n === null || n === undefined || n === '' || !isFinite(n)) ? '' : Number(n).toLocaleString('en-US', { minimumFractionDigits:d === undefined ? 2 : d, maximumFractionDigits:d === undefined ? 2 : d });
 const dbD = iso => { if(!iso) return ''; const p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '-' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+p[1] - 1] + '-' + p[0] : ''; };
 function dbNights(ci, co){ if(!ci || !co) return null; const n = Math.round((new Date(co + 'T00:00:00Z') - new Date(ci + 'T00:00:00Z')) / 864e5); return n > 0 ? n : null; }
@@ -7125,32 +7150,49 @@ function dbRows(){
     .filter(b => !DBK.villa || b.villa === DBK.villa)
     .filter(b => { if(!DBK.status) return true; return dbCalc(b).state === DBK.status; })
     .filter(b => !q || [b.guest, b.fullName, b.bookingRef, b.sheetNotes, b.invoiceNoCo, b.invoiceNoVilla].join(' ').toLowerCase().includes(q))
-    .sort((a, b) => a.checkIn.localeCompare(b.checkIn) || String(a.id).localeCompare(String(b.id)));
+    .sort(dbCmp);
 }
 function dbVillaName(id){ const v = CAL_VILLAS.find(x => x.id === id); return v ? v.name : id; }
 function dbVillaColor(id){ const v = CAL_VILLAS.find(x => x.id === id); return v ? v.color : '#888'; }
 
-/* One row of input cells — a new booking (prefix 'dbn') or a booking being corrected ('dbe'). */
-function dbInputCells(p, b){
+/* The Add / Edit form (a pop-up card). Ids start with 'dbf'. */
+function dbFormHtml(b){
   const v = b || {}, c = b ? dbCalc(b) : {}, villaId = v.villa || DBK.villa || (CAL_VILLAS[0] || {}).id, cur = v.currency || (CAL_VILLAS.find(x => x.id === villaId) || {}).currency || 'USD';
-  const val = x => x === null || x === undefined ? '' : String(x).replace(/"/g, '&quot;');
-  return `<td class="in"><input id="${p}Ref" value="${val(v.bookingRef)}" placeholder="ID"></td>
-    <td class="in"><select id="${p}Villa">${CAL_VILLAS.map(x => `<option value="${esc(x.id)}" ${x.id === villaId ? 'selected' : ''}>${esc(x.name.replace(/ Villa$/i, ''))}</option>`).join('')}</select></td>
-    <td class="in"><input id="${p}Guest" value="${val(v.fullName || v.guest)}" placeholder="Guest name"></td>
-    <td class="in"><input type="date" id="${p}CI" value="${val(v.checkIn)}"></td><td class="in"><input type="date" id="${p}CO" value="${val(v.checkOut)}"></td>
-    <td class="calc" id="${p}Nights">${val(c.n)}</td>
-    <td class="in"><select id="${p}Cur">${['USD', 'EUR', 'GBP', 'LKR'].map(x => `<option ${x === cur ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
-    <td class="in"><input type="number" step="0.01" id="${p}Rate" value="${val(v.rateRaw)}" placeholder="0.00"></td>
-    <td class="calc" id="${p}Tot"></td>
-    <td class="in"><input type="number" step="0.0001" id="${p}Fx" value="${val(v.agreedRate)}" placeholder="auto"></td>
-    <td class="calc lkr" id="${p}TotL"></td>
-    <td class="in"><input type="number" step="0.01" id="${p}Adv" value="${val(c.adv !== null && c.adv !== undefined ? Math.round(c.adv * 100) / 100 : '')}" placeholder="LKR"></td>
-    <td class="in"><input type="date" id="${p}AdvD" value="${val(v.paidOn)}"></td>
-    <td class="calc" id="${p}AdvC"></td><td class="calc bal" id="${p}Bal"></td><td class="calc" id="${p}Due">${val(dbD(v.checkIn))}</td>
-    <td class="in"><input type="number" step="0.0001" id="${p}Arr" value="${val(v.arrivalRate)}" placeholder="arrival day"></td>
-    <td class="calc" id="${p}ArrBal"></td>
-    <td class="in"><select id="${p}St">${['pending', 'paid', 'cancelled'].map(s => `<option value="${s}" ${(b ? c.state : 'pending') === s ? 'selected' : ''}>${DB_STATE[s][0]}</option>`).join('')}</select></td>
-    <td class="in"><input id="${p}Notes" value="${val(v.sheetNotes)}" placeholder="Notes"></td>`;
+  const val = x => x === null || x === undefined ? '' : String(x).replace(/"/g, '&quot;'), p = 'dbf';
+  const adv = c.adv !== null && c.adv !== undefined ? Math.round(c.adv * 100) / 100 : '';
+  return `<div class="dbgrid">
+    <label>Booking ID<input id="${p}Ref" value="${val(v.bookingRef)}" placeholder="e.g. 1-0521"></label>
+    <label>Villa<select id="${p}Villa">${CAL_VILLAS.map(x => `<option value="${esc(x.id)}" ${x.id === villaId ? 'selected' : ''}>${esc(x.name.replace(/ Villa$/i, ''))}</option>`).join('')}</select></label>
+    <label>Guest name<input id="${p}Guest" value="${val(v.fullName || v.guest)}" placeholder="Guest name"></label>
+    <label>Check-in<input type="date" id="${p}CI" value="${val(v.checkIn)}"></label>
+    <label>Check-out<input type="date" id="${p}CO" value="${val(v.checkOut)}"></label>
+    <label>Currency<select id="${p}Cur">${['USD', 'EUR', 'GBP', 'LKR'].map(x => `<option ${x === cur ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+    <label>Rate per night<input type="number" step="0.01" id="${p}Rate" value="${val(v.rateRaw)}" placeholder="0.00"></label>
+    <label>Booking rate (LKR per 1)<input type="number" step="0.0001" id="${p}Fx" value="${val(v.agreedRate)}" placeholder="auto"></label>
+    <label>Arrival-day rate<input type="number" step="0.0001" id="${p}Arr" value="${val(v.arrivalRate)}" placeholder="optional"></label>
+    <label>Advance received (LKR)<input type="number" step="0.01" id="${p}Adv" value="${val(adv)}" placeholder="0.00"></label>
+    <label>Advance date<input type="date" id="${p}AdvD" value="${val(v.paidOn)}"></label>
+    <label>Status<select id="${p}St">${['pending', 'paid', 'cancelled'].map(s => `<option value="${s}" ${(b ? c.state : 'pending') === s ? 'selected' : ''}>${DB_STATE[s][0]}</option>`).join('')}</select></label>
+    <label class="full">Notes<input id="${p}Notes" value="${val(v.sheetNotes)}" placeholder="Notes"></label>
+  </div>
+  <div class="dbpv"><div>Nights<b id="${p}Nights"></b></div><div>Total<b id="${p}Tot"></b></div><div>Total (LKR)<b class="lkr" id="${p}TotL"></b></div><div>Advance (in currency)<b id="${p}AdvC"></b></div>
+    <div>Balance (LKR)<b class="bal" id="${p}Bal"></b></div><div>Balance due on<b id="${p}Due"></b></div><div>Balance @ arrival rate<b class="bal" id="${p}ArrBal"></b></div></div>`;
+}
+function dbCloseForm(){ const m = document.getElementById('dbModal'); if(m) m.remove(); document.removeEventListener('keydown', dbEsc); }
+function dbEsc(e){ if(e.key === 'Escape') dbCloseForm(); }
+function dbOpenForm(existing){
+  dbCloseForm();
+  const m = document.createElement('div'); m.id = 'dbModal';
+  m.innerHTML = `<div class="dbcard" role="dialog" aria-modal="true"><h3>${existing ? '✏️ Edit booking — ' + esc(existing.fullName || existing.guest || '') : '＋ Add a direct booking'}</h3>
+    <div id="dbfMsg" class="dbmsg" style="display:none"></div>${dbFormHtml(existing)}
+    <div class="dbfoot"><button type="button" class="dbp clr" id="dbfClear">${existing ? '↺ Undo my changes' : '↺ Clear'}</button><button type="button" class="dbp clr" id="dbfCancel">✖ Cancel</button><button type="button" class="dbp add big" id="dbfSave">💾 ${existing ? 'Save changes' : 'Save booking'}</button></div></div>`;
+  document.body.appendChild(m);
+  dbWireInputs('dbf', existing);
+  document.addEventListener('keydown', dbEsc);
+  m.querySelector('#dbfSave').addEventListener('click', () => dbSave('dbf', existing));
+  m.querySelector('#dbfCancel').addEventListener('click', dbCloseForm);
+  m.querySelector('#dbfClear').addEventListener('click', () => dbOpenForm(existing));
+  setTimeout(() => { const g = m.querySelector(existing ? '#dbfGuest' : '#dbfGuest'); if(g) g.focus(); }, 30);
 }
 function dbWireInputs(p, existing){
   const g = id => document.getElementById(p + id);
@@ -7170,7 +7212,7 @@ function dbWireInputs(p, existing){
   g('CI').addEventListener('change', () => { if(!g('CO').value || g('CO').value <= g('CI').value){ const d = new Date(g('CI').value + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); g('CO').value = d.toISOString().slice(0, 10); calc(); } });
   calc();
 }
-function dbMsg(t, ok){ const m = document.getElementById('dbMsg'); if(!m) return; m.textContent = t || ''; m.style.display = t ? '' : 'none'; m.style.background = ok ? '#e8f6ee' : '#fdecec'; m.style.color = ok ? '#1f7a55' : '#a11'; }
+function dbMsg(t, ok){ const m = document.getElementById('dbfMsg') || document.getElementById('dbMsg'); if(!m) return; m.textContent = t || ''; m.style.display = t ? '' : 'none'; m.style.background = ok ? '#e8f6ee' : '#fdecec'; m.style.color = ok ? '#1f7a55' : '#a11'; }
 
 /* Save a new row (existing = null) or a corrected row. */
 async function dbSave(p, existing){
@@ -7230,7 +7272,7 @@ async function dbSave(p, existing){
       logActivity('create', 'villa_bookings', 'Direct bookings sheet — added ' + guest + ' (' + ci + ' → ' + co + ') at ' + dbVillaName(villa) + ' · ' + nights + ' nights × ' + cur + ' ' + rate + ' · advance Rs. ' + dbN(advL));
     }
   }catch(e){ console.error(e); dbMsg('Could not save — ' + (e.message || 'check the connection.')); if(btn) btn.disabled = false; return; }
-  DBK.editId = null; DBK.force = true; await fetchBookings(); dbMsg('Saved ✓', true); setTimeout(() => dbMsg(''), 2500);
+  dbCloseForm(); DBK.editId = null; DBK.force = true; await fetchBookings(); dbMsg('Saved ✓', true); setTimeout(() => dbMsg(''), 2500);
 }
 
 async function dbDelete(b){
@@ -7240,7 +7282,7 @@ async function dbDelete(b){
     try{
       await delRows('villa_bookings', 'id', b.id);
       logActivity('delete', 'villa_bookings', 'Direct bookings sheet — deleted ' + nm + ' (' + b.checkIn + ' → ' + b.checkOut + ') at ' + dbVillaName(b.villa));
-      DBK.force = true; await afterDelete('villa_bookings'); await fetchBookings();
+      DBK.sel = null; DBK.force = true; await afterDelete('villa_bookings'); await fetchBookings();
       dbMsg('Deleted ✓', true); setTimeout(() => dbMsg(''), 2500);
     }catch(e){ delFailed(e); }
   }else if(drReady && drCanAsk('villa_bookings')){
@@ -7294,51 +7336,65 @@ async function renderDirectBk(){
   const villas = CAL_VILLAS.filter(v => all.some(b => b.villa === v.id) || !lockedVilla());
   const chip = (k, label, cur, attr) => `<button type="button" class="dbchip${cur ? ' on' : ''}" data-${attr}="${esc(k)}">${label}</button>`;
   const stCount = s => all.filter(b => (!DBK.villa || b.villa === DBK.villa) && dbCalc(b).state === s).length;
-  const th = ['Booking<br>ID', 'Villa', 'Guest name', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate<br>(LKR per 1)', 'Total<br>(LKR)', 'Advance<br>(LKR)', 'Advance<br>date', 'Advance<br>(in cur)', 'Balance<br>(LKR)', 'Balance<br>due date', 'Arrival rate', 'Balance @<br>arrival rate', 'Status', 'Notes'];
-  const rowHtml = ({ b, c }) => {
-    const st = DB_STATE[c.state];
-    if(DBK.editId !== null && String(DBK.editId) === String(b.id)) return `<tr class="dbedit" data-st="${c.state}">${dbInputCells('dbe', b)}<td class="act"><button type="button" class="dbp add" id="dbeSave">💾 Save</button><button type="button" class="dbp clr" id="dbeCancel">✖ Cancel</button></td></tr>`;
-    return `<tr data-st="${c.state}">
+  if(DBK.sel && !all.some(x => String(x.id) === String(DBK.sel))) DBK.sel = null;
+  const th = ['ID', 'Villa', 'Guest name', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate<br>(LKR per 1)', 'Total<br>(LKR)', 'Advance<br>(LKR)', 'Advance<br>date', 'Balance<br>(LKR)', 'Arrival<br>rate', 'Balance @<br>arrival rate', 'Status', 'Notes'];
+  const rowHtml = b => {
+    const c = dbCalc(b), st = DB_STATE[c.state];
+    return `<tr data-dbrow="${b.id}" data-st="${c.state}" class="${String(DBK.sel) === String(b.id) ? 'sel' : ''}">
       <td class="id">${esc(b.bookingRef || b.invoiceNoVilla || '')}</td>
       <td><span class="dbvilla" style="--c:${dbVillaColor(b.villa)}">${esc(dbVillaName(b.villa).replace(/ Villa$/i, ''))}</span></td>
       <td class="guest">${esc(b.fullName || b.guest || '')}${b.status === 'provisional' ? ' <span class="dbhold" title="No money received yet — the dates are only held">HOLD</span>' : ''}</td>
       <td>${esc(dbD(b.checkIn))}</td><td>${esc(dbD(b.checkOut))}</td><td class="n">${c.n === null ? '' : c.n}</td><td>${esc(c.cur)}</td>
       <td class="n blue">${c.rate === null || c.rate === undefined ? '' : Number(c.rate).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:4 })}</td><td class="n">${dbN(c.tot)}</td><td class="n blue">${c.cur === 'LKR' ? '' : dbN(c.fx, 4)}</td>
-      <td class="n lkr">${dbN(c.totL)}</td><td class="n lkr">${dbN(c.adv)}</td><td>${esc(dbD(b.paidOn))}</td><td class="n">${dbN(c.advC)}</td>
-      <td class="n bal">${dbN(c.bal)}</td><td>${esc(dbD(b.checkIn))}</td><td class="n blue">${dbN(b.arrivalRate, 4)}</td><td class="n bal">${dbN(c.arrBal)}</td>
-      <td><span class="dbst" style="background:${st[1]};color:${st[2]}">${st[0]}</span></td><td class="notes">${esc(b.sheetNotes || '')}</td>
-      ${edit ? `<td class="act"><button type="button" class="dbp edit" data-dbedit="${b.id}" title="Correct this booking (your name is kept in the activity log)">✏️ Edit</button>${canDel ? (() => { const pr = (!canDelete() && drReady) ? drPending('villa_bookings', b.id) : null; return `<button type="button" class="dbp del" data-dbdel="${b.id}" title="${canDelete() ? 'Delete this booking everywhere' : (pr ? 'Withdraw the delete request' : 'Ask Makky to delete this booking')}">${pr ? '↩ Undo request' : '🗑️ Delete'}</button>`; })() : ''}</td>` : ''}</tr>`;
+      <td class="n lkr">${dbN(c.totL)}</td><td class="n lkr">${dbN(c.adv)}</td><td>${esc(dbD(b.paidOn))}</td>
+      <td class="n bal">${dbN(c.bal)}</td><td class="n blue">${dbN(b.arrivalRate, 4)}</td><td class="n bal">${dbN(c.arrBal)}</td>
+      <td><span class="dbst" style="background:${st[1]};color:${st[2]}">${st[0]}</span></td><td class="notes">${esc(b.sheetNotes || '')}</td></tr>`;
   };
   const sumRows = CAL_VILLAS.map(v => { const l = all.filter(b => b.villa === v.id && b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) })); if(!l.length) return '';
     const t = k => l.reduce((s, r) => s + (r.c[k] || 0), 0), due = l.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
     return `<tr><td><span class="dbvilla" style="--c:${v.color}">${esc(v.name)}</span></td><td class="n">${l.length}</td><td class="n">${t('n')}</td><td class="n lkr">${dbN(t('totL'))}</td><td class="n lkr">${dbN(t('adv'))}</td><td class="n bal">${dbN(due)}</td><td class="n">${l.filter(r => r.c.state === 'paid').length}</td></tr>`; }).join('');
   box.innerHTML = `
-    <div class="dbhead"><div><h3 style="margin:0">📒 Direct Bookings <small>— Excel view · the same bookings as the calendar</small></h3>
-      <div class="r-muted" style="font-size:12px">Blue = typed in · green = LKR amount · orange = balance · rows turn green when paid, yellow when pending, red when cancelled.</div></div>
-      <div class="dbtools"><input type="search" id="dbQ" placeholder="🔍 Search guest, ID, notes" value="${esc(DBK.q)}">${(DBK.villa || DBK.status || DBK.q) ? '<button type="button" class="dbp clr" id="dbClearF">✖ Clear filters</button>' : ''}<button type="button" class="dbp print" id="dbPrint">🖨️ Print report / PDF</button><button type="button" class="dbp csv" id="dbCsv">⬇ Excel / CSV</button></div></div>
+    <div class="dbhead"><div><h3 style="margin:0">📒 Direct Bookings <small>— the same bookings as the calendar</small></h3>
+      <div class="r-muted" style="font-size:12px">Green = paid · yellow = pending · red = cancelled. Click a row to select it.${edit ? ' Double-click a row to edit it.' : ''}</div></div>
+      <div class="dbtools"><input type="search" id="dbQ" placeholder="🔍 Search guest, ID, notes" value="${esc(DBK.q)}"><button type="button" class="dbp print" id="dbPrint">🖨️ Print report / PDF</button><button type="button" class="dbp csv" id="dbCsv">⬇ Excel / CSV</button></div></div>
+    <div class="dbbar">
+      ${edit ? `<button type="button" class="dbp add big" id="dbAdd">＋ Add booking</button><button type="button" class="dbp edit big" id="dbEdit">✏️ Edit</button>${canDel ? '<button type="button" class="dbp del big" id="dbDel">🗑️ Delete</button>' : ''}` : ''}
+      <span class="dbselinfo" id="dbSelInfo"></span>
+      <label class="dbsortl">↕ Sort by <select id="dbSort">${Object.keys(DB_SORTS).map(k => `<option value="${k}" ${DBK.sort === k ? 'selected' : ''}>${esc(DB_SORTS[k])}</option>`).join('')}</select></label>
+      ${(DBK.villa || DBK.status || DBK.q) ? '<button type="button" class="dbp clr" id="dbClearF">✖ Clear filters</button>' : ''}</div>
     <div class="dbchips">${chip('', 'All villas', !DBK.villa, 'dbvilla')}${villas.map(v => chip(v.id, esc(v.name), DBK.villa === v.id, 'dbvilla')).join('')}
-      <span class="dbsep"></span>${chip('', 'All status', !DBK.status, 'dbstat')}${chip('pending', '⏳ Pending (' + stCount('pending') + ')', DBK.status === 'pending', 'dbstat')}${chip('paid', '✅ Paid (' + stCount('paid') + ')', DBK.status === 'paid', 'dbstat')}${chip('cancelled', '❌ Cancelled (' + stCount('cancelled') + ')', DBK.status === 'cancelled', 'dbstat')}</div>
+      <span class="dbsep"></span>${chip('', 'All status', !DBK.status, 'dbstat')}${chip('pending', '⏳ Pending payments (' + stCount('pending') + ')', DBK.status === 'pending', 'dbstat')}${chip('paid', '✅ Paid (' + stCount('paid') + ')', DBK.status === 'paid', 'dbstat')}${chip('cancelled', '❌ Cancelled (' + stCount('cancelled') + ')', DBK.status === 'cancelled', 'dbstat')}</div>
     <div class="dbkpi"><div><span>Bookings</span><b>${live.length}</b></div><div><span>Nights</span><b>${sum('n')}</b></div><div><span>Total (LKR)</span><b>${dbN(sum('totL'))}</b></div><div><span>Advance received (LKR)</span><b>${dbN(sum('adv'))}</b></div><div class="warn"><span>Still to collect (LKR)</span><b>${dbN(toCollect)}</b></div></div>
     <div id="dbMsg" class="dbmsg" style="display:none"></div>
-    <div class="dbwrap"><table class="dbx"><thead><tr>${th.map((t, i) => `<th class="c${i}">${t}</th>`).join('')}${edit ? '<th class="act">Actions</th>' : ''}</tr></thead><tbody>
-      ${edit && !DBK.editId ? `<tr class="dbnew">${dbInputCells('dbn', null)}<td class="act"><button type="button" class="dbp add" id="dbnSave">＋ Add</button><button type="button" class="dbp clr" id="dbnClear" title="Empty the new-booking row">↺ Clear</button></td></tr>` : ''}
-      ${live.length + rows.filter(b => b.status === 'cancelled').length ? rows.map(b => rowHtml({ b, c:dbCalc(b) })).join('') : `<tr><td colspan="${th.length + 1}" class="r-muted" style="padding:18px;text-align:center">No direct bookings match.${edit ? ' Type the first one in the blue row above.' : ''}</td></tr>`}
-      <tr class="dbtot"><td colspan="5">Total (${live.length} bookings, cancelled not counted)</td><td class="n">${sum('n')}</td><td colspan="4"></td><td class="n lkr">${dbN(sum('totL'))}</td><td class="n lkr">${dbN(sum('adv'))}</td><td colspan="2"></td><td class="n bal">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td colspan="2"></td><td class="n bal">${dbN(toCollect)}</td><td colspan="${edit ? 3 : 2}"></td></tr></tbody></table></div>
+    <div class="dbwrap"><table class="dbx"><thead><tr>${th.map(t => `<th>${t}</th>`).join('')}</tr></thead><tbody>
+      ${rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="${th.length}" class="r-muted" style="padding:18px;text-align:center;cursor:default">No direct bookings match.${edit ? ' Press “＋ Add booking” to enter the first one.' : ''}</td></tr>`}
+      <tr class="dbtot"><td colspan="5">Total (${live.length} bookings, cancelled not counted)</td><td class="n">${sum('n')}</td><td colspan="4"></td><td class="n lkr">${dbN(sum('totL'))}</td><td class="n lkr">${dbN(sum('adv'))}</td><td></td><td class="n bal">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td></td><td class="n bal">${dbN(toCollect)}</td><td colspan="2"></td></tr></tbody></table></div>
     <details class="dbsum"><summary>📊 Summary by villa</summary><table class="r-table"><thead><tr><th>Villa</th><th class="n">Bookings</th><th class="n">Nights</th><th class="n">Total (LKR)</th><th class="n">Advance (LKR)</th><th class="n">Still to collect (LKR)</th><th class="n">Paid</th></tr></thead><tbody>${sumRows || '<tr><td colspan="7" class="r-muted">Nothing yet.</td></tr>'}</tbody></table></details>`;
-  // wiring
+  // selection: updates the highlight and the Edit / Delete buttons without redrawing (keeps your scroll place)
+  const selRow = () => all.find(x => String(x.id) === String(DBK.sel)) || null;
+  const selUi = () => {
+    const b = selRow(), info = box.querySelector('#dbSelInfo'), e = box.querySelector('#dbEdit'), d = box.querySelector('#dbDel');
+    box.querySelectorAll('[data-dbrow]').forEach(r => r.classList.toggle('sel', String(r.dataset.dbrow) === String(DBK.sel)));
+    info.innerHTML = b ? 'Selected: <b>' + esc(b.fullName || b.guest || '') + '</b> · ' + esc(dbD(b.checkIn)) + ' → ' + esc(dbD(b.checkOut)) + ' · ' + esc(dbVillaName(b.villa)) : (edit ? 'Click a row to select it, then press Edit or Delete' : '');
+    if(e) e.disabled = !b;
+    if(d){ d.disabled = !b; const pr = b && !canDelete() && drReady ? drPending('villa_bookings', b.id) : null; d.textContent = pr ? '↩ Undo delete request' : (canDelete() ? '🗑️ Delete' : '🗑️ Ask Makky to delete'); }
+  };
+  box.querySelectorAll('[data-dbrow]').forEach(r => {
+    r.addEventListener('click', () => { DBK.sel = String(DBK.sel) === String(r.dataset.dbrow) ? null : r.dataset.dbrow; selUi(); });
+    if(edit) r.addEventListener('dblclick', () => { DBK.sel = r.dataset.dbrow; selUi(); const b = selRow(); if(b) dbOpenForm(b); });
+  });
+  selUi();
+  if(edit){
+    box.querySelector('#dbAdd').addEventListener('click', () => dbOpenForm(null));
+    box.querySelector('#dbEdit').addEventListener('click', () => { const b = selRow(); if(b) dbOpenForm(b); });
+    const dl = box.querySelector('#dbDel'); if(dl) dl.addEventListener('click', () => { const b = selRow(); if(b) dbDelete(b); });
+  }
+  box.querySelector('#dbSort').addEventListener('change', e => { DBK.sort = e.target.value; renderDirectBk(); });
   box.querySelectorAll('[data-dbvilla]').forEach(b => b.addEventListener('click', () => { DBK.villa = b.dataset.dbvilla; renderDirectBk(); }));
   box.querySelectorAll('[data-dbstat]').forEach(b => b.addEventListener('click', () => { DBK.status = b.dataset.dbstat; renderDirectBk(); }));
   const cf = box.querySelector('#dbClearF'); if(cf) cf.addEventListener('click', () => { DBK.villa = ''; DBK.status = ''; DBK.q = ''; renderDirectBk(); });
   const q = box.querySelector('#dbQ'); q.addEventListener('input', () => { DBK.q = q.value; clearTimeout(DBK.t); DBK.t = setTimeout(() => { renderDirectBk().then(() => { const n = document.getElementById('dbQ'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); }, 350); });
-  if(edit){
-    if(box.querySelector('#dbnSave')){ dbWireInputs('dbn', null); box.querySelector('#dbnSave').addEventListener('click', () => dbSave('dbn', null)); }
-    const clr = box.querySelector('#dbnClear'); if(clr) clr.addEventListener('click', () => { DBK.force = true; renderDirectBk(); dbMsg('Row cleared.', true); setTimeout(() => dbMsg(''), 1500); });
-    box.querySelectorAll('[data-dbdel]').forEach(b => b.addEventListener('click', () => { const x = all.find(r => String(r.id) === String(b.dataset.dbdel)); if(x) dbDelete(x); }));
-    box.querySelectorAll('[data-dbedit]').forEach(b => b.addEventListener('click', () => { DBK.editId = b.dataset.dbedit; renderDirectBk(); }));
-    const ex = DBK.editId && all.find(x => String(x.id) === String(DBK.editId));
-    if(ex){ DBK.editId = ex.id; dbWireInputs('dbe', ex); box.querySelector('#dbeSave').addEventListener('click', () => dbSave('dbe', ex)); box.querySelector('#dbeCancel').addEventListener('click', () => { DBK.editId = null; renderDirectBk(); }); }
-  }
-  const label = () => [DBK.villa ? dbVillaName(DBK.villa) : 'All villas', DBK.status ? DB_STATE[DBK.status][0] : 'All status', DBK.q.trim() ? '“' + DBK.q.trim() + '”' : ''].filter(Boolean).join(' · ');
+  const label = () => [DBK.villa ? dbVillaName(DBK.villa) : 'All villas', DBK.status ? DB_STATE[DBK.status][0] : 'All status', DBK.q.trim() ? '“' + DBK.q.trim() + '”' : '', 'sorted: ' + DB_SORTS[DBK.sort]].filter(Boolean).join(' · ');
   box.querySelector('#dbPrint').addEventListener('click', () => dbPrintReport(rows, label()));
   box.querySelector('#dbCsv').addEventListener('click', () => {
     const q2 = v => { const t = typeof v === 'number' ? String(Math.round(v * 10000) / 10000) : csvSafe(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
@@ -7378,10 +7434,7 @@ async function fetchBookings(){
   bookingStatusMsg.textContent = 'Calendar synced (live)';
   renderCalendar();
   // The Direct Bookings sheet: refresh it, unless someone is in the middle of typing a row.
-  if(DBK.open){
-    const typing = !!DBK.editId || ['dbnGuest', 'dbnRate', 'dbnCI'].some(i => { const e = document.getElementById(i); return e && e.value; });
-    if(DBK.force || !typing){ DBK.force = false; renderDirectBk(); }
-  }
+  if(DBK.open){ DBK.force = false; renderDirectBk(); }
   renderHoldBanner();
   if(typeof settingsInited !== 'undefined' && settingsInited){ renderInvoiceList(); renderCancelledList(); renderReminderList(); }
   if(typeof villaReportInited !== 'undefined' && villaReportInited) renderVillaReport();
