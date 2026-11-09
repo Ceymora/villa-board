@@ -4607,7 +4607,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.09-direct-permission';
+const APP_VERSION = 'v2026.11.09-loyverse-totals';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -20956,6 +20956,7 @@ function restLoyverseShow(lv, info){
   const cur = lvCurrency(lv.currency);
   const L = lv.days || {};
   let ok = 0, bad = 0, missing = 0, diffSum = 0;
+  const T = { lc:0, lk:0, lt:0, lo:0, lT:0, ec:0, ek:0, et:0, eT:0, rc:0, days:0 };   // column totals
   const toCopy = [];
   const rows = restDaysOf(from, to).map(d => {
     const a = sumSales(salesBetween(d, d), info);
@@ -20963,6 +20964,8 @@ function restLoyverseShow(lv, info){
     if(!a.total && !b.total && !b.receipts) return null;
     const entered = salesBetween(d, d).length > 0;
     const diff = a.total - b.total;
+    T.lc += b.cash; T.lk += b.card; T.lt += b.transfer; T.lo += b.other; T.lT += b.total; T.rc += Number(b.receipts) || 0; T.days++;
+    if(entered){ T.ec += a.cash; T.ek += a.card; T.et += a.transfer; T.eT += a.total; }
     let status, diffCell;
     if(!entered){
       missing++;
@@ -20989,7 +20992,9 @@ function restLoyverseShow(lv, info){
       <td class="n">${rnum(b.cash)}</td><td class="n">${rnum(b.card)}</td><td class="n">${rnum(b.transfer)}</td>
       <td class="n">${b.other ? `<span style="color:#c92a2a">${rnum(b.other)}</span>` : '—'}</td>
       <td class="n" style="font-weight:700">${rnum(b.total)}</td>
-      <td class="n" style="border-left:2px solid var(--r-line)">${entered ? rnum(a.total) : '<span class="r-muted">—</span>'}</td>
+      <td class="n" style="border-left:2px solid var(--r-line)">${entered ? rnum(a.cash) : '<span class="r-muted">—</span>'}</td>
+      <td class="n">${entered ? rnum(a.card) : '<span class="r-muted">—</span>'}</td><td class="n">${entered ? rnum(a.transfer) : '<span class="r-muted">—</span>'}</td>
+      <td class="n" style="font-weight:700">${entered ? rnum(a.total) : '<span class="r-muted">—</span>'}</td>
       <td class="n">${diffCell}</td><td>${status}</td></tr>`;
   }).filter(Boolean);
   const names = lv.payment_names || {};
@@ -21010,10 +21015,16 @@ function restLoyverseShow(lv, info){
       <button class="r-btn primary" id="lvCopy">⬇ Copy missing days from Loyverse</button></div>` : ''}
     <div class="r-box"><h3><span>Day by day</span><small>Difference = entered here minus Loyverse</small></h3>
       <div class="r-scroll"><table class="r-table"><thead>
-        <tr><th></th><th class="n" colspan="5" style="text-align:center;background:#eef4fd">In Loyverse</th><th class="n" colspan="3" style="text-align:center;background:#e8f6ee">Entered here</th></tr>
+        <tr><th></th><th class="n" colspan="5" style="text-align:center;background:#eef4fd">In Loyverse</th><th class="n" colspan="6" style="text-align:center;background:#e8f6ee">Entered here</th></tr>
         <tr><th>Date</th><th class="n">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Other</th><th class="n">Total</th>
-          <th class="n" style="border-left:2px solid var(--r-line)">Total</th><th class="n">Difference</th><th>Status</th></tr></thead>
-      <tbody>${rows.join('') || '<tr><td colspan="9" class="r-muted">No sales here or in Loyverse for these days.</td></tr>'}</tbody></table></div>
+          <th class="n" style="border-left:2px solid var(--r-line)">Cash</th><th class="n">Card</th><th class="n">Transfer</th><th class="n">Total</th><th class="n">Difference</th><th>Status</th></tr></thead>
+      <tbody>${rows.join('') || '<tr><td colspan="12" class="r-muted">No sales here or in Loyverse for these days.</td></tr>'}</tbody>
+      ${rows.length ? `<tfoot><tr style="font-weight:800;background:#eef2f8;border-top:2px solid #13233a">
+        <td>Total<div class="r-muted" style="font-size:11px;font-weight:400">${T.days} days · ${T.rc} receipts</div></td>
+        <td class="n">${rnum(T.lc)}</td><td class="n">${rnum(T.lk)}</td><td class="n">${rnum(T.lt)}</td><td class="n">${T.lo ? rnum(T.lo) : '—'}</td><td class="n">${rnum(T.lT)}</td>
+        <td class="n" style="border-left:2px solid var(--r-line)">${rnum(T.ec)}</td><td class="n">${rnum(T.ek)}</td><td class="n">${rnum(T.et)}</td><td class="n">${rnum(T.eT)}</td>
+        <td class="n" style="color:${Math.abs(diffSum) < 1 ? '#1f7a55' : '#c92a2a'}">${Math.abs(diffSum) < 1 ? '0' : (diffSum > 0 ? '+' : '') + rnum(diffSum)}</td>
+        <td style="font-weight:600;font-size:12px">${missing ? `${missing} day${missing > 1 ? 's' : ''} not entered yet` : 'All days entered'}</td></tr></tfoot>` : ''}</table></div>
       <div class="r-note">Loyverse payment types are counted as — <b>Cash:</b> ${nameLine('cash')} · <b>Card:</b> ${nameLine('card')} · <b>Transfer:</b> ${nameLine('transfer')}${names.other && names.other.length ? ` · <b style="color:#c92a2a">Not sorted:</b> ${nameLine('other')} (rename it in Loyverse to include "card" or "transfer")` : ''}.<br>
         Refunds in Loyverse are taken off the day they happened. Days follow Sri Lanka time.</div></div>`;
   const btn = document.getElementById('lvCopy');
