@@ -255,9 +255,9 @@
   .dbkpi b{ font-size:21px; color:#13233a; } .dbkpi .warn b{ color:#c2410c; }
   .dbmsg{ padding:9px 14px; border-radius:10px; margin-bottom:8px; font-weight:600; font-size:13.5px; }
   .dbwrap{ overflow-x:auto; overflow-y:auto; max-height:72vh; border:1px solid #c9d2e0; border-radius:10px; background:#fff; }
-  table.dbx{ border-collapse:separate; border-spacing:0; font-size:11.5px; width:100%; }
-  .dbx th{ position:sticky; top:0; z-index:3; background:#1e3a5f; color:#fff; font-size:10.5px; line-height:1.25; padding:7px 4px; border-right:1px solid rgba(255,255,255,.18); text-align:center; }
-  .dbx td{ padding:6px 4px; border-right:1px solid #e3e8f0; border-bottom:1px solid #e3e8f0; white-space:nowrap; background:#fff; cursor:pointer; }
+  table.dbx{ border-collapse:separate; border-spacing:0; font-size:11px; width:100%; }
+  .dbx th{ position:sticky; top:0; z-index:3; background:#1e3a5f; color:#fff; font-size:10px; line-height:1.25; padding:7px 3px; border-right:1px solid rgba(255,255,255,.18); text-align:center; }
+  .dbx td{ padding:6px 3px; border-right:1px solid #e3e8f0; border-bottom:1px solid #e3e8f0; white-space:nowrap; background:#fff; cursor:pointer; }
   .dbx td.n{ text-align:right; font-variant-numeric:tabular-nums; } .dbx td.blue{ color:#1d4ed8; } .dbx td.lkr{ color:#1f7a55; font-weight:600; } .dbx td.bal{ color:#c2410c; font-weight:700; }
   .dbx td.id{ font-weight:700; } .dbx td.guest{ font-weight:600; white-space:normal; } .dbx td.notes{ white-space:normal; color:#44506a; font-size:11px; }
   .dbx tr[data-st=paid] td{ background:#f3fbf6; } .dbx tr[data-st=pending] td{ background:#fffbea; } .dbx tr[data-st=cancelled] td{ background:#fff5f5; color:#8a8f9c; text-decoration:line-through; }
@@ -279,6 +279,9 @@
   .dbgrid label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:#6b7385; text-transform:uppercase; letter-spacing:.04em; }
   .dbgrid input, .dbgrid select{ height:40px; border:1.5px solid #cfd6e3; border-radius:10px; padding:0 11px; font:500 14px Inter,sans-serif; color:#13233a; background:#fff; text-transform:none; letter-spacing:0; }
   .dbgrid input:focus, .dbgrid select:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+  .dbgrid .dbcommrow span{ display:flex; align-items:center; gap:10px; background:#fff8e6; border:1.5px solid #f0c36a; border-radius:10px; padding:10px 12px; font-size:13.5px; font-weight:700; color:#8a5a00; text-transform:none; letter-spacing:0; cursor:pointer; }
+  .dbgrid .dbcommrow input{ width:20px; height:20px; accent-color:#d98a0b; cursor:pointer; padding:0; }
+  .dbx td.comm{ color:#b36a00; font-weight:600; }
   .dbgrid .wide{ grid-column:span 2; } .dbgrid .full{ grid-column:1/-1; }
   .dbpv{ display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; margin-top:14px; background:#f1f4f9; border-radius:12px; padding:10px 12px; }
   .dbpv div{ font-size:11px; font-weight:700; color:#6b7385; text-transform:uppercase; } .dbpv b{ display:block; font-size:15px; color:#13233a; text-transform:none; min-height:20px; }
@@ -3930,6 +3933,7 @@ function rowToBooking(r){ return {
   balancePaid: r.balance_paid === true,
   balancePaidOn: r.balance_paid_on || null,
   sheetNotes: r.sheet_notes || '',
+  commissionPct: Number(r.client_commission_pct) || 0,   // file 65: % added to what the client pays
 }; }
 // Advances once recorded for "Unassigned" are the office's money: shown and kept as "Office".
 function advPersonName(n){ const v = String(n || '').trim(); if(!v) return null; return /^unassigned$/i.test(v) ? 'Office' : v; }
@@ -4601,7 +4605,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.09-direct-fit';
+const APP_VERSION = 'v2026.11.09-direct-commission';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -7101,7 +7105,8 @@ function initBookings(){
    Management spreadsheet. Advance paid = the booking's "amount paid" (in its currency) and
    "paid on" date, so the calendar and this sheet can never disagree.
    ===================================================================== */
-const DBK = { open:false, villa:'', status:'', q:'', editId:null, hasCols:null, sort:'ci-asc', sel:null };
+const DBK = { open:false, villa:'', status:'', q:'', editId:null, hasCols:null, hasComm:null, sort:'ci-asc', sel:null };
+const DB_COMM = 2.5;   // the commission % charged to the client
 const DB_SORTS = { 'ci-asc':'Check-in date — earliest first', 'ci-desc':'Check-in date — latest first', 'villa':'Villa (A–Z), then check-in date', 'bd-desc':'Booking date — newest first', 'bd-asc':'Booking date — oldest first', 'pend':'Pending payments first', 'paid':'Paid first', 'canc':'Cancelled first', 'guest':'Guest name (A–Z)' };
 function dbCmp(a, b){
   const ci = (x, y) => x.checkIn.localeCompare(y.checkIn), bd = x => String(x.bookingDate || x.paidOn || ''), st = x => dbCalc(x).state;
@@ -7129,12 +7134,14 @@ function dbCalc(b){
   const fx = cur === 'LKR' ? 1 : (b.agreedRate || null);
   const tot = n && rate !== null && rate !== undefined ? n * rate : null;
   const totL = tot !== null && fx ? tot * fx : null;
+  const comm = totL !== null && b.commissionPct > 0 ? totL * b.commissionPct / 100 : null;   // added on top for the client
+  const payable = totL !== null ? totL + (comm || 0) : null;
   const advC = b.amountPaid > 0 ? b.amountPaid : null;
   const adv = advC !== null && fx ? advC * fx : null;
-  const bal = totL !== null ? totL - (adv || 0) : null;
+  const bal = payable !== null ? payable - (adv || 0) : null;
   const arrBal = bal !== null && fx && b.arrivalRate ? bal / fx * b.arrivalRate : null;
   const state = b.status === 'cancelled' ? 'cancelled' : (b.balancePaid || (bal !== null && bal <= 1 && adv !== null) ? 'paid' : 'pending');
-  return { cur, n, rate, fx, tot, totL, advC, adv, bal, arrBal, state };
+  return { cur, n, rate, fx, tot, totL, comm, payable, advC, adv, bal, arrBal, state };
 }
 const DB_STATE = { paid:['✅ Paid', '#e8f6ee', '#1f7a55'], pending:['⏳ Pending', '#fff6dd', '#a35a00'], cancelled:['❌ Cancelled', '#fdecec', '#c92a2a'] };
 
@@ -7142,6 +7149,7 @@ function initDirectBk(){ /* the Direct Bookings page is its own area now (see en
 async function dbColsReady(){
   if(DBK.hasCols !== null || !sb) return !!DBK.hasCols;
   try{ const { error } = await sb.from('villa_bookings').select('booking_ref,arrival_rate,balance_paid,sheet_notes').limit(1); DBK.hasCols = !error; }catch(_e){ DBK.hasCols = false; }
+  try{ const { error } = await sb.from('villa_bookings').select('client_commission_pct').limit(1); DBK.hasComm = !error; }catch(_e){ DBK.hasComm = false; }
   return DBK.hasCols;
 }
 function dbRows(){
@@ -7173,9 +7181,10 @@ function dbFormHtml(b){
     <label>Advance received (LKR)<input type="number" step="0.01" id="${p}Adv" value="${val(adv)}" placeholder="0.00"></label>
     <label>Advance date<input type="date" id="${p}AdvD" value="${val(v.paidOn)}"></label>
     <label>Status<select id="${p}St">${['pending', 'paid', 'cancelled'].map(s => `<option value="${s}" ${(b ? c.state : 'pending') === s ? 'selected' : ''}>${DB_STATE[s][0]}</option>`).join('')}</select></label>
+    <label class="full dbcommrow"><span><input type="checkbox" id="${p}Comm" ${v.commissionPct > 0 ? 'checked' : ''}> Add ${DB_COMM}% commission — charged to the client on top of the total</span></label>
     <label class="full">Notes<input id="${p}Notes" value="${val(v.sheetNotes)}" placeholder="Notes"></label>
   </div>
-  <div class="dbpv"><div>Nights<b id="${p}Nights"></b></div><div>Total<b id="${p}Tot"></b></div><div>Total (LKR)<b class="lkr" id="${p}TotL"></b></div><div>Advance (in currency)<b id="${p}AdvC"></b></div>
+  <div class="dbpv"><div>Nights<b id="${p}Nights"></b></div><div>Total<b id="${p}Tot"></b></div><div>Total (LKR)<b class="lkr" id="${p}TotL"></b></div><div>Commission ${DB_COMM}% (LKR)<b id="${p}CommV"></b></div><div>Total payable (LKR)<b class="lkr" id="${p}Pay"></b></div><div>Advance (in currency)<b id="${p}AdvC"></b></div>
     <div>Balance (LKR)<b class="bal" id="${p}Bal"></b></div><div>Balance due on<b id="${p}Due"></b></div><div>Balance @ arrival rate<b class="bal" id="${p}ArrBal"></b></div></div>`;
 }
 function dbCloseForm(){ const m = document.getElementById('dbModal'); if(m) m.remove(); document.removeEventListener('keydown', dbEsc); }
@@ -7199,7 +7208,9 @@ function dbWireInputs(p, existing){
   const calc = () => {
     const n = dbNights(g('CI').value, g('CO').value), rate = parseFloat(g('Rate').value), fx = g('Cur').value === 'LKR' ? 1 : parseFloat(g('Fx').value);
     const adv = parseFloat(g('Adv').value), tot = n && rate >= 0 ? n * rate : null, totL = tot !== null && fx > 0 ? tot * fx : null;
-    const bal = totL !== null ? totL - (adv > 0 ? adv : 0) : null, arr = parseFloat(g('Arr').value);
+    const comm = totL !== null && g('Comm').checked ? totL * DB_COMM / 100 : 0, pay = totL !== null ? totL + comm : null;
+    const bal = pay !== null ? pay - (adv > 0 ? adv : 0) : null, arr = parseFloat(g('Arr').value);
+    g('CommV').textContent = totL === null || !g('Comm').checked ? '' : dbN(comm); g('Pay').textContent = pay === null ? '' : dbN(pay);
     g('Nights').textContent = n === null ? '' : n; g('Tot').textContent = tot === null ? '' : dbN(tot);
     g('TotL').textContent = totL === null ? '' : dbN(totL); g('AdvC').textContent = adv > 0 && fx > 0 ? dbN(adv / fx) : '';
     g('Bal').textContent = bal === null ? '' : dbN(bal); g('Due').textContent = dbD(g('CI').value);
@@ -7207,7 +7218,7 @@ function dbWireInputs(p, existing){
     g('Fx').disabled = g('Cur').value === 'LKR';
   };
   ['CI', 'CO', 'Rate', 'Fx', 'Adv', 'Arr', 'Cur'].forEach(i => g(i).addEventListener('input', calc));
-  g('Cur').addEventListener('change', calc);
+  g('Cur').addEventListener('change', calc); g('Comm').addEventListener('change', calc);
   g('Villa').addEventListener('change', () => { const v = CAL_VILLAS.find(x => x.id === g('Villa').value); if(v && !existing){ g('Cur').value = ['USD', 'EUR', 'GBP', 'LKR'].includes(v.currency) ? v.currency : 'USD'; calc(); } });
   g('CI').addEventListener('change', () => { if(!g('CO').value || g('CO').value <= g('CI').value){ const d = new Date(g('CI').value + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); g('CO').value = d.toISOString().slice(0, 10); calc(); } });
   calc();
@@ -7237,7 +7248,9 @@ async function dbSave(p, existing){
   if(!(fx > 0)) fx = await getFxRate(bookingDate, cur);
   if(!(fx > 0)){ dbMsg('Could not get the exchange rate. Type the booking rate in the “Booking rate” cell.'); return; }
   if(!(existing && existing.agreedRate && fx === existing.agreedRate)) fx = Math.round(fx * 10000) / 10000;   // keep a saved rate exactly as it was
-  const nights = dbNights(ci, co), totL = nights * rate * fx, state = status;
+  const commOn = g('Comm').checked;
+  if(commOn && !DBK.hasComm){ dbMsg('Run file 65 in Supabase first (it adds the commission column), then reload.'); return; }
+  const nights = dbNights(ci, co), totL = nights * rate * fx * (commOn ? 1 + DB_COMM / 100 : 1), state = status;
   // An untouched advance keeps its exact stored value (the sheet shows it rounded to 2 decimals).
   const oldAdv = existing ? dbCalc(existing).adv : null;
   const advSame = existing && ((oldAdv === null && advL === 0) || (oldAdv !== null && Math.round(oldAdv * 100) === Math.round(advL * 100)));
@@ -7247,6 +7260,7 @@ async function dbSave(p, existing){
     amount_paid: advSame ? (existing.amountPaid || 0) : (advL > 0 ? advL / fx : 0), paid_on: advL > 0 ? (advD || todayISO()) : null,
     booking_date: bookingDate, payment_terms: advL >= totL - 1 ? 'full' : 'deposit',
     booking_ref: s('Ref') || null, arrival_rate: arr, sheet_notes: s('Notes') || null,
+    ...(DBK.hasComm ? { client_commission_pct: commOn ? DB_COMM : 0 } : {}),
     balance_paid: state === 'paid', balance_paid_on: state === 'paid' ? ((existing && existing.balancePaidOn) || todayISO()) : null,
     // Nothing is truly booked until money has arrived: no advance and not paid = a hold on the calendar.
     status: state === 'cancelled' ? 'cancelled' : (advL > 0 || state === 'paid' ? 'confirmed' : 'provisional'),
@@ -7263,7 +7277,7 @@ async function dbSave(p, existing){
       const add = (l, a, b) => { if(String(a == null ? '' : a) !== String(b == null ? '' : b)) ch.push(l + ': ' + (a == null || a === '' ? '(empty)' : a) + ' → ' + (b == null || b === '' ? '(empty)' : b)); };
       add('guest', existing.fullName || existing.guest, guest); add('villa', dbVillaName(existing.villa), dbVillaName(villa)); add('check-in', existing.checkIn, ci); add('check-out', existing.checkOut, co);
       add('rate/night', existing.rateRaw, rate); add('booking rate', o.fx, fx); add('advance LKR', o.adv === null ? null : Math.round(o.adv * 100) / 100, Math.round(advL * 100) / 100);
-      add('arrival rate', existing.arrivalRate, arr); add('status', DB_STATE[o.state][0], DB_STATE[state][0]); add('ID', existing.bookingRef, payload.booking_ref); add('notes', existing.sheetNotes, payload.sheet_notes);
+      add('arrival rate', existing.arrivalRate, arr); add('status', DB_STATE[o.state][0], DB_STATE[state][0]); add('commission %', existing.commissionPct || 0, commOn ? DB_COMM : 0); add('ID', existing.bookingRef, payload.booking_ref); add('notes', existing.sheetNotes, payload.sheet_notes);
       logActivity('update', 'villa_bookings', 'Direct bookings sheet — corrected ' + guest + ' (' + ci + ' → ' + co + ') at ' + dbVillaName(villa) + (ch.length ? ': ' + ch.join('; ') : ': saved with no change'));
     }else{
       try{ Object.assign(payload, await issueInvoiceNumbers(villa, bookingDate)); }catch(e){ console.error('Could not issue invoice numbers', e); }
@@ -7299,12 +7313,12 @@ function dbPrintReport(rows, label){
   const due = l => l.filter(r => r.c.state === 'pending').reduce((t, r) => t + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
   const ST = { paid:'#e8f6ee', pending:'#fff6dd', cancelled:'#fdecec' };
   const td = (v, c) => '<td' + (c ? ' class="' + c + '"' : '') + '>' + esc(v == null ? '' : String(v)) + '</td>';
-  const head = ['ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate', 'Total (LKR)', 'Advance (LKR)', 'Advance date', 'Balance (LKR)', 'Arrival rate', 'Bal. @ arrival', 'Status', 'Notes'];
+  const head = ['ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate', 'Total (LKR)', 'Commission 2.5% (LKR)', 'Total payable (LKR)', 'Advance (LKR)', 'Advance date', 'Balance (LKR)', 'Arrival rate', 'Bal. @ arrival', 'Status', 'Notes'];
   const body = list.map(({ b, c }) => '<tr style="background:' + ST[c.state] + '">' + td(b.bookingRef || '') + td(dbVillaName(b.villa)) + td(b.fullName || b.guest || '') + td(dbD(b.checkIn)) + td(dbD(b.checkOut)) + td(c.n, 'n') + td(c.cur)
-    + td(c.rate === null || c.rate === undefined ? '' : Number(c.rate).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:4 }), 'n') + td(dbN(c.tot), 'n') + td(c.cur === 'LKR' ? '' : dbN(c.fx, 4), 'n') + td(dbN(c.totL), 'n') + td(dbN(c.adv), 'n') + td(dbD(b.paidOn))
+    + td(c.rate === null || c.rate === undefined ? '' : Number(c.rate).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:4 }), 'n') + td(dbN(c.tot), 'n') + td(c.cur === 'LKR' ? '' : dbN(c.fx, 4), 'n') + td(dbN(c.totL), 'n') + td(dbN(c.comm), 'n') + td(dbN(c.payable), 'n') + td(dbN(c.adv), 'n') + td(dbD(b.paidOn))
     + td(dbN(c.bal), 'n') + td(dbN(b.arrivalRate, 4), 'n') + td(dbN(c.arrBal), 'n') + td(DB_STATE[c.state][0].replace(/^[^A-Za-z]+/, '')) + td(b.sheetNotes || '') + '</tr>').join('');
   const byVilla = CAL_VILLAS.map(v => { const l = live.filter(r => r.b.villa === v.id); if(!l.length) return '';
-    return '<tr>' + td(v.name) + td(l.length, 'n') + td(sum(l, 'n'), 'n') + td(dbN(sum(l, 'totL')), 'n') + td(dbN(sum(l, 'adv')), 'n') + td(dbN(due(l)), 'n') + td(l.filter(r => r.c.state === 'paid').length, 'n') + '</tr>'; }).join('');
+    return '<tr>' + td(v.name) + td(l.length, 'n') + td(sum(l, 'n'), 'n') + td(dbN(sum(l, 'payable')), 'n') + td(dbN(sum(l, 'adv')), 'n') + td(dbN(due(l)), 'n') + td(l.filter(r => r.c.state === 'paid').length, 'n') + '</tr>'; }).join('');
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Direct bookings report</title><style>'
     + '@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#13233a;margin:0;padding:18px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     + '.hd{display:flex;align-items:center;gap:16px;border-bottom:2px solid #13233a;padding-bottom:10px;margin-bottom:12px}.hd img{max-height:60px;max-width:160px;object-fit:contain}'
@@ -7314,10 +7328,10 @@ function dbPrintReport(rows, label){
     + 'thead{display:table-header-group}tr{page-break-inside:avoid}.sig{display:flex;gap:40px;margin-top:40px;font-size:11px}.sig div{flex:1;border-top:1px solid #13233a;padding-top:5px}'
     + '</style></head><body><div class="hd">' + (logo && /^(https:|data:image\/)/.test(logo) ? '<img src="' + esc(logo) + '" alt="">' : '')
     + '<div><h1>' + esc(co.name || co.companyName || 'Ceymora Management') + ' — Direct Bookings Report</h1><div class="sub">' + esc(label) + ' · Printed ' + esc(dbD(todayISO())) + ' · Cancelled bookings are listed but not counted in the totals</div></div></div>'
-    + '<div class="kpi"><div><span>Bookings</span><b>' + live.length + '</b></div><div><span>Nights</span><b>' + sum(live, 'n') + '</b></div><div><span>Total (LKR)</span><b>' + dbN(sum(live, 'totL')) + '</b></div><div><span>Advance received (LKR)</span><b>' + dbN(sum(live, 'adv')) + '</b></div><div><span>Still to collect (LKR)</span><b>' + dbN(due(live)) + '</b></div></div>'
-    + '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="18">No bookings match.</td></tr>')
-    + '<tr class="tot"><td colspan="5">Total (' + live.length + ' bookings)</td><td class="n">' + sum(live, 'n') + '</td><td colspan="4"></td><td class="n">' + dbN(sum(live, 'totL')) + '</td><td class="n">' + dbN(sum(live, 'adv')) + '</td><td></td><td class="n">' + dbN(live.reduce((t, r) => t + (r.c.bal || 0), 0)) + '</td><td></td><td class="n">' + dbN(due(live)) + '</td><td colspan="2"></td></tr></tbody></table>'
-    + '<h2>Summary by villa</h2><table style="max-width:700px"><thead><tr><th>Villa</th><th>Bookings</th><th>Nights</th><th>Total (LKR)</th><th>Advance (LKR)</th><th>Still to collect (LKR)</th><th>Paid</th></tr></thead><tbody>' + (byVilla || '<tr><td colspan="7">Nothing yet.</td></tr>') + '</tbody></table>'
+    + '<div class="kpi"><div><span>Bookings</span><b>' + live.length + '</b></div><div><span>Nights</span><b>' + sum(live, 'n') + '</b></div><div><span>Total payable (LKR)</span><b>' + dbN(sum(live, 'payable')) + '</b></div><div><span>Commission (LKR)</span><b>' + dbN(sum(live, 'comm')) + '</b></div><div><span>Advance received (LKR)</span><b>' + dbN(sum(live, 'adv')) + '</b></div><div><span>Still to collect (LKR)</span><b>' + dbN(due(live)) + '</b></div></div>'
+    + '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (body || '<tr><td colspan="20">No bookings match.</td></tr>')
+    + '<tr class="tot"><td colspan="5">Total (' + live.length + ' bookings)</td><td class="n">' + sum(live, 'n') + '</td><td colspan="4"></td><td class="n">' + dbN(sum(live, 'totL')) + '</td><td class="n">' + dbN(sum(live, 'comm')) + '</td><td class="n">' + dbN(sum(live, 'payable')) + '</td><td class="n">' + dbN(sum(live, 'adv')) + '</td><td></td><td class="n">' + dbN(live.reduce((t, r) => t + (r.c.bal || 0), 0)) + '</td><td></td><td class="n">' + dbN(due(live)) + '</td><td colspan="2"></td></tr></tbody></table>'
+    + '<h2>Summary by villa</h2><table style="max-width:700px"><thead><tr><th>Villa</th><th>Bookings</th><th>Nights</th><th>Total payable (LKR)</th><th>Advance (LKR)</th><th>Still to collect (LKR)</th><th>Paid</th></tr></thead><tbody>' + (byVilla || '<tr><td colspan="7">Nothing yet.</td></tr>') + '</tbody></table>'
     + '<div class="sig"><div>Prepared by</div><div>Checked by</div></div></body></html>');
   w.document.close(); setTimeout(() => w.print(), 400);
   logActivity('print', 'villa_bookings', 'Printed the Direct Bookings report (' + label + ')');
@@ -7337,7 +7351,7 @@ async function renderDirectBk(){
   const chip = (k, label, cur, attr) => `<button type="button" class="dbchip${cur ? ' on' : ''}" data-${attr}="${esc(k)}">${label}</button>`;
   const stCount = s => all.filter(b => (!DBK.villa || b.villa === DBK.villa) && dbCalc(b).state === s).length;
   if(DBK.sel && !all.some(x => String(x.id) === String(DBK.sel))) DBK.sel = null;
-  const th = ['ID', 'Villa', 'Guest name', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate<br>(LKR per 1)', 'Total<br>(LKR)', 'Advance<br>(LKR)', 'Advance<br>date', 'Balance<br>(LKR)', 'Arrival<br>rate', 'Balance @<br>arrival rate', 'Status', 'Notes'];
+  const th = ['ID', 'Villa', 'Guest name', 'Check-in', 'Check-out', 'Nights', 'Cur', 'Rate / night', 'Total', 'Booking rate<br>(LKR per 1)', 'Total<br>(LKR)', 'Commission<br>2.5% (LKR)', 'Total payable<br>(LKR)', 'Advance<br>(LKR)', 'Advance<br>date', 'Balance<br>(LKR)', 'Arrival<br>rate', 'Balance @<br>arrival rate', 'Status', 'Notes'];
   const rowHtml = b => {
     const c = dbCalc(b), st = DB_STATE[c.state];
     return `<tr data-dbrow="${b.id}" data-st="${c.state}" class="${String(DBK.sel) === String(b.id) ? 'sel' : ''}">
@@ -7346,13 +7360,13 @@ async function renderDirectBk(){
       <td class="guest">${esc(b.fullName || b.guest || '')}${b.status === 'provisional' ? ' <span class="dbhold" title="No money received yet — the dates are only held">HOLD</span>' : ''}</td>
       <td>${esc(dbD(b.checkIn))}</td><td>${esc(dbD(b.checkOut))}</td><td class="n">${c.n === null ? '' : c.n}</td><td>${esc(c.cur)}</td>
       <td class="n blue">${c.rate === null || c.rate === undefined ? '' : Number(c.rate).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:4 })}</td><td class="n">${dbN(c.tot)}</td><td class="n blue">${c.cur === 'LKR' ? '' : dbN(c.fx, 4)}</td>
-      <td class="n lkr">${dbN(c.totL)}</td><td class="n lkr">${dbN(c.adv)}</td><td>${esc(dbD(b.paidOn))}</td>
+      <td class="n">${dbN(c.totL)}</td><td class="n comm">${dbN(c.comm)}</td><td class="n lkr">${dbN(c.payable)}</td><td class="n lkr">${dbN(c.adv)}</td><td>${esc(dbD(b.paidOn))}</td>
       <td class="n bal">${dbN(c.bal)}</td><td class="n blue">${dbN(b.arrivalRate, 4)}</td><td class="n bal">${dbN(c.arrBal)}</td>
       <td><span class="dbst" style="background:${st[1]};color:${st[2]}">${st[0]}</span></td><td class="notes">${esc(b.sheetNotes || '')}</td></tr>`;
   };
   const sumRows = CAL_VILLAS.map(v => { const l = all.filter(b => b.villa === v.id && b.status !== 'cancelled').map(b => ({ b, c:dbCalc(b) })); if(!l.length) return '';
     const t = k => l.reduce((s, r) => s + (r.c[k] || 0), 0), due = l.filter(r => r.c.state === 'pending').reduce((s, r) => s + ((r.c.arrBal !== null ? r.c.arrBal : r.c.bal) || 0), 0);
-    return `<tr><td><span class="dbvilla" style="--c:${v.color}">${esc(v.name)}</span></td><td class="n">${l.length}</td><td class="n">${t('n')}</td><td class="n lkr">${dbN(t('totL'))}</td><td class="n lkr">${dbN(t('adv'))}</td><td class="n bal">${dbN(due)}</td><td class="n">${l.filter(r => r.c.state === 'paid').length}</td></tr>`; }).join('');
+    return `<tr><td><span class="dbvilla" style="--c:${v.color}">${esc(v.name)}</span></td><td class="n">${l.length}</td><td class="n">${t('n')}</td><td class="n lkr">${dbN(t('payable'))}</td><td class="n lkr">${dbN(t('adv'))}</td><td class="n bal">${dbN(due)}</td><td class="n">${l.filter(r => r.c.state === 'paid').length}</td></tr>`; }).join('');
   box.innerHTML = `
     <div class="dbhead"><div><h3 style="margin:0">📒 Direct Bookings <small>— the same bookings as the calendar</small></h3>
       <div class="r-muted" style="font-size:12px">Green = paid · yellow = pending · red = cancelled. Click a row to select it.${edit ? ' Double-click a row to edit it.' : ''}</div></div>
@@ -7364,12 +7378,12 @@ async function renderDirectBk(){
       ${(DBK.villa || DBK.status || DBK.q) ? '<button type="button" class="dbp clr" id="dbClearF">✖ Clear filters</button>' : ''}</div>
     <div class="dbchips">${chip('', 'All villas', !DBK.villa, 'dbvilla')}${villas.map(v => chip(v.id, esc(v.name), DBK.villa === v.id, 'dbvilla')).join('')}
       <span class="dbsep"></span>${chip('', 'All status', !DBK.status, 'dbstat')}${chip('pending', '⏳ Pending payments (' + stCount('pending') + ')', DBK.status === 'pending', 'dbstat')}${chip('paid', '✅ Paid (' + stCount('paid') + ')', DBK.status === 'paid', 'dbstat')}${chip('cancelled', '❌ Cancelled (' + stCount('cancelled') + ')', DBK.status === 'cancelled', 'dbstat')}</div>
-    <div class="dbkpi"><div><span>Bookings</span><b>${live.length}</b></div><div><span>Nights</span><b>${sum('n')}</b></div><div><span>Total (LKR)</span><b>${dbN(sum('totL'))}</b></div><div><span>Advance received (LKR)</span><b>${dbN(sum('adv'))}</b></div><div class="warn"><span>Still to collect (LKR)</span><b>${dbN(toCollect)}</b></div></div>
+    <div class="dbkpi"><div><span>Bookings</span><b>${live.length}</b></div><div><span>Nights</span><b>${sum('n')}</b></div><div><span>Total payable (LKR)</span><b>${dbN(sum('payable'))}</b></div><div><span>Commission (LKR)</span><b>${dbN(sum('comm'))}</b></div><div><span>Advance received (LKR)</span><b>${dbN(sum('adv'))}</b></div><div class="warn"><span>Still to collect (LKR)</span><b>${dbN(toCollect)}</b></div></div>
     <div id="dbMsg" class="dbmsg" style="display:none"></div>
     <div class="dbwrap"><table class="dbx"><thead><tr>${th.map(t => `<th>${t}</th>`).join('')}</tr></thead><tbody>
       ${rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="${th.length}" class="r-muted" style="padding:18px;text-align:center;cursor:default">No direct bookings match.${edit ? ' Press “＋ Add booking” to enter the first one.' : ''}</td></tr>`}
-      <tr class="dbtot"><td colspan="5">Total (${live.length} bookings, cancelled not counted)</td><td class="n">${sum('n')}</td><td colspan="4"></td><td class="n lkr">${dbN(sum('totL'))}</td><td class="n lkr">${dbN(sum('adv'))}</td><td></td><td class="n bal">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td></td><td class="n bal">${dbN(toCollect)}</td><td colspan="2"></td></tr></tbody></table></div>
-    <details class="dbsum"><summary>📊 Summary by villa</summary><table class="r-table"><thead><tr><th>Villa</th><th class="n">Bookings</th><th class="n">Nights</th><th class="n">Total (LKR)</th><th class="n">Advance (LKR)</th><th class="n">Still to collect (LKR)</th><th class="n">Paid</th></tr></thead><tbody>${sumRows || '<tr><td colspan="7" class="r-muted">Nothing yet.</td></tr>'}</tbody></table></details>`;
+      <tr class="dbtot"><td colspan="5">Total (${live.length} bookings, cancelled not counted)</td><td class="n">${sum('n')}</td><td colspan="4"></td><td class="n">${dbN(sum('totL'))}</td><td class="n comm">${dbN(sum('comm'))}</td><td class="n lkr">${dbN(sum('payable'))}</td><td class="n lkr">${dbN(sum('adv'))}</td><td></td><td class="n bal">${dbN(live.reduce((s, r) => s + (r.c.bal || 0), 0))}</td><td></td><td class="n bal">${dbN(toCollect)}</td><td colspan="2"></td></tr></tbody></table></div>
+    <details class="dbsum"><summary>📊 Summary by villa</summary><table class="r-table"><thead><tr><th>Villa</th><th class="n">Bookings</th><th class="n">Nights</th><th class="n">Total payable (LKR)</th><th class="n">Advance (LKR)</th><th class="n">Still to collect (LKR)</th><th class="n">Paid</th></tr></thead><tbody>${sumRows || '<tr><td colspan="7" class="r-muted">Nothing yet.</td></tr>'}</tbody></table></details>`;
   // selection: updates the highlight and the Edit / Delete buttons without redrawing (keeps your scroll place)
   const selRow = () => all.find(x => String(x.id) === String(DBK.sel)) || null;
   const selUi = () => {
@@ -7398,8 +7412,8 @@ async function renderDirectBk(){
   box.querySelector('#dbPrint').addEventListener('click', () => dbPrintReport(rows, label()));
   box.querySelector('#dbCsv').addEventListener('click', () => {
     const q2 = v => { const t = typeof v === 'number' ? String(Math.round(v * 10000) / 10000) : csvSafe(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
-    const head = ['Booking ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Currency', 'Rate/night', 'Total', 'Booking rate', 'Total LKR', 'Advance LKR', 'Advance date', 'Advance (cur)', 'Balance LKR', 'Balance due date', 'Arrival rate', 'Balance @ arrival rate', 'Status', 'Notes'];
-    const csv = [head].concat(rows.map(b => { const c = dbCalc(b); return [b.bookingRef || '', dbVillaName(b.villa), b.fullName || b.guest, dbD(b.checkIn), dbD(b.checkOut), c.n, c.cur, c.rate, c.tot, c.cur === 'LKR' ? '' : c.fx, c.totL, c.adv, dbD(b.paidOn), c.advC, c.bal, dbD(b.checkIn), b.arrivalRate, c.arrBal, DB_STATE[c.state][0], b.sheetNotes || '']; })).map(r => r.map(q2).join(',')).join('\r\n');
+    const head = ['Booking ID', 'Villa', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Currency', 'Rate/night', 'Total', 'Booking rate', 'Total LKR', 'Commission 2.5% LKR', 'Total payable LKR', 'Advance LKR', 'Advance date', 'Advance (cur)', 'Balance LKR', 'Balance due date', 'Arrival rate', 'Balance @ arrival rate', 'Status', 'Notes'];
+    const csv = [head].concat(rows.map(b => { const c = dbCalc(b); return [b.bookingRef || '', dbVillaName(b.villa), b.fullName || b.guest, dbD(b.checkIn), dbD(b.checkOut), c.n, c.cur, c.rate, c.tot, c.cur === 'LKR' ? '' : c.fx, c.totL, c.comm, c.payable, c.adv, dbD(b.paidOn), c.advC, c.bal, dbD(b.checkIn), b.arrivalRate, c.arrBal, DB_STATE[c.state][0], b.sheetNotes || '']; })).map(r => r.map(q2).join(',')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' })); a.download = 'Direct bookings.csv'; document.body.appendChild(a); a.click(); a.remove();
   });
 }
