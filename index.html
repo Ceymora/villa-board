@@ -4607,7 +4607,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.10-advance-save-reason';
+const APP_VERSION = 'v2026.11.10-ceymora-sum-of-boxes';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -9106,7 +9106,7 @@ function renderAdvanceWallets(){
     const isOffice = name === 'Office';
     const shown = isOffice ? box + w.balance : w.balance;
     const ceyPart = isOffice ? box + w.cey : w.cey;
-    parts.push([name, ceyPart]);
+    parts.push([name, shown]);   // the Ceymora card is exactly the sum of the boxes below
     const defaultInfo = ADVANCE_WALLET_DEFAULTS.find(d=>d.name===name);
     const gap = allCashTxns.filter(t => isAdvanceParent(t) && t.settled && t.employeeName === name)
       .reduce((sum,t)=> sum + advFigures(t).left, 0);
@@ -9121,7 +9121,6 @@ function renderAdvanceWallets(){
       <div class="cash-card-balance">LKR ${Math.round(shown).toLocaleString()}</div>
       ${isOffice ? `<div style="font-size:11px; opacity:0.9; margin-top:4px;">Cash in the office ${fmt(box)}${w.given || w.spent || w.returned ? ` + office advances ${fmt(w.balance)}` : ''}</div>` : ''}
       ${!isOffice || w.given ? `<div style="font-size:11px; opacity:0.85; margin-top:4px;">${isOffice ? 'Advances: ' : ''}Given LKR ${w.given.toLocaleString()} − billed LKR ${w.spent.toLocaleString()}${w.returned ? ' − returned LKR ' + w.returned.toLocaleString() : ''}</div>` : ''}
-      ${Math.round(ceyPart) !== Math.round(shown) ? `<div style="font-size:11px; opacity:0.95; margin-top:2px;">of which from ${esc(pettyName('ceymora'))} ${fmt(ceyPart)}</div>` : ''}
       ${!isOffice ? `<div style="font-size:11px; opacity:0.85; margin-top:2px;">of which bank transfer LKR ${(w.givenBank||0).toLocaleString()} · cash LKR ${(w.givenCash||0).toLocaleString()} <span style="opacity:.8;">· tap to open</span></div>` : '<div style="font-size:11px; opacity:0.8; margin-top:2px;">tap to open</div>'}
       ${openCount ? `<div style="font-size:11.5px; margin-top:6px; font-weight:700;">${openCount} advance${openCount === 1 ? '' : 's'} open — tap to settle</div>` : ''}
       ${Math.abs(gap) >= 1 ? `<div style="font-size:11px; margin-top:5px; background:rgba(255,255,255,0.2); border-radius:6px; padding:3px 6px;">⚠ LKR ${Math.round(gap).toLocaleString()} still to recover from settled advances — click to see</div>` : ''}
@@ -19204,7 +19203,7 @@ async function askVilla(text){
     if(!canSee('pettycash')) return ASK_NO('Petty Cash');
     const list = await askCash();
     let cey = 0, kal = 0; list.forEach(t => { if(t.card === 'ceymora') cey += cardEffect(t); else if(t.card === 'kalava_card') kal += cardEffect(t); });
-    const w = computeAdvanceWallets(list); let held = 0; Object.values(w).forEach(x => { held += x.cey || 0; });
+    const w = computeAdvanceWallets(list); let held = 0; Object.values(w).forEach(x => { held += x.balance || 0; });
     return `<b>${esc(pettyName('ceymora'))}</b> <span class="big">${askFmt(cey + held)}</span>
       <span class="muted">Cash in the office ${askFmt(cey)} · out as advances ${askFmt(held)}</span><br><br>
       <b>${esc(pettyName('kalava_card'))}</b> ${askFmt(kal)}`;
