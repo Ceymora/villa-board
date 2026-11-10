@@ -4607,7 +4607,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.09-direct-villa-only';
+const APP_VERSION = 'v2026.11.10-advance-save-reason';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -13915,7 +13915,7 @@ function wireSimpleAdvance(name){
     try{
       const files = [...(g('saFile').files || [])];
       const urls = [];
-      for(const f of files) urls.push(await uploadReceiptFile(f));
+      for(const f of files){ try{ urls.push(await uploadReceiptFile(f)); }catch(e){ e.message = 'the invoice photo could not be uploaded (' + (e.message || 'storage refused it') + '). Your account may not be allowed to add bills, or this computer is not approved.'; throw e; } }
       const cols = await pcColsReady();
       for(const [i, pt] of parts.entries()){
         const { error } = await sb.from('petty_cash_transactions').insert({
@@ -13926,7 +13926,7 @@ function wireSimpleAdvance(name){
           employee_name: name, direct_expense:false, account_code: advAccountFor(place, purpose), advance_id: String(pt.adv.id),
           ...(cols ? { invoice_no: invNo, bank_account: pt.adv.card === 'bank' ? (pt.adv.bankAccount || null) : null } : {}),
         });
-        if(error) throw error;
+        if(error){ if(/row-level security/i.test(error.message || '')) error.message = 'the database refused this invoice for “' + (FOR_LABELS[place] || place) + '”. ' + (/^(office|store)$/i.test(place) ? 'Office and Store bills can only be saved by people who are not limited to particular villas — ask Makky to check your villa ticks.' : 'You may not be allowed to record for that villa — ask Makky to check your permissions.'); throw error; }
       }
       logActivity('create', 'petty_cash_transactions', `Invoice from ${name}'s advance: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[place] || place}), dated ${date}${invNo ? ', invoice ' + invNo : ''}`);
       await fetchCash();
