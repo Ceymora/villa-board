@@ -723,6 +723,31 @@
   .rpt-section-count{ font-family:'Inter',sans-serif; font-size:11.5px; color:var(--muted); font-weight:600; }
   .rpt-note{ font-size:11px; color:var(--muted); margin-top:5px; font-style:italic; }
 
+  /* Standard reports (summary + Excel-style tables) */
+  .std-views{ display:inline-flex; gap:0; margin:0 0 10px; border:1.5px solid var(--board-line); border-radius:999px; overflow:hidden; }
+  .std-views button{ border:0; background:#fff; padding:7px 16px; font:700 12.5px Inter,sans-serif; color:var(--muted); cursor:pointer; }
+  .std-views button.on{ background:var(--frame); color:#fff; }
+  .std-bar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .std-q{ flex:1; min-width:180px; max-width:340px; height:36px; border:1.5px solid #cfd6e3; border-radius:999px; padding:0 14px; font:500 13px Inter,sans-serif; }
+  .std-btn{ height:36px; padding:0 16px; border:0; border-radius:999px; color:#fff; font:700 13px Inter,sans-serif; cursor:pointer; box-shadow:0 2px 5px rgba(19,35,58,.18); }
+  .std-btn.xl{ background:linear-gradient(135deg,#1f9d6b,#157a52); } .std-btn.pr{ background:linear-gradient(135deg,#6d4fd8,#4a32a8); }
+  .std-btn:hover{ filter:brightness(1.07); }
+  .std-title{ font-family:'Fraunces',serif; font-size:22px; font-weight:700; color:#13233a; } .std-sub{ font-size:12.5px; color:var(--muted); margin:2px 0 10px; }
+  .std-note{ font-size:12px; color:var(--muted); font-style:italic; margin-bottom:8px; }
+  .std-h2{ font:800 12px Inter,sans-serif; text-transform:uppercase; letter-spacing:.08em; color:#1e3a5f; margin:16px 0 6px; }
+  .std-dim{ color:var(--muted); font-size:11.5px; font-weight:400; }
+  .std-sum{ border-collapse:collapse; width:100%; max-width:720px; font-size:13px; }
+  .std-sum th, .std-tbl th{ background:#1e3a5f; color:#fff; font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:8px 10px; text-align:left; border:1px solid #1e3a5f; }
+  .std-sum td, .std-tbl td{ padding:7px 10px; border:1px solid #dde3ee; vertical-align:top; background:#fff; }
+  .std-sum tbody tr:nth-child(even) td, .std-tbl tbody tr:nth-child(even) td{ background:#f6f9fd; }
+  .std-sum tfoot td, .std-tbl tfoot td{ background:#d9e2f3 !important; font-weight:800; }
+  .std-sum tfoot tr.x td{ background:#eef2f8 !important; font-weight:700; }
+  .std-sum .c{ text-align:center; } .std-sum .r, .std-tbl .r{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; } .std-tbl td.d{ white-space:nowrap; }
+  .std-chip{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:8px; vertical-align:-1px; }
+  .std-sec{ margin-top:16px; } .std-sec-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-left:6px solid var(--c); background:#f3f6fb; padding:7px 12px; border-radius:4px 4px 0 0; font-size:14px; }
+  .std-sec-h span{ font-size:12px; color:var(--muted); font-weight:600; }
+  .std-scroll{ overflow-x:auto; } .std-tbl{ border-collapse:collapse; width:100%; min-width:820px; table-layout:fixed; font-size:12.5px; } .std-tbl td{ overflow-wrap:anywhere; }
+  .std-tbl th[data-std-sort]{ cursor:pointer; user-select:none; white-space:nowrap; } .std-tbl th[data-std-sort]:hover{ background:#2a4d7c; } .std-tbl th i{ font-style:normal; font-size:10px; }
   /* Report tables */
   .rpt-table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:12.5px; }
   .rpt-table thead th{
@@ -1931,12 +1956,12 @@
           <div class="cash-card-balance" id="kalavaCardBalance">LKR 0</div>
         </div>
         <div class="cash-card" id="directPurchasesKalavaCard" style="background:linear-gradient(135deg, #f08c00, #b56500); cursor:pointer;" title="Click to see which transactions make up this total">
-          <div class="cash-card-label"><span data-cardname="kalava_card">Direct Villa Purchases Kalava</span></div>
+          <div class="cash-card-label"><span data-cardname="kalava_card">KALAVA CARD</span></div>
           <div class="cash-card-balance" id="directPurchasesKalava">LKR 0</div>
           <div class="cash-card-sub" id="directKalavaSub"></div>
         </div>
         <div class="cash-card" id="directPurchasesCeymoraCard" style="background:linear-gradient(135deg, #4d5bd1, #2e3a91); cursor:pointer;" title="Click to see which transactions make up this total">
-          <div class="cash-card-label"><span data-cardname="ceymora">Direct Villa Purchases Ceymora</span></div>
+          <div class="cash-card-label"><span data-cardname="ceymora">CEYMORA CARD</span></div>
           <div class="cash-card-balance" id="directPurchasesCeymora">LKR 0</div>
           <div class="cash-card-sub" id="directCeymoraSub"></div>
         </div>
@@ -4607,7 +4632,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.10-ceymora-sum-of-boxes';
+const APP_VERSION = 'v2026.11.11-standard-report';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -6262,6 +6287,7 @@ let exPlace = 'all';             // which villa / place, or 'all'
 let exKind = 'all';              // one of PETTY_GROUPS' keys, or 'all'
 let exAllTime = false;
 let exDaily = false;              // one day at a time
+let exView = 'std';              // 'std' = the standard report, 'old' = the earlier print layout
 let exGroupBy = 'paid';          // 'paid' = how it was paid, 'account' = what it was for
 let exMonthDate = new Date();
 // Shown in another currency: every rupee amount is divided by one rate — the rate on
@@ -6560,7 +6586,336 @@ function renderVillaExpensesIn(curNote){
         <span class="rpt-section-count">stock sent from Store with + Distribute</span></div>${exStoreBlock(exStoreLines(), false)}`;
     }
   }
-  document.getElementById('exBody').innerHTML = vcToolbarHTML() + html;
+  exRender(rows, curNote, html);
+}
+/* The Villa Expenses report in the standard layout: a summary of the four ways money goes out
+   (plus Store supplies issued), then each as its own table — Date, Description, Paid from, Notes, Amount. */
+function exStdSpec(rows, curNote){
+  const cur = RPT_CUR.cur, rate = RPT_CUR.rate || 1;
+  const conv = n => Math.round(((Number(n) || 0) / (cur === 'LKR' ? 1 : rate)) * 100) / 100;
+  const placeName = EX_PLACES().find(v => v.id === exPlace).name, showPlace = exPlace === 'all';
+  const colors = { staff:'#0c8599', direct:'#3b5bdb', bank:'#f08c00', sharon:'#e64980', store:'#a06800' };
+  const cols = [{ k:'date', label:'Date', type:'date', w:14 }, { k:'desc', label:'Description', type:'text', w:40 },
+    ...(showPlace ? [{ k:'place', label:'Place', type:'text', w:16 }] : []),
+    { k:'paid', label:'Paid from', type:'text', w:28 }, { k:'notes', label:'Notes', type:'text', w:52,
+      html: r => esc(r.notes || '') + (r.links ? ' ' + r.links : '') },
+    { k:'amount', label:'Amount (' + cur + ')', type:'num', w:18 }];
+  const mine = (exKind === 'all' ? PETTY_GROUPS : PETTY_GROUPS.filter(g => g.key === exKind));
+  const sections = [], summary = [];
+  for(const g of (exKind === 'store' ? [] : mine)){
+    const list = rows.filter(r => pettyGroupOf(r) === g.key).sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)));
+    const out = list.map(e => {
+      const tags = [];
+      if(e.note) tags.push(e.note);
+      if(e.linkedInventory){ const pur = e.linkedPurchaseId ? allInvTxns.find(x => String(x.id) === String(e.linkedPurchaseId)) : null; tags.push(pur ? 'stock: ' + pur.item + ' × ' + pur.qty : 'stock item'); }
+      if(e.employeeName) tags.push("from " + e.employeeName + "'s advance");
+      if(e.card === 'sharon') tags.push('his own money');
+      const nos = docNosText(e); if(nos) tags.push(nos);
+      return { date:e.date, desc:e.purpose || 'Expense', place:FOR_LABELS[e.for] || e.for || '—', paid:e.employeeName ? 'Staff advance' : payLabel(e), notes:tags.join(' · '), links:invoiceLinksHTML(e), amount:conv(e.amount) };
+    });
+    sections.push({ id:g.key, title:g.label, short:g.pl, color:colors[g.key], columns:cols, rows:out });
+    summary.push({ label:g.pl, color:colors[g.key], count:out.length, amount:out.reduce((n, r) => n + r.amount, 0), counted:true });
+  }
+  if((exKind === 'all' || exKind === 'store') && exStorePlaces().length){
+    const st = exStoreLines();
+    const out = st.sort((a, b) => (a.t.date || '').localeCompare(b.t.date || '')).map(x => ({ date:x.t.date, desc:x.t.item + ' × ' + x.t.qty, place:INV_LOCATION_LABELS[x.loc] || x.loc, paid:'Store stock',
+      notes:[x.t.note, x.value === null ? 'no price yet' : x.estimated ? 'valued at the average price Store paid' : ''].filter(Boolean).join(' · '), links:'', amount:x.value === null ? null : conv(x.value) }));
+    sections.push({ id:'store', title:'5. Store Supply Issues', short:'Store Supply Issues', color:colors.store, columns:cols, rows:out });
+    summary.push({ label:'Store Supply Issues', color:colors.store, count:out.length, amount:out.reduce((n, r) => n + (r.amount || 0), 0), counted:false, note:'stock sent out of Store — already paid for there, so not added again' });
+  }
+  const spend = summary.filter(s => s.counted).reduce((n, s) => n + s.amount, 0), storeVal = summary.filter(s => !s.counted).reduce((n, s) => n + s.amount, 0);
+  const onePlace = exPlace !== 'all' && exPlace !== 'store';
+  const slug = x => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return { id:'villaexp', title:'Villa expenses — ' + placeName, subtitle:exPeriodLabel() + (exKind === 'all' ? '' : ' · ' + ((PETTY_GROUPS.find(g => g.key === exKind) || {}).pl || 'Store Supply Issues')) + ' · amounts in ' + cur,
+    cur, filename:'villa-expenses-' + slug(placeName) + '-' + slug(exPeriodLabel()) + '.xlsx', notes:curNote ? [curNote] : [],
+    summary, totalLabel:'Total spending', extra:onePlace && exKind === 'all' && storeVal ? [{ label:placeName + ' — full cost (spending + store supplies)', amount:spend + storeVal }] : [], sections };
+}
+function exRender(rows, curNote, oldHtml){
+  const body = document.getElementById('exBody');
+  const tabs = `<div class="std-views no-print"><button type="button" class="${exView === 'std' ? 'on' : ''}" data-exview="std">📑 Standard report</button><button type="button" class="${exView === 'old' ? 'on' : ''}" data-exview="old">🖨️ Earlier print layout</button></div>`;
+  const gt = document.getElementById('exGroupTabs'); if(gt) gt.style.display = exView === 'std' ? 'none' : 'inline-flex';
+  if(exView === 'std'){
+    body.innerHTML = vcToolbarHTML() + tabs + '<div id="exStdHost"></div>';
+    stdRender(document.getElementById('exStdHost'), exStdSpec(rows, curNote));
+  } else {
+    body.innerHTML = vcToolbarHTML() + tabs + oldHtml;
+  }
+  body.querySelectorAll('[data-exview]').forEach(b => b.addEventListener('click', () => { exView = b.dataset.exview; renderVillaExpenses(); }));
+}
+
+/* ============================ STANDARD REPORTS ============================
+   One layout for every report: a summary first, then each category as an Excel-style
+   table (click a heading to sort), a styled Excel download and a compact print.
+   A report only has to describe itself:
+     { id, title, subtitle, cur, filename, notes:[],
+       summary:[{ label, color, count, amount, counted }], totalLabel, extra:[{label, amount}],
+       sections:[{ id, title, short, color, columns:[{ k, label, type:'date'|'text'|'num', w, html? }], rows:[{...}] }] }
+   The older print layout of each report stays available beside it.                      */
+const STD = { spec:{}, state:{} };
+function stdNum(v, cur){
+  if(v === null || v === undefined || v === '') return '';
+  const n = Number(v) || 0;
+  return n.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
+}
+function stdState(spec){ return STD.state[spec.id] || (STD.state[spec.id] = { sort:{}, q:'' }); }
+function stdRows(spec, sec, searched){
+  const st = stdState(spec), q = searched ? st.q.trim().toLowerCase() : '';
+  let rows = sec.rows.slice();
+  if(q) rows = rows.filter(r => sec.columns.some(c => String(r[c.k] === null || r[c.k] === undefined ? '' : r[c.k]).toLowerCase().includes(q)));
+  const s = st.sort[sec.id];
+  if(s){
+    const col = sec.columns.find(c => c.k === s.k);
+    if(col){
+      const dir = s.dir === 'desc' ? -1 : 1;
+      rows.sort((a, b) => {
+        const x = a[s.k], y = b[s.k];
+        if(col.type === 'num') return ((x === null || x === '' ? -Infinity : Number(x)) - (y === null || y === '' ? -Infinity : Number(y))) * dir;
+        return String(x || '').localeCompare(String(y || ''), undefined, { numeric:true, sensitivity:'base' }) * dir;
+      });
+    }
+  }
+  return rows;
+}
+function stdColgroup(sec){ const t = sec.columns.reduce((n, c) => n + (c.w || 16), 0); return '<colgroup>' + sec.columns.map(c => `<col style="width:${((c.w || 16) / t * 100).toFixed(1)}%">`).join('') + '</colgroup>'; }
+function stdSum(sec, rows){ const c = sec.columns.find(c => c.type === 'num'); return c ? rows.reduce((n, r) => n + (Number(r[c.k]) || 0), 0) : 0; }
+function stdCell(c, r){
+  if(c.html) return c.html(r);
+  const v = r[c.k];
+  if(c.type === 'date') return v ? esc(fmtDayY(v)) : '';
+  if(c.type === 'num') return esc(stdNum(v));
+  return esc(v === null || v === undefined ? '' : v);
+}
+function stdRender(host, spec){
+  if(!host) return;
+  STD.spec[spec.id] = spec;
+  const st = stdState(spec), cur = spec.cur;
+  const total = spec.summary.filter(s => s.counted).reduce((n, s) => n + (s.amount || 0), 0);
+  const sumRows = spec.summary.map(s => `<tr>
+      <td><span class="std-chip" style="background:${s.color}"></span>${esc(s.label)}${s.note ? `<div class="std-dim">${esc(s.note)}</div>` : ''}</td>
+      <td class="c">${s.count}</td><td class="r">${esc(stdNum(s.amount || 0))}</td>
+      <td class="c">${s.counted ? (total ? Math.round((s.amount || 0) / total * 100) + '%' : '—') : '<span class="std-dim">not added</span>'}</td></tr>`).join('');
+  const secs = spec.sections.filter(s => s.rows.length).map(sec => {
+    const rows = stdRows(spec, sec, true), sorted = st.sort[sec.id] || {};
+    const hasNum = sec.columns.some(c => c.type === 'num'), numIdx = sec.columns.findIndex(c => c.type === 'num');
+    return `<div class="std-sec" id="std-${esc(spec.id)}-${esc(sec.id)}">
+      <div class="std-sec-h" style="--c:${sec.color}"><b>${esc(sec.title)}</b><span>${rows.length}${rows.length !== sec.rows.length ? ' of ' + sec.rows.length : ''} item${sec.rows.length === 1 ? '' : 's'} · ${esc(cur)} ${esc(stdNum(stdSum(sec, rows)))}</span></div>
+      <div class="std-scroll"><table class="std-tbl">${stdColgroup(sec)}<thead><tr>${sec.columns.map(c => `<th class="${c.type === 'num' ? 'r' : ''}" data-std-sort="${esc(c.k)}" data-std-sec="${esc(sec.id)}" title="Click to sort">${esc(c.label)}<i>${sorted.k === c.k ? (sorted.dir === 'desc' ? ' ▼' : ' ▲') : ''}</i></th>`).join('')}</tr></thead>
+        <tbody>${rows.length ? rows.map(r => `<tr>${sec.columns.map(c => `<td class="${c.type === 'num' ? 'r' : c.type === 'date' ? 'd' : ''}">${stdCell(c, r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${sec.columns.length}" class="std-dim" style="text-align:center;padding:12px">No match for the search.</td></tr>`}</tbody>
+        ${hasNum ? `<tfoot><tr><td colspan="${numIdx}">Subtotal — ${esc(sec.short || sec.title)}</td><td class="r">${esc(stdNum(stdSum(sec, rows)))}</td>${'<td></td>'.repeat(sec.columns.length - numIdx - 1)}</tr></tfoot>` : ''}</table></div></div>`;
+  }).join('');
+  host.innerHTML = `<div class="std-doc">
+    <div class="std-bar no-print"><input type="search" class="std-q" placeholder="🔍 Search this report…" value="${esc(st.q)}">
+      <button type="button" class="std-btn xl" data-std-act="xlsx">⬇ Download Excel</button><button type="button" class="std-btn pr" data-std-act="print">🖨 Print</button></div>
+    <div class="std-head"><div class="std-title">${esc(spec.title)}</div><div class="std-sub">${esc(spec.subtitle)}</div></div>
+    ${spec.notes && spec.notes.length ? `<div class="std-note">${spec.notes.map(esc).join('<br>')}</div>` : ''}
+    <div class="std-h2">Summary</div>
+    <table class="std-sum"><thead><tr><th>Category</th><th class="c">Items</th><th class="r">Amount (${esc(cur)})</th><th class="c">Share</th></tr></thead>
+      <tbody>${sumRows}</tbody>
+      <tfoot><tr><td>${esc(spec.totalLabel || 'Total')}</td><td class="c">${spec.summary.filter(s => s.counted).reduce((n, s) => n + s.count, 0)}</td><td class="r">${esc(stdNum(total))}</td><td></td></tr>
+        ${(spec.extra || []).map(x => `<tr class="x"><td>${esc(x.label)}</td><td></td><td class="r">${esc(stdNum(x.amount))}</td><td></td></tr>`).join('')}</tfoot></table>
+    <div class="std-h2">Details</div>${secs || '<div class="std-dim" style="padding:14px">Nothing recorded for this period.</div>'}</div>`;
+  const q = host.querySelector('.std-q');
+  let t = null;
+  q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { st.q = q.value; stdRender(host, spec); const n = host.querySelector('.std-q'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 300); });
+  host.querySelectorAll('[data-std-sort]').forEach(th => th.addEventListener('click', () => {
+    const id = th.dataset.stdSec, k = th.dataset.stdSort, cur0 = st.sort[id];
+    st.sort[id] = cur0 && cur0.k === k ? (cur0.dir === 'asc' ? { k, dir:'desc' } : null) : { k, dir:'asc' };
+    if(!st.sort[id]) delete st.sort[id];
+    stdRender(host, spec);
+  }));
+  host.querySelectorAll('[data-std-act]').forEach(b => b.addEventListener('click', () => {
+    if(b.dataset.stdAct === 'xlsx') stdDownloadXlsx(spec.id); else stdPrint(spec.id);
+  }));
+}
+
+/* ---- the compact print: summary + tables, no pictures, landscape A4 ---- */
+function stdPrint(id){
+  const spec = STD.spec[id]; if(!spec) return;
+  const w = window.open('', '_blank'); if(!w){ alert('Please allow pop-ups to print the report.'); return; }
+  const total = spec.summary.filter(s => s.counted).reduce((n, s) => n + (s.amount || 0), 0);
+  const secs = spec.sections.filter(s => s.rows.length).map(sec => {
+    const rows = stdRows(spec, sec, false), numIdx = sec.columns.findIndex(c => c.type === 'num');
+    const txt = (c, r) => c.type === 'date' ? esc(r[c.k] ? fmtDayY(r[c.k]) : '') : c.type === 'num' ? esc(stdNum(r[c.k])) : esc(r[c.k] === null || r[c.k] === undefined ? '' : r[c.k]);
+    return `<h3 style="border-left:6px solid ${sec.color}">${esc(sec.title)} <small>${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(spec.cur)} ${esc(stdNum(stdSum(sec, rows)))}</small></h3>
+      <table>${stdColgroup(sec)}<thead><tr>${sec.columns.map(c => `<th class="${c.type === 'num' ? 'r' : ''}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(r => `<tr>${sec.columns.map(c => `<td class="${c.type === 'num' ? 'r' : ''}">${txt(c, r)}</td>`).join('')}</tr>`).join('')}
+      <tr class="t"><td colspan="${numIdx}">Subtotal — ${esc(sec.short || sec.title)}</td><td class="r">${esc(stdNum(stdSum(sec, rows)))}</td>${'<td></td>'.repeat(sec.columns.length - numIdx - 1)}</tr></tbody></table>`;
+  }).join('');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(spec.title)}</title><style>
+    @page{size:A4 landscape;margin:10mm} body{font-family:Arial,sans-serif;color:#13233a;margin:0;padding:14px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    h1{font-size:19px;margin:0}.sub{font-size:11px;color:#6b7385;margin:3px 0 10px;border-bottom:2px solid #13233a;padding-bottom:8px}
+    h2{font-size:13px;margin:14px 0 5px;color:#1e3a5f}h3{font-size:12.5px;margin:14px 0 4px;padding:3px 8px;background:#f3f6fb}h3 small{font-weight:400;color:#6b7385;margin-left:8px}
+    table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:9.5px}th,td{overflow-wrap:anywhere;border:1px solid #cfd5e1;padding:3px 6px;vertical-align:top}th{background:#1e3a5f;color:#fff;text-align:left}
+    tbody tr:nth-child(even) td{background:#f7f9fc}.r{text-align:right;white-space:nowrap}.t td{font-weight:bold;background:#d9e2f3 !important}
+    .sum{max-width:620px;table-layout:auto}.sum td.c,.sum th.c{text-align:center}.note{font-size:10px;color:#6b7385;font-style:italic;margin:4px 0}
+    thead{display:table-header-group}tr{page-break-inside:avoid}.foot{margin-top:16px;font-size:9px;color:#6b7385}
+  </style></head><body><h1>${esc(spec.title)}</h1><div class="sub">${esc(spec.subtitle)} · Printed ${esc(fmtDayY(todayISO()))}</div>
+    ${spec.notes && spec.notes.length ? `<div class="note">${spec.notes.map(esc).join('<br>')}</div>` : ''}
+    <h2>Summary</h2><table class="sum"><thead><tr><th>Category</th><th class="r">Items</th><th class="r">Amount (${esc(spec.cur)})</th><th class="r">Share</th></tr></thead><tbody>
+    ${spec.summary.map(s => `<tr><td>${esc(s.label)}${s.counted ? '' : ' (not added to the total)'}</td><td class="r">${s.count}</td><td class="r">${esc(stdNum(s.amount || 0))}</td><td class="r">${s.counted && total ? Math.round((s.amount || 0) / total * 100) + '%' : ''}</td></tr>`).join('')}
+    <tr class="t"><td>${esc(spec.totalLabel || 'Total')}</td><td class="r">${spec.summary.filter(s => s.counted).reduce((n, s) => n + s.count, 0)}</td><td class="r">${esc(stdNum(total))}</td><td></td></tr>
+    ${(spec.extra || []).map(x => `<tr><td>${esc(x.label)}</td><td></td><td class="r">${esc(stdNum(x.amount))}</td><td></td></tr>`).join('')}</tbody></table>
+    <h2>Details</h2>${secs || '<p>Nothing recorded for this period.</p>'}<div class="foot">Ceymora Management · ${esc(spec.title)}</div></body></html>`);
+  w.document.close(); setTimeout(() => w.print(), 400);
+}
+
+/* ---- the Excel file: written here, no outside library ---- */
+const STDX = (() => {
+  const X = s => String(s === null || s === undefined ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const enc = new TextEncoder();
+  let T = null;
+  const crc32 = u8 => { if(!T){ T = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; } }
+    let c = 0xFFFFFFFF; for(let i = 0; i < u8.length; i++) c = T[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  function zip(files){
+    const parts = [], central = []; let off = 0;
+    const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    for(const f of files){
+      const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      const lh = new DataView(new ArrayBuffer(30)); lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+      lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+      parts.push(new Uint8Array(lh.buffer), name, data);
+      const ch = new DataView(new ArrayBuffer(46)); ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+      ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true); ch.setUint32(42, off, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      off += 30 + name.length + data.length;
+    }
+    const cdSize = central.reduce((n, p) => n + p.length, 0);
+    const end = new DataView(new ArrayBuffer(22)); end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cdSize, true); end.setUint32(16, off, true);
+    return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+  const col = n => { let s = ''; n++; while(n > 0){ const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const serial = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400000) : null; };
+  // Style numbers (see styles below)
+  const S = { title:1, sub:2, head:3, text:4, textB:5, date:6, dateB:7, num:8, numB:9, totL:10, totN:11, sect:12, int:13, intB:14, totI:15, pct:16, totP:17, note:18 };
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.00"/><numFmt numFmtId="165" formatCode="dd\\-mmm\\-yyyy"/></numFmts>
+<fonts count="6"><font><sz val="11"/><color rgb="FF13233A"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><color rgb="FF13233A"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="18"/><color rgb="FF13233A"/><name val="Calibri"/><family val="2"/></font><font><i/><sz val="10"/><color rgb="FF6B7385"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="12"/><color rgb="FF1E3A5F"/><name val="Calibri"/><family val="2"/></font></fonts>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E3A5F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F6FB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E2F3"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD5DAE3"/></left><right style="thin"><color rgb="FFD5DAE3"/></right><top style="thin"><color rgb="FFD5DAE3"/></top><bottom style="thin"><color rgb="FFD5DAE3"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="19">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>
+<xf numFmtId="165" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>
+<xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>
+<xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="164" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>
+<xf numFmtId="1" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>
+<xf numFmtId="1" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="9" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>
+<xf numFmtId="9" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  // A sheet is built from rows of cells: { v, s, f? (formula) , t? ('d' = ISO date) }
+  function sheetXml(sh){
+    const rows = sh.rows.map((cells, ri) => {
+      const r = ri + 1;
+      const cx = cells.map((c, ci) => {
+        if(!c) return '';
+        const ref = col(ci) + r, s = c.s === undefined ? 0 : c.s;
+        if(c.f !== undefined) return `<c r="${ref}" s="${s}"><f>${X(c.f)}</f><v>${Number(c.v) || 0}</v></c>`;
+        if(c.t === 'd'){ const n = serial(c.v); return n === null ? `<c r="${ref}" s="${s}"/>` : `<c r="${ref}" s="${s}"><v>${n}</v></c>`; }
+        if(typeof c.v === 'number' && isFinite(c.v)) return `<c r="${ref}" s="${s}"><v>${c.v}</v></c>`;
+        if(c.v === null || c.v === undefined || c.v === '') return `<c r="${ref}" s="${s}"/>`;
+        return `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${X(c.v)}</t></is></c>`;
+      }).join('');
+      const ht = sh.heights && sh.heights[ri] ? ` ht="${sh.heights[ri]}" customHeight="1"` : '';
+      return `<row r="${r}"${ht}>${cx}</row>`;
+    }).join('');
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<sheetViews><sheetView workbookViewId="0" showGridLines="0"${sh.first ? ' tabSelected="1"' : ''}>${sh.freeze ? `<pane ySplit="${sh.freeze}" topLeftCell="A${sh.freeze + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft"/>` : ''}</sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/><cols>${sh.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows}</sheetData>
+${sh.filter ? `<autoFilter ref="${sh.filter}"/>` : ''}${sh.merges && sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}
+<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  }
+  function build(sheets){
+    const files = [
+      { name:'[Content_Types].xml', data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>` },
+      { name:'_rels/.rels', data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+      { name:'xl/workbook.xml', data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.map((s, i) => `<sheet name="${X(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${sheets.some(s => s.filter) ? `<definedNames>${sheets.map((s, i) => s.filter ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${X(s.name)}'!${s.filter.replace(/([A-Z]+)(\d+)/g, '$$$1$$$2')}</definedName>` : '').join('')}</definedNames>` : ''}</workbook>` },
+      { name:'xl/_rels/workbook.xml.rels', data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+      { name:'xl/styles.xml', data:styles },
+      ...sheets.map((s, i) => ({ name:`xl/worksheets/sheet${i + 1}.xml`, data:sheetXml(s) })),
+    ];
+    return zip(files);
+  }
+  return { build, col, S };
+})();
+
+function stdSheetName(s, used){
+  let n = String(s || 'Sheet').replace(/[\\\/\?\*\[\]:]/g, ' ').trim().slice(0, 28) || 'Sheet', k = 2, base = n;
+  while(used.has(n.toLowerCase())){ n = base.slice(0, 26) + ' ' + k++; }
+  used.add(n.toLowerCase()); return n;
+}
+function stdWorkbook(spec){
+  const S = STDX.S, used = new Set(), sheets = [];
+  const total = spec.summary.filter(s => s.counted).reduce((n, s) => n + (s.amount || 0), 0);
+  // ---- Summary
+  const rows = [], merges = [], heights = {};
+  rows.push([{ v:spec.title, s:S.title }]); heights[0] = 28; merges.push('A1:D1');
+  rows.push([{ v:spec.subtitle + ' · Printed ' + fmtDayY(todayISO()), s:S.sub }]); merges.push('A2:D2');
+  (spec.notes || []).forEach(n => { rows.push([{ v:n, s:S.note }]); merges.push(`A${rows.length}:D${rows.length}`); });
+  rows.push([]);
+  rows.push([{ v:'Summary', s:S.sect }]);
+  const hdr = rows.length + 1;
+  rows.push([{ v:'Category', s:S.head }, { v:'Items', s:S.head }, { v:`Amount (${spec.cur})`, s:S.head }, { v:'Share', s:S.head }]);
+  const counted = spec.summary.filter(s => s.counted), notCounted = spec.summary.filter(s => !s.counted);
+  const first = rows.length + 1, lastC = first + counted.length - 1, totalRow = lastC + 1;
+  counted.forEach((s, i) => { const b = i % 2; rows.push([{ v:s.label, s:b ? S.textB : S.text }, { v:s.count, s:b ? S.intB : S.int }, { v:s.amount || 0, s:b ? S.numB : S.num }, { f:`IF($C$${totalRow}=0,0,C${first + i}/$C$${totalRow})`, v:total ? (s.amount || 0) / total : 0, s:S.pct }]); });
+  rows.push([{ v:spec.totalLabel || 'Total', s:S.totL }, { f:counted.length ? `SUM(B${first}:B${lastC})` : '0', v:counted.reduce((n, s) => n + s.count, 0), s:S.totI }, { f:counted.length ? `SUM(C${first}:C${lastC})` : '0', v:total, s:S.totN }, { v:'', s:S.totP }]);
+  if(notCounted.length || (spec.extra || []).length){
+    rows.push([]);
+    notCounted.forEach(s => rows.push([{ v:s.label + ' (not added to the total)', s:S.text }, { v:s.count, s:S.int }, { v:s.amount || 0, s:S.num }, { v:'', s:S.text }]));
+    (spec.extra || []).forEach(x => rows.push([{ v:x.label, s:S.totL }, { v:'', s:S.totL }, { v:x.amount, s:S.totN }, { v:'', s:S.totL }]));
+  }
+  sheets.push({ name:stdSheetName('Summary', used), rows, merges, heights, widths:[40, 10, 20, 12], first:true, freeze:0 });
+  // ---- One sheet per category
+  const real = spec.sections.filter(s => s.rows.length);
+  const sheetFor = (title, sub, columns, list, withCat) => {
+    const r = [], mg = [], h = {};
+    r.push([{ v:title, s:S.title }]); h[0] = 28; mg.push(`A1:${STDX.col(columns.length - 1)}1`);
+    r.push([{ v:sub, s:S.sub }]); mg.push(`A2:${STDX.col(columns.length - 1)}2`);
+    r.push([]);
+    r.push(columns.map(c => ({ v:c.label, s:S.head }))); h[3] = 30;
+    const startRow = r.length + 1;
+    list.forEach((row, i) => { const b = i % 2; r.push(columns.map(c => c.type === 'date' ? { v:row[c.k], t:'d', s:b ? S.dateB : S.date } : c.type === 'num' ? { v:row[c.k] === null || row[c.k] === '' || row[c.k] === undefined ? null : Number(row[c.k]), s:b ? S.numB : S.num } : { v:row[c.k], s:b ? S.textB : S.text })); });
+    const endRow = r.length, ni = columns.findIndex(c => c.type === 'num');
+    if(ni >= 0){
+      const sum = list.reduce((n, row) => n + (Number(row[columns[ni].k]) || 0), 0), L = STDX.col(ni);
+      r.push(columns.map((c, i) => i === 0 ? { v:'Total (of what is showing — filter to recount)', s:S.totL } : i === ni ? { f:`SUBTOTAL(109,${L}${startRow}:${L}${Math.max(endRow, startRow)})`, v:sum, s:S.totN } : { v:'', s:S.totL }));
+    }
+    return { rows:r, merges:mg, heights:h, widths:columns.map(c => c.w || 16), freeze:4, filter:list.length ? `A4:${STDX.col(columns.length - 1)}${endRow}` : null };
+  };
+  real.forEach(sec => {
+    const sh = sheetFor(sec.title, spec.subtitle, sec.columns, stdRows(spec, sec, false));
+    sh.name = stdSheetName(sec.short || sec.title, used); sheets.push(sh);
+  });
+  if(real.length > 1){
+    const base = real[0].columns, hasPlace = base.some(c => c.k === 'place');
+    const cols = [{ k:'cat', label:'Category', type:'text', w:24 }, ...base];
+    const all = real.flatMap(sec => stdRows(spec, sec, false).map(r => Object.assign({ cat:sec.short || sec.title }, r)));
+    all.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    if(real.every(s => s.columns.length === base.length)){
+      const sh = sheetFor('All items — ' + spec.title, spec.subtitle, cols, all);
+      sh.name = stdSheetName('All items', used); sheets.push(sh);
+    }
+  }
+  return STDX.build(sheets);
+}
+function stdDownloadXlsx(id){
+  const spec = STD.spec[id]; if(!spec) return;
+  try{
+    const blob = stdWorkbook(spec);
+    saveBlob(spec.filename || 'report.xlsx', blob);
+  }catch(e){ console.error(e); alert('Could not make the Excel file. ' + (e.message || '')); }
 }
 
 /* Day by day: each date with what was spent and what Store sent, newest first. */
@@ -6705,7 +7060,7 @@ function initVillaExpenses(){
       exAllTime = !exAllTime; exDaily = false; renderVillaExpenses();
     });
     document.getElementById('exExportBtn').addEventListener('click', exportVillaExpensesCSV);
-    document.getElementById('exPrintBtn').addEventListener('click', ()=> window.print());
+    document.getElementById('exPrintBtn').addEventListener('click', ()=> { if(exView === 'std' && STD.spec.villaexp) stdPrint('villaexp'); else window.print(); });
   }
   renderVillaExpenses();
 }
@@ -8874,10 +9229,10 @@ async function restoreBooking(b){
 
 /* ============================= PETTY CASH ============================= */
 const CARD_LABELS = { ceymora: 'Ceymora Card', kalava_card: 'Kalava Villa Card', bank: 'Bank transfer', sharon: 'Paid by Sharon personally' };
-const CARD_DEFAULT_NAMES = { ceymora: 'Direct Villa Purchases Ceymora', kalava_card: 'Direct Villa Purchases Kalava' };
+const CARD_DEFAULT_NAMES = { ceymora: 'CEYMORA CARD', kalava_card: 'KALAVA CARD' };
 const CASH_DEFAULT_NAMES = { ceymora: 'Petty Cash Ceymora', kalava_card: 'Petty Cash Kalava' };
 // Names that were only ever the old defaults move to the new ones by themselves.
-const OLD_DEFAULT_NAMES = ['ceymora card', 'kalava villa card', 'kalava card', 'ceymora card petty cash', 'kalava villa petty cash'];
+const OLD_DEFAULT_NAMES = ['ceymora card', 'kalava villa card', 'kalava card', 'ceymora card petty cash', 'kalava villa petty cash', 'direct villa purchases ceymora', 'direct villa purchases kalava'];
 const isOldDefaultName = n => OLD_DEFAULT_NAMES.includes(String(n || '').trim().toLowerCase());
 // Which bank account a bank transfer went from (or into).
 const BANK_ACCOUNTS = { ceymora: 'Ceymora', kalava: 'Kalava Villa' };
