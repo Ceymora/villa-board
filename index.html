@@ -655,6 +655,10 @@
     border-radius:14px; padding:14px 16px; margin-bottom:10px; }
   .bin-row.restored{ opacity:.65; background:#faf8f3; }
   .bin-main{ flex:1; min-width:0; }
+  .bin-pick{ display:flex; align-items:center; padding-top:2px; cursor:pointer; }
+  .bin-pick input, .bin-bulk-all input{ width:18px; height:18px; cursor:pointer; }
+  .bin-bulk{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:2; background:#faf8f3; border:1px solid var(--board-line); border-radius:12px; padding:10px 14px; margin-bottom:10px; }
+  .bin-bulk-all{ display:flex; gap:8px; align-items:center; font-weight:700; cursor:pointer; }
   .bin-where{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:4px; }
   .bin-where .dim{ text-transform:none; letter-spacing:0; font-weight:400; }
   .bin-what{ font-size:14px; font-weight:600; margin:2px 0; overflow-wrap:anywhere; }
@@ -4632,7 +4636,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.11-standard-report';
+const APP_VERSION = 'v2026.11.12-bin-select-all';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -14850,11 +14854,20 @@ async function renderBin(){
   const waiting = binRows.filter(r => !r.restored_at).length;
   document.querySelectorAll('.bin-count').forEach(el => el.textContent = waiting ? String(waiting) : '');
   if(!rows.length){ body.innerHTML = `<div class="manage-empty">${binShowRestored ? 'Nothing here.' : 'Nothing deleted that is waiting to be put back.'}</div>`; return; }
-  body.innerHTML = groupsAll.map((g, gi) => {
+  const canPick = groupsAll.some(g => !g.restored);
+  const toolbar = canPick ? `<div class="bin-bulk" id="binBulk">
+      <label class="bin-bulk-all"><input type="checkbox" id="binSelAll"> Select all (${groupsAll.filter(g => !g.restored).length})</label>
+      <span class="dim" id="binSelCount"></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-save" id="binRestoreSel" disabled>↩ Restore selected</button>
+      ${isAdmin() ? '<button class="manage-del" id="binForeverSel" disabled>Delete selected for good</button>' : ''}
+    </div>` : '';
+  body.innerHTML = toolbar + groupsAll.map((g, gi) => {
     const when = new Date(g.t).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
     const sections = [...new Set(g.rows.map(r => (BIN_SECTIONS[r.table_name] || {}).label || r.table_name))].join(', ');
     const files = g.rows.reduce((n, r) => n + binAttachments(r.row_data).length, 0);
     return `<div class="bin-row${g.restored ? ' restored' : ''}">
+      ${g.restored ? '' : `<label class="bin-pick" title="Select"><input type="checkbox" data-bin-sel="${gi}"></label>`}
       <div class="bin-main">
         <div class="bin-where">${esc(sections)} · <span class="dim">deleted ${esc(when)}${g.by ? ' by ' + esc(g.by) : ''}</span></div>
         ${g.rows.map(r => `<div class="bin-what">${esc(binSummary(r.table_name, r.row_data))}</div>`).join('')}
@@ -14868,6 +14881,50 @@ async function renderBin(){
     </div>`;
   }).join('');
   const groups = groupsAll;
+  const picks = [...body.querySelectorAll('[data-bin-sel]')];
+  const selAll = document.getElementById('binSelAll');
+  const chosen = () => picks.filter(c => c.checked).map(c => groups[Number(c.dataset.binSel)]);
+  const syncBulk = () => {
+    const n = chosen().length;
+    const cnt = document.getElementById('binSelCount'); if(cnt) cnt.textContent = n ? n + ' selected' : '';
+    ['binRestoreSel','binForeverSel'].forEach(id => { const el = document.getElementById(id); if(el) el.disabled = !n; });
+    if(selAll){ selAll.checked = n > 0 && n === picks.length; selAll.indeterminate = n > 0 && n < picks.length; }
+  };
+  picks.forEach(c => c.addEventListener('change', syncBulk));
+  if(selAll) selAll.addEventListener('change', ()=>{ picks.forEach(c => c.checked = selAll.checked); syncBulk(); });
+  const rs = document.getElementById('binRestoreSel');
+  if(rs) rs.addEventListener('click', async ()=>{
+    const sel = chosen(); if(!sel.length) return;
+    const nRows = sel.reduce((n, g) => n + g.rows.length, 0);
+    if(!confirm(`Put back ${nRows} item${nRows === 1 ? '' : 's'} where ${nRows === 1 ? 'it was' : 'they were'}?`)) return;
+    rs.disabled = true;
+    const done = new Set(), problems = [];
+    for(const g of sel) for(const r of g.rows){
+      const { error } = await sb.rpc('restore_deleted', { p_id: r.id });
+      if(error) problems.push(binSummary(r.table_name, r.row_data) + ' — ' + (error.message || 'could not restore'));
+      else { done.add(r.table_name); logActivity('restore', r.table_name, 'Restored: ' + binSummary(r.table_name, r.row_data)); }
+    }
+    await refreshAfterRestore(done);
+    if(problems.length) alert('Some of it could not be put back:\n\n' + problems.join('\n'));
+    await renderBin(); refreshBinCount();
+  });
+  const fs = document.getElementById('binForeverSel');
+  if(fs) fs.addEventListener('click', async ()=>{
+    const sel = chosen(); if(!sel.length) return;
+    const nRows = sel.reduce((n, g) => n + g.rows.length, 0);
+    if(!confirm(`Delete ${nRows} item${nRows === 1 ? '' : 's'} for good?\n\nThis can never be undone, and their attachments are removed too.`)) return;
+    fs.disabled = true;
+    const failed = [];
+    for(const g of sel) for(const r of g.rows){
+      try{
+        await delRows('deleted_records', 'id', r.id);
+        await deleteReceiptFiles(binAttachments(r.row_data));
+        logActivity('delete', 'deleted_records', 'Deleted for good: ' + binSummary(r.table_name, r.row_data));
+      }catch(e){ console.error(e); failed.push(binSummary(r.table_name, r.row_data)); }
+    }
+    if(failed.length) alert('These could not be deleted for good (only Makky can):\n\n' + failed.join('\n'));
+    await renderBin(); refreshBinCount();
+  });
   body.querySelectorAll('[data-bin-restore]').forEach(b => b.addEventListener('click', async ()=>{
     const g = groups[Number(b.dataset.binRestore)];
     const what = g.rows.map(r => '• ' + binSummary(r.table_name, r.row_data)).join('\n');
