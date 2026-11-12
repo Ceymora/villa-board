@@ -1996,6 +1996,7 @@
         <div class="toolbar-actions">
           <button class="add-booking-btn" id="addIncomeBtn">+ Petty Cash Money Received</button>
           <button class="add-booking-btn" id="addExpenseBtn">+ Expenses</button>
+          <button class="add-booking-btn" id="wbOpenBtn">🧺 Welcome baskets</button>
           <button class="add-booking-btn" data-vc="diesel" style="display:none">⛽ Diesel / petrol</button>
           <button class="add-booking-btn" data-vc="laundry" data-vc-petty="1" style="display:none">🧺 Laundry</button>
           <button class="add-booking-btn" id="addAdvanceBtn">+ Give advance</button>
@@ -4636,7 +4637,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.12-bin-select-all';
+const APP_VERSION = 'v2026.11.12-welcome-basket';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -10220,6 +10221,7 @@ function openExpenseModal(record, forceDirect, opts){
     alert(`This bill belongs to ${record.employeeName || 'a staff'}'s settled advance, so it's locked.\n\nTo change it, request an undo on that advance (Petty Cash → 📋 Staff advances report) — Makky approves it.`);
     return;
   }
+  wbDraft = null;
   editingCashId = record ? record.id : null;
   expLinkAdvanceId = opts.advanceId != null ? String(opts.advanceId) : (record && record.advanceId) || null;
   expReturnToAdvance = opts.returnToAdvance != null ? opts.returnToAdvance : null;
@@ -10311,8 +10313,8 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const invoiceDate = document.getElementById('expInvoiceDate').value || null;
   let voucherNo = document.getElementById('expVoucherNo').value.trim() || null;
   const forWhom = document.getElementById('expFor').value;
-  const purpose = document.getElementById('expPurpose').value.trim();
-  const amount = parseFloat(document.getElementById('expAmount').value);
+  let purpose = document.getElementById('expPurpose').value.trim();
+  let amount = parseFloat(document.getElementById('expAmount').value);
   const note = document.getElementById('expNote').value.trim();
   const isStock = document.getElementById('expIsStock').checked;
   const fundedByEmployee = expFundedBy || null;
@@ -10322,6 +10324,13 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const files = expFileHandler.getFiles();
 
   const stop = m => { errEl.textContent = m; errEl.style.display = 'block'; };
+  // Zahny / Buddhini: is this a welcome basket? If yes, the basket total becomes the expense.
+  let basket = null;
+  if(!editingCashId && isSettleStaff() && date && forWhom && !['office','store','boss'].includes(forWhom)){
+    const ans = await wbAskFlow(forWhom, date);
+    if(ans === null) return;
+    if(ans){ basket = ans; amount = ans.total; purpose = 'Welcome basket — ' + ans.guest; }
+  }
   if(!date || !amount || amount <= 0 || !purpose) return stop('Fill in date, what it was for, and a valid amount.');
   if(!forWhom) return stop(expDirectMode ? 'Choose which villa this was for.' : 'Choose which villa or place this was for.');
   if(card === 'kalava_card' && !fundedByEmployee && forWhom !== 'kalava') return stop(`${expDirectMode ? cardName('kalava_card') : pettyName('kalava_card')} can only be used for Kalava Villa.`);
@@ -10457,6 +10466,7 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
       type:'expense', date, card, for: forWhom, purpose, amount, note, linked_inventory: isStock, invoice_urls: newUrls, employee_name: fundedByEmployee, direct_expense: expDirectMode, account_code: accountCode, advance_id: advanceId, ...docFields
     }).select().single();
     if(error) throw error;
+    if(basket){ try{ await wbSaveFor(basket, expenseRow.id); wbDraft = null; }catch(be){ console.error(be); alert('The expense was saved, but the welcome basket details could not be saved' + (/welcome_baskets/.test((be && be.message) || '') ? ' — run 66-supabase-welcome-baskets.sql in Supabase first.' : '.') + '\n\nAdd the basket again from "Welcome baskets" → "+ Add basket".'); wbDraft = null; } }
     logActivity('create', 'petty_cash_transactions', `Recorded expense: ${purpose} — LKR ${amount.toLocaleString()} (${FOR_LABELS[forWhom]}, paid from ${payLabel({ card, bankAccount, type:'expense', directExpense: expDirectMode })}${voucherNo ? ', voucher ' + voucherNo : ''})`);
     if(isStock){
       const { data: purchaseRow, error: invErr } = await sb.from('inventory_transactions').insert({
@@ -10485,6 +10495,212 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
     await expBackToAdvance();
   }catch(e){ errEl.textContent='Save failed.'; errEl.style.display='block'; console.error(e); }
 });
+
+/* ============================================================================
+   WELCOME BASKETS (file 66) — asked when Zahny / Buddhini record a villa purchase.
+   "Yes" → villa, guest, booking method and each item (Fruits / Vegetable / Wine / Other) with its price.
+   The expense is saved as usual with the basket total; the basket detail is kept separately so each
+   villa's monthly welcome-basket cost can be added up. Edit / delete: Makky only.
+   ============================================================================ */
+const WB_CATS = ['Fruits','Vegetable','Wine','Other'];
+const WB = { month:null, villa:'all', rows:[], missing:false };
+let wbDraft = null;
+const wbMoney = n => 'LKR ' + Math.round(Number(n) || 0).toLocaleString('en-US');
+const wbVillas = () => (VR_VILLAS || []).map(v => ({ id:v.id, name:v.name }));
+const wbVillaName = id => { const v = wbVillas().find(x => x.id === id); return v ? v.name : villaName(id); };
+const wbDay = d => { try{ return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); }catch(_e){ return d; } };
+function wbOverlay(id){
+  let ov = document.getElementById(id);
+  if(!ov){ ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = id; ov.style.zIndex = '10040'; document.body.appendChild(ov); }
+  return ov;
+}
+// "Is this for a welcome basket?"  → true / false / null (cancelled)
+function wbAskYesNo(){
+  return new Promise(resolve => {
+    const ov = wbOverlay('wbAskOv');
+    ov.innerHTML = `<div class="modal"><h3>🧺 Is this for a welcome basket?</h3>
+      <div class="field-hint">If yes, you will enter the guest and each item with its price, so the villa's welcome-basket cost can be added up.</div>
+      <div class="modal-actions"><div style="flex:1"></div>
+        <button class="btn btn-cancel" data-a="x">Cancel</button>
+        <button class="btn" data-a="no" style="background:var(--amber);color:#fff;">No</button>
+        <button class="btn btn-save" data-a="yes">Yes, welcome basket</button></div></div>`;
+    ov.classList.add('open');
+    ov.onclick = e => { const a = e.target.dataset && e.target.dataset.a; if(!a) return; ov.classList.remove('open'); resolve(a === 'yes' ? true : a === 'no' ? false : null); };
+  });
+}
+// The basket form. Resolves to { villa, guest, method, day, items, total } or null.
+function wbForm(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const ov = wbOverlay('wbFormOv');
+    const villas = wbVillas();
+    const r = opts.row || {};
+    const vsel = r.villa_id || opts.villa || '';
+    const items = (r.items && r.items.length) ? r.items.map(i => ({ ...i })) : [{ category:'Fruits', name:'', price:'' }];
+    ov.innerHTML = `<div class="modal modal-wide" style="max-height:92vh;overflow:auto;"><h3>🧺 ${r.id ? 'Edit welcome basket' : 'Welcome basket'}</h3>
+      <label>Villa</label>
+      <select data-f="villa" ${opts.lockVilla ? 'disabled' : ''}><option value="">— Choose villa —</option>${villas.map(v => `<option value="${esc(v.id)}"${v.id === vsel ? ' selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
+      <label>Guest name</label><input type="text" data-f="guest" maxlength="120" value="${esc(r.guest || '')}">
+      <label>Booking method</label>
+      <select data-f="method"><option value="">— Choose —</option>${['Direct Booking','Airbnb'].map(m => `<option${m === r.booking_method ? ' selected' : ''}>${m}</option>`).join('')}</select>
+      <label>Date</label><input type="date" data-f="day" value="${esc(r.day || opts.day || todayISO())}">
+      <label style="margin-top:10px;">Items</label>
+      <div data-f="lines"></div>
+      <div style="margin:6px 0;"><button type="button" class="add-booking-btn" data-f="add">+ Add item</button></div>
+      <div data-f="total" style="font-weight:800;margin:8px 0;"></div>
+      <div class="modal-error" data-f="err"></div>
+      <div class="modal-actions"><div style="flex:1"></div>
+        <button class="btn btn-cancel" data-f="cancel">Cancel</button>
+        <button class="btn btn-save" data-f="save">${r.id ? 'Save changes' : (opts.confirmLabel || 'Save basket')}</button></div></div>`;
+    const q = s => ov.querySelector(`[data-f="${s}"]`);
+    const drawLines = () => {
+      q('lines').innerHTML = items.map((it, i) => `<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">
+        <select data-i="${i}" data-k="category" style="flex:0 0 130px;">${WB_CATS.map(c => `<option${c === it.category ? ' selected' : ''}>${c}</option>`).join('')}</select>
+        <input type="text" data-i="${i}" data-k="name" maxlength="60" style="flex:1;min-width:140px;" placeholder="${it.category === 'Other' ? 'Specify what it is' : it.category === 'Wine' ? 'Which wine' : 'Item name, e.g. ' + (it.category === 'Fruits' ? 'Papaya' : 'Carrot')}" value="${esc(it.name || '')}">
+        <input type="number" data-i="${i}" data-k="price" min="0" step="1" style="flex:0 0 110px;" placeholder="Price" value="${it.price === '' || it.price == null ? '' : esc(String(it.price))}">
+        <button type="button" class="manage-del" data-rm="${i}" ${items.length < 2 ? 'disabled' : ''}>✕</button></div>`).join('');
+      sum();
+    };
+    const sum = () => { q('total').textContent = 'Basket total: ' + wbMoney(items.reduce((s, i) => s + (Number(i.price) || 0), 0)); };
+    ov.oninput = e => { const t = e.target; if(t.dataset && t.dataset.i != null){ items[+t.dataset.i][t.dataset.k] = t.value; sum(); } };
+    ov.onchange = e => { const t = e.target; if(t.dataset && t.dataset.k === 'category'){ items[+t.dataset.i].category = t.value; drawLines(); } };
+    ov.onclick = e => {
+      const t = e.target;
+      if(t.dataset && t.dataset.rm != null){ items.splice(+t.dataset.rm, 1); drawLines(); }
+      else if(t === q('add')){ items.push({ category:'Fruits', name:'', price:'' }); drawLines(); }
+      else if(t === q('cancel') || t === ov){ ov.classList.remove('open'); resolve(null); }
+      else if(t === q('save')){
+        const err = m => { q('err').textContent = m; q('err').style.display = 'block'; };
+        const villa = opts.lockVilla ? vsel : q('villa').value, guest = q('guest').value.trim(), method = q('method').value, day = q('day').value;
+        if(!villa) return err('Choose the villa.');
+        if(!guest) return err('Enter the guest name.');
+        if(!method) return err('Choose Direct Booking or Airbnb.');
+        if(!day) return err('Choose the date.');
+        const clean = [];
+        for(const it of items){
+          const name = String(it.name || '').trim(), price = parseFloat(it.price);
+          if(!name && (it.price === '' || it.price == null)) continue;
+          if(!name) return err(it.category === 'Other' ? 'Specify what the "Other" item is.' : 'Enter the item name.');
+          if(!isFinite(price) || price < 0) return err('Enter a price for ' + name + '.');
+          clean.push({ category:it.category, name, price });
+        }
+        if(!clean.length) return err('Add at least one item with its price.');
+        ov.classList.remove('open');
+        resolve({ villa, guest, method, day, items:clean, total:clean.reduce((s, i) => s + i.price, 0) });
+      }
+    };
+    drawLines();
+    ov.classList.add('open');
+  });
+}
+// Called from the expense Save: returns null (cancelled), false (not a basket) or the basket.
+async function wbAskFlow(villa, date){
+  if(wbDraft && wbDraft.villa === villa) return wbDraft;
+  wbDraft = null;
+  const yes = await wbAskYesNo();
+  if(yes === null) return null;
+  if(!yes) return false;
+  const b = await wbForm({ villa, day:date, lockVilla:true, confirmLabel:'Use this basket' });
+  if(!b) return null;
+  wbDraft = b;
+  return b;
+}
+async function wbSaveFor(basket, pettyId){
+  const { error } = await sb.from('welcome_baskets').insert({ villa_id:basket.villa, day:basket.day, guest:basket.guest, booking_method:basket.method, items:basket.items, petty_cash_id: pettyId != null ? String(pettyId) : null });
+  if(error) throw error;
+  try{ logActivity('create', 'welcome_baskets', `Welcome basket: ${basket.guest} — ${wbVillaName(basket.villa)} — ${wbMoney(basket.total)}`); }catch(_e){}
+}
+async function wbLoad(){
+  const from = WB.month + '-01', d = new Date(from + 'T00:00:00'); d.setMonth(d.getMonth() + 1);
+  const to = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+  let qy = sb.from('welcome_baskets').select('*').gte('day', from).lt('day', to).order('day', { ascending:true }).limit(2000);
+  if(WB.villa !== 'all') qy = qy.eq('villa_id', WB.villa);
+  const { data, error } = await qy;
+  WB.missing = !!error; WB.rows = error ? [] : (data || []);
+}
+async function wbOpen(){
+  const ov = wbOverlay('wbOv');
+  if(!ov.dataset.on){
+    ov.dataset.on = '1';
+    ov.innerHTML = '<div class="modal r-form" style="width:min(1100px,96vw);max-height:94vh;overflow:auto;"><h3>🧺 Welcome baskets — what we spend per villa</h3><div data-wb-body></div></div>';
+    ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
+  }
+  if(!WB.month) WB.month = todayISO().slice(0, 7);
+  ov.classList.add('open');
+  await wbRender();
+}
+async function wbRender(){
+  const body = document.querySelector('#wbOv [data-wb-body]');
+  body.innerHTML = '<div class="manage-empty">Loading…</div>';
+  await wbLoad();
+  if(WB.missing){ body.innerHTML = '<div class="adv-status warn">Run <b>66-supabase-welcome-baskets.sql</b> in Supabase once, then this report works.</div>'; return; }
+  const th = 'text-align:left;padding:6px 8px;border-bottom:2px solid #ccd;background:#f2f4f8;', td = 'padding:6px 8px;border-bottom:1px solid #e3e6ee;vertical-align:top;';
+  const catSum = (rows, c) => rows.reduce((s, r) => s + (r.items || []).filter(i => i.category === c).reduce((x, i) => x + Number(i.price || 0), 0), 0);
+  const byVilla = {};
+  WB.rows.forEach(r => { (byVilla[r.villa_id] = byVilla[r.villa_id] || []).push(r); });
+  const grand = WB.rows.reduce((s, r) => s + Number(r.total || 0), 0);
+  const sumRows = Object.keys(byVilla).map(v => { const rs = byVilla[v], t = rs.reduce((s, r) => s + Number(r.total || 0), 0);
+    return `<tr><td style="${td}"><b>${esc(wbVillaName(v))}</b></td><td style="${td};text-align:right">${rs.length}</td>${WB_CATS.map(c => `<td style="${td};text-align:right">${wbMoney(catSum(rs, c))}</td>`).join('')}<td style="${td};text-align:right"><b>${wbMoney(t)}</b></td><td style="${td};text-align:right">${wbMoney(t / rs.length)}</td></tr>`; }).join('');
+  const admin = isAdmin();
+  body.innerHTML = `<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;">Month <input type="month" data-wb="month" value="${esc(WB.month)}"></label>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600;">Villa <select data-wb="villa"><option value="all">All villas</option>${wbVillas().map(v => `<option value="${esc(v.id)}"${v.id === WB.villa ? ' selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>
+      <span style="flex:1"></span>
+      <button class="add-booking-btn" data-wb="add">+ Add basket</button>
+      <button class="add-booking-btn" data-wb="print">🖨️ Print</button>
+      <button class="btn btn-cancel" data-wb="close">Close</button></div>
+    <h4 style="margin:6px 0;">Summary — ${esc(WB.month)}</h4>
+    ${WB.rows.length ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Villa</th><th style="${th};text-align:right">Baskets</th>${WB_CATS.map(c => `<th style="${th};text-align:right">${c}</th>`).join('')}<th style="${th};text-align:right">Total cost</th><th style="${th};text-align:right">Per basket</th></tr></thead><tbody>${sumRows}
+      <tr><td style="${td}"><b>ALL</b></td><td style="${td};text-align:right"><b>${WB.rows.length}</b></td>${WB_CATS.map(c => `<td style="${td};text-align:right"><b>${wbMoney(catSum(WB.rows, c))}</b></td>`).join('')}<td style="${td};text-align:right"><b>${wbMoney(grand)}</b></td><td style="${td};text-align:right"><b>${wbMoney(grand / WB.rows.length)}</b></td></tr></tbody></table></div>
+    <h4 style="margin:16px 0 6px;">Baskets</h4>
+    <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th}">Date</th><th style="${th}">Villa</th><th style="${th}">Guest</th><th style="${th}">Booking</th><th style="${th}">Items</th><th style="${th};text-align:right">Total</th>${admin ? `<th style="${th}" class="no-print"></th>` : ''}</tr></thead><tbody>
+      ${WB.rows.map(r => `<tr><td style="${td}">${esc(wbDay(r.day))}</td><td style="${td}">${esc(wbVillaName(r.villa_id))}</td><td style="${td}">${esc(r.guest)}</td><td style="${td}">${esc(r.booking_method)}</td><td style="${td};font-size:12px">${(r.items || []).map(i => `${esc(i.category === 'Other' ? 'Other: ' + i.name : i.name)} <span class="dim">(${esc(i.category)})</span> ${Math.round(i.price).toLocaleString('en-US')}`).join(' · ')}</td><td style="${td};text-align:right"><b>${wbMoney(r.total)}</b></td>${admin ? `<td style="${td};white-space:nowrap" class="no-print"><button class="btn btn-save" data-wb-edit="${esc(r.id)}">Edit</button> <button class="manage-del" data-wb-del="${esc(r.id)}">Delete</button></td>` : ''}</tr>`).join('')}</tbody></table></div>`
+      : '<div class="manage-empty">No welcome baskets recorded for this month.</div>'}
+    <div class="field-hint" style="margin-top:8px;">${admin ? '' : 'Only Makky can edit or delete a basket. '}Baskets entered through a villa purchase are also in that villa's expenses; this report only adds up the baskets.</div>`;
+  const q = s => body.querySelector(`[data-wb="${s}"]`);
+  q('month').onchange = e => { WB.month = e.target.value || WB.month; wbRender(); };
+  q('villa').onchange = e => { WB.villa = e.target.value; wbRender(); };
+  q('close').onclick = () => document.getElementById('wbOv').classList.remove('open');
+  q('print').onclick = () => {
+    const w = window.open('', '_blank'); if(!w) return;
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>Welcome baskets</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#13233a}table{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:14px}th,td{border:1px solid #ccd;padding:5px 7px;text-align:left}th{background:#f2f4f8}.no-print{display:none}.dim{color:#667}</style><h2>Welcome baskets — ${esc(WB.month)}${WB.villa !== 'all' ? ' — ' + esc(wbVillaName(WB.villa)) : ''}</h2>${body.innerHTML.replace(/<div class="no-print"[\s\S]*?<\/div>\s*<h4/, '<h4')}`);
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+  };
+  q('add').onclick = async () => {
+    const b = await wbForm({ day:todayISO(), villa:WB.villa !== 'all' ? WB.villa : '' });
+    if(!b) return;
+    try{ await wbSaveFor(b, null); }catch(e){ alert('Could not save. ' + (e.message || '')); }
+    wbRender();
+  };
+  body.querySelectorAll('[data-wb-edit]').forEach(btn => btn.onclick = async () => {
+    const row = WB.rows.find(r => r.id === btn.dataset.wbEdit); if(!row) return;
+    const b = await wbForm({ row });
+    if(!b) return;
+    const { data, error } = await sb.from('welcome_baskets').update({ villa_id:b.villa, day:b.day, guest:b.guest, booking_method:b.method, items:b.items }).eq('id', row.id).select('id');
+    if(error || !data || !data.length){ alert('Could not save. ' + ((error && error.message) || 'Only Makky can edit baskets.')); return; }
+    if(row.petty_cash_id && confirm(`Also change the linked expense in petty cash to ${wbMoney(b.total)}?\n\n(OK = update it, Cancel = leave it as it is)`)){
+      const u = await sb.from('petty_cash_transactions').update({ amount:b.total, purpose:'Welcome basket — ' + b.guest }).eq('id', row.petty_cash_id).select('id');
+      if(u.error || !u.data || !u.data.length) alert('The basket was saved, but the petty cash entry could not be changed.');
+      else if(typeof fetchCash === 'function') fetchCash();
+    }
+    try{ logActivity('update', 'welcome_baskets', `Changed a welcome basket: ${b.guest} — ${wbVillaName(b.villa)} — ${wbMoney(b.total)}`); }catch(_e){}
+    wbRender();
+  });
+  body.querySelectorAll('[data-wb-del]').forEach(btn => btn.onclick = async () => {
+    const row = WB.rows.find(r => r.id === btn.dataset.wbDel); if(!row) return;
+    if(!confirm(`Delete the welcome basket for ${row.guest} (${wbMoney(row.total)})?`)) return;
+    const { data, error } = await sb.from('welcome_baskets').delete().eq('id', row.id).select('id');
+    if(error || !data || !data.length){ alert('Could not delete. ' + ((error && error.message) || 'Only Makky can delete baskets.')); return; }
+    try{ logActivity('delete', 'welcome_baskets', `Deleted a welcome basket: ${row.guest} — ${wbVillaName(row.villa_id)} — ${wbMoney(row.total)}`); }catch(_e){}
+    if(row.petty_cash_id && confirm('Also delete the linked expense in petty cash?\n\n(OK = delete it too, Cancel = keep it in petty cash)')){
+      const d2 = await sb.from('petty_cash_transactions').delete().eq('id', row.petty_cash_id).select('id');
+      if(d2.error || !d2.data || !d2.data.length) alert('The basket was deleted, but the petty cash entry could not be deleted — delete it in Petty Cash.');
+      else if(typeof fetchCash === 'function') fetchCash();
+    }
+    wbRender();
+  });
+}
+document.getElementById('wbOpenBtn') && document.getElementById('wbOpenBtn').addEventListener('click', wbOpen);
 
 /* ============================================================================
    STAFF ADVANCES — give → record bills → settle → (undo only with approval)
