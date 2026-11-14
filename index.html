@@ -4637,7 +4637,7 @@ function canApproveUndo(){ return hasPerm('approve_undo'); }
 function canDelete(){ return hasPerm('delete_records'); }
 // Bump this on every delivered file. It is printed on the login badge, and it is the
 // only way to tell at a glance whether the browser is running the newest copy.
-const APP_VERSION = 'v2026.11.12-welcome-basket';
+const APP_VERSION = 'v2026.11.14-welcome-basket-button';
 function isAdmin(){ return hasPerm('admin'); }
 function canManageUsers(){ return hasPerm('admin') || hasPerm('manage_users'); }
 
@@ -10324,13 +10324,9 @@ document.getElementById('expSave').addEventListener('click', async ()=>{
   const files = expFileHandler.getFiles();
 
   const stop = m => { errEl.textContent = m; errEl.style.display = 'block'; };
-  // Zahny / Buddhini: is this a welcome basket? If yes, the basket total becomes the expense.
+  // A welcome basket entered from "Welcome baskets → + Add basket": its total becomes this expense.
   let basket = null;
-  if(!editingCashId && isSettleStaff() && date && forWhom && !['office','store','boss'].includes(forWhom)){
-    const ans = await wbAskFlow(forWhom, date);
-    if(ans === null) return;
-    if(ans){ basket = ans; amount = ans.total; purpose = 'Welcome basket — ' + ans.guest; }
-  }
+  if(!editingCashId && wbDraft && wbDraft.villa === forWhom){ basket = wbDraft; amount = basket.total; purpose = 'Welcome basket — ' + basket.guest; }
   if(!date || !amount || amount <= 0 || !purpose) return stop('Fill in date, what it was for, and a valid amount.');
   if(!forWhom) return stop(expDirectMode ? 'Choose which villa this was for.' : 'Choose which villa or place this was for.');
   if(card === 'kalava_card' && !fundedByEmployee && forWhom !== 'kalava') return stop(`${expDirectMode ? cardName('kalava_card') : pettyName('kalava_card')} can only be used for Kalava Villa.`);
@@ -10593,18 +10589,6 @@ function wbForm(opts){
     ov.classList.add('open');
   });
 }
-// Called from the expense Save: returns null (cancelled), false (not a basket) or the basket.
-async function wbAskFlow(villa, date){
-  if(wbDraft && wbDraft.villa === villa) return wbDraft;
-  wbDraft = null;
-  const yes = await wbAskYesNo();
-  if(yes === null) return null;
-  if(!yes) return false;
-  const b = await wbForm({ villa, day:date, lockVilla:true, confirmLabel:'Use this basket' });
-  if(!b) return null;
-  wbDraft = b;
-  return b;
-}
 async function wbSaveFor(basket, pettyId){
   const { error } = await sb.from('welcome_baskets').insert({ villa_id:basket.villa, day:basket.day, guest:basket.guest, booking_method:basket.method, items:basket.items, petty_cash_id: pettyId != null ? String(pettyId) : null });
   if(error) throw error;
@@ -10667,10 +10651,16 @@ async function wbRender(){
     w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
   };
   q('add').onclick = async () => {
-    const b = await wbForm({ day:todayISO(), villa:WB.villa !== 'all' ? WB.villa : '' });
+    const b = await wbForm({ day:todayISO(), villa:WB.villa !== 'all' ? WB.villa : '', confirmLabel:'Next — how it was paid' });
     if(!b) return;
-    try{ await wbSaveFor(b, null); }catch(e){ alert('Could not save. ' + (e.message || '')); }
-    wbRender();
+    // Now the normal expense form opens, already filled in; choose how it was paid and press Save.
+    document.getElementById('wbOv').classList.remove('open');
+    openExpenseModal(null, false, { for:b.villa });
+    wbDraft = b;
+    document.getElementById('expDate').value = b.day;
+    document.getElementById('expPurpose').value = 'Welcome basket — ' + b.guest;
+    document.getElementById('expAmount').value = b.total;
+    document.getElementById('expFor').value = b.villa;
   };
   body.querySelectorAll('[data-wb-edit]').forEach(btn => btn.onclick = async () => {
     const row = WB.rows.find(r => r.id === btn.dataset.wbEdit); if(!row) return;
